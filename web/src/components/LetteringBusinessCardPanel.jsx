@@ -6,6 +6,7 @@ import { clampLetteringBizcardEmail } from "../lib/letteringBizcardStorage.js";
 import { resolveLetteringDemoLogoUrl } from "../lib/letteringDemoAssets.js";
 import { corporateBrandingStyleVars } from "../lib/b2bCorporateBranding.js";
 import BizcardInlineQr from "./BizcardInlineQr.jsx";
+import { shouldShowVlueVerifiedSeal } from "../lib/vlueVerifiedBadgeApi.js";
 import {
   LetteringBizcardSecurityOverlayBack,
   LetteringBizcardSecurityOverlayFront
@@ -109,7 +110,7 @@ function BizAvatar({ card }) {
   );
 }
 
-function CardFront({ card, securityOverlay }) {
+function CardFront({ card, securityOverlay, officialBadgeActive }) {
   const { companyLine, name: personName, title: personTitle, hasPersonLine } =
     formatLetteringPaidIdentity(card);
   const contactRows = buildBizcardContactRows(card);
@@ -126,7 +127,7 @@ function CardFront({ card, securityOverlay }) {
         <div className="lettering-bizcard__identity min-w-0">
           <p className="lettering-bizcard__name-row">
             <span className="lettering-bizcard__name">{companyLine}</span>
-            <VlueVerifiedBadge />
+            {officialBadgeActive ? <VlueVerifiedBadge /> : null}
           </p>
         </div>
       </div>
@@ -235,6 +236,9 @@ export default function LetteringBusinessCardPanel({
 }) {
   const [flipped, setFlipped] = useState(false);
   const displayCard = displayCardProp || card;
+  const officialBadgeActive = shouldShowVlueVerifiedSeal({
+    vlueVerifiedBadge: displayCard?.vlueVerifiedBadge ?? displayCard?.vlue_verified_badge
+  });
   const brandingStyle = useMemo(
     () => corporateBrandingStyleVars(displayCard),
     [displayCard]
@@ -256,7 +260,11 @@ export default function LetteringBusinessCardPanel({
         </p>
       ) : null}
       <div className={`lettering-bizcard__flip ${flipped ? "lettering-bizcard__flip--back" : ""}`}>
-        <CardFront card={displayCard} securityOverlay={securityOverlay} />
+        <CardFront
+          card={displayCard}
+          securityOverlay={securityOverlay}
+          officialBadgeActive={officialBadgeActive}
+        />
         <CardBack card={displayCard} securityOverlay={securityOverlay} />
       </div>
       <button

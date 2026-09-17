@@ -474,7 +474,8 @@ letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
       editor: body?.editor,
       live: body?.live,
       liveSource: body?.liveSource,
-      clientUpdatedAt: body?.clientUpdatedAt ?? body?.updatedAt ?? null
+      clientUpdatedAt: body?.clientUpdatedAt ?? body?.updatedAt ?? null,
+      rewardedGrantId: body?.rewardedGrantId ?? null
     });
     if (!result.ok) {
       return c.json({ ok: false, conflict: true, ...result.bundle }, 409);
@@ -482,8 +483,14 @@ letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
     return c.json({ ok: true, v: 2, updatedAt: result.updatedAt });
   } catch (e) {
     const err = e as Error & { code?: string; status?: number };
-    if (err.code === "STYLE_TOO_LARGE" || err.status === 400) {
-      return c.json({ ok: false, error: err.message, code: err.code }, 400);
+    if (
+      err.code === "STYLE_TOO_LARGE" ||
+      err.code === "REWARDED_AD_REQUIRED" ||
+      err.status === 400 ||
+      err.status === 403
+    ) {
+      const status = err.status === 403 ? 403 : 400;
+      return c.json({ ok: false, error: err.message, code: err.code }, status);
     }
     throw e;
   }

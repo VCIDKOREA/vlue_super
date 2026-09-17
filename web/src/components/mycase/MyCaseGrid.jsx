@@ -62,6 +62,7 @@ import {
 import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
 import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
 import {
+  fetchVlueBadgeSnapshot,
   shouldShowVlueVerifiedSeal,
   VLUE_VERIFIED_BADGE_CHANGED_EVENT
 } from "../../lib/vlueVerifiedBadgeApi.js";
@@ -182,8 +183,9 @@ export default function MyCaseGrid({
   useEffect(() => {
     const bump = () => setBadgeTick((n) => n + 1);
     window.addEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, bump);
+    if (isMine) void fetchVlueBadgeSnapshot();
     return () => window.removeEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, bump);
-  }, []);
+  }, [isMine]);
 
   useEffect(() => {
     toastRef.current = onToast;

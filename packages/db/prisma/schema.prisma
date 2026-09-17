@@ -154,8 +154,8 @@ enum NotificationStatus {
 // -----------------------------------------------------------------------------
 
 model User {
-  id     String  @id @default(uuid()) @db.Uuid
-  email  String? @unique
+  id    String  @id @default(uuid()) @db.Uuid
+  email String? @unique
 
   /// 매니페스트 phoneNumber — E.164 정규화 연락처 (예: +821012345678)
   phoneE164 String? @unique @map("phone_e164")
@@ -170,11 +170,11 @@ model User {
   hasActiveShowcase Boolean @default(false) @map("has_active_showcase")
 
   /// 검색 프라이버시 토글 (기본 비허용 — 옵트인)
-  isPhoneSearchAllowed Boolean @default(false) @map("is_phone_search_allowed")
-  isNameSearchAllowed  Boolean @default(false) @map("is_name_search_allowed")
+  isPhoneSearchAllowed   Boolean @default(false) @map("is_phone_search_allowed")
+  isNameSearchAllowed    Boolean @default(false) @map("is_name_search_allowed")
   /// 상호(회사명) 검색 허용 — 실명(isNameSearchAllowed)과 분리
-  isOrgSearchAllowed   Boolean @default(false) @map("is_org_search_allowed")
-  isIdSearchAllowed    Boolean @default(false) @map("is_id_search_allowed")
+  isOrgSearchAllowed     Boolean @default(false) @map("is_org_search_allowed")
+  isIdSearchAllowed      Boolean @default(false) @map("is_id_search_allowed")
   /// DCC 검색 주소 전체 공개 (끄면 시·군·구만)
   isAddressSearchAllowed Boolean @default(false) @map("is_address_search_allowed")
 
@@ -185,22 +185,22 @@ model User {
   isShowcasePrivate Boolean @default(false) @map("is_showcase_private")
 
   /// 기기 간 동기화 — 쇼케이스 편집 초안(사진·쇼셜링크·페이지 등)
-  showcaseStyleJson Json? @map("showcase_style_json") @db.JsonB
+  showcaseStyleJson      Json?     @map("showcase_style_json") @db.JsonB
   /// 메인 송출(라이브) 스타일 — 통화·홈 미리보기
-  showcaseLiveStyleJson Json? @map("showcase_live_style_json") @db.JsonB
+  showcaseLiveStyleJson  Json?     @map("showcase_live_style_json") @db.JsonB
   /// 라이브 출처 { source: editor|mycase, at }
-  showcaseLiveSourceJson Json? @map("showcase_live_source_json") @db.JsonB
+  showcaseLiveSourceJson Json?     @map("showcase_live_source_json") @db.JsonB
   showcaseStyleUpdatedAt DateTime? @map("showcase_style_updated_at") @db.Timestamptz(6)
 
   /// 팔로워에게만 공개 (검색 공개와 별도 옵트인)
-  isPhoneFollowersAllowed Boolean @default(true) @map("is_phone_followers_allowed")
-  isNameFollowersAllowed  Boolean @default(true) @map("is_name_followers_allowed")
-  isOrgFollowersAllowed   Boolean @default(true) @map("is_org_followers_allowed")
-  isIdFollowersAllowed    Boolean @default(true) @map("is_id_followers_allowed")
+  isPhoneFollowersAllowed   Boolean @default(true) @map("is_phone_followers_allowed")
+  isNameFollowersAllowed    Boolean @default(true) @map("is_name_followers_allowed")
+  isOrgFollowersAllowed     Boolean @default(true) @map("is_org_followers_allowed")
+  isIdFollowersAllowed      Boolean @default(true) @map("is_id_followers_allowed")
   /// 팔로우하면 주소 전체 공개
   isAddressFollowersAllowed Boolean @default(false) @map("is_address_followers_allowed")
   /// DCC 노출 4항목을 사용자가 지정했는지 — 미지정 시 명함 저장 거부
-  dccExposureConfigured Boolean @default(false) @map("dcc_exposure_configured")
+  dccExposureConfigured     Boolean @default(false) @map("dcc_exposure_configured")
 
   /// 검색 어뷰징 카운터·잠금
   searchAbuseStrikeCount Int       @default(0) @map("search_abuse_strike_count")
@@ -218,17 +218,19 @@ model User {
   showcaseCases ShowcaseCase[]
 
   /// 쇼케이스 음원(User Original) · 퍼가기
-  showcaseSoundsOwned   ShowcaseSound[]       @relation("ShowcaseSoundOwner")
-  showcaseSoundBorrows  ShowcaseSoundBorrow[]
-  showcaseSoundQuotas   ShowcaseSoundQuotaMonth[]
+  showcaseSoundsOwned  ShowcaseSound[]           @relation("ShowcaseSoundOwner")
+  showcaseSoundBorrows ShowcaseSoundBorrow[]
+  showcaseSoundQuotas  ShowcaseSoundQuotaMonth[]
+  adState              UserAdState?
+  rewardedAdGrants     RewardedAdGrant[]
 
   /// 무료 회원 메인 송출 슬롯 변경 쿨다운 기준 시각
   mainBroadcastChangedAt DateTime? @map("main_broadcast_changed_at") @db.Timestamptz(6)
 
-  /// VLUE 시안 인증 배지 — 최초 부여 후 해제하지 않음
+  /// VLUE 시안 인증 배지 현재 동기화 시각 — 구독/가족 이탈 시 null로 즉시 회수
   vlueVerifiedBadgeAt DateTime? @map("vlue_verified_badge_at") @db.Timestamptz(6)
   /// 본인 쇼케이스 링크 공유(복사·카카오) 누적 횟수
-  showcaseShareCount Int @default(0) @map("showcase_share_count")
+  showcaseShareCount  Int       @default(0) @map("showcase_share_count")
 
   /// 로그인 비밀번호(scrypt 해시). null 이면 비밀번호 로그인 불가(관리자·레거시 등).
   passwordHash String? @map("password_hash") @db.VarChar(256)
@@ -262,10 +264,10 @@ model User {
   /// Portone 본인인증 생년월일 YYYYMMDD
   birthDate String? @map("birth_date") @db.VarChar(8)
   /// M / F
-  gender String? @map("gender") @db.VarChar(1)
+  gender    String? @map("gender") @db.VarChar(1)
 
-  role            UserRole        @default(user)
-  accountStatus   AccountStatus   @default(pending_identity) @map("account_status")
+  role          UserRole      @default(user)
+  accountStatus AccountStatus @default(pending_identity) @map("account_status")
 
   /// 매니페스트 status — ACTIVE / INACTIVE / DELETED (탈퇴 시 DELETED + PII 파기)
   status UserStatus @default(ACTIVE) @map("user_status")
@@ -315,9 +317,9 @@ model User {
   dccAgentProfiles UserDccAgentProfile[]
 
   /// 1:1 DM — participant_low 쪽
-  chatRoomsAsLow ChatRoom[] @relation("ChatRoomParticipantLow")
+  chatRoomsAsLow  ChatRoom[]    @relation("ChatRoomParticipantLow")
   /// 1:1 DM — participant_high 쪽
-  chatRoomsAsHigh ChatRoom[] @relation("ChatRoomParticipantHigh")
+  chatRoomsAsHigh ChatRoom[]    @relation("ChatRoomParticipantHigh")
   chatMessages    ChatMessage[]
 
   vouchRequestsSent     VouchRequest[] @relation("VouchFrom")
@@ -337,72 +339,72 @@ model User {
   requiresParentalConsent Boolean   @default(false) @map("requires_parental_consent")
   parentalConsentAt       DateTime? @map("parental_consent_at") @db.Timestamptz(6)
   parentalGuardianUserId  String?   @map("parental_guardian_user_id") @db.Uuid
-  parentalGuardianUser    User?   @relation("ParentalGuardianFor", fields: [parentalGuardianUserId], references: [id], onDelete: SetNull)
-  parentalConsentWards    User[]  @relation("ParentalGuardianFor")
+  parentalGuardianUser    User?     @relation("ParentalGuardianFor", fields: [parentalGuardianUserId], references: [id], onDelete: SetNull)
+  parentalConsentWards    User[]    @relation("ParentalGuardianFor")
 
-  businessCardsOwned BusinessCard[]      @relation("BusinessCardOwner")
-  cardMemberships    CardMember[]
-  authoredCardPosts  CardFeedPost[]      @relation("CardFeedPostAuthor")
-  verificationLogs   VerificationLog[]
-  lineCallEventsOwned LineCallEvent[]    @relation("LineCallEventOwner")
+  businessCardsOwned   BusinessCard[]    @relation("BusinessCardOwner")
+  cardMemberships      CardMember[]
+  authoredCardPosts    CardFeedPost[]    @relation("CardFeedPostAuthor")
+  verificationLogs     VerificationLog[]
+  lineCallEventsOwned  LineCallEvent[]   @relation("LineCallEventOwner")
   lineCallEventsAsPeer LineCallEvent[]   @relation("LineCallEventPeer")
 
-  authRefreshSessions AuthRefreshSession[]
-  passwordResetTokens PasswordResetToken[]
-  blocksCreated       UserBlock[]         @relation("UserBlocksCreated")
-  blocksReceived      UserBlock[]         @relation("UserBlocksReceived")
-  chatReadStates      ChatReadState[]
-  campaignsOwned      Campaign[]
-  campaignApplications CampaignApplication[]
-  campaignMatches      CampaignMatch[] @relation("CampaignBlogger")
-  campaignMatchOwned   CampaignMatch[] @relation("CampaignOwner")
-  visitVerifications   VisitVerification[]
-  reviewSubmissions    ReviewSubmission[]
-  reviewDrafts         ReviewDraft[]
-  walletAccount              WalletAccount?
-  walletWithdrawalAccount    WalletWithdrawalAccount?
-  trustScoreEvents     TrustScoreLedger[]
-  penaltyEvents        PenaltyEvent[]
-  notificationsOwned   OwnerNotification[] @relation("OwnerNotificationOwner")
-  notificationsActor   OwnerNotification[] @relation("OwnerNotificationActor")
-  lineSubscriptions    LineSubscription[]
-  boardEvents          ActiveBoardEvent[]
-  letteringPhoneBlocks LetteringPhoneBlock[] @relation("LetteringBlocksOwned")
-  letteringPhoneReports LetteringPhoneReport[] @relation("LetteringReportsFiled")
+  authRefreshSessions     AuthRefreshSession[]
+  passwordResetTokens     PasswordResetToken[]
+  blocksCreated           UserBlock[]              @relation("UserBlocksCreated")
+  blocksReceived          UserBlock[]              @relation("UserBlocksReceived")
+  chatReadStates          ChatReadState[]
+  campaignsOwned          Campaign[]
+  campaignApplications    CampaignApplication[]
+  campaignMatches         CampaignMatch[]          @relation("CampaignBlogger")
+  campaignMatchOwned      CampaignMatch[]          @relation("CampaignOwner")
+  visitVerifications      VisitVerification[]
+  reviewSubmissions       ReviewSubmission[]
+  reviewDrafts            ReviewDraft[]
+  walletAccount           WalletAccount?
+  walletWithdrawalAccount WalletWithdrawalAccount?
+  trustScoreEvents        TrustScoreLedger[]
+  penaltyEvents           PenaltyEvent[]
+  notificationsOwned      OwnerNotification[]      @relation("OwnerNotificationOwner")
+  notificationsActor      OwnerNotification[]      @relation("OwnerNotificationActor")
+  lineSubscriptions       LineSubscription[]
+  boardEvents             ActiveBoardEvent[]
+  letteringPhoneBlocks    LetteringPhoneBlock[]    @relation("LetteringBlocksOwned")
+  letteringPhoneReports   LetteringPhoneReport[]   @relation("LetteringReportsFiled")
 
-  vluerProfile                 UserVluerProfile?
-  b2bEnterprisesAdministered   B2BEnterpriseAccount[] @relation("B2BEnterpriseAdmin")
+  vluerProfile                  UserVluerProfile?
+  b2bEnterprisesAdministered    B2BEnterpriseAccount[]        @relation("B2BEnterpriseAdmin")
   corporateAttributionsAsMember CorporateAttributionRequest[] @relation("AttributionMember")
-  corporateMembership          UserCorporateMembership?
-  subscriptions                UserSubscription[]
-  subscriptionPayments         SubscriptionPayment[]
-  refundQueues                 RefundQueue[]
-  commissionsAsVluer           CommissionLedger[] @relation("CommissionVluer")
-  commissionsAsPayer             CommissionLedger[] @relation("CommissionPayer")
-  referralAttribution          ReferralAttribution?
-  referralDownlines            ReferralAttribution[] @relation("ReferralSponsor")
-  vluerCodeChangeRequests      VluerCodeChangeRequest[] @relation("CodeChangeMember")
-  vluerReferralPenalties       VluerReferralPenalty[] @relation("PenaltyMember")
-  b2bEnterprisesAcquired       B2BEnterpriseAccount[] @relation("EnterpriseAcquiredBy")
+  corporateMembership           UserCorporateMembership?
+  subscriptions                 UserSubscription[]
+  subscriptionPayments          SubscriptionPayment[]
+  refundQueues                  RefundQueue[]
+  commissionsAsVluer            CommissionLedger[]            @relation("CommissionVluer")
+  commissionsAsPayer            CommissionLedger[]            @relation("CommissionPayer")
+  referralAttribution           ReferralAttribution?
+  referralDownlines             ReferralAttribution[]         @relation("ReferralSponsor")
+  vluerCodeChangeRequests       VluerCodeChangeRequest[]      @relation("CodeChangeMember")
+  vluerReferralPenalties        VluerReferralPenalty[]        @relation("PenaltyMember")
+  b2bEnterprisesAcquired        B2BEnterpriseAccount[]        @relation("EnterpriseAcquiredBy")
 
-  familyProtectionAsGuardian FamilyProtectionLink[] @relation("FamilyGuardian")
-  familyProtectionAsWard     FamilyProtectionLink[] @relation("FamilyWard")
+  familyProtectionAsGuardian FamilyProtectionLink[]    @relation("FamilyGuardian")
+  familyProtectionAsWard     FamilyProtectionLink[]    @relation("FamilyWard")
   familyWardPresence         FamilyWardPresence?
   familyProtectionSettings   FamilyProtectionSettings?
   localAds                   LocalAd[]
-  storeProducts              StoreProduct[] @relation("StoreProductSeller")
-  shopOrdersAsBuyer          ShopOrder[]    @relation("ShopOrderBuyer")
-  shopOrdersAsSeller         ShopOrder[]    @relation("ShopOrderSeller")
+  storeProducts              StoreProduct[]            @relation("StoreProductSeller")
+  shopOrdersAsBuyer          ShopOrder[]               @relation("ShopOrderBuyer")
+  shopOrdersAsSeller         ShopOrder[]               @relation("ShopOrderSeller")
 
   memberReferralBenefitState MemberReferralBenefitState?
 
   /// B2B 회선·역할 — enterpriseGroupId = 대표(MASTER) user id
-  lineType          LineType         @default(NONE) @map("line_type")
-  enterpriseRole    EnterpriseRole   @default(NONE) @map("enterprise_role")
-  enterpriseGroupId String?          @map("enterprise_group_id") @db.Uuid
-  enterpriseGroupMaster User?        @relation("EnterpriseGroupMembers", fields: [enterpriseGroupId], references: [id], onDelete: SetNull)
-  enterpriseGroupMembers User[]      @relation("EnterpriseGroupMembers")
-  enterpriseDept    String?          @map("enterprise_dept") @db.VarChar(80)
+  lineType               LineType       @default(NONE) @map("line_type")
+  enterpriseRole         EnterpriseRole @default(NONE) @map("enterprise_role")
+  enterpriseGroupId      String?        @map("enterprise_group_id") @db.Uuid
+  enterpriseGroupMaster  User?          @relation("EnterpriseGroupMembers", fields: [enterpriseGroupId], references: [id], onDelete: SetNull)
+  enterpriseGroupMembers User[]         @relation("EnterpriseGroupMembers")
+  enterpriseDept         String?        @map("enterprise_dept") @db.VarChar(80)
 
   /// 복수계정 콤보 — 기업 회선 계정과 FK·ID 연동 없음 (사생활 격리)
   isEnterpriseVerified        Boolean   @default(false) @map("is_enterprise_verified")
@@ -412,9 +414,9 @@ model User {
 
   personalEnterpriseMailOtps PersonalEnterpriseMailOtp[]
 
-  userDevices              UserDevice[]
-  storePurchaseRequests      StorePurchaseRequest[] @relation("StorePurchaseRequester")
-  enterpriseProcurementAdds  EnterpriseProcurementCartItem[] @relation("ProcurementCartAddedBy")
+  userDevices               UserDevice[]
+  storePurchaseRequests     StorePurchaseRequest[]          @relation("StorePurchaseRequester")
+  enterpriseProcurementAdds EnterpriseProcurementCartItem[] @relation("ProcurementCartAddedBy")
 
   /// 사후 연동된 소셜 로그인 (카카오/네이버) — VLUE 마스터 계정 1:1 매핑
   socialLoginLinks UserSocialLoginLink[]
@@ -425,24 +427,24 @@ model User {
   /// Kakao Login OAuth — 쇼케이스 카카오 프로필 SNS 인증용
   kakaoLink UserKakaoLink?
 
-  userEmailMapping UserEmailMapping?
+  userEmailMapping             UserEmailMapping?
   emailForwardingNotifications EmailForwardingNotificationLog[]
-  inappMailCaches InappMailCache[]
-  userEmails      UserEmail[]
+  inappMailCaches              InappMailCache[]
+  userEmails                   UserEmail[]
 
   mailTalkRooms         MailTalkRoom[]
   mailTalkEmailTemplate MailTalkEmailTemplate?
 
-  auctionsSold       Auction[]              @relation("AuctionSeller")
-  auctionBids        AuctionBid[]           @relation("AuctionBidder")
-  auctionWins        Auction[]              @relation("AuctionWinner")
-  auctionEscrowsBuy  AuctionEscrow[]        @relation("AuctionEscrowBuyer")
-  auctionEscrowsSell AuctionEscrow[]        @relation("AuctionEscrowSeller")
+  auctionsSold       Auction[]             @relation("AuctionSeller")
+  auctionBids        AuctionBid[]          @relation("AuctionBidder")
+  auctionWins        Auction[]             @relation("AuctionWinner")
+  auctionEscrowsBuy  AuctionEscrow[]       @relation("AuctionEscrowBuyer")
+  auctionEscrowsSell AuctionEscrow[]       @relation("AuctionEscrowSeller")
   interestKeywords   UserInterestKeyword[]
-  mediaLiveSessions  MediaLiveSession[]     @relation("MediaLiveSeller")
-  sellerVodProducts  SellerVodProduct[]     @relation("SellerVodOwner")
-  mediaEscrowsBuy    MediaCommerceEscrow[]  @relation("MediaEscrowBuyer")
-  mediaEscrowsSell   MediaCommerceEscrow[]  @relation("MediaEscrowSeller")
+  mediaLiveSessions  MediaLiveSession[]    @relation("MediaLiveSeller")
+  sellerVodProducts  SellerVodProduct[]    @relation("SellerVodOwner")
+  mediaEscrowsBuy    MediaCommerceEscrow[] @relation("MediaEscrowBuyer")
+  mediaEscrowsSell   MediaCommerceEscrow[] @relation("MediaEscrowSeller")
 
   @@unique([socialProvider, socialId], map: "users_social_provider_social_id_key")
   @@index([enterpriseGroupId])
@@ -469,7 +471,7 @@ model AdminDevice {
   isAuthorized Boolean @default(false) @map("is_authorized")
 
   /// PC 등 비마스터 기기가 비밀 URL로 등록 시 발급되는 6자리(일회)
-  authCode           String?   @map("auth_code") @db.VarChar(6)
+  authCode          String?   @map("auth_code") @db.VarChar(6)
   authCodeExpiresAt DateTime? @map("auth_code_expires_at") @db.Timestamptz(6)
 
   userAgent String? @map("user_agent") @db.VarChar(512)
@@ -487,21 +489,21 @@ model AdminDevice {
 // -----------------------------------------------------------------------------
 
 model AuthRefreshSession {
-  id        String @id @default(uuid()) @db.Uuid
-  userId    String @map("user_id") @db.Uuid
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tokenHash String    @unique @map("token_hash") @db.VarChar(128)
   expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
   revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  userAgent String?  @map("user_agent") @db.VarChar(512)
-  lastIp    String?  @map("last_ip") @db.VarChar(45)
-  clientKind String? @map("client_kind") @db.VarChar(16)
-  deviceToken String? @map("device_token") @db.VarChar(128)
-  geoLabel  String?  @map("geo_label") @db.VarChar(64)
-  platform  String?  @map("platform") @db.VarChar(16)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  userAgent   String?  @map("user_agent") @db.VarChar(512)
+  lastIp      String?  @map("last_ip") @db.VarChar(45)
+  clientKind  String?  @map("client_kind") @db.VarChar(16)
+  deviceToken String?  @map("device_token") @db.VarChar(128)
+  geoLabel    String?  @map("geo_label") @db.VarChar(64)
+  platform    String?  @map("platform") @db.VarChar(16)
 
   @@index([userId])
   @@index([userId, platform, revokedAt])
@@ -509,9 +511,9 @@ model AuthRefreshSession {
 }
 
 model PasswordResetToken {
-  id        String @id @default(uuid()) @db.Uuid
-  userId    String @map("user_id") @db.Uuid
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tokenHash String    @unique @map("token_hash") @db.VarChar(128)
   expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
@@ -567,17 +569,17 @@ model ChatRoom {
 }
 
 model ChatMessage {
-  id          String          @id @default(uuid()) @db.Uuid
-  roomId      String          @map("room_id") @db.Uuid
-  room        ChatRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  senderId    String?         @map("sender_id") @db.Uuid
-  sender      User?           @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  id           String          @id @default(uuid()) @db.Uuid
+  roomId       String          @map("room_id") @db.Uuid
+  room         ChatRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId     String?         @map("sender_id") @db.Uuid
+  sender       User?           @relation(fields: [senderId], references: [id], onDelete: SetNull)
   /// 직장내선·위임 명함으로 송신한 경우 감사용
-  senderCardId String?      @map("sender_card_id") @db.Uuid
-  senderCard   BusinessCard? @relation(fields: [senderCardId], references: [id], onDelete: SetNull)
-  content     String          @db.Text
-  messageType ChatMessageType @default(normal) @map("message_type")
-  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  senderCardId String?         @map("sender_card_id") @db.Uuid
+  senderCard   BusinessCard?   @relation(fields: [senderCardId], references: [id], onDelete: SetNull)
+  content      String          @db.Text
+  messageType  ChatMessageType @default(normal) @map("message_type")
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([roomId, createdAt])
   @@map("chat_messages")
@@ -585,11 +587,11 @@ model ChatMessage {
 
 /// 방별 사용자 읽음 커서(상대방 읽음 확인·동기화용)
 model ChatReadState {
-  roomId String @map("room_id") @db.Uuid
+  roomId String   @map("room_id") @db.Uuid
   room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   userId String @map("user_id") @db.Uuid
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   lastReadMessageId String?   @map("last_read_message_id") @db.Uuid
   lastReadAt        DateTime? @map("last_read_at") @db.Timestamptz(6)
@@ -615,16 +617,16 @@ model DigitalCard {
   /// 외부 HTML 명함 배포용 디자인 템플릿 (modern-dark | professional-gold | creative-gradient)
   designTemplateSnapshot String? @map("design_template_snapshot") @db.VarChar(40)
   /// 카카오 OG·썸네일용 명함 스냅샷 (슬림 https URL·텍스트만 — data URL 금지)
-  exportSnapshotJson Json? @map("export_snapshot_json")
+  exportSnapshotJson     Json?   @map("export_snapshot_json")
 
   /// 정규화 메타 컬럼 — 목록·lite·검색용 (JSONB 통째 SELECT 대체)
-  photoUrl             String? @map("photo_url") @db.Text
-  logoUrl              String? @map("logo_url") @db.Text
-  displayName          String? @map("display_name") @db.VarChar(120)
-  organization         String? @map("organization") @db.VarChar(200)
-  titleSnapshot        String? @map("title_snapshot") @db.VarChar(120)
-  departmentSnapshot   String? @map("department_snapshot") @db.VarChar(120)
-  activityName         String? @map("activity_name") @db.VarChar(80)
+  photoUrl           String? @map("photo_url") @db.Text
+  logoUrl            String? @map("logo_url") @db.Text
+  displayName        String? @map("display_name") @db.VarChar(120)
+  organization       String? @map("organization") @db.VarChar(200)
+  titleSnapshot      String? @map("title_snapshot") @db.VarChar(120)
+  departmentSnapshot String? @map("department_snapshot") @db.VarChar(120)
+  activityName       String? @map("activity_name") @db.VarChar(80)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -643,22 +645,22 @@ model UserDccAgentProfile {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// 드롭다운 표시명. 비우면 displayName · title 로 조합
-  label       String @default("") @db.VarChar(80)
-  displayName String @map("display_name") @db.VarChar(120)
-  title       String @default("") @db.VarChar(120)
-  department  String @default("") @db.VarChar(120)
-  photoUrl    String? @map("photo_url") @db.Text
-  photoFocus  String  @default("center") @map("photo_focus") @db.VarChar(16)
-  isActive    Boolean @default(false) @map("is_active")
+  label                 String  @default("") @db.VarChar(80)
+  displayName           String  @map("display_name") @db.VarChar(120)
+  title                 String  @default("") @db.VarChar(120)
+  department            String  @default("") @db.VarChar(120)
+  photoUrl              String? @map("photo_url") @db.Text
+  photoFocus            String  @default("center") @map("photo_focus") @db.VarChar(16)
+  isActive              Boolean @default(false) @map("is_active")
   /// 미지정·모르는 번호 상대에게 송출되는 대표 멀티 프로필
-  isRepresentative Boolean @default(false) @map("is_representative")
+  isRepresentative      Boolean @default(false) @map("is_representative")
   /// 이 프로필 전용 DCC 스냅샷 (지정 번호에 동기화)
-  dccSnapshotJson Json? @map("dcc_snapshot_json") @db.JsonB
-  showcaseStyleJson Json? @map("showcase_style_json") @db.JsonB
-  showcaseLiveStyleJson Json? @map("showcase_live_style_json") @db.JsonB
+  dccSnapshotJson       Json?   @map("dcc_snapshot_json") @db.JsonB
+  showcaseStyleJson     Json?   @map("showcase_style_json") @db.JsonB
+  showcaseLiveStyleJson Json?   @map("showcase_live_style_json") @db.JsonB
   /// 카카오톡 친구관리형 — 이 프로필로 소통할 상대 전화번호(E.164) 목록
-  routedContactPhones Json? @map("routed_contact_phones") @db.JsonB
-  sortOrder   Int     @default(0) @map("sort_order")
+  routedContactPhones   Json?   @map("routed_contact_phones") @db.JsonB
+  sortOrder             Int     @default(0) @map("sort_order")
 
   assignedLines BusinessCard[]
 
@@ -792,34 +794,34 @@ model BusinessCard {
   profileJson Json?   @map("profile_json") @db.JsonB
 
   /// 이 번호 전용 DCC (대표계정 DigitalCard와 분리)
-  dccSnapshotJson Json? @map("dcc_snapshot_json") @db.JsonB
+  dccSnapshotJson            Json?                @map("dcc_snapshot_json") @db.JsonB
   /// 이 번호 전용 쇼케이스 (User.showcaseStyleJson과 분리)
-  lineShowcaseStyleJson Json? @map("line_showcase_style_json") @db.JsonB
-  lineShowcaseLiveStyleJson Json? @map("line_showcase_live_style_json") @db.JsonB
-  lineShowcaseLiveSourceJson Json? @map("line_showcase_live_source_json") @db.JsonB
-  lineShowcaseUpdatedAt DateTime? @map("line_showcase_updated_at") @db.Timestamptz(6)
-  activeDccAgentProfileId String? @map("active_dcc_agent_profile_id") @db.Uuid
-  activeDccAgentProfile UserDccAgentProfile? @relation(fields: [activeDccAgentProfileId], references: [id], onDelete: SetNull)
+  lineShowcaseStyleJson      Json?                @map("line_showcase_style_json") @db.JsonB
+  lineShowcaseLiveStyleJson  Json?                @map("line_showcase_live_style_json") @db.JsonB
+  lineShowcaseLiveSourceJson Json?                @map("line_showcase_live_source_json") @db.JsonB
+  lineShowcaseUpdatedAt      DateTime?            @map("line_showcase_updated_at") @db.Timestamptz(6)
+  activeDccAgentProfileId    String?              @map("active_dcc_agent_profile_id") @db.Uuid
+  activeDccAgentProfile      UserDccAgentProfile? @relation(fields: [activeDccAgentProfileId], references: [id], onDelete: SetNull)
 
   verificationStatus CardVerificationStatus @default(approved) @map("verification_status")
   /// 내선/대표 등 유료 라인 — 승인된 경우에만 사업 피드 생성 허용
-  isPremiumLine       Boolean @default(false) @map("is_premium_line")
+  isPremiumLine      Boolean                @default(false) @map("is_premium_line")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  members           CardMember[]
-  feedPosts         CardFeedPost[]
-  verificationLogs  VerificationLog[]
-  chatMessagesSent  ChatMessage[]
-  lineSubscription  LineSubscription?
-  lineCallEvents    LineCallEvent[]
+  members          CardMember[]
+  feedPosts        CardFeedPost[]
+  verificationLogs VerificationLog[]
+  chatMessagesSent ChatMessage[]
+  lineSubscription LineSubscription?
+  lineCallEvents   LineCallEvent[]
 
   /// B2B 기업 귀속 회선 — 통화 오버레이 시 대표번호 마스킹용
-  b2bEnterpriseId String? @map("b2b_enterprise_id") @db.Uuid
+  b2bEnterpriseId String?               @map("b2b_enterprise_id") @db.Uuid
   b2bEnterprise   B2BEnterpriseAccount? @relation(fields: [b2bEnterpriseId], references: [id], onDelete: SetNull)
-  b2bCartLineId   String? @unique @map("b2b_cart_line_id") @db.Uuid
-  b2bCartLine     B2BCartLine? @relation(fields: [b2bCartLineId], references: [id], onDelete: SetNull)
+  b2bCartLineId   String?               @unique @map("b2b_cart_line_id") @db.Uuid
+  b2bCartLine     B2BCartLine?          @relation(fields: [b2bCartLineId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([b2bEnterpriseId])
@@ -834,20 +836,20 @@ model LineCallEvent {
   ownerUserId String @map("owner_user_id") @db.Uuid
   owner       User   @relation("LineCallEventOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
 
-  lineCardId String?       @map("line_card_id") @db.Uuid
-  lineCard   BusinessCard? @relation(fields: [lineCardId], references: [id], onDelete: SetNull)
-  linePhoneE164 String     @map("line_phone_e164") @db.VarChar(24)
+  lineCardId    String?       @map("line_card_id") @db.Uuid
+  lineCard      BusinessCard? @relation(fields: [lineCardId], references: [id], onDelete: SetNull)
+  linePhoneE164 String        @map("line_phone_e164") @db.VarChar(24)
 
-  peerUserId String? @map("peer_user_id") @db.Uuid
-  peer       User?   @relation("LineCallEventPeer", fields: [peerUserId], references: [id], onDelete: SetNull)
-  peerPhoneE164 String @map("peer_phone_e164") @db.VarChar(24)
-  peerDisplayName String @default("") @map("peer_display_name") @db.VarChar(120)
-  peerIsVlueMember Boolean @default(false) @map("peer_is_vlue_member")
+  peerUserId         String? @map("peer_user_id") @db.Uuid
+  peer               User?   @relation("LineCallEventPeer", fields: [peerUserId], references: [id], onDelete: SetNull)
+  peerPhoneE164      String  @map("peer_phone_e164") @db.VarChar(24)
+  peerDisplayName    String  @default("") @map("peer_display_name") @db.VarChar(120)
+  peerIsVlueMember   Boolean @default(false) @map("peer_is_vlue_member")
   peerMembershipTier String? @map("peer_membership_tier") @db.VarChar(24)
 
   /// 소유자 기준 방향 — 상대가 이 회선으로 걸면 in
-  direction String @default("in") @db.VarChar(8)
-  durationSec Int @default(0) @map("duration_sec")
+  direction   String @default("in") @db.VarChar(8)
+  durationSec Int    @default(0) @map("duration_sec")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -858,11 +860,11 @@ model LineCallEvent {
 }
 
 model CardMember {
-  id     String @id @default(uuid()) @db.Uuid
-  cardId String @map("card_id") @db.Uuid
+  id     String       @id @default(uuid()) @db.Uuid
+  cardId String       @map("card_id") @db.Uuid
   card   BusinessCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  userId String @map("user_id") @db.Uuid
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String       @map("user_id") @db.Uuid
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   role CardMemberRole @map("role")
 
@@ -874,11 +876,11 @@ model CardMember {
 }
 
 model VerificationLog {
-  id     String @id @default(uuid()) @db.Uuid
-  cardId String? @map("card_id") @db.Uuid
+  id     String        @id @default(uuid()) @db.Uuid
+  cardId String?       @map("card_id") @db.Uuid
   card   BusinessCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
-  userId String? @map("user_id") @db.Uuid
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?       @map("user_id") @db.Uuid
+  user   User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   action  String @map("action") @db.VarChar(80)
   detail  Json?  @map("detail") @db.JsonB
@@ -892,11 +894,11 @@ model VerificationLog {
 
 /// 게시물은 card_id 에 귀속 (§7)
 model CardFeedPost {
-  id           String @id @default(uuid()) @db.Uuid
-  cardId       String @map("card_id") @db.Uuid
+  id           String       @id @default(uuid()) @db.Uuid
+  cardId       String       @map("card_id") @db.Uuid
   card         BusinessCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  authorUserId String @map("author_user_id") @db.Uuid
-  author       User   @relation("CardFeedPostAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+  authorUserId String       @map("author_user_id") @db.Uuid
+  author       User         @relation("CardFeedPostAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
 
   title    String? @map("title") @db.VarChar(200)
   body     String  @map("body") @db.Text
@@ -924,21 +926,21 @@ model FeedPostHashtag {
 }
 
 model Campaign {
-  id              String            @id @default(uuid()) @db.Uuid
-  ownerUserId     String            @map("owner_user_id") @db.Uuid
-  ownerUser       User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  title           String            @db.VarChar(200)
-  description     String            @db.Text
-  rewardCash      Int               @map("reward_cash")
-  capacity        Int               @default(1)
-  status          CampaignStatus    @default(recruiting)
-  tierScope       CampaignTierScope @default(all) @map("tier_scope")
-  locationLat     Float?            @map("location_lat")
-  locationLng     Float?            @map("location_lng")
-  radiusMeters    Int?              @map("radius_meters")
-  reviewDeadlineHours Int           @default(24) @map("review_deadline_hours")
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                  String            @id @default(uuid()) @db.Uuid
+  ownerUserId         String            @map("owner_user_id") @db.Uuid
+  ownerUser           User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  title               String            @db.VarChar(200)
+  description         String            @db.Text
+  rewardCash          Int               @map("reward_cash")
+  capacity            Int               @default(1)
+  status              CampaignStatus    @default(recruiting)
+  tierScope           CampaignTierScope @default(all) @map("tier_scope")
+  locationLat         Float?            @map("location_lat")
+  locationLng         Float?            @map("location_lng")
+  radiusMeters        Int?              @map("radius_meters")
+  reviewDeadlineHours Int               @default(24) @map("review_deadline_hours")
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   requiredKeywords CampaignKeyword[]
   applications     CampaignApplication[]
@@ -960,15 +962,15 @@ model CampaignKeyword {
 }
 
 model CampaignApplication {
-  id           String                    @id @default(uuid()) @db.Uuid
-  campaignId   String                    @map("campaign_id") @db.Uuid
-  campaign     Campaign                  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  applicantId  String                    @map("applicant_id") @db.Uuid
-  applicant    User                      @relation(fields: [applicantId], references: [id], onDelete: Cascade)
-  message      String?                   @db.Text
-  status       CampaignApplicationStatus @default(applied)
-  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          String                    @id @default(uuid()) @db.Uuid
+  campaignId  String                    @map("campaign_id") @db.Uuid
+  campaign    Campaign                  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  applicantId String                    @map("applicant_id") @db.Uuid
+  applicant   User                      @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  message     String?                   @db.Text
+  status      CampaignApplicationStatus @default(applied)
+  createdAt   DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([campaignId, applicantId])
   @@index([applicantId, status])
@@ -976,23 +978,23 @@ model CampaignApplication {
 }
 
 model CampaignMatch {
-  id              String      @id @default(uuid()) @db.Uuid
-  campaignId      String      @map("campaign_id") @db.Uuid
-  campaign        Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  ownerUserId     String      @map("owner_user_id") @db.Uuid
-  ownerUser       User        @relation("CampaignOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  bloggerUserId   String      @map("blogger_user_id") @db.Uuid
-  bloggerUser     User        @relation("CampaignBlogger", fields: [bloggerUserId], references: [id], onDelete: Cascade)
-  status          MatchStatus @default(matched)
-  matchedAt       DateTime    @default(now()) @map("matched_at") @db.Timestamptz(6)
-  reviewDeadlineAt DateTime?  @map("review_deadline_at") @db.Timestamptz(6)
-  settledAt       DateTime?   @map("settled_at") @db.Timestamptz(6)
+  id               String      @id @default(uuid()) @db.Uuid
+  campaignId       String      @map("campaign_id") @db.Uuid
+  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  ownerUserId      String      @map("owner_user_id") @db.Uuid
+  ownerUser        User        @relation("CampaignOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  bloggerUserId    String      @map("blogger_user_id") @db.Uuid
+  bloggerUser      User        @relation("CampaignBlogger", fields: [bloggerUserId], references: [id], onDelete: Cascade)
+  status           MatchStatus @default(matched)
+  matchedAt        DateTime    @default(now()) @map("matched_at") @db.Timestamptz(6)
+  reviewDeadlineAt DateTime?   @map("review_deadline_at") @db.Timestamptz(6)
+  settledAt        DateTime?   @map("settled_at") @db.Timestamptz(6)
 
-  escrowHold       EscrowHold?
+  escrowHold         EscrowHold?
   visitVerifications VisitVerification[]
-  reviewDraft      ReviewDraft?
-  reviewSubmission ReviewSubmission?
-  penalties        PenaltyEvent[]
+  reviewDraft        ReviewDraft?
+  reviewSubmission   ReviewSubmission?
+  penalties          PenaltyEvent[]
 
   @@unique([campaignId, bloggerUserId])
   @@index([ownerUserId, status])
@@ -1001,79 +1003,79 @@ model CampaignMatch {
 }
 
 model EscrowHold {
-  id           String       @id @default(uuid()) @db.Uuid
-  matchId      String       @unique @map("match_id") @db.Uuid
-  match        CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  amountCash   Int          @map("amount_cash")
-  status       EscrowStatus @default(held)
-  heldAt       DateTime     @default(now()) @map("held_at") @db.Timestamptz(6)
-  releasedAt   DateTime?    @map("released_at") @db.Timestamptz(6)
+  id         String        @id @default(uuid()) @db.Uuid
+  matchId    String        @unique @map("match_id") @db.Uuid
+  match      CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  amountCash Int           @map("amount_cash")
+  status     EscrowStatus  @default(held)
+  heldAt     DateTime      @default(now()) @map("held_at") @db.Timestamptz(6)
+  releasedAt DateTime?     @map("released_at") @db.Timestamptz(6)
 
   @@map("escrow_holds")
 }
 
 model VisitVerification {
-  id             String             @id @default(uuid()) @db.Uuid
-  matchId        String             @map("match_id") @db.Uuid
-  match          CampaignMatch      @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  userId         String             @map("user_id") @db.Uuid
-  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  method         VerificationMethod
-  status         VerificationStatus @default(pending)
-  gpsLat         Float?             @map("gps_lat")
-  gpsLng         Float?             @map("gps_lng")
-  receiptImageUrl String?           @map("receipt_image_url") @db.VarChar(800)
-  photoMetaJson  Json?              @map("photo_meta_json") @db.JsonB
-  verifiedAt     DateTime?          @map("verified_at") @db.Timestamptz(6)
-  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  id              String             @id @default(uuid()) @db.Uuid
+  matchId         String             @map("match_id") @db.Uuid
+  match           CampaignMatch      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId          String             @map("user_id") @db.Uuid
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method          VerificationMethod
+  status          VerificationStatus @default(pending)
+  gpsLat          Float?             @map("gps_lat")
+  gpsLng          Float?             @map("gps_lng")
+  receiptImageUrl String?            @map("receipt_image_url") @db.VarChar(800)
+  photoMetaJson   Json?              @map("photo_meta_json") @db.JsonB
+  verifiedAt      DateTime?          @map("verified_at") @db.Timestamptz(6)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([matchId, status])
   @@map("visit_verifications")
 }
 
 model ReviewDraft {
-  id             String        @id @default(uuid()) @db.Uuid
-  matchId        String        @unique @map("match_id") @db.Uuid
-  match          CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  userId         String        @map("user_id") @db.Uuid
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blogUrl        String?       @map("blog_url") @db.VarChar(800)
-  bodyText       String?       @map("body_text") @db.Text
-  summary3Lines  String?       @map("summary_3_lines") @db.Text
-  keywordsCheckJson Json?      @map("keywords_check_json") @db.JsonB
-  photosJson     Json?         @map("photos_json") @db.JsonB
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                String        @id @default(uuid()) @db.Uuid
+  matchId           String        @unique @map("match_id") @db.Uuid
+  match             CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId            String        @map("user_id") @db.Uuid
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blogUrl           String?       @map("blog_url") @db.VarChar(800)
+  bodyText          String?       @map("body_text") @db.Text
+  summary3Lines     String?       @map("summary_3_lines") @db.Text
+  keywordsCheckJson Json?         @map("keywords_check_json") @db.JsonB
+  photosJson        Json?         @map("photos_json") @db.JsonB
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("review_drafts")
 }
 
 model ReviewSubmission {
-  id             String       @id @default(uuid()) @db.Uuid
-  matchId        String       @unique @map("match_id") @db.Uuid
-  match          CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  userId         String       @map("user_id") @db.Uuid
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  blogUrl        String       @map("blog_url") @db.VarChar(800)
-  bodyText       String       @map("body_text") @db.Text
-  summary3Lines  String       @map("summary_3_lines") @db.Text
-  keywordsHit    Boolean      @default(false) @map("keywords_hit")
-  photosCount    Int          @default(0) @map("photos_count")
-  status         ReviewStatus @default(submitted)
-  submittedAt    DateTime     @default(now()) @map("submitted_at") @db.Timestamptz(6)
-  approvedAt     DateTime?    @map("approved_at") @db.Timestamptz(6)
+  id            String        @id @default(uuid()) @db.Uuid
+  matchId       String        @unique @map("match_id") @db.Uuid
+  match         CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId        String        @map("user_id") @db.Uuid
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blogUrl       String        @map("blog_url") @db.VarChar(800)
+  bodyText      String        @map("body_text") @db.Text
+  summary3Lines String        @map("summary_3_lines") @db.Text
+  keywordsHit   Boolean       @default(false) @map("keywords_hit")
+  photosCount   Int           @default(0) @map("photos_count")
+  status        ReviewStatus  @default(submitted)
+  submittedAt   DateTime      @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  approvedAt    DateTime?     @map("approved_at") @db.Timestamptz(6)
 
   @@index([userId, submittedAt])
   @@map("review_submissions")
 }
 
 model WalletAccount {
-  id          String        @id @default(uuid()) @db.Uuid
-  userId      String        @unique @map("user_id") @db.Uuid
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  balanceCash Int           @default(0) @map("balance_cash")
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @unique @map("user_id") @db.Uuid
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceCash Int            @default(0) @map("balance_cash")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   ledger      WalletLedger[]
 
   @@map("wallet_accounts")
@@ -1093,61 +1095,61 @@ model WalletWithdrawalAccount {
 }
 
 model WalletLedger {
-  id            String          @id @default(uuid()) @db.Uuid
-  walletAccountId String        @map("wallet_account_id") @db.Uuid
-  walletAccount WalletAccount   @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
-  userId         String         @map("user_id") @db.Uuid
-  amountCash     Int            @map("amount_cash")
-  entryType      WalletEntryType @map("entry_type")
-  referenceId    String?        @map("reference_id") @db.VarChar(80)
-  note           String?        @db.VarChar(200)
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  id              String          @id @default(uuid()) @db.Uuid
+  walletAccountId String          @map("wallet_account_id") @db.Uuid
+  walletAccount   WalletAccount   @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+  userId          String          @map("user_id") @db.Uuid
+  amountCash      Int             @map("amount_cash")
+  entryType       WalletEntryType @map("entry_type")
+  referenceId     String?         @map("reference_id") @db.VarChar(80)
+  note            String?         @db.VarChar(200)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([userId, createdAt])
   @@map("wallet_ledger")
 }
 
 model TrustScoreLedger {
-  id           String   @id @default(uuid()) @db.Uuid
-  userId       String   @map("user_id") @db.Uuid
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  delta        Int
-  reason       String   @db.VarChar(120)
-  referenceId  String?  @map("reference_id") @db.VarChar(80)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta       Int
+  reason      String   @db.VarChar(120)
+  referenceId String?  @map("reference_id") @db.VarChar(80)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([userId, createdAt])
   @@map("trust_score_ledger")
 }
 
 model PenaltyEvent {
-  id            String       @id @default(uuid()) @db.Uuid
-  matchId        String      @map("match_id") @db.Uuid
-  match          CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  userId         String      @map("user_id") @db.Uuid
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scoreDelta     Int         @default(-10) @map("score_delta")
-  reason         String      @db.VarChar(200)
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  id         String        @id @default(uuid()) @db.Uuid
+  matchId    String        @map("match_id") @db.Uuid
+  match      CampaignMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId     String        @map("user_id") @db.Uuid
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scoreDelta Int           @default(-10) @map("score_delta")
+  reason     String        @db.VarChar(200)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([userId, createdAt])
   @@map("penalty_events")
 }
 
 model OwnerNotification {
-  id           String             @id @default(uuid()) @db.Uuid
-  ownerUserId  String             @map("owner_user_id") @db.Uuid
-  ownerUser    User               @relation("OwnerNotificationOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  actorUserId  String?            @map("actor_user_id") @db.Uuid
-  actorUser    User?              @relation("OwnerNotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-  title        String             @db.VarChar(120)
-  body         String             @db.Text
-  status       NotificationStatus @default(unread)
+  id          String             @id @default(uuid()) @db.Uuid
+  ownerUserId String             @map("owner_user_id") @db.Uuid
+  ownerUser   User               @relation("OwnerNotificationOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  actorUserId String?            @map("actor_user_id") @db.Uuid
+  actorUser   User?              @relation("OwnerNotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  title       String             @db.VarChar(120)
+  body        String             @db.Text
+  status      NotificationStatus @default(unread)
   /// line_grace 등 — 알림함 상단 고정. 결제·해지 시 서버에서 삭제
-  pinKind      String?            @map("pin_kind") @db.VarChar(40)
-  pinKey       String?            @map("pin_key") @db.VarChar(80)
-  payloadJson  Json?              @map("payload_json") @db.JsonB
-  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  pinKind     String?            @map("pin_kind") @db.VarChar(40)
+  pinKey      String?            @map("pin_key") @db.VarChar(80)
+  payloadJson Json?              @map("payload_json") @db.JsonB
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([ownerUserId, pinKey])
   @@index([ownerUserId, status])
@@ -1156,14 +1158,14 @@ model OwnerNotification {
 }
 
 model ActiveBoardEvent {
-  id           String   @id @default(uuid()) @db.Uuid
-  campaignId   String?  @map("campaign_id") @db.Uuid
-  campaign     Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  userId       String?  @map("user_id") @db.Uuid
-  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  eventType    String   @map("event_type") @db.VarChar(60)
-  payloadJson  Json?    @map("payload_json") @db.JsonB
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String    @id @default(uuid()) @db.Uuid
+  campaignId  String?   @map("campaign_id") @db.Uuid
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  userId      String?   @map("user_id") @db.Uuid
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  eventType   String    @map("event_type") @db.VarChar(60)
+  payloadJson Json?     @map("payload_json") @db.JsonB
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([eventType, createdAt])
   @@map("active_board_events")
@@ -1268,12 +1270,12 @@ enum CommissionLedgerKind {
 model VluerTierPolicy {
   tierCode VluerTierCode @id @map("tier_code")
 
-  labelKo String @map("label_ko") @db.VarChar(40)
-  minReferrals Int @map("min_referrals")
-  maxReferrals Int? @map("max_referrals")
+  labelKo      String @map("label_ko") @db.VarChar(40)
+  minReferrals Int    @map("min_referrals")
+  maxReferrals Int?   @map("max_referrals")
 
-  subscriptionRateBp Int @map("subscription_rate_bp")
-  commerceRateBp     Int @default(0) @map("commerce_rate_bp")
+  subscriptionRateBp Int             @map("subscription_rate_bp")
+  commerceRateBp     Int             @default(0) @map("commerce_rate_bp")
   payoutMode         VluerPayoutMode @map("payout_mode")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1296,8 +1298,8 @@ model ReferralAttribution {
   sponsorVluerUserId String? @map("sponsor_vluer_user_id") @db.Uuid
   sponsorVluer       User?   @relation("ReferralSponsor", fields: [sponsorVluerUserId], references: [id], onDelete: SetNull)
 
-  referralCodeUsed String? @map("referral_code_used") @db.VarChar(24)
-  attributedAt   DateTime @default(now()) @map("attributed_at") @db.Timestamptz(6)
+  referralCodeUsed      String?  @map("referral_code_used") @db.VarChar(24)
+  attributedAt          DateTime @default(now()) @map("attributed_at") @db.Timestamptz(6)
   /// 가입 후 3개월 — 코드 변경 불가
   codeChangeLockedUntil DateTime @map("code_change_locked_until") @db.Timestamptz(6)
 
@@ -1315,10 +1317,10 @@ model VluerCodeChangeRequest {
   memberUserId String @map("member_user_id") @db.Uuid
   memberUser   User   @relation("CodeChangeMember", fields: [memberUserId], references: [id], onDelete: Cascade)
 
-  currentSponsorUserId String? @map("current_sponsor_user_id") @db.Uuid
-  requestedReferralCode String @map("requested_referral_code") @db.VarChar(24)
-  status VluerCodeChangeStatus @default(pending) @map("status")
-  adminNote String? @map("admin_note") @db.Text
+  currentSponsorUserId  String?               @map("current_sponsor_user_id") @db.Uuid
+  requestedReferralCode String                @map("requested_referral_code") @db.VarChar(24)
+  status                VluerCodeChangeStatus @default(pending) @map("status")
+  adminNote             String?               @map("admin_note") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1335,13 +1337,13 @@ model VluerReferralPenalty {
   memberUserId String @map("member_user_id") @db.Uuid
   memberUser   User   @relation("PenaltyMember", fields: [memberUserId], references: [id], onDelete: Cascade)
 
-  sponsorUserId String? @map("sponsor_user_id") @db.Uuid
+  sponsorUserId       String? @map("sponsor_user_id") @db.Uuid
   codeChangeRequestId String? @map("code_change_request_id") @db.Uuid
 
-  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
-  endsAt    DateTime @map("ends_at") @db.Timestamptz(6)
-  monthlyFullPriceKrw Int @default(28300) @map("monthly_full_price_krw")
-  isActive  Boolean @default(true) @map("is_active")
+  startedAt           DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  endsAt              DateTime @map("ends_at") @db.Timestamptz(6)
+  monthlyFullPriceKrw Int      @default(28300) @map("monthly_full_price_krw")
+  isActive            Boolean  @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1353,20 +1355,20 @@ model UserVluerProfile {
   userId String @id @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tierCode VluerTierCode @default(general) @map("tier_code")
-  vluerGrade VluerGrade @default(general) @map("vluer_grade")
+  tierCode                 VluerTierCode @default(general) @map("tier_code")
+  vluerGrade               VluerGrade    @default(general) @map("vluer_grade")
   /// @deprecated 3-2-1 활동 티어 폐기 — vluerGrade 사용
-  activityTier Int? @map("activity_tier")
-  cumulativeB2cReferrals Int @default(0) @map("cumulative_b2c_referrals")
-  cumulativeB2bEnterprises Int @default(0) @map("cumulative_b2b_enterprises")
+  activityTier             Int?          @map("activity_tier")
+  cumulativeB2cReferrals   Int           @default(0) @map("cumulative_b2c_referrals")
+  cumulativeB2bEnterprises Int           @default(0) @map("cumulative_b2b_enterprises")
 
   referralCode String? @unique @map("referral_code") @db.VarChar(24)
 
-  canActAsVluer Boolean @default(true) @map("can_act_as_vluer")
-  isEligibleForVluerSettlement Boolean @default(true) @map("is_eligible_for_vluer_settlement")
-  rewardsFrozen Boolean @default(false) @map("rewards_frozen")
-  rewardsFrozenAt DateTime? @map("rewards_frozen_at") @db.Timestamptz(6)
-  b2bBlockedAt DateTime? @map("b2b_blocked_at") @db.Timestamptz(6)
+  canActAsVluer                Boolean   @default(true) @map("can_act_as_vluer")
+  isEligibleForVluerSettlement Boolean   @default(true) @map("is_eligible_for_vluer_settlement")
+  rewardsFrozen                Boolean   @default(false) @map("rewards_frozen")
+  rewardsFrozenAt              DateTime? @map("rewards_frozen_at") @db.Timestamptz(6)
+  b2bBlockedAt                 DateTime? @map("b2b_blocked_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1381,30 +1383,30 @@ model B2BEnterpriseAccount {
   adminUser   User   @relation("B2BEnterpriseAdmin", fields: [adminUserId], references: [id], onDelete: Cascade)
 
   acquiredByVluerUserId String? @map("acquired_by_vluer_user_id") @db.Uuid
-  acquiredByVluer     User?   @relation("EnterpriseAcquiredBy", fields: [acquiredByVluerUserId], references: [id], onDelete: SetNull)
+  acquiredByVluer       User?   @relation("EnterpriseAcquiredBy", fields: [acquiredByVluerUserId], references: [id], onDelete: SetNull)
 
-  companyName String @map("company_name") @db.VarChar(200)
-  masterDisplayNumber String @map("master_display_number") @db.VarChar(32)
-  carrier B2BTelecomCarrier @map("carrier")
-  billingCycle B2BBillingCycle @default(monthly) @map("billing_cycle")
-  status B2BEnterpriseStatus @default(draft) @map("status")
+  companyName         String              @map("company_name") @db.VarChar(200)
+  masterDisplayNumber String              @map("master_display_number") @db.VarChar(32)
+  carrier             B2BTelecomCarrier   @map("carrier")
+  billingCycle        B2BBillingCycle     @default(monthly) @map("billing_cycle")
+  status              B2BEnterpriseStatus @default(draft) @map("status")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  totalBillingAmountKrw Int @default(0) @map("total_billing_amount_krw")
-  nextBillingAt DateTime? @map("next_billing_at") @db.Timestamptz(6)
-  companyBrandingJson Json? @map("company_branding_json") @db.JsonB
+  totalBillingAmountKrw Int       @default(0) @map("total_billing_amount_krw")
+  nextBillingAt         DateTime? @map("next_billing_at") @db.Timestamptz(6)
+  companyBrandingJson   Json?     @map("company_branding_json") @db.JsonB
 
-  cartLines B2BCartLine[]
-  businessCards BusinessCard[]
-  attributions CorporateAttributionRequest[]
-  billingSchedule EnterpriseBillingSchedule?
+  cartLines        B2BCartLine[]
+  businessCards    BusinessCard[]
+  attributions     CorporateAttributionRequest[]
+  billingSchedule  EnterpriseBillingSchedule?
   corporateMembers UserCorporateMembership[]
 
   /// 회사 공용 예산(캐시) · 법인카드 등록 여부(결제 수단)
-  corporateWalletBalanceKrw Int @default(0) @map("corporate_wallet_balance_krw")
-  corporateCardLast4        String? @map("corporate_card_last4") @db.VarChar(4)
+  corporateWalletBalanceKrw Int       @default(0) @map("corporate_wallet_balance_krw")
+  corporateCardLast4        String?   @map("corporate_card_last4") @db.VarChar(4)
   corporateCardRegisteredAt DateTime? @map("corporate_card_registered_at") @db.Timestamptz(6)
 
   /// 가입·장바구니 목표 회선 수 (전원 등록 완료 시 그룹 채팅 자동 개설)
@@ -1424,20 +1426,24 @@ model B2BEnterpriseAccount {
 model B2BCartLine {
   id String @id @default(uuid()) @db.Uuid
 
-  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterpriseId String               @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
-  lineKind B2BCartLineKind @map("line_kind")
-  realCliPhoneE164 String @map("real_cli_phone_e164") @db.VarChar(24)
-  assigneeName String @map("assignee_name") @db.VarChar(120)
-  assigneeTitle String? @map("assignee_title") @db.VarChar(120)
-  /** 회선 계정 역할 — 가입·등록 시 대표가 지정 */
-  enterpriseRole EnterpriseRole @default(STAFF) @map("enterprise_role")
-  /** true: 고객·디지털 명함에 기업 대표번호 표시 / false: 등록 번호 그대로 */
-  useMasterDisplayNumber Boolean @default(false) @map("use_master_display_number")
+  lineKind               B2BCartLineKind @map("line_kind")
+  realCliPhoneE164       String          @map("real_cli_phone_e164") @db.VarChar(24)
+  assigneeName           String          @map("assignee_name") @db.VarChar(120)
+  assigneeTitle          String?         @map("assignee_title") @db.VarChar(120)
+  /**
+   * 회선 계정 역할 — 가입·등록 시 대표가 지정
+   */
+  enterpriseRole         EnterpriseRole  @default(STAFF) @map("enterprise_role")
+  /**
+   * true: 고객·디지털 명함에 기업 대표번호 표시 / false: 등록 번호 그대로
+   */
+  useMasterDisplayNumber Boolean         @default(false) @map("use_master_display_number")
 
   linkedUserId String? @map("linked_user_id") @db.Uuid
-  sortOrder Int @default(0) @map("sort_order")
+  sortOrder    Int     @default(0) @map("sort_order")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1451,19 +1457,19 @@ model B2BCartLine {
 model CorporateAttributionRequest {
   id String @id @default(uuid()) @db.Uuid
 
-  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterpriseId String               @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
   memberUserId String @map("member_user_id") @db.Uuid
   memberUser   User   @relation("AttributionMember", fields: [memberUserId], references: [id], onDelete: Cascade)
 
-  memberPhoneE164 String @map("member_phone_e164") @db.VarChar(24)
-  status CorporateAttributionStatus @default(pending_doc_verification) @map("status")
-  documentUrls Json? @map("document_urls") @db.JsonB
-  adminNote String? @map("admin_note") @db.Text
+  memberPhoneE164 String                     @map("member_phone_e164") @db.VarChar(24)
+  status          CorporateAttributionStatus @default(pending_doc_verification) @map("status")
+  documentUrls    Json?                      @map("document_urls") @db.JsonB
+  adminNote       String?                    @map("admin_note") @db.Text
 
-  approvedAt DateTime? @map("approved_at") @db.Timestamptz(6)
-  approvedByAdminId String? @map("approved_by_admin_id") @db.Uuid
+  approvedAt        DateTime? @map("approved_at") @db.Timestamptz(6)
+  approvedByAdminId String?   @map("approved_by_admin_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1480,18 +1486,18 @@ model CommissionLedger {
   vluerUser   User   @relation("CommissionVluer", fields: [vluerUserId], references: [id], onDelete: Cascade)
 
   payerUserId String? @map("payer_user_id") @db.Uuid
-  payerUser   User?  @relation("CommissionPayer", fields: [payerUserId], references: [id], onDelete: SetNull)
+  payerUser   User?   @relation("CommissionPayer", fields: [payerUserId], references: [id], onDelete: SetNull)
 
-  kind CommissionLedgerKind @map("kind")
-  tierCode VluerTierCode @map("tier_code")
-  payoutMode VluerPayoutMode @map("payout_mode")
+  kind       CommissionLedgerKind @map("kind")
+  tierCode   VluerTierCode        @map("tier_code")
+  payoutMode VluerPayoutMode      @map("payout_mode")
 
   grossPaymentKrw Int @map("gross_payment_krw")
-  pgFeeKrw Int @default(0) @map("pg_fee_krw")
-  commissionKrw Int @map("commission_krw")
+  pgFeeKrw        Int @default(0) @map("pg_fee_krw")
+  commissionKrw   Int @map("commission_krw")
 
   blockedReason String? @map("blocked_reason") @db.VarChar(80)
-  referralCode String? @map("referral_code") @db.VarChar(24)
+  referralCode  String? @map("referral_code") @db.VarChar(24)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1545,13 +1551,13 @@ model UserCorporateMembership {
   userId String @id @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterpriseId String               @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
   attributionRequestId String? @unique @map("attribution_request_id") @db.Uuid
 
-  overrideByCompany Boolean @default(true) @map("override_by_company")
-  activatedAt DateTime @default(now()) @map("activated_at") @db.Timestamptz(6)
+  overrideByCompany Boolean  @default(true) @map("override_by_company")
+  activatedAt       DateTime @default(now()) @map("activated_at") @db.Timestamptz(6)
 
   @@index([enterpriseId])
   @@map("user_corporate_memberships")
@@ -1563,34 +1569,40 @@ model UserSubscription {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  plan UserSubscriptionPlan @map("plan")
-  status UserSubscriptionStatus @default(active) @map("status")
-  amountKrw Int @map("amount_krw")
-  listPriceKrw Int? @map("list_price_krw")
-  isDiscounted Boolean @default(false) @map("is_discounted")
-  /** 사후 추천인 등록 — 다음 결제 주기부터 30% 할인 적용 예약 */
-  isDiscountedNextCycle Boolean @default(false) @map("is_discounted_next_cycle")
-  referralCodeUsed String? @map("referral_code_used") @db.VarChar(24)
-  sponsorVluerUserId String? @map("sponsor_vluer_user_id") @db.Uuid
+  plan                  UserSubscriptionPlan   @map("plan")
+  status                UserSubscriptionStatus @default(active) @map("status")
+  amountKrw             Int                    @map("amount_krw")
+  listPriceKrw          Int?                   @map("list_price_krw")
+  isDiscounted          Boolean                @default(false) @map("is_discounted")
+  /**
+   * 사후 추천인 등록 — 다음 결제 주기부터 30% 할인 적용 예약
+   */
+  isDiscountedNextCycle Boolean                @default(false) @map("is_discounted_next_cycle")
+  referralCodeUsed      String?                @map("referral_code_used") @db.VarChar(24)
+  sponsorVluerUserId    String?                @map("sponsor_vluer_user_id") @db.Uuid
 
-  cycleStartAt DateTime @map("cycle_start_at") @db.Timestamptz(6)
-  cycleEndAt   DateTime @map("cycle_end_at") @db.Timestamptz(6)
+  cycleStartAt DateTime  @map("cycle_start_at") @db.Timestamptz(6)
+  cycleEndAt   DateTime  @map("cycle_end_at") @db.Timestamptz(6)
   nextChargeAt DateTime? @map("next_charge_at") @db.Timestamptz(6)
 
-  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(6)
-  cancelReason String? @map("cancel_reason") @db.VarChar(120)
+  cancelledAt  DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason String?   @map("cancel_reason") @db.VarChar(120)
 
-  /** 포트원 V1 정기결제 빌링키(customer_uid) */
+  /**
+   * 포트원 V1 정기결제 빌링키(customer_uid)
+   */
   portoneCustomerUid String? @map("portone_customer_uid") @db.VarChar(64)
 
-  /** 임직원 개인 콤보 — 회사 14,700원 + 개인 5,100원 = 유료 19,800원 수평 */
+  /**
+   * 임직원 개인 콤보 — 회사 14,700원 + 개인 5,100원 = 유료 19,800원 수평
+   */
   isPersonalCombo Boolean @default(false) @map("is_personal_combo")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  refundQueues RefundQueue[]
-  payments       SubscriptionPayment[]
+  refundQueues      RefundQueue[]
+  payments          SubscriptionPayment[]
   lineSubscriptions LineSubscription[]
 
   @@index([userId, status])
@@ -1603,11 +1615,11 @@ model MemberReferralBenefitState {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// 누적 이용 개월(페널티 6개월 포함) — 12 초과 시 15% 할인·5% 레퍼럴 고정
-  accumulatedBenefitMonths Int @default(0) @map("accumulated_benefit_months")
+  accumulatedBenefitMonths Int     @default(0) @map("accumulated_benefit_months")
   /// 재가입 직후 스폰서 레퍼럴 0원 잔여 개월
-  sponsorPenaltyMonthsLeft Int @default(0) @map("sponsor_penalty_months_left")
+  sponsorPenaltyMonthsLeft Int     @default(0) @map("sponsor_penalty_months_left")
   /// 탈퇴 후 동일 신원 재가입
-  isRejoinFromAbuseLog Boolean @default(false) @map("is_rejoin_from_abuse_log")
+  isRejoinFromAbuseLog     Boolean @default(false) @map("is_rejoin_from_abuse_log")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1618,12 +1630,12 @@ model MemberReferralBenefitState {
 /// 탈퇴 회원 신원 해시·혜택 이력 (전자상거래법·개인정보보호법 — PII 미보관, 3~5년 분리 보관)
 model AbusingProtectionLog {
   /// 휴대폰(CI 우선) SHA-256 hex — PK
-  hashedIdentity String @id @map("hashed_identity") @db.VarChar(64)
+  hashedIdentity         String   @id @map("hashed_identity") @db.VarChar(64)
   /// 탈퇴 시점까지 유료 이용 누적 개월 (슬라이딩 30% 잔여 산정)
-  accumulatedUsingMonths Int @default(0) @map("accumulated_using_months")
+  accumulatedUsingMonths Int      @default(0) @map("accumulated_using_months")
   /// 탈퇴 당시 마지막 추천인 코드
-  lastReferralCode String? @map("last_referral_code") @db.VarChar(24)
-  deletedAt DateTime @default(now()) @map("deleted_at") @db.Timestamptz(6)
+  lastReferralCode       String?  @map("last_referral_code") @db.VarChar(24)
+  deletedAt              DateTime @default(now()) @map("deleted_at") @db.Timestamptz(6)
 
   @@index([deletedAt])
   @@map("abusing_protection_logs")
@@ -1637,10 +1649,10 @@ model SecuritySearchAlert {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// RATE_LIMIT_BURST | ACCOUNT_SUSPENDED | ANOMALY_VOLUME
-  alertType String @map("alert_type") @db.VarChar(48)
-  severity  String @default("high") @map("severity") @db.VarChar(16)
-  message   String @map("message") @db.VarChar(500)
-  metaJson  Json?  @map("meta_json") @db.JsonB
+  alertType    String  @map("alert_type") @db.VarChar(48)
+  severity     String  @default("high") @map("severity") @db.VarChar(16)
+  message      String  @map("message") @db.VarChar(500)
+  metaJson     Json?   @map("meta_json") @db.JsonB
   acknowledged Boolean @default(false) @map("acknowledged")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1792,6 +1804,59 @@ model ShowcaseSoundQuotaMonth {
   @@map("showcase_sound_quota_months")
 }
 
+enum RewardedAdAction {
+  showcase_slot_unlock
+  showcase_save
+  bgm_apply
+}
+
+enum RewardedAdGrantStatus {
+  pending
+  earned
+  consumed
+  rejected
+  expired
+}
+
+/// 무료회원의 영구 쇼케이스 슬롯 해금 상태. 1번 슬롯은 가입 즉시 기본 제공.
+model UserAdState {
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// bit 0~4 = 슬롯 1~5. 기본값 1은 첫 슬롯만 즉시 제공.
+  showcaseSlotMask     Int       @default(1) @map("showcase_slot_mask")
+  firstShowcaseSavedAt DateTime? @map("first_showcase_saved_at") @db.Timestamptz(6)
+  firstBgmAppliedAt    DateTime? @map("first_bgm_applied_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("user_ad_states")
+}
+
+/// AdMob SSV로 획득 여부를 검증하는 일회성 광고 권한.
+model RewardedAdGrant {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  action    RewardedAdAction
+  targetKey String?               @map("target_key") @db.VarChar(120)
+  status    RewardedAdGrantStatus @default(pending)
+
+  providerTransactionId String?   @unique @map("provider_transaction_id") @db.VarChar(180)
+  providerPayloadJson   Json?     @map("provider_payload_json") @db.JsonB
+  expiresAt             DateTime  @map("expires_at") @db.Timestamptz(6)
+  earnedAt              DateTime? @map("earned_at") @db.Timestamptz(6)
+  consumedAt            DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId, action, status, createdAt(sort: Desc)])
+  @@map("rewarded_ad_grants")
+}
+
 /// V2 쇼케이스 소셜 — 좋아요 등 반응
 model ShowcaseReaction {
   id String @id @default(uuid()) @db.Uuid
@@ -1826,12 +1891,12 @@ model ShowcaseComment {
   author       User   @relation("ShowcaseCommentAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
 
   /// 답글 대상(루트 댓글). null = 최상위 댓글. 답글의 답글은 허용하지 않음(1단).
-  parentId String?          @map("parent_id") @db.Uuid
-  parent   ShowcaseComment? @relation("ShowcaseCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId String?           @map("parent_id") @db.Uuid
+  parent   ShowcaseComment?  @relation("ShowcaseCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies  ShowcaseComment[] @relation("ShowcaseCommentReplies")
 
   slideId String @default("") @map("slide_id") @db.VarChar(80)
-  body    String  @map("body") @db.VarChar(1000)
+  body    String @map("body") @db.VarChar(1000)
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1848,17 +1913,17 @@ model SubscriptionPayment {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  subscriptionId String? @map("subscription_id") @db.Uuid
+  subscriptionId String?           @map("subscription_id") @db.Uuid
   subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
-  merchantUid  String @unique @map("merchant_uid") @db.VarChar(80)
-  impUid       String? @map("imp_uid") @db.VarChar(80)
-  customerUid  String @map("customer_uid") @db.VarChar(64)
-  amountKrw    Int    @map("amount_krw")
-  status       SubscriptionPaymentStatus @default(pending) @map("status")
-  portoneStatus String? @map("portone_status") @db.VarChar(40)
-  paidAt       DateTime? @map("paid_at") @db.Timestamptz(6)
-  rawResponse  Json? @map("raw_response") @db.JsonB
+  merchantUid   String                    @unique @map("merchant_uid") @db.VarChar(80)
+  impUid        String?                   @map("imp_uid") @db.VarChar(80)
+  customerUid   String                    @map("customer_uid") @db.VarChar(64)
+  amountKrw     Int                       @map("amount_krw")
+  status        SubscriptionPaymentStatus @default(pending) @map("status")
+  portoneStatus String?                   @map("portone_status") @db.VarChar(40)
+  paidAt        DateTime?                 @map("paid_at") @db.Timestamptz(6)
+  rawResponse   Json?                     @map("raw_response") @db.JsonB
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1880,19 +1945,19 @@ model LineSubscription {
   userSubscriptionId String?           @map("user_subscription_id") @db.Uuid
   userSubscription   UserSubscription? @relation(fields: [userSubscriptionId], references: [id], onDelete: SetNull)
 
-  plan   UserSubscriptionPlan   @map("plan")
-  status LineSubscriptionStatus @default(pending_payment) @map("status")
-  amountKrw Int @map("amount_krw")
+  plan      UserSubscriptionPlan   @map("plan")
+  status    LineSubscriptionStatus @default(pending_payment) @map("status")
+  amountKrw Int                    @map("amount_krw")
 
   cycleStartAt DateTime  @map("cycle_start_at") @db.Timestamptz(6)
   cycleEndAt   DateTime  @map("cycle_end_at") @db.Timestamptz(6)
   nextChargeAt DateTime? @map("next_charge_at") @db.Timestamptz(6)
 
-  graceStartedAt DateTime? @map("grace_started_at") @db.Timestamptz(6)
-  graceEndsAt    DateTime? @map("grace_ends_at") @db.Timestamptz(6)
-  lapsedAt       DateTime? @map("lapsed_at") @db.Timestamptz(6)
-  cancelledAt    DateTime? @map("cancelled_at") @db.Timestamptz(6)
-  cancelReason   String?   @map("cancel_reason") @db.VarChar(120)
+  graceStartedAt   DateTime? @map("grace_started_at") @db.Timestamptz(6)
+  graceEndsAt      DateTime? @map("grace_ends_at") @db.Timestamptz(6)
+  lapsedAt         DateTime? @map("lapsed_at") @db.Timestamptz(6)
+  cancelledAt      DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason     String?   @map("cancel_reason") @db.VarChar(120)
   showcasePurgedAt DateTime? @map("showcase_purged_at") @db.Timestamptz(6)
 
   portoneCustomerUid String?   @map("portone_customer_uid") @db.VarChar(64)
@@ -1917,15 +1982,15 @@ model LineSubscriptionPayment {
   lineSubscriptionId String           @map("line_subscription_id") @db.Uuid
   lineSubscription   LineSubscription @relation(fields: [lineSubscriptionId], references: [id], onDelete: Cascade)
 
-  merchantUid   String  @unique @map("merchant_uid") @db.VarChar(80)
-  impUid        String? @map("imp_uid") @db.VarChar(80)
-  customerUid   String  @map("customer_uid") @db.VarChar(64)
-  amountKrw     Int     @map("amount_krw")
+  merchantUid   String                    @unique @map("merchant_uid") @db.VarChar(80)
+  impUid        String?                   @map("imp_uid") @db.VarChar(80)
+  customerUid   String                    @map("customer_uid") @db.VarChar(64)
+  amountKrw     Int                       @map("amount_krw")
   status        SubscriptionPaymentStatus @default(pending) @map("status")
-  portoneStatus String? @map("portone_status") @db.VarChar(40)
-  paidAt        DateTime? @map("paid_at") @db.Timestamptz(6)
-  failureReason String? @map("failure_reason") @db.VarChar(240)
-  rawResponse   Json?   @map("raw_response") @db.JsonB
+  portoneStatus String?                   @map("portone_status") @db.VarChar(40)
+  paidAt        DateTime?                 @map("paid_at") @db.Timestamptz(6)
+  failureReason String?                   @map("failure_reason") @db.VarChar(240)
+  rawResponse   Json?                     @map("raw_response") @db.JsonB
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -1937,15 +2002,15 @@ model LineSubscriptionPayment {
 model EnterpriseBillingSchedule {
   id String @id @default(uuid()) @db.Uuid
 
-  enterpriseId String @unique @map("enterprise_id") @db.Uuid
+  enterpriseId String               @unique @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
-  totalBillingAmountKrw Int @default(0) @map("total_billing_amount_krw")
-  lineCount Int @default(0) @map("line_count")
-  billingCycle B2BBillingCycle @map("billing_cycle")
-  nextBillingAt DateTime @map("next_billing_at") @db.Timestamptz(6)
-  status EnterpriseBillingStatus @default(active) @map("status")
-  corporatePaymentRef String? @map("corporate_payment_ref") @db.VarChar(120)
+  totalBillingAmountKrw Int                     @default(0) @map("total_billing_amount_krw")
+  lineCount             Int                     @default(0) @map("line_count")
+  billingCycle          B2BBillingCycle         @map("billing_cycle")
+  nextBillingAt         DateTime                @map("next_billing_at") @db.Timestamptz(6)
+  status                EnterpriseBillingStatus @default(active) @map("status")
+  corporatePaymentRef   String?                 @map("corporate_payment_ref") @db.VarChar(120)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1959,15 +2024,15 @@ model RefundQueue {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  subscriptionId String? @map("subscription_id") @db.Uuid
+  subscriptionId String?           @map("subscription_id") @db.Uuid
   subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
-  refundAmountKrw Int @map("refund_amount_krw")
-  reason String @map("reason") @db.VarChar(200)
-  status RefundQueueStatus @default(pending) @map("status")
-  prorationMeta Json? @map("proration_meta") @db.JsonB
+  refundAmountKrw Int               @map("refund_amount_krw")
+  reason          String            @map("reason") @db.VarChar(200)
+  status          RefundQueueStatus @default(pending) @map("status")
+  prorationMeta   Json?             @map("proration_meta") @db.JsonB
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
 
   @@index([userId, status])
@@ -2017,48 +2082,50 @@ enum FamilyBankConsentStatus {
 }
 
 model FamilyProtectionSettings {
-  userId                   String   @id @map("user_id") @db.Uuid
-  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  alertNoAppEnabled        Boolean  @default(true) @map("alert_no_app_enabled")
-  alertNoAppHours          Int      @default(24) @map("alert_no_app_hours")
-  alertMissedCallEnabled   Boolean  @default(true) @map("alert_missed_call_enabled")
-  alertMissedCallThreshold Int      @default(3) @map("alert_missed_call_threshold")
-  alertChildSiteEnabled    Boolean  @default(true) @map("alert_child_site_enabled")
-  alertElderLongCallEnabled      Boolean @default(true) @map("alert_elder_long_call_enabled")
-  alertElderLongCallMinutes      Int     @default(10) @map("alert_elder_long_call_minutes")
-  alertElderRemoteAppEnabled     Boolean @default(true) @map("alert_elder_remote_app_enabled")
-  alertElderGovCallEnabled       Boolean @default(true) @map("alert_elder_gov_call_enabled")
-  alertChildBankEnabled          Boolean @default(true) @map("alert_child_bank_enabled")
-  alertChildBankAllTx            Boolean @default(false) @map("alert_child_bank_all_tx")
-  alertChildBankThresholdKrw     Int     @default(10000) @map("alert_child_bank_threshold_krw")
-  alertChildUnknownPayeeEnabled  Boolean @default(true) @map("alert_child_unknown_payee_enabled")
-  /** 추가 인원 패키지(4→8명) — 추후 결제 연동 */
-  extraMemberPackActive  Boolean  @default(false) @map("extra_member_pack_active")
-  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userId                        String   @id @map("user_id") @db.Uuid
+  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertNoAppEnabled             Boolean  @default(true) @map("alert_no_app_enabled")
+  alertNoAppHours               Int      @default(24) @map("alert_no_app_hours")
+  alertMissedCallEnabled        Boolean  @default(true) @map("alert_missed_call_enabled")
+  alertMissedCallThreshold      Int      @default(3) @map("alert_missed_call_threshold")
+  alertChildSiteEnabled         Boolean  @default(true) @map("alert_child_site_enabled")
+  alertElderLongCallEnabled     Boolean  @default(true) @map("alert_elder_long_call_enabled")
+  alertElderLongCallMinutes     Int      @default(10) @map("alert_elder_long_call_minutes")
+  alertElderRemoteAppEnabled    Boolean  @default(true) @map("alert_elder_remote_app_enabled")
+  alertElderGovCallEnabled      Boolean  @default(true) @map("alert_elder_gov_call_enabled")
+  alertChildBankEnabled         Boolean  @default(true) @map("alert_child_bank_enabled")
+  alertChildBankAllTx           Boolean  @default(false) @map("alert_child_bank_all_tx")
+  alertChildBankThresholdKrw    Int      @default(10000) @map("alert_child_bank_threshold_krw")
+  alertChildUnknownPayeeEnabled Boolean  @default(true) @map("alert_child_unknown_payee_enabled")
+  /**
+   * 추가 인원 패키지(4→8명) — 추후 결제 연동
+   */
+  extraMemberPackActive         Boolean  @default(false) @map("extra_member_pack_active")
+  createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("family_protection_settings")
 }
 
 model FamilyProtectionLink {
-  id             String                     @id @default(uuid()) @db.Uuid
-  guardianUserId String                     @map("guardian_user_id") @db.Uuid
-  guardianUser   User                       @relation("FamilyGuardian", fields: [guardianUserId], references: [id], onDelete: Cascade)
-  wardUserId     String                     @map("ward_user_id") @db.Uuid
-  wardUser       User                       @relation("FamilyWard", fields: [wardUserId], references: [id], onDelete: Cascade)
-  wardRole       FamilyWardRole             @map("ward_role")
-  familyRelation FamilyRelation             @map("family_relation")
-  status         FamilyProtectionLinkStatus @default(pending)
-  wardAcceptedAt DateTime?                  @map("ward_accepted_at") @db.Timestamptz(6)
+  id                       String                     @id @default(uuid()) @db.Uuid
+  guardianUserId           String                     @map("guardian_user_id") @db.Uuid
+  guardianUser             User                       @relation("FamilyGuardian", fields: [guardianUserId], references: [id], onDelete: Cascade)
+  wardUserId               String                     @map("ward_user_id") @db.Uuid
+  wardUser                 User                       @relation("FamilyWard", fields: [wardUserId], references: [id], onDelete: Cascade)
+  wardRole                 FamilyWardRole             @map("ward_role")
+  familyRelation           FamilyRelation             @map("family_relation")
+  status                   FamilyProtectionLinkStatus @default(pending)
+  wardAcceptedAt           DateTime?                  @map("ward_accepted_at") @db.Timestamptz(6)
   /// 가족플랜 활성화 시 관리자·감사용 멤버십 경로 라벨
-  membershipPathLabel String?              @map("membership_path_label") @db.VarChar(120)
-  alertNoAppEnabled        Boolean? @map("alert_no_app_enabled")
-  alertNoAppHours          Int?     @map("alert_no_app_hours")
-  alertMissedCallEnabled   Boolean? @map("alert_missed_call_enabled")
-  alertMissedCallThreshold Int?     @map("alert_missed_call_threshold")
-  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
-  bankConsent    FamilyBankConsent?
+  membershipPathLabel      String?                    @map("membership_path_label") @db.VarChar(120)
+  alertNoAppEnabled        Boolean?                   @map("alert_no_app_enabled")
+  alertNoAppHours          Int?                       @map("alert_no_app_hours")
+  alertMissedCallEnabled   Boolean?                   @map("alert_missed_call_enabled")
+  alertMissedCallThreshold Int?                       @map("alert_missed_call_threshold")
+  createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bankConsent              FamilyBankConsent?
 
   @@unique([guardianUserId, wardUserId])
   @@index([wardUserId, status])
@@ -2067,18 +2134,18 @@ model FamilyProtectionLink {
 }
 
 model FamilyBankConsent {
-  id              String                  @id @default(uuid()) @db.Uuid
-  linkId          String                  @unique @map("link_id") @db.Uuid
-  link            FamilyProtectionLink    @relation(fields: [linkId], references: [id], onDelete: Cascade)
-  guardianUserId  String                  @map("guardian_user_id") @db.Uuid
-  wardUserId      String                  @map("ward_user_id") @db.Uuid
-  status          FamilyBankConsentStatus @default(pending)
-  accountLabel    String?                 @map("account_label") @db.VarChar(80)
-  bankCode        String?                 @map("bank_code") @db.VarChar(20)
-  accountMasked   String?                 @map("account_masked") @db.VarChar(40)
-  scopesJson      Json?                   @map("scopes_json") @db.JsonB
-  requestedAt     DateTime                @default(now()) @map("requested_at") @db.Timestamptz(6)
-  respondedAt     DateTime?               @map("responded_at") @db.Timestamptz(6)
+  id             String                  @id @default(uuid()) @db.Uuid
+  linkId         String                  @unique @map("link_id") @db.Uuid
+  link           FamilyProtectionLink    @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  guardianUserId String                  @map("guardian_user_id") @db.Uuid
+  wardUserId     String                  @map("ward_user_id") @db.Uuid
+  status         FamilyBankConsentStatus @default(pending)
+  accountLabel   String?                 @map("account_label") @db.VarChar(80)
+  bankCode       String?                 @map("bank_code") @db.VarChar(20)
+  accountMasked  String?                 @map("account_masked") @db.VarChar(40)
+  scopesJson     Json?                   @map("scopes_json") @db.JsonB
+  requestedAt    DateTime                @default(now()) @map("requested_at") @db.Timestamptz(6)
+  respondedAt    DateTime?               @map("responded_at") @db.Timestamptz(6)
 
   @@index([wardUserId, status])
   @@map("family_bank_consents")
@@ -2141,12 +2208,15 @@ model LocalAd {
   storeName      String   @map("store_name") @db.VarChar(80)
   description    String   @map("description") @db.VarChar(300)
   location       String   @map("location") @db.VarChar(120)
+  latitude       Float?
+  longitude      Float?
   imageUrl       String?  @map("image_url") @db.VarChar(512)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
+  @@index([latitude, longitude])
   @@index([feedPostId])
   @@map("local_ads")
 }
@@ -2194,14 +2264,14 @@ model StoreProduct {
   /// 프론트 localStorage 상품 id (`vlue_store_products_v1`)
   externalId String @map("external_id") @db.VarChar(64)
 
-  name            String @db.VarChar(200)
-  unitPriceKrw    Int    @map("unit_price_krw")
-  salePriceKrw    Int?   @map("sale_price_krw")
-  shippingFeeKrw  Int    @default(0) @map("shipping_fee_krw")
-  stock           Int    @default(0)
-  status          String @default("on_sale") @db.VarChar(24)
+  name           String  @db.VarChar(200)
+  unitPriceKrw   Int     @map("unit_price_krw")
+  salePriceKrw   Int?    @map("sale_price_krw")
+  shippingFeeKrw Int     @default(0) @map("shipping_fee_krw")
+  stock          Int     @default(0)
+  status         String  @default("on_sale") @db.VarChar(24)
   /// 숏폼·제품 소개 동영상 URL (mp4/HLS/YouTube 등 — 서버 장기 보관 없음)
-  videoUrl        String? @map("video_url") @db.VarChar(2048)
+  videoUrl       String? @map("video_url") @db.VarChar(2048)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -2227,23 +2297,23 @@ model ShopOrder {
   storeProductId String?       @map("store_product_id") @db.Uuid
   storeProduct   StoreProduct? @relation(fields: [storeProductId], references: [id], onDelete: SetNull)
 
-  productName     String @map("product_name") @db.VarChar(200)
-  unitPriceKrw    Int    @map("unit_price_krw")
-  shippingFeeKrw  Int    @default(0) @map("shipping_fee_krw")
-  quantity        Int    @default(1)
-  totalAmountKrw  Int    @map("total_amount_krw")
+  productName    String @map("product_name") @db.VarChar(200)
+  unitPriceKrw   Int    @map("unit_price_krw")
+  shippingFeeKrw Int    @default(0) @map("shipping_fee_krw")
+  quantity       Int    @default(1)
+  totalAmountKrw Int    @map("total_amount_krw")
 
-  status ShopOrderStatus @default(pending_payment) @map("status")
-  payMethod String? @map("pay_method") @db.VarChar(24)
+  status    ShopOrderStatus @default(pending_payment) @map("status")
+  payMethod String?         @map("pay_method") @db.VarChar(24)
 
-  impUid         String? @map("imp_uid") @db.VarChar(80)
-  portoneStatus  String? @map("portone_status") @db.VarChar(40)
-  receiptUrl     String? @map("receipt_url") @db.VarChar(512)
-  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
-  rawResponse    Json? @map("raw_response") @db.JsonB
+  impUid        String?   @map("imp_uid") @db.VarChar(80)
+  portoneStatus String?   @map("portone_status") @db.VarChar(40)
+  receiptUrl    String?   @map("receipt_url") @db.VarChar(512)
+  paidAt        DateTime? @map("paid_at") @db.Timestamptz(6)
+  rawResponse   Json?     @map("raw_response") @db.JsonB
 
   /// B2B 구매 시 세금·증빙 일괄 귀속(대표 그룹 id = MASTER user id)
-  enterpriseGroupId String? @map("enterprise_group_id") @db.Uuid
+  enterpriseGroupId      String? @map("enterprise_group_id") @db.Uuid
   paidByEnterpriseWallet Boolean @default(false) @map("paid_by_enterprise_wallet")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2266,17 +2336,17 @@ model UserDevice {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  deviceToken String @map("device_token") @db.VarChar(128)
-  fcmToken    String? @map("fcm_token") @db.VarChar(512)
-  label       String? @db.VarChar(120)
-  isVerified  Boolean @default(false) @map("is_verified")
+  deviceToken String    @map("device_token") @db.VarChar(128)
+  fcmToken    String?   @map("fcm_token") @db.VarChar(512)
+  label       String?   @db.VarChar(120)
+  isVerified  Boolean   @default(false) @map("is_verified")
   verifiedAt  DateTime? @map("verified_at") @db.Timestamptz(6)
 
-  userAgent String? @map("user_agent") @db.VarChar(512)
-  lastIp    String? @map("last_ip") @db.VarChar(45)
+  userAgent  String? @map("user_agent") @db.VarChar(512)
+  lastIp     String? @map("last_ip") @db.VarChar(45)
   clientKind String? @map("client_kind") @db.VarChar(16)
-  geoLabel  String? @map("geo_label") @db.VarChar(64)
-  platform  String? @map("platform") @db.VarChar(16)
+  geoLabel   String? @map("geo_label") @db.VarChar(64)
+  platform   String? @map("platform") @db.VarChar(16)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -2289,24 +2359,24 @@ model UserDevice {
 model StorePurchaseRequest {
   id String @id @default(uuid()) @db.Uuid
 
-  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterpriseId String               @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
   enterpriseGroupId String @map("enterprise_group_id") @db.Uuid
 
-  productId           String @map("product_id") @db.VarChar(64)
-  productName         String @map("product_name") @db.VarChar(200)
-  quantity            Int    @default(1)
-  unitPriceKrw        Int    @default(0) @map("unit_price_krw")
-  requestedByUserId   String @map("requested_by_user_id") @db.Uuid
-  requestedByUser     User   @relation("StorePurchaseRequester", fields: [requestedByUserId], references: [id], onDelete: Cascade)
-  requestedByName     String @map("requested_by_name") @db.VarChar(120)
-  requestedByDept     String? @map("requested_by_dept") @db.VarChar(80)
+  productId         String  @map("product_id") @db.VarChar(64)
+  productName       String  @map("product_name") @db.VarChar(200)
+  quantity          Int     @default(1)
+  unitPriceKrw      Int     @default(0) @map("unit_price_krw")
+  requestedByUserId String  @map("requested_by_user_id") @db.Uuid
+  requestedByUser   User    @relation("StorePurchaseRequester", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  requestedByName   String  @map("requested_by_name") @db.VarChar(120)
+  requestedByDept   String? @map("requested_by_dept") @db.VarChar(80)
 
-  status StorePurchaseRequestStatus @default(PENDING) @map("status")
-  buyerNote String? @map("buyer_note") @db.Text
-  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(6)
-  reviewedByUserId String? @map("reviewed_by_user_id") @db.Uuid
+  status           StorePurchaseRequestStatus @default(PENDING) @map("status")
+  buyerNote        String?                    @map("buyer_note") @db.Text
+  reviewedAt       DateTime?                  @map("reviewed_at") @db.Timestamptz(6)
+  reviewedByUserId String?                    @map("reviewed_by_user_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -2319,7 +2389,7 @@ model StorePurchaseRequest {
 model EnterpriseProcurementCartItem {
   id String @id @default(uuid()) @db.Uuid
 
-  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterpriseId String               @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
   externalProductId String @map("external_product_id") @db.VarChar(64)
@@ -2327,9 +2397,9 @@ model EnterpriseProcurementCartItem {
   quantity          Int    @default(1)
   unitPriceKrw      Int    @default(0) @map("unit_price_krw")
 
-  addedByUserId String @map("added_by_user_id") @db.Uuid
-  addedByUser   User   @relation("ProcurementCartAddedBy", fields: [addedByUserId], references: [id], onDelete: Cascade)
-  addedByName   String @map("added_by_name") @db.VarChar(120)
+  addedByUserId String  @map("added_by_user_id") @db.Uuid
+  addedByUser   User    @relation("ProcurementCartAddedBy", fields: [addedByUserId], references: [id], onDelete: Cascade)
+  addedByName   String  @map("added_by_name") @db.VarChar(120)
   addedByDept   String? @map("added_by_dept") @db.VarChar(80)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2341,7 +2411,7 @@ model EnterpriseProcurementCartItem {
 model EnterpriseGroupChat {
   id String @id @default(uuid()) @db.Uuid
 
-  enterpriseId String @unique @map("enterprise_id") @db.Uuid
+  enterpriseId String               @unique @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
   title String @default("사내 비품·업무") @db.VarChar(120)
@@ -2356,11 +2426,11 @@ model EnterpriseGroupChat {
 model EnterpriseGroupChatMessage {
   id String @id @default(uuid()) @db.Uuid
 
-  chatId String @map("chat_id") @db.Uuid
+  chatId String              @map("chat_id") @db.Uuid
   chat   EnterpriseGroupChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   senderId String? @map("sender_id") @db.Uuid
-  content  String @db.Text
+  content  String  @db.Text
   isSystem Boolean @default(false) @map("is_system")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2372,18 +2442,18 @@ model EnterpriseGroupChatMessage {
 model EnterpriseMemberCredential {
   id String @id @default(uuid()) @db.Uuid
 
-  enterpriseId String @map("enterprise_id") @db.Uuid
+  enterpriseId String               @map("enterprise_id") @db.Uuid
   enterprise   B2BEnterpriseAccount @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
 
-  userId String @map("user_id") @db.Uuid
-  publicHandle String @map("public_handle") @db.VarChar(32)
-  assigneeName String @map("assignee_name") @db.VarChar(120)
-  enterpriseRole EnterpriseRole @default(STAFF) @map("enterprise_role")
-  lineKind B2BCartLineKind @map("line_kind")
-  phoneE164 String @map("phone_e164") @db.VarChar(24)
+  userId         String          @map("user_id") @db.Uuid
+  publicHandle   String          @map("public_handle") @db.VarChar(32)
+  assigneeName   String          @map("assignee_name") @db.VarChar(120)
+  enterpriseRole EnterpriseRole  @default(STAFF) @map("enterprise_role")
+  lineKind       B2BCartLineKind @map("line_kind")
+  phoneE164      String          @map("phone_e164") @db.VarChar(24)
 
-  initialPassword String @map("initial_password") @db.VarChar(64)
-  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(6)
+  initialPassword String    @map("initial_password") @db.VarChar(64)
+  deliveredAt     DateTime? @map("delivered_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -2399,9 +2469,9 @@ model PersonalEnterpriseMailOtp {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  email   String @db.VarChar(254)
-  otpHash String @map("otp_hash") @db.VarChar(128)
-  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  email      String    @db.VarChar(254)
+  otpHash    String    @map("otp_hash") @db.VarChar(128)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
   verifiedAt DateTime? @map("verified_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2513,8 +2583,8 @@ enum MailMessageDirection {
 model StoreProfile {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId String @map("owner_user_id") @db.Uuid
-  displayName String @map("display_name") @db.VarChar(160)
+  ownerUserId String  @map("owner_user_id") @db.Uuid
+  displayName String  @map("display_name") @db.VarChar(160)
   introText   String? @map("intro_text") @db.Text
   metaJson    Json?   @map("meta_json") @db.JsonB
 
@@ -2528,11 +2598,11 @@ model StoreProfile {
 model SourcingDraft {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId    String @map("owner_user_id") @db.Uuid
-  storeProfileId String? @map("store_profile_id") @db.Uuid
-  sourceImageUrl String? @map("source_image_url") @db.VarChar(1000)
-  sourceUrl      String? @map("source_url") @db.VarChar(1000)
-  contentJson    Json?   @map("content_json") @db.JsonB
+  ownerUserId    String              @map("owner_user_id") @db.Uuid
+  storeProfileId String?             @map("store_profile_id") @db.Uuid
+  sourceImageUrl String?             @map("source_image_url") @db.VarChar(1000)
+  sourceUrl      String?             @map("source_url") @db.VarChar(1000)
+  contentJson    Json?               @map("content_json") @db.JsonB
   status         SourcingDraftStatus @default(draft) @map("status")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2590,11 +2660,11 @@ model PartnershipVaultConnection {
 model GroupBuyCampaign {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId String @map("owner_user_id") @db.Uuid
-  title       String @map("title") @db.VarChar(240)
-  targetQty   Int    @map("target_qty")
-  soldQty     Int    @default(0) @map("sold_qty")
-  endsAt      DateTime @map("ends_at") @db.Timestamptz(6)
+  ownerUserId String                 @map("owner_user_id") @db.Uuid
+  title       String                 @map("title") @db.VarChar(240)
+  targetQty   Int                    @map("target_qty")
+  soldQty     Int                    @default(0) @map("sold_qty")
+  endsAt      DateTime               @map("ends_at") @db.Timestamptz(6)
   status      GroupBuyCampaignStatus @default(draft) @map("status")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2607,11 +2677,11 @@ model GroupBuyCampaign {
 model GroupBuyStockTick {
   id String @id @default(uuid()) @db.Uuid
 
-  campaignId String @map("campaign_id") @db.Uuid
-  soldQty    Int    @map("sold_qty")
-  remainQty  Int    @map("remain_qty")
-  payloadJson Json? @map("payload_json") @db.JsonB
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  campaignId  String   @map("campaign_id") @db.Uuid
+  soldQty     Int      @map("sold_qty")
+  remainQty   Int      @map("remain_qty")
+  payloadJson Json?    @map("payload_json") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([campaignId, createdAt(sort: Desc)])
   @@map("groupbuy_stock_ticks")
@@ -2620,12 +2690,12 @@ model GroupBuyStockTick {
 model LiveStreamEndpoint {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId String @map("owner_user_id") @db.Uuid
-  platform    String @map("platform") @db.VarChar(40)
-  streamId    String @map("stream_id") @db.VarChar(120)
-  rtmpUrl     String @map("rtmp_url") @db.VarChar(1000)
-  streamKey   String @map("stream_key") @db.VarChar(220)
-  embedUrl    String @map("embed_url") @db.VarChar(1000)
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  platform    String   @map("platform") @db.VarChar(40)
+  streamId    String   @map("stream_id") @db.VarChar(120)
+  rtmpUrl     String   @map("rtmp_url") @db.VarChar(1000)
+  streamKey   String   @map("stream_key") @db.VarChar(220)
+  embedUrl    String   @map("embed_url") @db.VarChar(1000)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([platform, streamId])
@@ -2652,10 +2722,10 @@ model PptJob {
 model PptJobEvent {
   id String @id @default(uuid()) @db.Uuid
 
-  pptJobId  String @map("ppt_job_id") @db.Uuid
-  eventType String @map("event_type") @db.VarChar(60)
-  payloadJson Json? @map("payload_json") @db.JsonB
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  pptJobId    String   @map("ppt_job_id") @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(60)
+  payloadJson Json?    @map("payload_json") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([pptJobId, createdAt(sort: Desc)])
   @@map("ppt_job_events")
@@ -2664,10 +2734,10 @@ model PptJobEvent {
 model CompanyLineWhitelist {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId String @map("owner_user_id") @db.Uuid
-  lineNumber  String @map("line_number") @db.VarChar(40)
-  lineLabel   String? @map("line_label") @db.VarChar(120)
-  active      Boolean @default(true) @map("active")
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  lineNumber  String   @map("line_number") @db.VarChar(40)
+  lineLabel   String?  @map("line_label") @db.VarChar(120)
+  active      Boolean  @default(true) @map("active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([ownerUserId, lineNumber])
@@ -2677,11 +2747,11 @@ model CompanyLineWhitelist {
 model PcAgentSession {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId   String @map("owner_user_id") @db.Uuid
-  sessionToken  String @unique @map("session_token") @db.VarChar(160)
-  deviceLabel   String @map("device_label") @db.VarChar(140)
+  ownerUserId     String    @map("owner_user_id") @db.Uuid
+  sessionToken    String    @unique @map("session_token") @db.VarChar(160)
+  deviceLabel     String    @map("device_label") @db.VarChar(140)
   lastHeartbeatAt DateTime? @map("last_heartbeat_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([ownerUserId, createdAt(sort: Desc)])
   @@map("pc_agent_sessions")
@@ -2690,13 +2760,13 @@ model PcAgentSession {
 model AssetFile {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId String @map("owner_user_id") @db.Uuid
-  folderId    String? @map("folder_id") @db.Uuid
-  fileName    String @map("file_name") @db.VarChar(260)
-  contentType String @map("content_type") @db.VarChar(120)
-  fileSize    Int?   @map("file_size")
-  objectKey   String @map("object_key") @db.VarChar(500)
-  fileUrl     String @map("file_url") @db.VarChar(1000)
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  folderId    String?  @map("folder_id") @db.Uuid
+  fileName    String   @map("file_name") @db.VarChar(260)
+  contentType String   @map("content_type") @db.VarChar(120)
+  fileSize    Int?     @map("file_size")
+  objectKey   String   @map("object_key") @db.VarChar(500)
+  fileUrl     String   @map("file_url") @db.VarChar(1000)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([ownerUserId, createdAt(sort: Desc)])
@@ -2706,10 +2776,10 @@ model AssetFile {
 model UserVaultFolder {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId String @map("owner_user_id") @db.Uuid
-  folderName  String @map("folder_name") @db.VarChar(140)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  folderName  String   @map("folder_name") @db.VarChar(140)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([ownerUserId, folderName])
   @@map("user_vault_folders")
@@ -2718,12 +2788,12 @@ model UserVaultFolder {
 model RemotePrintJob {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId    String @map("owner_user_id") @db.Uuid
-  sourceAssetId  String @map("source_asset_id") @db.Uuid
-  targetLine     String @map("target_line") @db.VarChar(40)
-  status         RemoteJobStatus @default(queued) @map("status")
-  message        String? @map("message") @db.VarChar(240)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  ownerUserId   String          @map("owner_user_id") @db.Uuid
+  sourceAssetId String          @map("source_asset_id") @db.Uuid
+  targetLine    String          @map("target_line") @db.VarChar(40)
+  status        RemoteJobStatus @default(queued) @map("status")
+  message       String?         @map("message") @db.VarChar(240)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([ownerUserId, createdAt(sort: Desc)])
   @@map("remote_print_jobs")
@@ -2732,12 +2802,12 @@ model RemotePrintJob {
 model RemoteFaxJob {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId    String @map("owner_user_id") @db.Uuid
-  sourceAssetId  String @map("source_asset_id") @db.Uuid
-  targetLine     String @map("target_line") @db.VarChar(40)
-  status         RemoteJobStatus @default(queued) @map("status")
-  message        String? @map("message") @db.VarChar(240)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  ownerUserId   String          @map("owner_user_id") @db.Uuid
+  sourceAssetId String          @map("source_asset_id") @db.Uuid
+  targetLine    String          @map("target_line") @db.VarChar(40)
+  status        RemoteJobStatus @default(queued) @map("status")
+  message       String?         @map("message") @db.VarChar(240)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([ownerUserId, createdAt(sort: Desc)])
   @@map("remote_fax_jobs")
@@ -2746,9 +2816,9 @@ model RemoteFaxJob {
 model MailAccount {
   id String @id @default(uuid()) @db.Uuid
 
-  ownerUserId String @map("owner_user_id") @db.Uuid
-  address     String @unique @map("address") @db.VarChar(254)
-  status      String @default("active") @map("status") @db.VarChar(20)
+  ownerUserId String   @map("owner_user_id") @db.Uuid
+  address     String   @unique @map("address") @db.VarChar(254)
+  status      String   @default("active") @map("status") @db.VarChar(20)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([ownerUserId, createdAt(sort: Desc)])
@@ -2758,14 +2828,14 @@ model MailAccount {
 model MailMessage {
   id String @id @default(uuid()) @db.Uuid
 
-  accountId   String @map("account_id") @db.Uuid
+  accountId   String               @map("account_id") @db.Uuid
   direction   MailMessageDirection @map("direction")
-  fromAddress String @map("from_address") @db.VarChar(254)
-  toAddress   String @map("to_address") @db.VarChar(254)
-  subject     String @map("subject") @db.VarChar(260)
-  bodyText    String? @map("body_text") @db.Text
-  payloadJson Json? @map("payload_json") @db.JsonB
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  fromAddress String               @map("from_address") @db.VarChar(254)
+  toAddress   String               @map("to_address") @db.VarChar(254)
+  subject     String               @map("subject") @db.VarChar(260)
+  bodyText    String?              @map("body_text") @db.Text
+  payloadJson Json?                @map("payload_json") @db.JsonB
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([accountId, createdAt(sort: Desc)])
   @@map("mail_messages")
@@ -2774,11 +2844,11 @@ model MailMessage {
 model MailAttachment {
   id String @id @default(uuid()) @db.Uuid
 
-  messageId String @map("message_id") @db.Uuid
-  assetFileId String? @map("asset_file_id") @db.Uuid
-  fileName String @map("file_name") @db.VarChar(260)
-  contentType String @map("content_type") @db.VarChar(120)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  messageId   String   @map("message_id") @db.Uuid
+  assetFileId String?  @map("asset_file_id") @db.Uuid
+  fileName    String   @map("file_name") @db.VarChar(260)
+  contentType String   @map("content_type") @db.VarChar(120)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([messageId, createdAt(sort: Desc)])
   @@map("mail_attachments")
@@ -2810,9 +2880,9 @@ model EmailForwardingNotificationLog {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  fromAddress      String @map("from_address") @db.VarChar(254)
-  subject          String @default("") @db.VarChar(500)
-  fullVirtualEmail String @map("full_virtual_email") @db.VarChar(254)
+  fromAddress      String   @map("from_address") @db.VarChar(254)
+  subject          String   @default("") @db.VarChar(500)
+  fullVirtualEmail String   @map("full_virtual_email") @db.VarChar(254)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([userId, createdAt(sort: Desc)])
@@ -2826,10 +2896,10 @@ model InappMailCache {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  mailSource  String @map("mail_source") @db.VarChar(24)
-  fromAddress String @map("from_address") @db.VarChar(254)
-  subject     String @default("") @db.VarChar(500)
-  snippet     String @default("") @db.Text
+  mailSource  String   @map("mail_source") @db.VarChar(24)
+  fromAddress String   @map("from_address") @db.VarChar(254)
+  subject     String   @default("") @db.VarChar(500)
+  snippet     String   @default("") @db.Text
   receivedAt  DateTime @map("received_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2845,16 +2915,16 @@ model UserEmail {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  direction  String @default("inbound") @db.VarChar(12)
-  mailSource String @default("VIRTUAL_FORWARD") @map("mail_source") @db.VarChar(24)
-  fromAddress String @map("from_address") @db.VarChar(254)
-  toAddress   String @map("to_address") @db.VarChar(254)
-  subject     String @default("") @db.VarChar(500)
-  bodyText    String @default("") @map("body_text") @db.Text
-  bodyHtml    String? @map("body_html") @db.Text
+  direction   String    @default("inbound") @db.VarChar(12)
+  mailSource  String    @default("VIRTUAL_FORWARD") @map("mail_source") @db.VarChar(24)
+  fromAddress String    @map("from_address") @db.VarChar(254)
+  toAddress   String    @map("to_address") @db.VarChar(254)
+  subject     String    @default("") @db.VarChar(500)
+  bodyText    String    @default("") @map("body_text") @db.Text
+  bodyHtml    String?   @map("body_html") @db.Text
   receivedAt  DateTime? @map("received_at") @db.Timestamptz(6)
   sentAt      DateTime? @map("sent_at") @db.Timestamptz(6)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("user_emails")
@@ -2899,12 +2969,12 @@ model MailTalkMessage {
   direction MailTalkMessageDirection @map("direction")
 
   /// 파싱된 최신 본문 (답장 히스토리 제거)
-  bodyText String @map("body_text") @db.Text
+  bodyText    String  @map("body_text") @db.Text
   /// 원본 텍스트 (본문 탭용)
   rawBodyText String? @map("raw_body_text") @db.Text
   /// 원본 HTML (본문 탭용)
-  bodyHtml String? @map("body_html") @db.Text
-  subject  String @default("") @db.VarChar(500)
+  bodyHtml    String? @map("body_html") @db.Text
+  subject     String  @default("") @db.VarChar(500)
 
   /// 첨부파일 공개 URL 목록
   attachmentUrls String[] @default([]) @map("attachment_urls")
@@ -2944,10 +3014,10 @@ model MailTalkEmailTemplate {
 model MailTalkSesEvent {
   id String @id @default(uuid()) @db.Uuid
 
-  eventType      String @map("event_type") @db.VarChar(40)
-  recipientEmail String @map("recipient_email") @db.VarChar(254)
+  eventType      String  @map("event_type") @db.VarChar(40)
+  recipientEmail String  @map("recipient_email") @db.VarChar(254)
   sesMessageId   String? @map("ses_message_id") @db.VarChar(120)
-  payloadJson    Json   @map("payload_json") @db.JsonB
+  payloadJson    Json    @map("payload_json") @db.JsonB
 
   processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2986,8 +3056,8 @@ model OfficeExcelWorkbook {
   createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  headRevision OfficeExcelRevision?  @relation("WorkbookHead", fields: [headRevisionId], references: [id], onDelete: SetNull)
-  revisions    OfficeExcelRevision[] @relation("WorkbookRevisions")
+  headRevision OfficeExcelRevision?       @relation("WorkbookHead", fields: [headRevisionId], references: [id], onDelete: SetNull)
+  revisions    OfficeExcelRevision[]      @relation("WorkbookRevisions")
   jobs         OfficeExcelGenerationJob[]
 
   @@index([ownerUserId, updatedAt(sort: Desc)])
@@ -3006,8 +3076,8 @@ model OfficeExcelRevision {
   authorClient     String   @default("web") @map("author_client") @db.VarChar(20)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  workbook     OfficeExcelWorkbook  @relation("WorkbookRevisions", fields: [workbookId], references: [id], onDelete: Cascade)
-  headOf       OfficeExcelWorkbook? @relation("WorkbookHead")
+  workbook     OfficeExcelWorkbook        @relation("WorkbookRevisions", fields: [workbookId], references: [id], onDelete: Cascade)
+  headOf       OfficeExcelWorkbook?       @relation("WorkbookHead")
   resultOfJobs OfficeExcelGenerationJob[] @relation("JobResultRevision")
 
   @@unique([workbookId, revisionNum])
@@ -3016,21 +3086,21 @@ model OfficeExcelRevision {
 }
 
 model OfficeExcelGenerationJob {
-  id                 String                @id @default(uuid()) @db.Uuid
-  workbookId         String?               @map("workbook_id") @db.Uuid
-  ownerUserId        String                @map("owner_user_id") @db.Uuid
-  promptText         String                @map("prompt_text") @db.Text
-  templateId         String?               @map("template_id") @db.VarChar(80)
-  status             ExcelGenerationStatus @default(PENDING)
-  progress           Int                   @default(0)
-  resultRevisionId   String?               @map("result_revision_id") @db.Uuid
-  errorMessage       String?               @map("error_message") @db.VarChar(500)
-  agentTraceJson     Json?                 @map("agent_trace_json") @db.JsonB
-  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String                @id @default(uuid()) @db.Uuid
+  workbookId       String?               @map("workbook_id") @db.Uuid
+  ownerUserId      String                @map("owner_user_id") @db.Uuid
+  promptText       String                @map("prompt_text") @db.Text
+  templateId       String?               @map("template_id") @db.VarChar(80)
+  status           ExcelGenerationStatus @default(PENDING)
+  progress         Int                   @default(0)
+  resultRevisionId String?               @map("result_revision_id") @db.Uuid
+  errorMessage     String?               @map("error_message") @db.VarChar(500)
+  agentTraceJson   Json?                 @map("agent_trace_json") @db.JsonB
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workbook       OfficeExcelWorkbook?  @relation(fields: [workbookId], references: [id], onDelete: SetNull)
-  resultRevision OfficeExcelRevision?  @relation("JobResultRevision", fields: [resultRevisionId], references: [id], onDelete: SetNull)
+  workbook       OfficeExcelWorkbook? @relation(fields: [workbookId], references: [id], onDelete: SetNull)
+  resultRevision OfficeExcelRevision? @relation("JobResultRevision", fields: [resultRevisionId], references: [id], onDelete: SetNull)
 
   @@index([ownerUserId, createdAt(sort: Desc)])
   @@map("office_excel_generation_jobs")
@@ -3095,13 +3165,13 @@ model Auction {
   /// YouTube/Vimeo 등 외부 임베드 URL (서버 스토리지 미사용)
   videoUrl       String?          @map("video_url") @db.VarChar(1000)
 
-  startPriceKrw  Int  @map("start_price_krw")
-  currentPriceKrw Int @map("current_price_krw")
-  buyNowPriceKrw Int? @map("buy_now_price_krw")
-  bidCount       Int  @default(0) @map("bid_count")
+  startPriceKrw   Int  @map("start_price_krw")
+  currentPriceKrw Int  @map("current_price_krw")
+  buyNowPriceKrw  Int? @map("buy_now_price_krw")
+  bidCount        Int  @default(0) @map("bid_count")
 
-  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
-  endsAt   DateTime @map("ends_at") @db.Timestamptz(6)
+  startsAt DateTime      @map("starts_at") @db.Timestamptz(6)
+  endsAt   DateTime      @map("ends_at") @db.Timestamptz(6)
   status   AuctionStatus @default(scheduled)
 
   winnerUserId String? @map("winner_user_id") @db.Uuid
@@ -3151,8 +3221,8 @@ model AuctionEscrow {
   sellerUserId String @map("seller_user_id") @db.Uuid
   seller       User   @relation("AuctionEscrowSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
 
-  amountKrw      Int @map("amount_krw")
-  shippingFeeKrw Int @default(0) @map("shipping_fee_krw")
+  amountKrw      Int                 @map("amount_krw")
+  shippingFeeKrw Int                 @default(0) @map("shipping_fee_krw")
   status         AuctionEscrowStatus @default(pending)
 
   merchantUid String? @map("merchant_uid") @db.VarChar(80)
@@ -3175,7 +3245,7 @@ model UserInterestKeyword {
   userId String @map("user_id") @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  keyword String @db.VarChar(80)
+  keyword String                @db.VarChar(80)
   source  InterestKeywordSource @default(watchlist)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -3222,11 +3292,11 @@ model MediaLiveSession {
   sellerUserId String @map("seller_user_id") @db.Uuid
   seller       User   @relation("MediaLiveSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
 
-  title       String @default("") @db.VarChar(200)
+  title       String          @default("") @db.VarChar(200)
   /// Instagram/TikTok/YouTube Live HLS·m3u8·임베드 URL — 서버 스트리밍 없음
-  streamUrl   String @map("stream_url") @db.VarChar(1000)
-  platform    String @default("youtube") @db.VarChar(32)
-  aspectRatio String @default("16:9") @map("aspect_ratio") @db.VarChar(8)
+  streamUrl   String          @map("stream_url") @db.VarChar(1000)
+  platform    String          @default("youtube") @db.VarChar(32)
+  aspectRatio String          @default("16:9") @map("aspect_ratio") @db.VarChar(8)
   status      MediaLiveStatus @default(live)
 
   startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
@@ -3247,21 +3317,21 @@ model SellerVodProduct {
   seller       User   @relation("SellerVodOwner", fields: [sellerUserId], references: [id], onDelete: Cascade)
 
   liveSessionId String?           @map("live_session_id") @db.Uuid
-  liveSession   MediaLiveSession?   @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
+  liveSession   MediaLiveSession? @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
 
-  title        String @db.VarChar(200)
-  productTitle String? @map("product_title") @db.VarChar(200)
+  title        String          @db.VarChar(200)
+  productTitle String?         @map("product_title") @db.VarChar(200)
   /// CDN public URL 또는 외부 스트리밍 주소 (텍스트만 저장)
-  videoUrl     String @map("video_url") @db.VarChar(1000)
-  thumbUrl     String? @map("thumb_url") @db.VarChar(1000)
-  aspectRatio  String @default("16:9") @map("aspect_ratio") @db.VarChar(8)
-  platform     String? @db.VarChar(32)
+  videoUrl     String          @map("video_url") @db.VarChar(1000)
+  thumbUrl     String?         @map("thumb_url") @db.VarChar(1000)
+  aspectRatio  String          @default("16:9") @map("aspect_ratio") @db.VarChar(8)
+  platform     String?         @db.VarChar(32)
   source       SellerVodSource @default(external_link)
   status       SellerVodStatus @default(ready)
-  category     String @default("past_live_deals") @db.VarChar(40)
-  priceKrw     Int?    @map("price_krw")
-  durationSec  Int?    @map("duration_sec")
-  viewCount    Int     @default(0) @map("view_count")
+  category     String          @default("past_live_deals") @db.VarChar(40)
+  priceKrw     Int?            @map("price_krw")
+  durationSec  Int?            @map("duration_sec")
+  viewCount    Int             @default(0) @map("view_count")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -3280,17 +3350,17 @@ model MediaCommerceEscrow {
   sellerUserId String @map("seller_user_id") @db.Uuid
   seller       User   @relation("MediaEscrowSeller", fields: [sellerUserId], references: [id], onDelete: Cascade)
 
-  feedId     String  @map("feed_id") @db.VarChar(120)
-  campaignId String? @map("campaign_id") @db.VarChar(120)
-  productTitle String @map("product_title") @db.VarChar(200)
-  amountKrw    Int    @map("amount_krw")
+  feedId       String  @map("feed_id") @db.VarChar(120)
+  campaignId   String? @map("campaign_id") @db.VarChar(120)
+  productTitle String  @map("product_title") @db.VarChar(200)
+  amountKrw    Int     @map("amount_krw")
 
-  merchantUid String @unique @map("merchant_uid") @db.VarChar(80)
-  impUid      String? @map("imp_uid") @db.VarChar(80)
+  merchantUid   String                   @unique @map("merchant_uid") @db.VarChar(80)
+  impUid        String?                  @map("imp_uid") @db.VarChar(80)
   paymentStatus MediaEscrowPaymentStatus @default(pending_payment) @map("payment_status")
-  receiptUrl    String? @map("receipt_url") @db.VarChar(512)
-  paidAt        DateTime? @map("paid_at") @db.Timestamptz(6)
-  rawResponse   Json? @map("raw_response") @db.JsonB
+  receiptUrl    String?                  @map("receipt_url") @db.VarChar(512)
+  paidAt        DateTime?                @map("paid_at") @db.Timestamptz(6)
+  rawResponse   Json?                    @map("raw_response") @db.JsonB
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -3329,13 +3399,13 @@ model AlimtalkOptOut {
 model ProductMetricEvent {
   id String @id @default(uuid()) @db.Uuid
 
-  eventType String  @map("event_type") @db.VarChar(40)
-  userId    String? @map("user_id") @db.Uuid
+  eventType    String  @map("event_type") @db.VarChar(40)
+  userId       String? @map("user_id") @db.Uuid
   /// 조회 대상 쇼케이스 소유자 등 (선택)
   targetUserId String? @map("target_user_id") @db.Uuid
   /// preview | live_call | peer_case | mycase | public_view 등
-  source String? @map("source") @db.VarChar(40)
-  metaJson Json? @map("meta_json") @db.JsonB
+  source       String? @map("source") @db.VarChar(40)
+  metaJson     Json?   @map("meta_json") @db.JsonB
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -3388,22 +3458,22 @@ model DiagnosticSession {
 model DiagnosticEvent {
   id String @id @default(uuid()) @db.Uuid
 
-  sessionId String @map("session_id") @db.Uuid
+  sessionId String            @map("session_id") @db.Uuid
   session   DiagnosticSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   seq   Int
-  code  String  @db.VarChar(64)
-  label String  @db.VarChar(160)
+  code  String   @db.VarChar(64)
+  label String   @db.VarChar(160)
   ok    Boolean?
 
   timestamp DateTime @db.Timestamptz(6)
   elapsedMs Int      @map("elapsed_ms")
 
-  reason            String? @db.Text
-  exceptionMessage  String? @map("exception_message") @db.Text
-  exceptionStack    String? @map("exception_stack") @db.Text
-  exceptionFn       String? @map("exception_fn") @db.VarChar(160)
-  exceptionLine     Int?    @map("exception_line")
+  reason           String? @db.Text
+  exceptionMessage String? @map("exception_message") @db.Text
+  exceptionStack   String? @map("exception_stack") @db.Text
+  exceptionFn      String? @map("exception_fn") @db.VarChar(160)
+  exceptionLine    Int?    @map("exception_line")
 
   payloadJson Json? @map("payload_json")
 
@@ -3438,28 +3508,28 @@ model NationalAgencyProfile {
 
 /// 공공·상권·학교·우체국 등 오프라인 적재 디렉터리 (안심팝업·통합검색 VLUE 인증)
 model PublicDirectoryEntry {
-  id              String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(uuid()) @db.Uuid
   /// school | post_office | public_agency | police | commerce | nadeul | mailorder
-  sourceKind      String   @map("source_kind") @db.VarChar(32)
+  sourceKind     String   @map("source_kind") @db.VarChar(32)
   /// 원본 파일 내 고유키 (상가업소번호·행정표준코드 등)
-  externalId      String   @default("") @map("external_id") @db.VarChar(80)
-  displayName     String   @map("display_name") @db.VarChar(240)
+  externalId     String   @default("") @map("external_id") @db.VarChar(80)
+  displayName    String   @map("display_name") @db.VarChar(240)
   /// 공백·기호 제거 소문자 정규화명 (검색용)
-  nameNorm        String   @map("name_norm") @db.VarChar(240)
+  nameNorm       String   @map("name_norm") @db.VarChar(240)
   /// +82… E.164 (없으면 빈 문자열 — 상권·경찰 등 전화 미제공 원본)
-  phoneE164       String   @default("") @map("phone_e164") @db.VarChar(24)
+  phoneE164      String   @default("") @map("phone_e164") @db.VarChar(24)
   /// 숫자만 (국내 0 포함 형태 매칭용)
-  phoneDigits     String   @default("") @map("phone_digits") @db.VarChar(24)
-  businessNumber  String   @default("") @map("business_number") @db.VarChar(16)
-  category        String   @default("") @db.VarChar(120)
-  address         String   @default("") @db.VarChar(400)
-  region          String   @default("") @db.VarChar(40)
-  latitude        Float?
-  longitude       Float?
-  sourceFile      String   @default("") @map("source_file") @db.VarChar(255)
-  metaJson        Json     @default("{}") @map("meta_json")
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  phoneDigits    String   @default("") @map("phone_digits") @db.VarChar(24)
+  businessNumber String   @default("") @map("business_number") @db.VarChar(16)
+  category       String   @default("") @db.VarChar(120)
+  address        String   @default("") @db.VarChar(400)
+  region         String   @default("") @db.VarChar(40)
+  latitude       Float?
+  longitude      Float?
+  sourceFile     String   @default("") @map("source_file") @db.VarChar(255)
+  metaJson       Json     @default("{}") @map("meta_json")
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([sourceKind, externalId], map: "public_directory_entries_source_ext_uid")
   @@index([phoneE164], map: "public_directory_entries_phone_e164_idx")

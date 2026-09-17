@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { loadStoreFeedPostCandidates } from "../lib/localAdFeedPosts.js";
+
+function readCurrentGeo() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude
+        }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 10 * 60 * 1000 }
+    );
+  });
+}
 import { createLocalAd } from "../lib/localAdsApi.js";
 import { getPageDisplayProfile } from "../lib/pageProfileStorage.js";
 
@@ -79,13 +94,16 @@ export default function LocalAdRegisterModal({
     setBusy(true);
     setError("");
     try {
+      const geo = await readCurrentGeo();
       const data = await createLocalAd({
         feedPostId: selected.id,
         feedPostSource: selected.source,
         storeName: selected.storeName,
         description: selected.body.slice(0, 300),
         location: selected.location,
-        imageUrl: selected.imageUrl || null
+        imageUrl: selected.imageUrl || null,
+        latitude: geo?.latitude ?? null,
+        longitude: geo?.longitude ?? null
       });
       onRegistered?.(data.ad);
       resetAndClose();

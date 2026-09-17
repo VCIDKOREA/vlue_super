@@ -24,6 +24,7 @@ import { dispatchShowcaseBgmOwnerReleased } from "../../lib/showcase/closeShowca
 import { resolveEffectiveMembershipTier } from "../../lib/effectiveMembership.js";
 import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
+import { requestRewardedAdGrant } from "../../lib/rewardedAdPolicy.js";
 
 const SIGNATURE_PAGE_SIZE = 10;
 
@@ -136,6 +137,7 @@ export default function ShowcaseBgmPicker({
   const [addMenuFor, setAddMenuFor] = useState(null);
   const [previewingId, setPreviewingId] = useState("");
   const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [rewardBusy, setRewardBusy] = useState(false);
   const previewAudioRef = useRef(null);
   const previewingIdRef = useRef("");
   const soundByIdRef = useRef(new Map());
@@ -390,12 +392,24 @@ export default function ShowcaseBgmPicker({
   };
 
   const applySound = async (sound, mode, extras = {}) => {
+    if (rewardBusy) return;
+    let rewardGrantId = "";
+    setRewardBusy(true);
     try {
-      if (value?.soundId && value.soundId !== sound.id) {
-        await notifyThemeBgmChange();
-      }
+      const reward = await requestRewardedAdGrant("bgm_apply", {
+        targetKey: `sound:${String(sound?.id || "")}`
+      });
+      rewardGrantId = reward.grantId || "";
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "광고 확인 후 다시 적용해 주세요.");
+      setRewardBusy(false);
+      return;
+    }
+    try {
+      await notifyThemeBgmChange(rewardGrantId);
     } catch (e) {
       setError(e?.message || "주제곡 변경 제한");
+      setRewardBusy(false);
       return;
     }
     const patch = soundToBgmPatch(sound, mode, {
@@ -444,6 +458,7 @@ export default function ShowcaseBgmPicker({
       playMode: nextPlayMode,
       playlist: nextPlaylist
     });
+    setRewardBusy(false);
     if (coexistWithPreview) {
       window.setTimeout(() => dispatchShowcaseBgmOwnerReleased(), 40);
     }
@@ -574,16 +589,19 @@ export default function ShowcaseBgmPicker({
       return;
     }
     if (actionId === "library") {
-      if (!paid) {
-        notify("내 사운드에 담기는 유료 회원만 가능합니다. 무료는 퍼오기만 가능합니다.");
-        return;
-      }
       if (mode === "borrowed" || sound.kind === "signature") {
+        if (rewardBusy) return;
+        setRewardBusy(true);
         try {
-          await borrowShowcaseSound(sound.id);
+          const reward = await requestRewardedAdGrant("bgm_apply", {
+            targetKey: `borrow:${String(sound?.id || "")}`
+          });
+          await borrowShowcaseSound(sound.id, reward.grantId || "");
           await load();
         } catch (e) {
           notify(e?.message || "담기에 실패했습니다.");
+        } finally {
+          setRewardBusy(false);
         }
       } else {
         notify("이미 내 Original Track입니다.");

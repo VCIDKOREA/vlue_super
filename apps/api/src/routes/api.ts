@@ -74,6 +74,7 @@ import { publicBgmRoutes } from "./publicBgm.js";
 import { webRiskRoutes } from "./webRisk.js";
 import { showcasePublicRoutes } from "./showcasePublic.js";
 import { appPublicRoutes } from "./appPublic.js";
+import { monetizationPolicyRoutes } from "./monetizationPolicy.js";
 
 /** `/api` 아래에 마운트되는 라우트 묶음 */
 export const apiRoutes = new Hono();
@@ -142,6 +143,7 @@ apiRoutes.route("/v1/search", searchV1Routes);
 apiRoutes.route("/v1/directory", directoryV1Routes);
 apiRoutes.route("/v1/copyright", copyrightV1Routes);
 apiRoutes.route("/showcase-sounds", showcaseSoundRoutes);
+apiRoutes.route("/monetization", monetizationPolicyRoutes);
 apiRoutes.route("/auction", auctionRoutes);
 apiRoutes.route("/scrape-product", scrapeProductRoutes);
 apiRoutes.route("/media", mediaRoutes);

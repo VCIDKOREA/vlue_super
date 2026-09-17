@@ -198,7 +198,8 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
 
   return {
     phone: phoneDisplay,
-    verified: Boolean(body.vlue_verified_badge ?? body.vlueVerifiedBadge ?? body.is_verified),
+    /* 공식 시안블루 배지는 통화 신원검증 is_verified와 분리한다. */
+    verified: Boolean(body.vlue_verified_badge ?? body.vlueVerifiedBadge),
     source: "public",
     isPaid: isPaidLetteringTier(tier),
     showcaseStyle,

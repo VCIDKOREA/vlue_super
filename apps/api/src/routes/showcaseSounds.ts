@@ -126,8 +126,9 @@ showcaseSoundRoutes.post("/", requireUserHeader, async (c) => {
 showcaseSoundRoutes.post("/:soundId/borrow", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
   const soundId = String(c.req.param("soundId") || "").trim();
+  const body = await c.req.json().catch(() => ({}));
   try {
-    const sound = await borrowShowcaseSound(me, soundId);
+    const sound = await borrowShowcaseSound(me, soundId, body?.rewardedGrantId);
     return c.json({ ok: true, sound });
   } catch (e) {
     return c.json({ ok: false, error: e instanceof Error ? e.message : "borrow_failed" }, 400);
@@ -147,8 +148,9 @@ showcaseSoundRoutes.delete("/:soundId", requireUserHeader, async (c) => {
 
 showcaseSoundRoutes.post("/theme-change", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId")!;
+  const body = await c.req.json().catch(() => ({}));
   try {
-    await bumpThemeChangeQuota(me);
+    await bumpThemeChangeQuota(me, body?.rewardedGrantId);
     const quota = await getSoundQuotaStatus(me);
     return c.json({ ok: true, quota });
   } catch (e) {

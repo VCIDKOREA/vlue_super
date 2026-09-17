@@ -41,6 +41,7 @@ import CompanionSamsungCallCta from "./call/CompanionSamsungCallCta.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
+import ShowcaseRibbonBanner from "./ads/ShowcaseRibbonBanner.jsx";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
@@ -413,6 +414,7 @@ export default function LetteringIncomingNotification({
             verificationItems: []
           }
   );
+  const officialBadgeActive = Boolean(c.vlueVerifiedBadge ?? c.vlue_verified_badge);
   /** prop + 상대 쇼케이스 스타일(includeDigitalCard) 모두 허용할 때만 DCC 슬라이드 */
   const isContactSafeCareCardFlag =
     String(c?.profileKind || "").trim() === "contact_safe_care" || Boolean(c?.dcp?.contactSafeCare);
@@ -1408,24 +1410,20 @@ export default function LetteringIncomingNotification({
             {isLookupPending
               ? "번호 확인 중"
               : showcaseOffPreview
-                ? "VLUÉ"
+                ? "VLUÉ 인증"
                 : previewShowcaseId
                   ? `${previewShowcaseId} Showcase`
                   : "VLUÉ Showcase"}
           </span>
         </div>
         {previewMode && showOwnerSettings ? (
-          <button
-            type="button"
-            onClick={toggleInCallChromePreview}
-            className="lettering-incall-preview-btn lettering-live-bar__call-preview"
-            aria-pressed={isInCallChromePreview}
-            aria-label={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기 (실제 통화 옵션 포함)"}
-            title={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
-          >
-            <Phone className="h-3 w-3" strokeWidth={2.5} aria-hidden />
-            {isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
-          </button>
+          isInCallChromePreview ? (
+            <span className="lettering-live-bar__status" aria-live="polite">
+              통화화면
+            </span>
+          ) : (
+            <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />
+          )
         ) : previewStatusLabel ? (
           <span className="lettering-live-bar__status">{previewStatusLabel}</span>
         ) : (
@@ -1500,7 +1498,7 @@ export default function LetteringIncomingNotification({
                   <span className="lettering-ongoing-name min-w-0 font-semibold">
                     {displayLabel}
                   </span>
-                  {verified && !showcaseOffPreview ? <VlueVerifiedBadge /> : null}
+                  {officialBadgeActive && !showcaseOffPreview ? <VlueVerifiedBadge /> : null}
                 </p>
                 {showCollapsedPhoneSubline ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0">
@@ -1529,21 +1527,54 @@ export default function LetteringIncomingNotification({
             ) : null}
           </div>
           {previewMode && showOwnerSettings ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                openOwnerSettings(carouselSlideType === "card" ? "card" : "showcase");
-              }}
-              className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
-              aria-label={carouselSlideType === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
-              title={carouselSlideType === "card" ? "명함 설정" : "쇼케이스 설정"}
-            >
-              <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-              설정
-            </button>
+            <div className="lettering-ongoing-summary__actions flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleInCallChromePreview();
+                }}
+                className={`lettering-call-icon-btn inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm active:scale-95 ${
+                  isInCallChromePreview
+                    ? "border-emerald-400/50 bg-emerald-500/20"
+                    : "border-slate-700/80 bg-slate-900/90"
+                }`}
+                aria-pressed={isInCallChromePreview}
+                aria-label={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
+                title={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
+              >
+                <Phone
+                  className={`h-5 w-5 ${isInCallChromePreview ? "text-emerald-300" : "text-emerald-400"}`}
+                  strokeWidth={2.6}
+                  aria-hidden
+                />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openOwnerSettings(carouselSlideType === "card" ? "card" : "showcase");
+                }}
+                className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
+                aria-label={carouselSlideType === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
+                title={carouselSlideType === "card" ? "명함 설정" : "쇼케이스 설정"}
+              >
+                <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+                설정
+              </button>
+            </div>
           ) : null}
         </div>
+
+        {previewMode && showOwnerSettings ? (
+          <div
+            className="lettering-ongoing-ribbon px-3 pb-2.5 pt-0"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <ShowcaseRibbonBanner membershipTier={c.membershipTier || "free"} />
+          </div>
+        ) : null}
 
         {canExpand && !showcaseOffPreview && (isFreeMember || showcaseOffAuthExpand) ? (
           <div
@@ -1568,7 +1599,7 @@ export default function LetteringIncomingNotification({
                   {useShowcaseCarousel ? (
                     <ShowcaseCallCarousel
                       card={c}
-                      verified={verified}
+                      verified={officialBadgeActive}
                       incomingNumber={incoming}
                       photos={showcasePhotos}
                       membershipTier="free"
@@ -1605,7 +1636,7 @@ export default function LetteringIncomingNotification({
                       isKnownContact={isKnownContact}
                       card={c}
                       phone={incoming}
-                      verified={verified}
+                      verified={officialBadgeActive}
                       showcaseOffPreview={showcaseOffPreview}
                     />
                   )}
@@ -1635,7 +1666,7 @@ export default function LetteringIncomingNotification({
                   {useShowcaseCarousel ? (
                     <ShowcaseCallCarousel
                       card={c}
-                      verified={verified}
+                      verified={officialBadgeActive}
                       verificationItems={verificationList}
                       incomingNumber={incoming}
                       photos={showcasePhotos}
@@ -1670,7 +1701,7 @@ export default function LetteringIncomingNotification({
                     <RenderErrorGuard fallback={null}>
                     <LetteringDigitalReception
                       card={c}
-                      verified={verified}
+                      verified={officialBadgeActive}
                       verificationItems={verificationList}
                       incomingNumber={incoming}
                       embeddedInPush

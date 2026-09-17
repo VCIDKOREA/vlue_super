@@ -18,6 +18,11 @@ fun gradleProp(key: String, fallback: String): String {
         val mapped = when (key) {
             "VLUE_API_BASE_URL" -> props.getProperty("vlue.api.base.url")
             "VLUE_WEB_BASE_URL" -> props.getProperty("vlue.web.base.url")
+            "ADMOB_APP_ID" -> props.getProperty("admob.app.id")
+            "ADMOB_REWARDED_15_ID" -> props.getProperty("admob.rewarded.15.id")
+            "ADMOB_REWARDED_30_ID" -> props.getProperty("admob.rewarded.30.id")
+            "ADMOB_NATIVE_ID" -> props.getProperty("admob.native.id")
+            "ADMOB_BANNER_ID" -> props.getProperty("admob.banner.id")
             else -> null
         }
         val value = mapped?.trim().orEmpty()
@@ -28,6 +33,12 @@ fun gradleProp(key: String, fallback: String): String {
 
 val vlueApiBase = gradleProp("VLUE_API_BASE_URL", "https://api.vlue.kr")
 val vlueWebBase = gradleProp("VLUE_WEB_BASE_URL", "https://www.vlue.kr")
+/* Google 공식 테스트 ID. 출시 전 local.properties/Gradle secret으로 실 ID를 반드시 주입한다. */
+val admobAppId = gradleProp("ADMOB_APP_ID", "ca-app-pub-3940256099942544~3347511713")
+val admobRewarded15Id = gradleProp("ADMOB_REWARDED_15_ID", "ca-app-pub-3940256099942544/5224354917")
+val admobRewarded30Id = gradleProp("ADMOB_REWARDED_30_ID", "ca-app-pub-3940256099942544/5224354917")
+val admobNativeId = gradleProp("ADMOB_NATIVE_ID", "ca-app-pub-3940256099942544/2241692110")
+val admobBannerId = gradleProp("ADMOB_BANNER_ID", "ca-app-pub-3940256099942544/6300978111")
 
 /** 릴리즈 서명 — keystore.properties 있으면 실키, 없으면 debug 키로 서명(스토어 제출 전 교체) */
 val keystorePropsFile = rootProject.file("keystore.properties")
@@ -54,6 +65,11 @@ android {
         versionName = "1.0.19"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
+        buildConfigField("String", "ADMOB_REWARDED_15_ID", "\"$admobRewarded15Id\"")
+        buildConfigField("String", "ADMOB_REWARDED_30_ID", "\"$admobRewarded30Id\"")
+        buildConfigField("String", "ADMOB_NATIVE_ID", "\"$admobNativeId\"")
+        buildConfigField("String", "ADMOB_BANNER_ID", "\"$admobBannerId\"")
+        manifestPlaceholders["admobAppId"] = admobAppId
     }
 
     signingConfigs {
@@ -103,7 +119,9 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.webkit:webkit:1.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
 
     implementation("com.google.mlkit:text-recognition-korean:16.0.1")
     implementation("com.google.mlkit:translate:17.0.3")

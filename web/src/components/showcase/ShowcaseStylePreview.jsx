@@ -9,6 +9,7 @@ import ShowcaseBgmMarquee from "./ShowcaseBgmMarquee.jsx";
 import ShowcasePhotoGallery from "./ShowcasePhotoGallery.jsx";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
+import { shouldShowVlueVerifiedSeal } from "../../lib/vlueVerifiedBadgeApi.js";
 
 const FONT_MAP = Object.fromEntries(SHOWCASE_FONT_SETS.map((f) => [f.id, f.css]));
 
@@ -25,6 +26,9 @@ export default function ShowcaseStylePreview({
 }) {
   const perms = getShowcasePermissions(membershipTier);
   const isPaid = isPaidLetteringTier(membershipTier);
+  const officialBadgeActive = shouldShowVlueVerifiedSeal({
+    vlueVerifiedBadge: card?.vlueVerifiedBadge ?? card?.vlue_verified_badge
+  });
   const style = SHOWCASE_STYLE_TYPES[styleConfig?.styleType] || SHOWCASE_STYLE_TYPES.default;
   const isCertificate = style.id === "certificate";
   const [certFace, setCertFace] = useState("front");
@@ -75,7 +79,7 @@ export default function ShowcaseStylePreview({
           </div>
           <LetteringDigitalReception
             card={card}
-            verified={styleConfig?.verifiedBadgeOn !== false}
+            verified={officialBadgeActive}
             embeddedInPush
             previewMode
             enableContactLinks

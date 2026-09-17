@@ -29,37 +29,24 @@ import CallBigPushPreviewSection from "./CallBigPushPreviewSection.jsx";
 import FriendShowcaseList from "./FriendShowcaseList.jsx";
 import HomeNotificationPanel from "./HomeNotificationPanel.jsx";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
+import AdMobNativeFallbackSlot from "./ads/AdMobNativeFallbackSlot.jsx";
+import HomeCentralFeedBanner from "./ads/HomeCentralFeedBanner.jsx";
 
-/** 상단 공식 광고 배너 — 샘플(이미지·문구는 교체 가능) / 배지 VLUÉ 공식 + 부가 라벨 */
-const OFFICIAL_BANNERS = [
-  {
-    id: "ad-myeonggyeong",
-    subLabel: "의료",
-    title: "성주 명경체용양병원",
-    tagline: "정형·재활·체형교정, 성주 지역 맞춤 케어",
-    cta: "병원 소개",
-    imageUrl: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&q=80",
-    fallbackGradient: "from-slate-800 via-blue-900 to-slate-900"
-  },
-  {
-    id: "ad-jhtc",
-    subLabel: "글로벌 HR",
-    title: "JHTC 글로벌 네트워크 센터",
-    tagline: "캄보디아 기술학교 연계 · 교육·파견·채용",
-    cta: "사업 안내",
-    imageUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&q=80",
-    fallbackGradient: "from-indigo-900 via-slate-900 to-emerald-900"
-  },
-  {
-    id: "ad-humancurating",
-    subLabel: "PG",
-    title: "휴먼큐레이팅 (PG사)",
-    tagline: "결제·정산 자동화 파트너",
-    cta: "서비스 소개",
-    imageUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=1200&q=80",
-    fallbackGradient: "from-slate-900 via-blue-950 to-violet-950"
-  }
-];
+function readHomeGeo() {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          radiusKm: 30
+        }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 10 * 60 * 1000 }
+    );
+  });
+}
 
 /** 추천 광고 — 카드 뉴스 큐레이션 */
 const RECOMMENDED = [
@@ -432,7 +419,6 @@ function Home({
       window.removeEventListener(HQ_HOME_LAYOUT_CHANGED, onLayout);
     };
   }, []);
-  const officialBanners = publishedLayout?.vluePick?.length ? publishedLayout.vluePick : OFFICIAL_BANNERS;
   const recommendedItems = publishedLayout?.aiRecommend?.length ? publishedLayout.aiRecommend : RECOMMENDED;
   const layoutHotPlaces = publishedLayout?.hotPlaces;
   const layoutCategories = publishedLayout?.categories;
@@ -472,6 +458,8 @@ function Home({
 
   const [localSort, setLocalSort] = useState("popular");
   const [apiAdStores, setApiAdStores] = useState([]);
+  const [nearbyAdBanners, setNearbyAdBanners] = useState([]);
+  const [nearbyAdsLoaded, setNearbyAdsLoaded] = useState(false);
   const [adModalOpen, setAdModalOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [adToast, setAdToast] = useState("");
@@ -480,16 +468,44 @@ function Home({
 
   const loadLocalAds = useCallback(async () => {
     try {
-      const { ads } = await fetchLocalAds();
+      const geo = await readHomeGeo();
+      const [{ ads }, nearby] = await Promise.all([
+        fetchLocalAds(),
+        geo ? fetchLocalAds(geo) : Promise.resolve({ ads: [] })
+      ]);
       setApiAdStores(ads.map((ad, i) => mapLocalAdToStoreCard(ad, i)));
+      setNearbyAdBanners(
+        nearby.ads.map((ad, i) => {
+          const mapped = mapLocalAdToStoreCard(ad, i);
+          return {
+            id: mapped.id,
+            subLabel: Number.isFinite(ad.distanceKm) ? `${ad.distanceKm.toFixed(1)}km` : "우리동네",
+            title: mapped.name,
+            tagline: mapped.description,
+            cta: "매장 보기",
+            imageUrl: mapped.img,
+            fallbackGradient: "from-blue-950 via-slate-900 to-cyan-900"
+          };
+        })
+      );
     } catch {
       setApiAdStores([]);
+      setNearbyAdBanners([]);
+    } finally {
+      setNearbyAdsLoaded(true);
     }
   }, []);
 
   useEffect(() => {
     loadLocalAds();
   }, [loadLocalAds]);
+  const hasNativeAdHost =
+    typeof window !== "undefined" &&
+    typeof (window.VlueLettering || window.Android)?.showNativeAdFallback === "function";
+  const mainAdBanners =
+    nearbyAdBanners.length || hasNativeAdHost
+      ? nearbyAdBanners
+      : publishedLayout?.vluePick || [];
 
   useEffect(() => {
     const bump = () => setFavoriteTick((n) => n + 1);
@@ -686,10 +702,11 @@ function Home({
   }, [selectedStory, currentUpdatePosts]);
 
   const goBanner = useCallback((idx) => {
-    const n = officialBanners.length;
+    const n = mainAdBanners.length;
+    if (!n) return;
     const i = ((idx % n) + n) % n;
     setBannerIndex(i);
-  }, []);
+  }, [mainAdBanners.length]);
   useEffect(() => {
     if (!activeSubcats.length) {
       setSubCategory("");
@@ -816,11 +833,12 @@ function Home({
   }, []);
 
   useEffect(() => {
+    if (mainAdBanners.length <= 1) return undefined;
     const id = setInterval(() => {
-      setBannerIndex((p) => (p + 1) % officialBanners.length);
+      setBannerIndex((p) => (p + 1) % mainAdBanners.length);
     }, AUTO_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [mainAdBanners.length]);
   useEffect(() => {
     const id = setInterval(() => {
       setTopInfoIndex((p) => (p + 1) % TOP_INFO_BANNERS.length);
@@ -921,6 +939,8 @@ function Home({
         <CallBigPushPreviewSection membershipTier={membershipTier} isDarkMode={isDarkMode} />
       </div>
       ) : null}
+
+      {v1AppShell.callBigPush ? <HomeCentralFeedBanner /> : null}
       </div>
 
       {v1AppShell.friendShowcaseFeed ? (
@@ -1292,7 +1312,7 @@ function Home({
             className="home-drag-scroll no-scrollbar flex w-full min-w-0 snap-x snap-proximity gap-3 overflow-x-auto overflow-y-hidden scroll-smooth pb-1"
             style={{ scrollPaddingInline: 0 }}
           >
-            {officialBanners.map((b) => (
+            {mainAdBanners.map((b) => (
               <article
                 key={b.id}
                 className="home-banner-slide home-official-card flex snap-start shrink-0 flex-col overflow-hidden rounded-[24px] bg-white shadow-md ring-1 ring-gray-100"
@@ -1339,10 +1359,13 @@ function Home({
                 </div>
               </article>
             ))}
+            {nearbyAdsLoaded && mainAdBanners.length === 0 && hasNativeAdHost ? (
+              <AdMobNativeFallbackSlot />
+            ) : null}
           </div>
 
           <div className="flex justify-center gap-1.5 pt-0.5">
-            {officialBanners.map((b, i) => (
+            {mainAdBanners.map((b, i) => (
               <button
                 key={b.id}
                 type="button"

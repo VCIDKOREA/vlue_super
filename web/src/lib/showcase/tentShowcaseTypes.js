@@ -3,7 +3,7 @@
  * UserTier / PrivacyMode / CallState
  *
  * 용어:
- * - 페이지(page): 위·아래 스와이프 장수 (무료 1 · 유료 콘텐츠 5 + 디지털인증명함)
+ * - 페이지(page): 위·아래 스와이프 장수 (모든 회원 콘텐츠 최대 5 + 유료 DCC)
  * - 장당 사진: 한 페이지 안 사진 수 (최대 20 — Instagram 캐러셀과 동일)
  */
 
@@ -34,7 +34,7 @@ export const TENT_THEME = Object.freeze({
 });
 
 /** 위·아래 스와이프 페이지 한도 (콘텐츠 — 디지털인증명함 별도) */
-export const SHOWCASE_MAX_PAGES_FREE = 1;
+export const SHOWCASE_MAX_PAGES_FREE = 5;
 export const SHOWCASE_MAX_PAGES_PAID = 5;
 
 /** 한 페이지(한 장)에 넣을 수 있는 사진 수 — Instagram 게시물 캐러셀과 동일 */
@@ -91,15 +91,17 @@ export function maxShowcasePhotosForTier(_tier) {
 
 /**
  * 위·아래 스와이프 가능한 콘텐츠 페이지 수 (디지털 인증명함 제외)
- * - 무료회원: 1
- * - 유료회원: 5 (디지털인증명함은 별도 추가)
+ * - 모든 회원: 콘텐츠 최대 5
+ * - 무료회원 슬롯 2~5는 서버에 영구 저장된 보상형 광고 해금 상태로 별도 제한
+ * - 유료 DCC는 콘텐츠 한도에 차감하지 않음
  * @param {UserTier|string} tier
  * @param {{ includeDigitalCard?: boolean }} [_opts] 호환용 — 명함은 한도에 차감하지 않음
  * @returns {number}
  */
 export function maxShowcaseContentPagesForTier(tier, _opts = {}) {
-  if (normalizeUserTier(tier) !== USER_TIERS.PAID) return SHOWCASE_MAX_PAGES_FREE;
-  return SHOWCASE_MAX_PAGES_PAID;
+  return normalizeUserTier(tier) === USER_TIERS.PAID
+    ? SHOWCASE_MAX_PAGES_PAID
+    : SHOWCASE_MAX_PAGES_FREE;
 }
 
 /**

@@ -60,6 +60,7 @@ export async function resolveVlueShowcaseByPhone(phoneRaw) {
         phone: phoneDisplay,
         phoneDigits: digits,
         verified: Boolean(lookup.is_verified),
+        cyanBadgeActive: Boolean(lookup.vlue_verified_badge ?? lookup.vlueVerifiedBadge),
         source: lookup.source || "api",
         isPaid: isPaidLetteringTier(tier),
         card: { ...mapped, phone: mapped.phone || phoneDisplay, membershipTier: tier },

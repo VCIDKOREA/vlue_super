@@ -7,7 +7,14 @@ export const adsRoutes = new Hono();
 /** 홈 핫플레이스 — 등록된 지역 광고 목록 (공개 조회) */
 adsRoutes.get("/", async (c) => {
   try {
-    return c.json(await listLocalAds());
+    const latitude = Number(c.req.query("lat"));
+    const longitude = Number(c.req.query("lng"));
+    const radiusKm = Number(c.req.query("radiusKm"));
+    const location =
+      Number.isFinite(latitude) && Number.isFinite(longitude)
+        ? { latitude, longitude, radiusKm: Number.isFinite(radiusKm) ? radiusKm : 30 }
+        : undefined;
+    return c.json(await listLocalAds(location));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     const schemaHint =
@@ -36,6 +43,8 @@ adsRoutes.post("/", requireUserHeader, async (c) => {
       storeName?: string;
       description?: string;
       location?: string;
+      latitude?: number | null;
+      longitude?: number | null;
       imageUrl?: string | null;
     }>();
     const result = await createLocalAd(uid, body);

@@ -29,6 +29,15 @@ async function overlayShowcaseStyleForUserId(userId: string | null | undefined):
   return loadOverlayShowcaseStyleLite(id);
 }
 
+async function officialCyanBadgeForUserId(userId: string): Promise<boolean> {
+  try {
+    const { hasOfficialCyanBadge } = await import("./membership/badgePolicyManager.js");
+    return await hasOfficialCyanBadge(userId);
+  } catch {
+    return false;
+  }
+}
+
 function expiredLineLookupBody(opts: {
   phoneE164: string;
   cardId?: string;
@@ -777,6 +786,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         {
           matched: true,
           is_verified: true,
+          vlue_verified_badge: await officialCyanBadgeForUserId(card.user.id),
           source: "business_card",
           userId: card.user.id,
           cardId: card.id,
@@ -888,6 +898,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         {
           matched: true,
           is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
+          vlue_verified_badge: await officialCyanBadgeForUserId(user.id),
           source: "user_mobile",
           userId: user.id,
           displayName: firstStr(exportSnap?.name, user.digitalCard?.displayName, user.legalName),
@@ -1109,6 +1120,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         body: {
           matched: true,
           is_verified: card.verificationStatus === "approved",
+          vlue_verified_badge: await officialCyanBadgeForUserId(card.user.id),
           source: "business_card",
           userId: card.user.id,
           cardId: card.id,
@@ -1154,6 +1166,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       body: {
         matched: true,
         is_verified: card.verificationStatus === "approved",
+        vlue_verified_badge: await officialCyanBadgeForUserId(card.user.id),
         source: "business_card",
         userId: card.user.id,
         cardId: card.id,
@@ -1260,6 +1273,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
         body: {
           matched: true,
           is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
+          vlue_verified_badge: await officialCyanBadgeForUserId(user.id),
           source: "user_mobile",
           userId: user.id,
           displayName: liveDisplayName,
@@ -1304,6 +1318,7 @@ export async function lookupCardByRawNumber(raw: string, opts: LookupOptions = {
       body: {
         matched: true,
         is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
+        vlue_verified_badge: await officialCyanBadgeForUserId(user.id),
         source: "user_mobile",
         userId: user.id,
         displayName: masked.displayName,

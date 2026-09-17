@@ -13,6 +13,7 @@ import ContactSyncConsentModal from "./components/ContactSyncConsentModal.jsx";
 import { openFriendShowcase } from "./lib/openFriendShowcase.js";
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
+import HomeBottomFixedBanner from "./components/ads/HomeBottomFixedBanner.jsx";
 import MyPage from "./components/MyPage";
 import MyCaseScreen from "./components/mycase/MyCaseScreen.jsx";
 import VlueCalendarScreen from "./components/calendar/VlueCalendarScreen.jsx";
@@ -102,6 +103,7 @@ import {
 } from "./lib/memberCardStorage.js";
 import { readCardWallet, writeCardWallet, buildCardSnapshot } from "./lib/cardWalletStorage.js";
 import { saveProfileToDeviceContacts } from "./lib/contactVcfSave.js";
+import { fetchVlueBadgeSnapshot } from "./lib/vlueVerifiedBadgeApi.js";
 import {
   markContactSyncPending,
   readContactMatchCache,
@@ -329,6 +331,19 @@ const initialUnreadByRoom = Object.entries(seedMessages).reduce((acc, [roomId, l
 }, {});
 
 function App() {
+  useEffect(() => {
+    const syncOfficialBadge = () => {
+      void fetchVlueBadgeSnapshot().catch(() => {});
+    };
+    window.addEventListener("vlue-family-protection-changed", syncOfficialBadge);
+    window.addEventListener("vlue-membership-changed", syncOfficialBadge);
+    window.addEventListener("vlue-lettering-bizcard-changed", syncOfficialBadge);
+    return () => {
+      window.removeEventListener("vlue-family-protection-changed", syncOfficialBadge);
+      window.removeEventListener("vlue-membership-changed", syncOfficialBadge);
+      window.removeEventListener("vlue-lettering-bizcard-changed", syncOfficialBadge);
+    };
+  }, []);
   const [showSplash, setShowSplash] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(() => localStorage.getItem(ONBOARDING_DONE_KEY) === "1");
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem(SESSION_KEY) === "1");
@@ -5494,9 +5509,11 @@ function App() {
       />
 
       <footer
-        className={`fixed bottom-0 left-0 right-0 z-[150] ${showBottomNav ? "block" : "hidden"}`}
+        className={`fixed bottom-0 left-0 right-0 z-[160] ${showBottomNav ? "block" : "hidden"}`}
+        data-vlue-bottom-chrome
       >
-        <nav className="fixed bottom-0 left-0 right-0 z-[151] flex justify-center">
+        {page === "main" ? <HomeBottomFixedBanner /> : null}
+        <nav className="relative z-[161] flex w-full justify-center">
           <div
             ref={bottomNavPulseSyncRef}
             data-vlue-bottom-nav

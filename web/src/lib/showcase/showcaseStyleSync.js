@@ -198,6 +198,7 @@ export async function pushShowcaseStyleBundle(opts = {}) {
     liveSource,
     clientUpdatedAt
   };
+  if (opts.rewardedGrantId) payload.rewardedGrantId = String(opts.rewardedGrantId);
   /* live 키 없음 = 서버 송출본 유지. null 은 보내지 않음 */
   if (liveSlim) {
     payload.live = liveSlim;

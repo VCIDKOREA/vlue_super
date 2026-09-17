@@ -5,6 +5,8 @@ import {
   evaluateAndGrantVlueVerifiedBadge,
   getVlueBadgeSnapshot
 } from "../membership/vlueVerifiedBadgeService.js";
+import { consumeRewardedAdGrant } from "../membership/rewardedAdPolicyService.js";
+import { resolveUserPolicy } from "../membership/userPolicyManager.js";
 import {
   assertShowcaseStyleWithinLimit,
   slimShowcaseStyleForPersist,
@@ -169,6 +171,7 @@ export async function putUserShowcaseStyleBundle(
     live?: unknown;
     liveSource?: unknown;
     clientUpdatedAt?: string | null;
+    rewardedGrantId?: string | null;
   }
 ): Promise<
   | { ok: true; updatedAt: string }
@@ -179,12 +182,14 @@ export async function putUserShowcaseStyleBundle(
       showcase_style_updated_at: Date | null;
       has_editor: boolean;
       has_live: boolean;
+      showcase_style_json: unknown | null;
     }>
   >(Prisma.sql`
     SELECT
       showcase_style_updated_at,
       (showcase_style_json IS NOT NULL) AS has_editor,
-      (showcase_live_style_json IS NOT NULL) AS has_live
+      (showcase_live_style_json IS NOT NULL) AS has_live,
+      showcase_style_json
     FROM users
     WHERE id = ${userId}::uuid
     LIMIT 1
@@ -217,6 +222,23 @@ export async function putUserShowcaseStyleBundle(
   if (input.editor !== undefined) {
     const editor = prepareStyleForDb(input.editor);
     if (editor) {
+      const previousPages = asObjectOrNull(meta?.showcase_style_json)?.pages ?? [];
+      const nextPages = editor.pages ?? [];
+      const pagesChanged = JSON.stringify(previousPages) !== JSON.stringify(nextPages);
+      const policy = await resolveUserPolicy(userId);
+      if (policy.rewardedAdsRequired && (pagesChanged || input.rewardedGrantId)) {
+          const consumed = await consumeRewardedAdGrant({
+            userId,
+            grantId: String(input.rewardedGrantId || ""),
+            action: "showcase_save"
+          });
+          if (!consumed.ok) {
+            throw Object.assign(new Error("rewarded_ad_required"), {
+              code: "REWARDED_AD_REQUIRED",
+              status: 403
+            });
+          }
+      }
       data.showcaseStyleJson = editor as Prisma.InputJsonValue;
     }
   }

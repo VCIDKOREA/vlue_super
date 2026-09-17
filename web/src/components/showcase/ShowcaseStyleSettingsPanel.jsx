@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, ImagePlus, Loader2, Music2, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, HelpCircle, ImagePlus, Loader2, Lock, Music2, Plus, Trash2, X } from "lucide-react";
 import BackButton from "../common/BackButton";
 import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 import { resolveEffectiveMembershipTier } from "../../lib/effectiveMembership.js";
@@ -48,6 +48,7 @@ import { healDigitalCardActiveFromLocalEvidence } from "../../lib/vlueShowcasePr
 import { useDccFeatureAccess } from "../../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../../lib/dccAccessPolicy.js";
 import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../../lib/v1PaidPackageGate.js";
+import RibbonBannerSettingsForm from "./RibbonBannerSettingsForm.jsx";
 import {
   LETTERING_BIZCARD_CHANGED_EVENT,
   LETTERING_OPEN_BIZCARD_SETTINGS_EVENT
@@ -66,6 +67,10 @@ import { KakaoOpenChatGlyph, KakaoTalkGlyph } from "./KakaoOutlinkGlyphs.jsx";
 import CallBigPushPreviewSection from "../CallBigPushPreviewSection.jsx";
 import DccLineSwitcher from "../dcc/DccLineSwitcher.jsx";
 import { ShowcaseOverlayPortalContext } from "../../context/ShowcaseOverlayPortalContext.jsx";
+import {
+  fetchMonetizationPolicy,
+  requestRewardedAdGrant
+} from "../../lib/rewardedAdPolicy.js";
 import "./showcase-style-settings.css";
 import "./showcase-web-desk.css";
 import "../../styles/showcase-call-glass.css";
@@ -289,11 +294,33 @@ export default function ShowcaseStyleSettingsPanel({
   const [deskNotice, setDeskNotice] = useState("");
   const [footerGuide, setFooterGuide] = useState("");
   const [photoGuideOpen, setPhotoGuideOpen] = useState(false);
+  const [rewardPolicy, setRewardPolicy] = useState(null);
+  const [rewardBusy, setRewardBusy] = useState(false);
+  const [applyDoneOpen, setApplyDoneOpen] = useState(false);
   const pages = useMemo(
     () => (Array.isArray(config.pages) ? config.pages.map(normalizeShowcasePage) : []),
     [config.pages]
   );
   const canAddPage = pages.length < maxContentPages;
+  const unlockedShowcaseSlots =
+    rewardPolicy?.policy?.rewardedAdsRequired === false
+      ? [1, 2, 3, 4, 5]
+      : rewardPolicy?.unlockedShowcaseSlots || [1];
+  const officialBadgeActive = rewardPolicy?.policy?.cyanBadgeActive === true;
+
+  const refreshRewardPolicy = useCallback(async () => {
+    try {
+      const result = await fetchMonetizationPolicy();
+      setRewardPolicy(result);
+      return result;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshRewardPolicy();
+  }, [refreshRewardPolicy]);
 
   const notify = useCallback(
     (msg) => {
@@ -463,11 +490,12 @@ export default function ShowcaseStyleSettingsPanel({
   const card = useMemo(() => {
     const base = resolveVlueShowcaseCard({ membershipTier: effectiveTier, previewExample: true });
     /* 설정 미리보기는 편집 초안(config)만 사용 — 라이브/마이케이스와 섞지 않음 */
-    return applyShowcaseStyleToCard(base, effectiveTier, {
+    const styled = applyShowcaseStyleToCard(base, effectiveTier, {
       style: config,
       digitalCardActive: dccCarouselEnabled
     });
-  }, [effectiveTier, config, dccCarouselEnabled, identityTick]);
+    return { ...styled, vlueVerifiedBadge: officialBadgeActive };
+  }, [effectiveTier, config, dccCarouselEnabled, identityTick, officialBadgeActive]);
 
   const persist = useCallback((patch) => {
     setConfig((prev) => {
@@ -693,10 +721,40 @@ export default function ShowcaseStyleSettingsPanel({
     persistPages(pages.slice(0, maxContentPages));
   }, [maxContentPages, pages, persistPages]);
 
-  const addPage = () => {
+  const unlockShowcaseSlot = useCallback(
+    async (targetSlot) => {
+      if (unlockedShowcaseSlots.includes(targetSlot)) return true;
+      setRewardBusy(true);
+      try {
+        await requestRewardedAdGrant("showcase_slot_unlock", {
+          targetKey: `slot:${targetSlot}`
+        });
+        await refreshRewardPolicy();
+        notify(`${targetSlot}번 쇼케이스 슬롯이 영구 해금되었습니다.`);
+        return true;
+      } catch (error) {
+        notify(
+          error instanceof Error
+            ? error.message
+            : "광고를 끝까지 시청해야 슬롯이 해금됩니다. 다시 시도해 주세요."
+        );
+        return false;
+      } finally {
+        setRewardBusy(false);
+      }
+    },
+    [notify, refreshRewardPolicy, unlockedShowcaseSlots]
+  );
+
+  const addPage = async () => {
     if (!canAddPage) {
       onToast?.(`콘텐츠 페이지는 최대 ${maxContentPages}장입니다.`);
       return;
+    }
+    const targetSlot = pages.length + 1;
+    if (!unlockedShowcaseSlots.includes(targetSlot)) {
+      const ok = await unlockShowcaseSlot(targetSlot);
+      if (!ok) return;
     }
     const page = createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM);
     persistPages([...pages, page]);
@@ -839,7 +897,20 @@ export default function ShowcaseStyleSettingsPanel({
     return () => onBindCloseGuard(null);
   }, [onBindCloseGuard, requestClose]);
 
-  const commitApply = useCallback(() => {
+  const commitApply = useCallback(async () => {
+    if (rewardBusy) return;
+    let rewardGrantId = "";
+    if (dirty) {
+      setRewardBusy(true);
+      try {
+        const reward = await requestRewardedAdGrant("showcase_save");
+        rewardGrantId = reward.grantId || "";
+      } catch (error) {
+        notify(error instanceof Error ? error.message : "광고 확인 후 다시 적용해 주세요.");
+        setRewardBusy(false);
+        return;
+      }
+    }
     const withTags = {
       ...config,
       includeDigitalCard: showcaseBroadcastOn,
@@ -853,8 +924,10 @@ export default function ShowcaseStyleSettingsPanel({
       writeLiveShowcaseStyle(latest, { source: "editor", skipSync: true });
     } catch (e) {
       notify(e instanceof Error ? e.message : "쇼케이스 적용에 실패했습니다.");
+      setRewardBusy(false);
       return;
     }
+    setRewardBusy(false);
     setConfig(latest);
     setAppliedFp(styleFingerprint(latest));
     setTagInput((latest.tags || []).join(" "));
@@ -870,7 +943,10 @@ export default function ShowcaseStyleSettingsPanel({
     void import("../../lib/showcase/showcaseStyleSync.js")
       .then(async (m) => {
         m.bumpLocalShowcaseStyleUpdatedAt?.();
-        const pushed = await m.pushShowcaseStyleBundle({ force: true });
+        const pushed = await m.pushShowcaseStyleBundle({
+          force: true,
+          rewardedGrantId: rewardGrantId || undefined
+        });
         if (!pushed?.ok && !pushed?.skipped) {
           notify(
             "기기에 저장됐습니다. 서버 동기화에 실패했습니다. 네트워크 확인 후 다시 적용해 주세요."
@@ -884,18 +960,22 @@ export default function ShowcaseStyleSettingsPanel({
         "프로필 사진은 「디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다.";
       focusShowcaseSection("showcase-settings-dcc", msg);
       notify(`쇼케이스 설정은 저장됐습니다. ${msg}`);
+      setApplyDoneOpen(true);
       return;
     }
 
-    notify("적용되었습니다.");
+    setApplyDoneOpen(true);
+    notify("적용 완료되었습니다");
   }, [
     config,
+    dirty,
     focusShowcaseSection,
     dccCarouselEnabled,
     showcaseBroadcastOn,
     isPaid,
     effectiveTier,
     notify,
+    rewardBusy,
     tagInput
   ]);
 
@@ -932,6 +1012,61 @@ export default function ShowcaseStyleSettingsPanel({
           ].join(" ")}
         />
       </p>
+
+      <div
+        className={`showcase-slot-unlock-strip mb-3 flex flex-wrap gap-1.5 ${
+          isDarkMode ? "text-gray-200" : "text-slate-700"
+        }`}
+        role="list"
+        aria-label="쇼케이스 슬롯 해금 상태"
+      >
+        {[1, 2, 3, 4, 5].map((slot) => {
+          const unlocked = unlockedShowcaseSlots.includes(slot);
+          const active = pages.length >= slot || slot === 1;
+          return (
+            <button
+              key={slot}
+              type="button"
+              role="listitem"
+              disabled={rewardBusy || unlocked || isPaid}
+              onClick={() => void unlockShowcaseSlot(slot)}
+              className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-black transition active:scale-[0.98] ${
+                unlocked
+                  ? isDarkMode
+                    ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : isDarkMode
+                    ? "border-amber-400/35 bg-amber-500/10 text-amber-100"
+                    : "border-amber-200 bg-amber-50 text-amber-800"
+              } ${!unlocked && !isPaid ? "" : "cursor-default"}`}
+              title={
+                unlocked
+                  ? `${slot}번 슬롯 해금됨`
+                  : isPaid
+                    ? `${slot}번 슬롯 · 유료 회원 전체 해금`
+                    : `${slot}번 슬롯 · 30초 광고로 해금`
+              }
+            >
+              {unlocked ? (
+                <span aria-hidden>✓</span>
+              ) : (
+                <Lock size={11} strokeWidth={2.6} aria-hidden />
+              )}
+              <span>
+                {slot}번
+                {!unlocked && !isPaid ? " · 광고 해금" : unlocked ? " · 해금" : " · 포함"}
+              </span>
+              {active && unlocked ? <span className="opacity-60">사용중</span> : null}
+            </button>
+          );
+        })}
+      </div>
+      {!isPaid ? (
+        <p className={`mb-2 text-[10px] leading-snug ${subText}`}>
+          무료 회원은 2~5번 슬롯을 30초 보상형 광고 완시청 후 해금할 수 있습니다. 중간 이탈 시 해금되지
+          않습니다.
+        </p>
+      ) : null}
       <div className="showcase-photo-guide mb-3">
         <button
           type="button"
@@ -1082,12 +1217,34 @@ export default function ShowcaseStyleSettingsPanel({
       })}
 
       {canAddPage ? (
-        <button type="button" className="showcase-page-add-btn showcase-page-add-btn--solo" onClick={addPage}>
-          <Plus size={16} aria-hidden />
-          쇼케이스 페이지
+        <button
+          type="button"
+          className="showcase-page-add-btn showcase-page-add-btn--solo"
+          onClick={() => void addPage()}
+          disabled={rewardBusy}
+        >
+          {unlockedShowcaseSlots.includes(pages.length + 1) ? (
+            <Plus size={16} aria-hidden />
+          ) : (
+            <Lock size={15} aria-hidden />
+          )}
+          {unlockedShowcaseSlots.includes(pages.length + 1)
+            ? "쇼케이스 페이지"
+            : `${pages.length + 1}번 슬롯 · 30초 광고로 영구 해금`}
         </button>
       ) : (
         <p className={`text-[11px] ${subText}`}>콘텐츠 페이지 한도({maxContentPages})에 도달했습니다.</p>
+      )}
+
+      {isPaid ? (
+        <div className="mt-3">
+          <RibbonBannerSettingsForm isDarkMode={isDarkMode} onToast={onToast} />
+        </div>
+      ) : (
+        <p className={`mt-3 text-[11px] leading-snug ${subText}`}>
+          빅푸시 하단 띠배너 커스텀 등록은 유료(DCC) 회원 전용입니다. 무료 회원은 AdMob 띠배너가
+          표시됩니다.
+        </p>
       )}
 
       {igLink.linked && !igLink.expired ? (
@@ -1591,15 +1748,10 @@ export default function ShowcaseStyleSettingsPanel({
               <p className="showcase-profile-block__sub mt-3 text-[11px] opacity-70">
                 홍보용 비즈니스 링크는 각 메인커스텀 페이지에서 페이지당 1개씩 설정합니다. (V1 유료 패키지)
               </p>
-              {isPaid ? (
-              <label className="showcase-style-settings__check mt-3">
-                <input
-                  type="checkbox"
-                  checked={config.verifiedBadgeOn}
-                  onChange={(e) => persist({ verifiedBadgeOn: e.target.checked })}
-                />
-                VLUÉ 인증 마크 표시
-              </label>
+              {officialBadgeActive ? (
+                <p className="showcase-style-settings__check mt-3">
+                  시안블루 공식 인증마크 · 구독/가족 상태에 따라 자동 표시
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -1631,8 +1783,9 @@ export default function ShowcaseStyleSettingsPanel({
         type="button"
         className={`showcase-style-settings__save-btn showcase-style-settings__save-btn--sticky${fullscreen && !isWebDesk ? " showcase-style-settings__save-btn--compact" : ""}`}
         onClick={commitApply}
+        disabled={rewardBusy}
       >
-        적용하기
+        {rewardBusy ? "광고 확인 중…" : "적용하기"}
       </button>
       {isWebDesk && deskNotice ? (
         <p className="showcase-web-desk__save-notice" role="status" aria-live="polite">
@@ -1674,6 +1827,40 @@ export default function ShowcaseStyleSettingsPanel({
                   취소
                 </button>
                 <button type="button" className="showcase-leave-confirm__btn showcase-leave-confirm__btn--ok" onClick={discardAndLeave}>
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  const applyDoneModal =
+    applyDoneOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div className="showcase-leave-confirm" role="dialog" aria-modal="true" aria-labelledby="showcase-apply-done-title">
+            <button
+              type="button"
+              className="showcase-leave-confirm__backdrop"
+              aria-label="닫기"
+              onClick={() => setApplyDoneOpen(false)}
+            />
+            <div className={`showcase-leave-confirm__panel ${isDarkMode ? "is-dark" : ""}`}>
+              <h2 id="showcase-apply-done-title" className="showcase-leave-confirm__title">
+                적용 완료되었습니다
+              </h2>
+              <p className="showcase-leave-confirm__hint">
+                {isPaid
+                  ? "쇼케이스·BGM 설정이 즉시 반영되었습니다."
+                  : "광고 확인 후 쇼케이스·BGM 설정이 반영되었습니다."}
+              </p>
+              <div className="showcase-leave-confirm__actions">
+                <button
+                  type="button"
+                  className="showcase-leave-confirm__btn showcase-leave-confirm__btn--ok"
+                  onClick={() => setApplyDoneOpen(false)}
+                >
                   확인
                 </button>
               </div>
@@ -1727,6 +1914,7 @@ export default function ShowcaseStyleSettingsPanel({
         ) : null}
         {gateModal}
         {leaveModal}
+        {applyDoneModal}
       </div>
     );
   }
@@ -1778,6 +1966,7 @@ export default function ShowcaseStyleSettingsPanel({
 
       {gateModal}
       {leaveModal}
+      {applyDoneModal}
     </div>
   );
 }

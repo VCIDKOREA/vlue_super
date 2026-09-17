@@ -1,8 +1,15 @@
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 
-export async function fetchLocalAds() {
-  const res = await fetch(apiUrl("/api/ads"));
+export async function fetchLocalAds(location = null) {
+  const params = new URLSearchParams();
+  if (Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude)) {
+    params.set("lat", String(location.latitude));
+    params.set("lng", String(location.longitude));
+    params.set("radiusKm", String(location.radiusKm || 30));
+  }
+  const suffix = params.size ? `?${params.toString()}` : "";
+  const res = await fetch(apiUrl(`/api/ads${suffix}`));
   const data = await res.json().catch(() => ({}));
   if (!res.ok && !Array.isArray(data.ads)) {
     throw new Error(data.error || `지역 광고 목록 조회 실패 (${res.status})`);
@@ -35,7 +42,7 @@ export function mapLocalAdToStoreCard(ad, index = 0) {
     id: `local-ad-${ad.id}`,
     adId: ad.id,
     name: ad.storeName,
-    distance: Math.min(2, 0.2 + index * 0.05),
+    distance: Number.isFinite(ad.distanceKm) ? ad.distanceKm : Math.min(2, 0.2 + index * 0.05),
     popular: aiScore,
     rating: 4.9,
     likes: 120 + index * 17,

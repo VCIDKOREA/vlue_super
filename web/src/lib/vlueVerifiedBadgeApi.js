@@ -43,8 +43,7 @@ export function shouldShowVlueVerifiedSeal(ctx = {}) {
   if (ctx.vlueVerifiedBadge === false) return false;
   const local = readVlueVerifiedBadgeLocal();
   if (local === true) return true;
-  if (local === false) return false;
-  return Boolean(ctx.digitalCardIssued || ctx.hasDigitalCard);
+  return false;
 }
 
 export async function fetchVlueBadgeSnapshot() {

@@ -25,6 +25,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.ViewModelProvider
+import com.google.android.gms.ads.MobileAds
 import kr.vlue.calloverlay.applock.AppLockStore
 import kr.vlue.calloverlay.applock.PinLockController
 import kr.vlue.calloverlay.family.FamilyPermissionHelper
@@ -43,6 +45,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private lateinit var webView: WebView
     private lateinit var mainRoot: FrameLayout
     private lateinit var pinLock: PinLockController
+    private lateinit var rewardedAdViewModel: VlueRewardedAdViewModel
+    private lateinit var nativeAdManager: VlueNativeAdManager
+    private lateinit var bannerAdManager: VlueBannerAdManager
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: android.webkit.PermissionRequest? = null
     private var pendingWebGrantResources: Array<String>? = null
@@ -117,6 +122,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        rewardedAdViewModel = ViewModelProvider(this)[VlueRewardedAdViewModel::class.java]
+        MobileAds.initialize(applicationContext) {}
         /* Big Push·통화 UI는 기기 방향 따름. 쇼케이스는 웹 CSS로 세로 프레임 유지 */
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         /* Android 15+ edge-to-edge 기본값에서 WebView가 상태바 아래로 깔리면 헤더가 시계·배터리와 겹침 */
@@ -131,6 +138,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         setContentView(R.layout.activity_main)
         mainRoot = findViewById(R.id.main_root)
         webView = findViewById(R.id.main_webview)
+        nativeAdManager =
+            VlueNativeAdManager(
+                this,
+                findViewById(R.id.native_ad_overlay),
+                webView,
+            )
+        bannerAdManager = VlueBannerAdManager(this, mainRoot, webView)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.allowFileAccess = true
@@ -779,6 +793,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
     override fun onDestroy() {
         VlueFamilyBridge.detachWebView()
+        if (::nativeAdManager.isInitialized) nativeAdManager.destroy()
+        if (::bannerAdManager.isInitialized) bannerAdManager.destroy()
         super.onDestroy()
     }
 
@@ -929,6 +945,33 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     }
                     return JSON.stringify({ok:false,error:'no_bridge'});
                   }catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
+                },
+                showRewardedAd:function(requestId,action,userId,grantId){
+                  try{
+                    if(window.Android&&window.Android.showRewardedAd){
+                      return window.Android.showRewardedAd(
+                        String(requestId||''),String(action||''),String(userId||''),String(grantId||'')
+                      );
+                    }
+                    return JSON.stringify({ok:false,error:'no_bridge'});
+                  }catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
+                },
+                showNativeAdFallback:function(rectJson){
+                  try{if(window.Android&&window.Android.showNativeAdFallback)window.Android.showNativeAdFallback(String(rectJson||'{}'));}catch(e){}
+                },
+                hideNativeAdFallback:function(){
+                  try{if(window.Android&&window.Android.hideNativeAdFallback)window.Android.hideNativeAdFallback();}catch(e){}
+                },
+                showBannerAd:function(slotKey,rectJson){
+                  try{
+                    if(window.Android&&window.Android.showBannerAd){
+                      return window.Android.showBannerAd(String(slotKey||''),String(rectJson||'{}'));
+                    }
+                    return JSON.stringify({ok:false,error:'no_bridge'});
+                  }catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
+                },
+                hideBannerAd:function(slotKey){
+                  try{if(window.Android&&window.Android.hideBannerAd)window.Android.hideBannerAd(String(slotKey||''));}catch(e){}
                 },
                 getLetteringPermissionStatusJson:function(){
                   try{return window.Android&&window.Android.getLetteringPermissionStatusJson?window.Android.getLetteringPermissionStatusJson():null;}
@@ -1311,6 +1354,58 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 Log.e(TAG, "saveSafeCareCache failed", e)
                 """{"ok":false,"error":"${e.message?.replace("\"", "") ?: "fail"}"}"""
             }
+        }
+
+        /** AdMob RewardedAd — 결과는 vlue-rewarded-ad-result CustomEvent로 비동기 전달 */
+        @android.webkit.JavascriptInterface
+        fun showRewardedAd(
+            requestId: String?,
+            action: String?,
+            userId: String?,
+            grantId: String?,
+        ): String {
+            val request =
+                VlueRewardedAdViewModel.Request(
+                    requestId = requestId?.trim().orEmpty(),
+                    action = action?.trim().orEmpty(),
+                    userId = userId?.trim().orEmpty(),
+                    grantId = grantId?.trim().orEmpty(),
+                )
+            if (
+                request.requestId.isEmpty() ||
+                    request.action.isEmpty() ||
+                    request.userId.isEmpty() ||
+                    request.grantId.isEmpty()
+            ) {
+                return """{"ok":false,"error":"invalid_request"}"""
+            }
+            activity.runOnUiThread {
+                activity.rewardedAdViewModel.show(activity, request) { detail ->
+                    activity.dispatchWebCustomEvent("vlue-rewarded-ad-result", detail)
+                }
+            }
+            return """{"ok":true,"accepted":true}"""
+        }
+
+        @android.webkit.JavascriptInterface
+        fun showNativeAdFallback(rectJson: String?) {
+            activity.runOnUiThread { activity.nativeAdManager.show(rectJson) }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun hideNativeAdFallback() {
+            activity.runOnUiThread { activity.nativeAdManager.hide() }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun showBannerAd(slotKey: String?, rectJson: String?): String {
+            activity.runOnUiThread { activity.bannerAdManager.show(slotKey, rectJson) }
+            return """{"ok":true,"accepted":true}"""
+        }
+
+        @android.webkit.JavascriptInterface
+        fun hideBannerAd(slotKey: String?) {
+            activity.runOnUiThread { activity.bannerAdManager.hide(slotKey) }
         }
 
         /** 종이 명함 스캔 → 시스템 연락처 추가 화면 (Insert Intent) */

@@ -110,13 +110,30 @@ export default function LetteringBizcardSharePanel({
     const gen = ++prepareGen.current;
     let cancelled = false;
     setKakaoPrepared(null);
-    (async () => {
-      const prepared = await prepareKakaoBizcardShare(card);
+    const timer = window.setTimeout(() => {
       if (cancelled || gen !== prepareGen.current) return;
-      setKakaoPrepared(prepared);
+      setKakaoPrepared((prev) =>
+        prev == null
+          ? { ok: false, error: "카카오 공유 준비가 지연되고 있습니다. 다시 준비를 눌러 주세요." }
+          : prev
+      );
+    }, 12_000);
+    (async () => {
+      try {
+        const prepared = await prepareKakaoBizcardShare(card);
+        if (cancelled || gen !== prepareGen.current) return;
+        setKakaoPrepared(prepared);
+      } catch (e) {
+        if (cancelled || gen !== prepareGen.current) return;
+        setKakaoPrepared({
+          ok: false,
+          error: e instanceof Error ? e.message : "카카오 공유 준비에 실패했습니다."
+        });
+      }
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [
     isPaid,

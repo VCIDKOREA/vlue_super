@@ -1422,6 +1422,10 @@ class CallOverlayService : Service() {
                  * 앱 홈 쇼케이스바와 동일 — WebView LetteringIncomingNotification(home-glass).
                  * Native BigPushShowcaseBar 는 사용하지 않음 (임의 UI 금지).
                  */
+                if (authPopupOnlyMode || dcpPopupView?.isAttachedToWindow == true) {
+                    softHideCompanionOverlayChrome()
+                    return
+                }
                 nativeBanner?.visibility = android.view.View.GONE
                 rootContainer?.setBackgroundColor(Color.TRANSPARENT)
                 webView?.setBackgroundColor(Color.TRANSPARENT)
@@ -1546,9 +1550,20 @@ class CallOverlayService : Service() {
      * FULLSCREEN 허용 여부 — CallUiPhasePolicy / 계약 §3.
      * false 면 빈 다크 창·터치 가로채기 금지.
      */
-    private fun mayCommitFullscreenShowcase(): Boolean {
+    private fun mayCommitFullscreenShowcase(allowFromMiniRestore: Boolean = false): Boolean {
         if (dismissing || authPopupOnlyMode || authPopupConfirmedToMini) return false
-        if (userMinimized && companion.state == OverlayState.MINI_CASE) return false
+        /*
+         * 자동/재진입은 Mini 유지. 단, 사용자가 MiniCase를 직접 탭한 복원 요청은
+         * 이 검사 시점에 userMinimized=true인 것이 정상이라 명시적으로 허용한다.
+         */
+        if (CallUiPhasePolicy.blocksFullscreenForMiniState(
+                userMinimized = userMinimized,
+                isMiniCase = companion.state == OverlayState.MINI_CASE,
+                explicitMiniRestore = allowFromMiniRestore
+            )
+        ) {
+            return false
+        }
         /* 비정상 경로 — 쇼케이스 금지 (안심 팝업만) */
         if (isCurrentPathAbnormal(pendingCardJson)) return false
         if (isContactSafeCare(pendingCardJson)) return false
@@ -1670,8 +1685,7 @@ class CallOverlayService : Service() {
             applyCapsuleClip(view, enabled = false)
             view.setBackgroundColor(Color.parseColor("#0B101B"))
             webView?.setBackgroundColor(Color.TRANSPARENT)
-            applyPassThroughTouchFlags(params)
-            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+            applyFullscreenInteractiveFlags(params)
             params.gravity = Gravity.TOP or Gravity.START
             VlueBigPushTrace.lifecycle(
                 "SHOWCASE_EXPAND_ANIM_BEGIN",
@@ -1749,9 +1763,8 @@ class CallOverlayService : Service() {
         applyCapsuleClip(view, enabled = false)
         view.setBackgroundColor(Color.parseColor("#0B101B"))
         webView?.setBackgroundColor(Color.TRANSPARENT)
-        applyPassThroughTouchFlags(params)
-        /* Showcase 터치 필요 — NOT_FOCUSABLE 유지하되 창은 full; HOME 시 MINI 로 축소 */
-        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+        /* 전체화면 제보 input은 Window 포커스가 있어야 WebView IME가 열린다. */
+        applyFullscreenInteractiveFlags(params)
         nativeBanner?.visibility = android.view.View.GONE
         try {
             CompanionPerfTracker.measureUpdateViewLayout {
@@ -3349,7 +3362,7 @@ class CallOverlayService : Service() {
             return
         }
         /* 빈 FULLSCREEN 복원 금지 — 계약 §3 */
-        if (!mayCommitFullscreenShowcase()) {
+        if (!mayCommitFullscreenShowcase(allowFromMiniRestore = true)) {
             refuseEmptyFullscreen("restore_$source")
             return
         }
@@ -3637,6 +3650,25 @@ class CallOverlayService : Service() {
             )
     }
 
+    /**
+     * 전체화면 Showcase/미인증 제보 패널: WebView input과 IME를 위해 포커스를 허용한다.
+     * Mini/BigPush는 applyPassThroughTouchFlags를 계속 사용하므로 전화 앱 터치 통과 정책은 유지된다.
+     */
+    private fun applyFullscreenInteractiveFlags(params: WindowManager.LayoutParams) {
+        @Suppress("DEPRECATION")
+        params.flags = (
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+        @Suppress("DEPRECATION")
+        params.softInputMode =
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED or
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+    }
+
     /** 신고 시트 등 — 전체 창 + 터치 포커스 (취소 버튼이 compact 창 밖으로 나가 무반응이던 문제) */
     fun setOverlayModal(open: Boolean) {
         mainHandler.post {
@@ -3658,14 +3690,7 @@ class CallOverlayService : Service() {
         params.height = WindowManager.LayoutParams.MATCH_PARENT
         params.x = 0
                 params.y = 0
-        @Suppress("DEPRECATION")
-        params.flags = (
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            )
+        applyFullscreenInteractiveFlags(params)
         nativeBanner?.visibility = android.view.View.GONE
         webView?.visibility = android.view.View.VISIBLE
         view.visibility = android.view.View.VISIBLE
@@ -3707,6 +3732,18 @@ class CallOverlayService : Service() {
         mainHandler.post {
             if (overlayModal) {
                 applyOverlayModalWindow()
+                return@post
+            }
+            /*
+             * 중앙 인증/안심 팝업이 떠 있는 동안 BigPush를 다시 VISIBLE 하면
+             * 팝업과 상단 바가 동시에 보인다 (김진현 수신 로그: SOFT_HIDE → COMPACT 반복).
+             */
+            if (authPopupOnlyMode || dcpPopupView?.isAttachedToWindow == true) {
+                softHideCompanionOverlayChrome()
+                VlueBigPushTrace.lifecycle(
+                    "COMPACT_RINGING_SKIP_POPUP",
+                    "authPopupOnly=$authPopupOnlyMode popupUp=${dcpPopupView?.isAttachedToWindow == true}"
+                )
                 return@post
             }
             val wm = windowManager
@@ -4484,9 +4521,11 @@ class CallOverlayService : Service() {
                     .put("position", companion.position.name)
             )
         } else if (companion.state == OverlayState.BIG_PUSH) {
-            if (currentOutgoing &&
-                (!outgoingExpandRequestedByUser || !authPopupOnlyMode)
-            ) {
+            if (authPopupOnlyMode || dcpPopupView?.isAttachedToWindow == true) {
+                softHideCompanionOverlayChrome()
+                return
+            }
+            if (currentOutgoing && !outgoingExpandRequestedByUser) {
                 ensureOutgoingLogoWindowLayout()
                 notifyCompactCallChrome()
             } else {
@@ -4604,6 +4643,7 @@ class CallOverlayService : Service() {
             height = WindowManager.LayoutParams.MATCH_PARENT
             width = WindowManager.LayoutParams.MATCH_PARENT
             gravity = Gravity.TOP or Gravity.START
+            applyFullscreenInteractiveFlags(this)
         }
 
     /** 인증 팝업 확인 후 MiniCase — 풀스크린 addView 금지 */

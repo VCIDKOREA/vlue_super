@@ -58,13 +58,22 @@ function VlueLogoAvatar({ avatarUrl, unread }) {
 }
 
 function measureNavHeightPx() {
+  const chrome = document.querySelector("[data-vlue-bottom-chrome]");
+  if (chrome) {
+    const h = Math.round(chrome.getBoundingClientRect().height);
+    if (h > 0) return h;
+  }
   const nav =
     document.querySelector("[data-vlue-bottom-nav]") ||
     document.querySelector(".bottom-nav-pulse-root");
+  const banner = document.querySelector("[data-vlue-bottom-banner]");
+  let total = 0;
+  if (banner) total += Math.round(banner.getBoundingClientRect().height);
   if (nav) {
     const h = Math.round(nav.getBoundingClientRect().height);
-    if (h > 0) return h;
+    if (h > 0) total += h;
   }
+  if (total > 0) return total;
   try {
     const el = document.getElementById("app-body") || document.documentElement;
     const raw = getComputedStyle(el).getPropertyValue("--vlue-bottom-nav-offset").trim();
@@ -73,7 +82,7 @@ function measureNavHeightPx() {
   } catch {
     /* ignore */
   }
-  return 48;
+  return 98;
 }
 
 function measureSheetTops() {

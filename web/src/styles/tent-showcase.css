@@ -902,6 +902,13 @@
   padding-top: 8px !important;
 }
 
+.lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-live-bar__brand {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
 .lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--phase-ringing,
 .lettering-overlay-host--tent.lettering-overlay-host--ringing .lettering-ongoing--fullscreen-tent[data-expanded="false"] {
   background: transparent !important;

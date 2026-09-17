@@ -67,10 +67,11 @@ export async function registerShowcaseSound(payload) {
   return data.sound;
 }
 
-export async function borrowShowcaseSound(soundId) {
+export async function borrowShowcaseSound(soundId, rewardedGrantId = "") {
   const res = await vlueAuthFetch(apiUrl(`/api/showcase-sounds/${encodeURIComponent(soundId)}/borrow`), {
     method: "POST",
-    headers: vlueAuthHeaders()
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ rewardedGrantId })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "퍼가기 실패");
@@ -88,10 +89,11 @@ export async function deleteShowcaseSound(soundId) {
   return data.sound;
 }
 
-export async function notifyThemeBgmChange() {
+export async function notifyThemeBgmChange(rewardedGrantId = "") {
   const res = await vlueAuthFetch(apiUrl("/api/showcase-sounds/theme-change"), {
     method: "POST",
-    headers: vlueAuthHeaders()
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ rewardedGrantId })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "주제곡 변경 제한");

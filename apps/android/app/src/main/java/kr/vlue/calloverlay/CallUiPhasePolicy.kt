@@ -68,6 +68,16 @@ object CallUiPhasePolicy {
     fun mayShowCenterPopupWhileUnanswered(): Boolean = false
 
     /**
+     * 자동 전환은 사용자가 선택한 MiniCase를 침범하지 않는다.
+     * MiniCase 자체를 탭한 명시적 복원 요청만 풀화면 검사를 통과한다.
+     */
+    fun blocksFullscreenForMiniState(
+        userMinimized: Boolean,
+        isMiniCase: Boolean,
+        explicitMiniRestore: Boolean
+    ): Boolean = userMinimized && isMiniCase && !explicitMiniRestore
+
+    /**
      * 수화 후 자동 팝업/쇼케이스 진입 허용.
      * 수신: 즉시 true. 발신: 사용자가 중앙 로고를 탭한 뒤에만 true (규격 §3b).
      */

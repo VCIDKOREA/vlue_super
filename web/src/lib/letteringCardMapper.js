@@ -150,6 +150,12 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
     ownerUserId: feedId,
     feedId: feedId || (phone ? `phone-${phone.replace(/\D/g, "")}` : ""),
     feedType: body.kind === "company" ? "company" : "personal",
+    vlueVerifiedBadge: Boolean(
+      body.vlue_verified_badge ??
+        body.vlueVerifiedBadge ??
+        nested.vlue_verified_badge ??
+        nested.vlueVerifiedBadge
+    ),
     membershipTier:
       profile.membershipTier ||
       body.membershipTier ||

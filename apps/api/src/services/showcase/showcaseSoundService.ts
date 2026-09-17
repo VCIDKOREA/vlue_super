@@ -1,12 +1,12 @@
 import type { Prisma, ShowcaseSoundCreateType, ShowcaseSoundKind } from "@prisma/client";
 import { prisma } from "../../db/client.js";
-import { isPaidMember } from "../membership/paidMemberGate.js";
+import { consumeRewardedAdGrant } from "../membership/rewardedAdPolicyService.js";
+import { resolveUserPolicy } from "../membership/userPolicyManager.js";
 
 export const SOUND_RIGHTS_DISCLAIMER =
   "VLUE는 음원을 직접 판매하거나 저작권을 최종 인증하는 플랫폼이 아닙니다. 이용자가 적법한 권리 또는 이용 권한을 보유한 음원을 쇼케이스에서 소개·재생할 수 있도록 연결합니다.";
 
 const FREE_MONTHLY_REGISTER_LIMIT = 0; /* 무료는 업로드 불가 — 퍼오기만 */
-const FREE_WEEKLY_THEME_CHANGE_LIMIT = 1;
 const PAID_DAILY_REGISTER_LIMIT = 3;
 const PAID_LIBRARY_LIMIT = 10;
 const PAID_PLAYLIST_SELECT_LIMIT = 5;
@@ -113,8 +113,8 @@ export function serializeShowcaseSound(
 }
 
 export async function getSoundQuotaStatus(userId: string) {
-  const paidGate = await isPaidMember(userId);
-  const paid = paidGate.ok;
+  const policy = await resolveUserPolicy(userId);
+  const paid = policy.tier !== "free";
   const yearMonth = yearMonthNow();
   const weekKey = isoWeekKey();
   const dayStart = startOfKoreaDayUtc();
@@ -154,8 +154,9 @@ export async function getSoundQuotaStatus(userId: string) {
     libraryLimit: paid ? PAID_LIBRARY_LIMIT : 0,
     playlistSelectLimit: paid ? PAID_PLAYLIST_SELECT_LIMIT : 1,
     themeChangeCount: themeWeek,
-    themeChangeLimit: paid ? null : FREE_WEEKLY_THEME_CHANGE_LIMIT,
-    canChangeTheme: paid || themeWeek < FREE_WEEKLY_THEME_CHANGE_LIMIT,
+    themeChangeLimit: null,
+    canChangeTheme: true,
+    requiresRewardedAd: !paid,
     canAddToLibrary: paid,
     canUpload: paid
   };
@@ -184,33 +185,18 @@ export async function bumpRegisterQuota(userId: string) {
   });
 }
 
-export async function bumpThemeChangeQuota(userId: string) {
-  const paidGate = await isPaidMember(userId);
-  if (paidGate.ok) return { ok: true as const, skipped: true };
-  const yearMonth = yearMonthNow();
-  const weekKey = isoWeekKey();
-  const row = await prisma.showcaseSoundQuotaMonth.findUnique({
-    where: { userId_yearMonth: { userId, yearMonth } }
+export async function bumpThemeChangeQuota(userId: string, rewardedGrantId?: string | null) {
+  const policy = await resolveUserPolicy(userId);
+  if (!policy.rewardedAdsRequired) return { ok: true as const, skipped: true };
+  const grantId = String(rewardedGrantId || "").trim();
+  if (!grantId) throw new Error("rewarded_ad_required");
+  const consumed = await consumeRewardedAdGrant({
+    userId,
+    grantId,
+    action: "bgm_apply"
   });
-  const count = row?.themeChangeWeekKey === weekKey ? row.themeChangeCount : 0;
-  if (count >= FREE_WEEKLY_THEME_CHANGE_LIMIT) {
-    throw new Error("무료 회원은 쇼케이스 주제곡을 주 1회만 변경할 수 있습니다.");
-  }
-  await prisma.showcaseSoundQuotaMonth.upsert({
-    where: { userId_yearMonth: { userId, yearMonth } },
-    create: {
-      userId,
-      yearMonth,
-      registerCount: 0,
-      themeChangeWeekKey: weekKey,
-      themeChangeCount: 1
-    },
-    update: {
-      themeChangeWeekKey: weekKey,
-      themeChangeCount: row?.themeChangeWeekKey === weekKey ? { increment: 1 } : 1
-    }
-  });
-  return { ok: true as const };
+  if (!consumed.ok) throw new Error("rewarded_ad_not_earned");
+  return { ok: true as const, skipped: false };
 }
 
 export async function listSignatureSounds() {
@@ -381,7 +367,11 @@ export async function updateSignatureSound(
   return serializeShowcaseSound(row);
 }
 
-export async function borrowShowcaseSound(borrowerUserId: string, soundId: string) {
+export async function borrowShowcaseSound(
+  borrowerUserId: string,
+  soundId: string,
+  rewardedGrantId?: string | null
+) {
   const sound = await prisma.showcaseSound.findFirst({
     where: { id: soundId, deletedAt: null }
   });
@@ -391,6 +381,24 @@ export async function borrowShowcaseSound(borrowerUserId: string, soundId: strin
   }
   if (sound.ownerUserId && sound.ownerUserId === borrowerUserId) {
     throw new Error("내 음원은 퍼갈 필요가 없습니다.");
+  }
+  const existing = await prisma.showcaseSoundBorrow.findUnique({
+    where: { borrowerUserId_soundId: { borrowerUserId, soundId } }
+  });
+  if (existing) return serializeShowcaseSound(sound);
+
+  const policy = await resolveUserPolicy(borrowerUserId);
+  if (policy.rewardedAdsRequired) {
+    const borrowedCount = await prisma.showcaseSoundBorrow.count({ where: { borrowerUserId } });
+    if (borrowedCount >= policy.bgmTrackLimit) {
+      throw new Error(`무료 회원은 BGM ${policy.bgmTrackLimit}곡까지 보관할 수 있습니다.`);
+    }
+    const consumed = await consumeRewardedAdGrant({
+      userId: borrowerUserId,
+      grantId: String(rewardedGrantId || ""),
+      action: "bgm_apply"
+    });
+    if (!consumed.ok) throw new Error("rewarded_ad_not_earned");
   }
   await prisma.showcaseSoundBorrow.upsert({
     where: {

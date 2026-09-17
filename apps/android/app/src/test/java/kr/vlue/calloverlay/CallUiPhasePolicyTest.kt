@@ -81,6 +81,24 @@ class CallUiPhasePolicyTest {
     }
 
     @Test
+    fun miniState_blocksAutomaticFullscreen_butAllowsExplicitMiniTapRestore() {
+        assertTrue(
+            CallUiPhasePolicy.blocksFullscreenForMiniState(
+                userMinimized = true,
+                isMiniCase = true,
+                explicitMiniRestore = false
+            )
+        )
+        assertFalse(
+            CallUiPhasePolicy.blocksFullscreenForMiniState(
+                userMinimized = true,
+                isMiniCase = true,
+                explicitMiniRestore = true
+            )
+        )
+    }
+
+    @Test
     fun outgoing_autoExpand_requiresUserTap() {
         assertFalse(
             CallUiPhasePolicy.mayAutoExpandAfterAnswer(

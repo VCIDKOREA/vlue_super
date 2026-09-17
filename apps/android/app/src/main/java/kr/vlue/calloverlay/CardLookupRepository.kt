@@ -19,6 +19,8 @@ data class CardLookupResult(
 
 object CardLookupRepository {
     private const val CACHE_TTL_MS = 30L * 60L * 1000L
+    /** 링잉 즉시 표시용. 이보다 오래된 회원 카드는 서버를 다시 조회한다. */
+    private const val AUTHORITATIVE_CACHE_TTL_MS = 60L * 1000L
     private const val DISK_TTL_MS = 7L * 24L * 60L * 60L * 1000L
     private const val DISK_PREFS = "vlue_card_lookup_disk_v1"
     private val cache = java.util.concurrent.ConcurrentHashMap<String, CachedLookup>()
@@ -43,19 +45,37 @@ object CardLookupRepository {
         return null
     }
 
+    private fun cacheAgeMs(rawNumber: String): Long {
+        val keys = cacheKeys(rawNumber)
+        val now = System.currentTimeMillis()
+        var best = -1L
+        for (key in keys) {
+            val hit = cache[key] ?: continue
+            val age = now - hit.atMs
+            if (age in 0 until CACHE_TTL_MS && (best < 0L || age < best)) {
+                best = age
+            }
+        }
+        return best
+    }
+
     /** 메모리 → 디스크. 링잉 직후 인증명 즉시 표시용. */
     fun peekCached(context: Context, rawNumber: String): CardLookupResult? {
         peekCached(rawNumber)?.let { return it }
         val fromDisk = readDisk(context, rawNumber) ?: return null
-        remember(rawNumber, fromDisk)
-        return fromDisk
+        rememberAt(rawNumber, fromDisk.result, fromDisk.atMs)
+        return fromDisk.result
     }
 
     fun remember(rawNumber: String, result: CardLookupResult) {
         if (!result.matched) return
-        val now = System.currentTimeMillis()
+        rememberAt(rawNumber, result, System.currentTimeMillis())
+    }
+
+    private fun rememberAt(rawNumber: String, result: CardLookupResult, atMs: Long) {
+        if (!result.matched) return
         for (key in cacheKeys(rawNumber)) {
-            cache[key] = CachedLookup(result, now)
+            cache[key] = CachedLookup(result, atMs)
         }
     }
 
@@ -147,11 +167,16 @@ object CardLookupRepository {
             var localSafeFallback: CardLookupResult? = null
 
             /*
-             * 강한 회원 카드는 즉시 확정한다. 로컬 안심 데이터는 링잉 UI에는 이미
-             * peekCached 로 먼저 표시됐으므로 여기서는 서버 회원 카드를 재확인한다.
+             * 로컬 안심/pending 은 폴백으로만 쓰고 서버를 재확인한다.
+             * 회원 카드도 60초 이상이면 서버를 다시 본다 — 송출 ON/OFF·쇼케이스
+             * 변경 후 구캐시로 인증팝업이 뜨는 회귀(김광덕 수신)를 막는다.
              */
             peekCached(context, rawNumber)?.let { cached ->
-                if (requiresAuthoritativeRefresh(cached)) {
+                val ageMs = cacheAgeMs(rawNumber)
+                if (requiresAuthoritativeRefresh(cached) ||
+                    ageMs < 0L ||
+                    ageMs > AUTHORITATIVE_CACHE_TTL_MS
+                ) {
                     localSafeFallback = cached
                 } else {
                     bg.execute { reportLineCallEvent(context, rawNumber) }
@@ -247,6 +272,11 @@ object CardLookupRepository {
         else CardLookupBridge.normalizeKr(rawNumber) ?: rawNumber.trim()
     }
 
+    private data class DiskLookup(
+        val result: CardLookupResult,
+        val atMs: Long
+    )
+
     private fun writeDisk(context: Context, rawNumber: String, result: CardLookupResult) {
         try {
             val key = diskKey(rawNumber)
@@ -263,7 +293,7 @@ object CardLookupRepository {
         }
     }
 
-    private fun readDisk(context: Context, rawNumber: String): CardLookupResult? {
+    private fun readDisk(context: Context, rawNumber: String): DiskLookup? {
         return try {
             val key = diskKey(rawNumber)
             if (key.isBlank()) return null
@@ -274,13 +304,16 @@ object CardLookupRepository {
             if (body.isEmpty()) return null
             val json = JSONObject(body)
             if (!json.optBoolean("matched", false)) return null
-            CardLookupResult(
-                matched = true,
-                verified = prefs.getBoolean("${key}_verified", json.optBoolean("is_verified", true)),
-                displayName =
-                    prefs.getString("${key}_name", null)?.ifBlank { null }
-                        ?: json.optString("displayName", ""),
-                rawJson = body
+            DiskLookup(
+                result = CardLookupResult(
+                    matched = true,
+                    verified = prefs.getBoolean("${key}_verified", json.optBoolean("is_verified", true)),
+                    displayName =
+                        prefs.getString("${key}_name", null)?.ifBlank { null }
+                            ?: json.optString("displayName", ""),
+                    rawJson = body
+                ),
+                atMs = at
             )
         } catch (_: Exception) {
             null
