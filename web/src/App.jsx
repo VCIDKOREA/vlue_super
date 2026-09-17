@@ -4420,6 +4420,29 @@ function App() {
     const period = 2400;
     root.style.setProperty("--nav-pulse-delay", `${-(performance.now() % period)}ms`);
   }, [showBottomNav]);
+
+  /** 홈이 아니면 AdMob 네이티브 오버레이를 즉시 숨김 — 마이페이지 등에서 공중 부유 방지 */
+  useEffect(() => {
+    if (page === "main" && !profileOpen) return undefined;
+    const hideAll = () => {
+      const bridge = window.VlueLettering || window.Android;
+      try {
+        bridge?.hideBannerAd?.("ribbon");
+        bridge?.hideBannerAd?.("bottom");
+        bridge?.hideNativeAdFallback?.();
+      } catch {
+        /* ignore */
+      }
+      try {
+        window.dispatchEvent(new CustomEvent("vlue-hide-all-ads"));
+      } catch {
+        /* ignore */
+      }
+    };
+    hideAll();
+    return hideAll;
+  }, [page, profileOpen]);
+
   const requireApp = (fn) => {
     requireAuth(fn);
   };

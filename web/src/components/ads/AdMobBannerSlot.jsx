@@ -1,41 +1,53 @@
 import { useEffect, useRef, useState } from "react";
 import { AD_SLOT, ADMOB_TEST } from "../../lib/ads/adMobUnitIds.js";
 
+function hideSlot(bridge, slotId) {
+  try {
+    bridge?.hideBannerAd?.(String(slotId));
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Adaptive Banner DOM 슬롯 — Android AdView를 좌표에 겹침.
- * 웹/로딩 중에는 고정 높이 스켈레톤 + Test Ad 배지로 레이아웃 붕괴 방지.
- *
- * @param {{
- *   slotId?: string,
- *   heightPx?: number,
- *   className?: string,
- *   label?: string,
- *   unitId?: string,
- * }} props
+ * visible=false / unmount 시 반드시 hide 해서 공중 부유 오버레이를 남기지 않는다.
  */
 export default function AdMobBannerSlot({
   slotId = AD_SLOT.BOTTOM,
   heightPx = 50,
   className = "",
   label = "배너 광고",
-  unitId = ADMOB_TEST.BANNER
+  unitId = ADMOB_TEST.BANNER,
+  enabled = true
 }) {
   const ref = useRef(null);
   const [nativeReady, setNativeReady] = useState(false);
 
   useEffect(() => {
     const bridge = window.VlueLettering || window.Android;
-    if (!ref.current || typeof bridge?.showBannerAd !== "function") {
+    if (!enabled || !ref.current || typeof bridge?.showBannerAd !== "function") {
       setNativeReady(false);
+      hideSlot(bridge, slotId);
       return undefined;
     }
     let frame = 0;
     const sync = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const rect = ref.current?.getBoundingClientRect();
-        if (!rect) return;
-        const visible = rect.bottom > 0 && rect.top < window.innerHeight && rect.width > 8;
+        const el = ref.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const visible =
+          rect.bottom > 8 &&
+          rect.top < window.innerHeight - 8 &&
+          rect.width > 8 &&
+          rect.height > 8;
+        if (!visible) {
+          hideSlot(bridge, slotId);
+          setNativeReady(false);
+          return;
+        }
         try {
           const raw = bridge.showBannerAd(
             String(slotId),
@@ -46,7 +58,7 @@ export default function AdMobBannerSlot({
               height: rect.height,
               viewportWidth: window.innerWidth,
               viewportHeight: window.innerHeight,
-              visible,
+              visible: true,
               unitId
             })
           );
@@ -62,23 +74,28 @@ export default function AdMobBannerSlot({
         }
       });
     };
+    const onHideAll = () => {
+      hideSlot(bridge, slotId);
+      setNativeReady(false);
+    };
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(sync) : null;
     observer?.observe(ref.current);
     window.addEventListener("scroll", sync, true);
     window.addEventListener("resize", sync);
+    window.addEventListener("vlue-hide-all-ads", onHideAll);
+    document.addEventListener("visibilitychange", sync);
     sync();
     return () => {
       cancelAnimationFrame(frame);
       observer?.disconnect();
       window.removeEventListener("scroll", sync, true);
       window.removeEventListener("resize", sync);
-      try {
-        bridge.hideBannerAd?.(String(slotId));
-      } catch {
-        /* ignore */
-      }
+      window.removeEventListener("vlue-hide-all-ads", onHideAll);
+      document.removeEventListener("visibilitychange", sync);
+      hideSlot(bridge, slotId);
+      setNativeReady(false);
     };
-  }, [slotId, unitId]);
+  }, [slotId, unitId, enabled]);
 
   return (
     <div

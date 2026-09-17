@@ -174,6 +174,22 @@ function kakaoShareOriginBlockedMessage() {
   );
 }
 
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(`${label} 시간이 초과되었습니다.`)), ms);
+    Promise.resolve(promise).then(
+      (v) => {
+        window.clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        window.clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
 /**
  * 카카오톡 Feed — 개인화 명함 카드 PNG + VLUÉ 인증 버튼
  *
@@ -187,12 +203,25 @@ export async function prepareKakaoBizcardShare(card) {
     return { ok: false, error: originBlock };
   }
 
-  const cardId = (await ensureDigitalCardId()) || "";
+  let cardId = "";
+  try {
+    cardId = (await withTimeout(ensureDigitalCardId(), 8_000, "명함 ID 확인")) || "";
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "명함 ID를 확인하지 못했습니다." };
+  }
   if (!cardId) {
     return { ok: false, error: "명함 ID가 없습니다. 명함을 저장한 뒤 다시 시도해 주세요." };
   }
 
-  const sync = await syncDigitalCardExportSnapshot(card);
+  let sync;
+  try {
+    sync = await withTimeout(syncDigitalCardExportSnapshot(card), 10_000, "명함 동기화");
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "명함 동기화가 지연되고 있습니다. 다시 시도해 주세요."
+    };
+  }
   if (sync?.ok === false) {
     return {
       ok: false,
@@ -204,7 +233,7 @@ export async function prepareKakaoBizcardShare(card) {
 
   let Kakao;
   try {
-    Kakao = await ensureKakaoSdk();
+    Kakao = await withTimeout(ensureKakaoSdk(), 8_000, "카카오 SDK 로드");
   } catch (e) {
     const raw = String(e?.message || "");
     const friendly = /키|KEY|설정/i.test(raw)

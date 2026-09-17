@@ -1,24 +1,17 @@
 import { useEffect, useState } from "react";
-import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
-import { resolveEffectiveMembershipTier } from "../../lib/effectiveMembership.js";
 import {
   hasCustomRibbonBanner,
   readRibbonBanner,
   RIBBON_BANNER_CHANGED_EVENT
 } from "../../lib/showcase/ribbonBannerStorage.js";
-import { AD_SLOT, ADMOB_TEST } from "../../lib/ads/adMobUnitIds.js";
-import AdMobBannerSlot from "./AdMobBannerSlot.jsx";
 
 const RIBBON_H = 50;
 
 /**
- * 빅푸시 「전화화면 보기」자리 → 가로 띠배너.
- * 유료: 커스텀 이미지(+링크) 우선, 미등록 시 AdMob fallback.
- * 무료: AdMob 상시.
+ * 유료 커스텀 띠배너 미리보기 전용 — AdMob 없음.
+ * 빅푸시/통화 UI에는 붙이지 않는다. 설정 화면에서만 사용.
  */
-export default function ShowcaseRibbonBanner({ membershipTier = "free", className = "" }) {
-  const tier = resolveEffectiveMembershipTier(membershipTier);
-  const isPaid = isPaidLetteringTier(tier);
+export default function ShowcaseRibbonBanner({ className = "" }) {
   const [custom, setCustom] = useState(() => readRibbonBanner());
 
   useEffect(() => {
@@ -31,48 +24,34 @@ export default function ShowcaseRibbonBanner({ membershipTier = "free", classNam
     };
   }, []);
 
-  const showCustom = isPaid && hasCustomRibbonBanner(custom);
-
-  if (showCustom) {
-    const href = String(custom.linkUrl || "").trim();
-    const img = (
-      <img
-        src={custom.imageUrl}
-        alt="등록 배너"
-        className="h-full w-full object-cover"
-        draggable={false}
-      />
-    );
+  if (!hasCustomRibbonBanner(custom)) {
     return (
       <div
-        className={`showcase-ribbon-banner showcase-ribbon-banner--custom overflow-hidden rounded-lg ${className}`.trim()}
+        className={`showcase-ribbon-banner flex items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 ${className}`.trim()}
         style={{ height: RIBBON_H, minHeight: RIBBON_H }}
-        data-vlue-ribbon="custom"
       >
-        {href ? (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block h-full w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {img}
-          </a>
-        ) : (
-          img
-        )}
+        <span className="text-[10px] font-bold text-slate-400">커스텀 띠배너 미등록</span>
       </div>
     );
   }
 
+  const href = String(custom.linkUrl || "").trim();
+  const img = (
+    <img src={custom.imageUrl} alt="등록 배너" className="h-full w-full object-cover" draggable={false} />
+  );
   return (
-    <AdMobBannerSlot
-      slotId={AD_SLOT.RIBBON}
-      heightPx={RIBBON_H}
-      unitId={ADMOB_TEST.BANNER}
-      label="띠배너 광고"
-      className={`showcase-ribbon-banner showcase-ribbon-banner--ad rounded-lg border border-white/10 ${className}`.trim()}
-    />
+    <div
+      className={`showcase-ribbon-banner showcase-ribbon-banner--custom overflow-hidden rounded-lg ${className}`.trim()}
+      style={{ height: RIBBON_H, minHeight: RIBBON_H }}
+      data-vlue-ribbon="custom"
+    >
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="block h-full w-full">
+          {img}
+        </a>
+      ) : (
+        img
+      )}
+    </div>
   );
 }

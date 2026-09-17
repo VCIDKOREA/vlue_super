@@ -73,8 +73,8 @@ export default function RibbonBannerSettingsForm({ isDarkMode = false, onToast }
         빅푸시 하단 띠배너 (유료)
       </p>
       <p className={`mt-1 text-[11px] leading-snug ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-        「전화화면 보기」자리의 가로 배너입니다. 이미지·연결 URL을 등록하면 우선 노출되고, 미등록 시 AdMob
-        띠배너로 자동 전환됩니다.
+        설정에서만 미리보는 커스텀 이미지입니다. 빅푸시·통화 화면 아래에는 광고가 붙지 않으며, 홈 하단 고정
+        배너만 노출됩니다.
       </p>
 
       <div
