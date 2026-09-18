@@ -1532,6 +1532,19 @@ export default function LetteringIncomingNotification({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
+                  openOwnerSettings(carouselSlideType === "card" ? "card" : "showcase");
+                }}
+                className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
+                aria-label={carouselSlideType === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
+                title={carouselSlideType === "card" ? "명함 설정" : "쇼케이스 설정"}
+              >
+                <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+                설정
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
                   toggleInCallChromePreview();
                 }}
                 className={`lettering-call-icon-btn inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm active:scale-95 ${
@@ -1548,19 +1561,6 @@ export default function LetteringIncomingNotification({
                   strokeWidth={2.6}
                   aria-hidden
                 />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openOwnerSettings(carouselSlideType === "card" ? "card" : "showcase");
-                }}
-                className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
-                aria-label={carouselSlideType === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
-                title={carouselSlideType === "card" ? "명함 설정" : "쇼케이스 설정"}
-              >
-                <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-                설정
               </button>
             </div>
           ) : null}
