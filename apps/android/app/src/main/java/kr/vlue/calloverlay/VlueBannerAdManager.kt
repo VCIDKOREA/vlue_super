@@ -86,10 +86,19 @@ class VlueBannerAdManager(
         slot.adView = null
         slot.host.removeAllViews()
 
+        val preferred =
+            slot.pendingRect?.optString("preferredSize")?.trim()?.uppercase().orEmpty()
+        val size =
+            when (preferred) {
+                "BANNER" -> AdSize.BANNER // 320x50 — 폰 표준 띠배너
+                "LARGE_BANNER" -> AdSize.LARGE_BANNER
+                else -> adaptiveSize() // 화면폭 Adaptive (테스트 문구에 468x60 등이 표시될 수 있음)
+            }
+
         val adView =
             AdView(activity).apply {
                 adUnitId = slot.unitId
-                setAdSize(adaptiveSize())
+                setAdSize(size)
             }
         slot.adView = adView
         slot.host.addView(

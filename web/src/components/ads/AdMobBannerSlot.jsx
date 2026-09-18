@@ -19,7 +19,9 @@ export default function AdMobBannerSlot({
   className = "",
   label = "배너 광고",
   unitId = ADMOB_TEST.BANNER,
-  enabled = true
+  enabled = true,
+  /** BANNER = 320x50 고정, ADAPTIVE = 화면폭 Adaptive (테스트 문구에 468x60 등이 뜰 수 있음) */
+  preferredSize = "ADAPTIVE"
 }) {
   const ref = useRef(null);
   const [nativeReady, setNativeReady] = useState(false);
@@ -59,7 +61,8 @@ export default function AdMobBannerSlot({
               viewportWidth: window.innerWidth,
               viewportHeight: window.innerHeight,
               visible: true,
-              unitId
+              unitId,
+              preferredSize
             })
           );
           let parsed = raw;
@@ -95,7 +98,7 @@ export default function AdMobBannerSlot({
       hideSlot(bridge, slotId);
       setNativeReady(false);
     };
-  }, [slotId, unitId, enabled]);
+  }, [slotId, unitId, enabled, preferredSize]);
 
   return (
     <div

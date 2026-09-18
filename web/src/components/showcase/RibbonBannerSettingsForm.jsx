@@ -82,8 +82,9 @@ export default function RibbonBannerSettingsForm({ isDarkMode = false, onToast }
       >
         <p className="font-black">권장 사이즈</p>
         <p className="mt-0.5">
-          · <strong>가로 1200×세로 150px</strong> (비율 8:1, Adaptive Banner에 맞춤)
+          · <strong>가로 1200×세로 150px</strong> (비율 약 8:1 · 화면폭 Adaptive용)
         </p>
+        <p>· 또는 표준 띠배너에 맞출 때 <strong>640×100px</strong> (표시는 약 320×50)</p>
         <p>· 최소 640×80px · 최대 파일 <strong>800KB</strong></p>
         <p>· 형식 PNG / JPG / WEBP · 중요 문구는 좌우 8% 안쪽(안전 영역)</p>
       </div>
