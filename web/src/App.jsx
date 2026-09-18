@@ -13,6 +13,7 @@ import ContactSyncConsentModal from "./components/ContactSyncConsentModal.jsx";
 import { openFriendShowcase } from "./lib/openFriendShowcase.js";
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
+import HomeBottomFixedBanner from "./components/ads/HomeBottomFixedBanner.jsx";
 import MyPage from "./components/MyPage";
 import MyCaseScreen from "./components/mycase/MyCaseScreen.jsx";
 import VlueCalendarScreen from "./components/calendar/VlueCalendarScreen.jsx";
@@ -5536,6 +5537,8 @@ function App() {
         className={`fixed bottom-0 left-0 right-0 z-[160] ${showBottomNav ? "block" : "hidden"}`}
         data-vlue-bottom-chrome
       >
+        {/* 하단 띠배너 — BottomNav 바로 위. 홈에서 바로 확인 가능 */}
+        {showBottomNav ? <HomeBottomFixedBanner /> : null}
         <nav className="relative z-[161] flex w-full justify-center">
           <div
             ref={bottomNavPulseSyncRef}

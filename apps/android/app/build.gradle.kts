@@ -37,7 +37,7 @@ val vlueWebBase = gradleProp("VLUE_WEB_BASE_URL", "https://www.vlue.kr")
 val admobAppId = gradleProp("ADMOB_APP_ID", "ca-app-pub-3940256099942544~3347511713")
 val admobRewarded15Id = gradleProp("ADMOB_REWARDED_15_ID", "ca-app-pub-3940256099942544/5224354917")
 val admobRewarded30Id = gradleProp("ADMOB_REWARDED_30_ID", "ca-app-pub-3940256099942544/5224354917")
-val admobNativeId = gradleProp("ADMOB_NATIVE_ID", "ca-app-pub-3940256099942544/2241692110")
+val admobNativeId = gradleProp("ADMOB_NATIVE_ID", "ca-app-pub-3940256099942544/2247696110")
 val admobBannerId = gradleProp("ADMOB_BANNER_ID", "ca-app-pub-3940256099942544/6300978111")
 
 /** 릴리즈 서명 — keystore.properties 있으면 실키, 없으면 debug 키로 서명(스토어 제출 전 교체) */

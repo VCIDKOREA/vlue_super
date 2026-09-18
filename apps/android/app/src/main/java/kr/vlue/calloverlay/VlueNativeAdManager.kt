@@ -77,7 +77,14 @@ class VlueNativeAdManager(
         if (loading) return
         loading = true
         publishStatus("loading", "AdLoader starting", -1)
-        val unitId = rect.optString("unitId").trim().ifEmpty { BuildConfig.ADMOB_NATIVE_ID }
+        val rawUnit = rect.optString("unitId").trim()
+        /* 웹 캐시에 남은 오타 테스트 ID(/2241692110)는 공식 ID로 교정 */
+        val unitId =
+            when {
+                rawUnit.contains("2241692110") -> BuildConfig.ADMOB_NATIVE_ID
+                rawUnit.isNotEmpty() -> rawUnit
+                else -> BuildConfig.ADMOB_NATIVE_ID
+            }
         Log.i(TAG, "loadAd unitId=$unitId adsReady=${VlueCallOverlayApp.isMobileAdsInitialized()}")
         scheduleLoadTimeout()
         VlueCallOverlayApp.whenMobileAdsReady {
@@ -118,9 +125,7 @@ class VlueNativeAdManager(
                     publishStatus("loaded", "native ad bound", 0)
                 }
                 .withNativeAdOptions(
-                    NativeAdOptions.Builder()
-                        .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_PORTRAIT)
-                        .build(),
+                    NativeAdOptions.Builder().build(),
                 )
                 .withAdListener(
                     object : com.google.android.gms.ads.AdListener() {

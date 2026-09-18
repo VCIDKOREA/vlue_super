@@ -59,8 +59,8 @@ body,
 
 /* ?? ?? ?? ??(?60px) + safe-area ? ????? ?? ?? */
 #app-body.has-bottom-nav {
-  /* BottomNav + safe-area. 홈 배너 포함 시 FriendShowcaseList가 chrome 높이로 덮어씀 */
-  --vlue-bottom-nav-offset: calc(48px + env(safe-area-inset-bottom, 0px));
+  /* BottomNav(48) + 하단띠배너(50) + safe-area. chrome 실측 시 FriendShowcaseList가 덮어씀 */
+  --vlue-bottom-nav-offset: calc(98px + env(safe-area-inset-bottom, 0px));
 }
 
 :root {
