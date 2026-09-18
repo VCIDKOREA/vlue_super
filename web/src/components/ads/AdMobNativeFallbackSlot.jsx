@@ -27,7 +27,7 @@ export default function AdMobNativeFallbackSlot({
 
   const sizeClass =
     variant === "portrait"
-      ? "h-[220px] w-[124px] shrink-0"
+      ? "h-[234px] w-[132px] shrink-0"
       : compact
         ? "h-[180px] min-w-[min(100%,280px)] flex-1"
         : "h-[246px] w-full";

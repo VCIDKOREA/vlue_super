@@ -125,7 +125,9 @@ class VlueNativeAdManager(
                     publishStatus("loaded", "native ad bound", 0)
                 }
                 .withNativeAdOptions(
-                    NativeAdOptions.Builder().build(),
+                    NativeAdOptions.Builder()
+                        .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_PORTRAIT)
+                        .build(),
                 )
                 .withAdListener(
                     object : com.google.android.gms.ads.AdListener() {
