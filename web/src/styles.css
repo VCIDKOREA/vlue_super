@@ -1875,6 +1875,16 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   box-sizing: border-box;
 }
 
+/* 홈 네이티브 AD — 릴스/클립형. home-banner-slide 가로 확장 규칙에서 제외 */
+.vlue-native-ad-clip {
+  flex: 0 0 132px !important;
+  width: 132px !important;
+  max-width: 132px !important;
+  height: 234px !important;
+  min-height: 234px !important;
+  box-sizing: border-box;
+}
+
 .home-official-card {
   min-height: 220px;
   position: relative;

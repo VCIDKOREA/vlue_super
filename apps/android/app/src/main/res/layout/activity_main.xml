@@ -14,6 +14,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:visibility="gone"
-        android:elevation="8dp"
-        android:clipChildren="false" />
+        android:elevation="0dp"
+        android:clipChildren="true" />
 </FrameLayout>

@@ -4440,6 +4440,14 @@ function App() {
     };
     if (showSplash || page !== "main" || profileOpen) {
       hideAll();
+      return hideAll;
+    }
+    /* 홈 복귀 — 네이티브 슬롯이 다시 sync 하도록 */
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-home-visible"));
+      window.dispatchEvent(new CustomEvent("vlue-show-home-native-ads"));
+    } catch {
+      /* ignore */
     }
     return hideAll;
   }, [page, profileOpen, showSplash]);

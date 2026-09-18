@@ -299,6 +299,9 @@ export default function FriendShowcaseList({
       "--friend-sheet-collapsed-h",
       sheetLevel === "collapsed" ? `${COLLAPSED_BAR_H}px` : "0px"
     );
+    window.dispatchEvent(
+      new CustomEvent("vlue-friend-sheet-level", { detail: { level: sheetLevel } })
+    );
   }, [isHome, sheetLevel]);
 
   const unreadCount = useMemo(() => {

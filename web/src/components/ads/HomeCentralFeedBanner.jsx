@@ -74,7 +74,7 @@ export default function HomeCentralFeedBanner({ className = "", layout: layoutPr
         ))}
 
         {/* 메인 = 네이티브 AD 세로 클립(릴스)만 */}
-        <AdMobNativeFallbackSlot variant="portrait" className="!h-[234px] !w-[132px]" />
+        <AdMobNativeFallbackSlot variant="portrait" />
       </div>
 
       <SponsorShowcaseOverlay

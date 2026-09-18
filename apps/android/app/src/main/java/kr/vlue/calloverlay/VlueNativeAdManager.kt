@@ -63,7 +63,14 @@ class VlueNativeAdManager(
             return
         }
         applyRect(rect)
-        if (nativeAd != null) {
+        val existing = nativeAd
+        if (existing != null) {
+            /* hide()가 뷰만 지운 뒤 복귀하면 다시 바인딩 */
+            if (host.childCount == 0) {
+                renderThumb(existing)
+            }
+            applyRect(rect)
+            host.visibility = View.VISIBLE
             publishStatus("loaded", "ok", 0)
             return
         }
@@ -232,16 +239,22 @@ class VlueNativeAdManager(
         if (viewportWidth <= 0.0 || viewportHeight <= 0.0 || webView.width <= 0 || webView.height <= 0) return
         val sx = webView.width / viewportWidth
         val sy = webView.height / viewportHeight
+        var widthPx = (rect.optDouble("width") * sx).roundToInt().coerceAtLeast(1)
+        var heightPx = (rect.optDouble("height") * sy).roundToInt().coerceAtLeast(1)
+        /* 세로 클립(9:16) 강제 — 웹 슬롯이 가로로 늘어나도 네이티브는 릴스형 유지 */
+        if (rect.optBoolean("clipPortrait", false)) {
+            val maxW = (webView.width * 0.42f).roundToInt().coerceAtLeast(120)
+            widthPx = widthPx.coerceAtMost(maxW).coerceAtLeast(120)
+            heightPx = (widthPx * 16f / 9f).roundToInt()
+        }
         val params =
-            FrameLayout.LayoutParams(
-                (rect.optDouble("width") * sx).roundToInt().coerceAtLeast(1),
-                (rect.optDouble("height") * sy).roundToInt().coerceAtLeast(1),
-            ).apply {
+            FrameLayout.LayoutParams(widthPx, heightPx).apply {
                 leftMargin = (webView.x + rect.optDouble("left") * sx).roundToInt()
                 topMargin = (webView.y + rect.optDouble("top") * sy).roundToInt()
             }
         host.layoutParams = params
         host.visibility = if (nativeAd != null) View.VISIBLE else View.GONE
+        host.elevation = 0f
     }
 
     private fun dp(value: Int): Int {
