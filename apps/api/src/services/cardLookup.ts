@@ -283,9 +283,15 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
       NULLIF(TRIM(export_snapshot_json->>'salesContent'), '') AS sales_content,
       NULLIF(TRIM(export_snapshot_json->>'customBackText'), '') AS custom_back_text,
-      NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
+      COALESCE(
+        NULLIF(TRIM(photo_url), ''),
+        NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '')
+      ) AS photo_url,
       NULLIF(TRIM(export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo_url,
-      NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
+      COALESCE(
+        NULLIF(TRIM(logo_url), ''),
+        NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '')
+      ) AS logo_url,
       NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus,
       CASE
         WHEN export_snapshot_json ? 'noTitlePhoto'

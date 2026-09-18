@@ -1,5 +1,9 @@
 import { ensureKakaoSdk } from "./kakaoSocialLogin.js";
-import { ensureDigitalCardId, syncDigitalCardExportSnapshot } from "./digitalCardApi.js";
+import {
+  ensureDigitalCardId,
+  readStoredDigitalCardId,
+  syncDigitalCardExportSnapshot
+} from "./digitalCardApi.js";
 import { apiUrl } from "./apiBase.js";
 import {
   buildPublicShowcaseSpaUrl,
@@ -203,35 +207,54 @@ export async function prepareKakaoBizcardShare(card) {
     return { ok: false, error: originBlock };
   }
 
-  let cardId = "";
-  try {
-    cardId = (await withTimeout(ensureDigitalCardId(), 8_000, "명함 ID 확인")) || "";
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "명함 ID를 확인하지 못했습니다." };
+  /* 로컬 ID 우선 — 네트워크 ensure 가 막혀도 공유 준비 진행 */
+  let cardId = readStoredDigitalCardId();
+  if (!cardId) {
+    try {
+      cardId = (await withTimeout(ensureDigitalCardId(), 5_000, "명함 ID 확인")) || "";
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "명함 ID를 확인하지 못했습니다." };
+    }
   }
   if (!cardId) {
     return { ok: false, error: "명함 ID가 없습니다. 명함을 저장한 뒤 다시 시도해 주세요." };
   }
 
-  let sync;
+  const ed = readLetteringBizcardEditable();
+  const pickHttp = (...vals) => {
+    for (const v of vals) {
+      const s = String(v || "").trim();
+      if (/^https:\/\//i.test(s)) return s;
+    }
+    return "";
+  };
+  const localCover = pickHttp(
+    card?.shareCoverUrl,
+    card?.titlePhotoUrl,
+    ed.kakaoFeedBgDataUrl,
+    ed.kakaoFeedBgUrl,
+    ed.titlePhotoDataUrl,
+    ed.titlePhotoUrl
+  );
+
+  /* 라이트 동기화 — 실패/타임아웃이어도 공개 cover 프록시(전화번호)로 공유 계속 */
+  let sync = { ok: true, shareCoverUrl: localCover, titlePhotoUrl: localCover };
   try {
     sync = await withTimeout(
       syncDigitalCardExportSnapshot(card, { liteShare: true }),
-      8_000,
+      4_000,
       "명함 동기화"
     );
-  } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "명함 동기화가 지연되고 있습니다. 다시 시도해 주세요."
-    };
+  } catch {
+    /* 로컬·공개 프록시로 진행 — 동기화 타임아웃으로 공유 자체를 막지 않음 */
+    sync = { ok: true, shareCoverUrl: localCover, titlePhotoUrl: localCover };
   }
   if (sync?.ok === false) {
-    return {
-      ok: false,
-      error:
-        sync.error ||
-        "명함·썸네일 서버 동기화에 실패해 카카오 공유를 열 수 없습니다. 네트워크를 확인한 뒤 다시 시도해 주세요."
+    /* 네트워크 PATCH 실패여도 로컬/프록시 URL 있으면 공유 허용 */
+    sync = {
+      ok: true,
+      shareCoverUrl: localCover || sync.shareCoverUrl || "",
+      titlePhotoUrl: localCover || sync.titlePhotoUrl || ""
     };
   }
 
@@ -254,11 +277,12 @@ export async function prepareKakaoBizcardShare(card) {
     ...(card || {}),
     shareCoverUrl:
       sync?.shareCoverUrl ||
+      localCover ||
       card?.shareCoverUrl ||
       sync?.titlePhotoUrl ||
       card?.titlePhotoUrl ||
       "",
-    titlePhotoUrl: sync?.titlePhotoUrl || card?.titlePhotoUrl || ""
+    titlePhotoUrl: sync?.titlePhotoUrl || card?.titlePhotoUrl || localCover || ""
   };
   const urls = buildKakaoBizcardPublicUrls(cardId, mergedCard);
   if (!isKakaoPublicImageUrl(urls.buttonImageUrl)) {
@@ -268,10 +292,14 @@ export async function prepareKakaoBizcardShare(card) {
     };
   }
 
-  /* 가능하면 CDN 업로드. 실패해도 cover URL로 페이로드는 준비 (공유 자체는 열리게) */
+  /* CDN 업로드는 최대 3초 — 실패해도 cover 프록시 URL 로 공유 */
   let feedImageUrl = urls.buttonImageUrl;
   try {
-    const hosted = await resolveKakaoCdnImageUrl(Kakao, urls.buttonImageUrl);
+    const hosted = await withTimeout(
+      resolveKakaoCdnImageUrl(Kakao, urls.buttonImageUrl),
+      3_000,
+      "이미지 CDN"
+    );
     if (isKakaoPublicImageUrl(hosted)) feedImageUrl = hosted;
   } catch {
     /* keep cover url */

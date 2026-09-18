@@ -551,9 +551,10 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
 
   /* 로컬이 오삭제 패턴(여러 no* + 빈 값)일 때만 서버 스냅으로 채움 — 의도적 단일 필드 삭제 보존 */
   const looksPartialWipe =
-    (Boolean(ed.noTitlePhoto) && !titlePhotoUrl && Boolean(ed.noFax) && !faxValue) ||
-    (Boolean(ed.noTitlePhoto) && !titlePhotoUrl && Boolean(ed.noWebsite) && !websiteValue) ||
-    (Boolean(ed.noFax) && !faxValue && Boolean(ed.noWebsite) && !websiteValue && Boolean(ed.noTitlePhoto));
+    !liteShare &&
+    ((Boolean(ed.noTitlePhoto) && !titlePhotoUrl && Boolean(ed.noFax) && !faxValue) ||
+      (Boolean(ed.noTitlePhoto) && !titlePhotoUrl && Boolean(ed.noWebsite) && !websiteValue) ||
+      (Boolean(ed.noFax) && !faxValue && Boolean(ed.noWebsite) && !websiteValue && Boolean(ed.noTitlePhoto)));
   if (looksPartialWipe) {
     try {
       const meta = await fetchDigitalCardMeta({ force: true, lite: false });
@@ -622,6 +623,24 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
     /* ignore */
   }
 
+  /* 카톡 공유 라이트: 명함 ID 있으면 PATCH/DCC 생략 — 동기화 타임아웃 방지 (이미지는 공개 cover 프록시) */
+  if (liteShare) {
+    const existingId = readStoredDigitalCardId();
+    if (existingId) {
+      return {
+        ok: true,
+        cardId: existingId,
+        exportSnapshot: null,
+        photoUrl,
+        titlePhotoUrl,
+        logoUrl,
+        shareCoverUrl: shareCoverUrl || titlePhotoUrl,
+        mediaError: null,
+        skippedNetwork: true
+      };
+    }
+  }
+
   try {
     const res = await vlueAuthFetch(apiUrl("/api/cards/my-digital-card"), {
       method: "PATCH",
@@ -677,66 +696,67 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
     digitalCardMetaCache.lite = null;
     digitalCardMetaCache.full = null;
 
-    /* 멀티 프로필: 선택 회선이 있으면 동일 스냅샷을 회선(+연결된 프로필)에도 반영 */
-    try {
-      const { readSelectedDccLineId, readDccLinePreview } = await import("./dccLineState.js");
-      const { putDccLineDcc } = await import("./dccLinesApi.js");
-      const { putDccProfileBundle } = await import("./dccAgentProfilesApi.js");
-      const lineId = String(readSelectedDccLineId() || "").trim();
-      const preview = readDccLinePreview() || {};
-      const snap = {
-        organization: card?.organization || "",
-        name: card?.name || card?.displayName || "",
-        displayName: card?.name || card?.displayName || "",
-        title: card?.title || ed.title || "",
-        department: card?.department || ed.department || "",
-        phone: card?.phone || "",
-        email: clampLetteringBizcardEmail(card?.email || ed.email || ""),
-        website: noWebsite ? "" : websiteValue,
-        fax: noFax ? "" : faxValue,
-        address,
-        companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
-        customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
-        logoUrl: noCompanyLogo ? "" : logoUrl,
-        photoUrl: noProfilePhoto ? "" : photoUrl,
-        titlePhotoUrl: noTitlePhoto ? "" : titlePhotoUrl,
-        photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
-        accountType: String(card?.accountType || ed.accountType || "").trim(),
-        bankName: String(card?.bankName || ed.bankName || "").trim(),
-        accountNumber: String(card?.accountNumber || ed.accountNumber || "").replace(/\D/g, ""),
-        accountHolder: String(card?.accountHolder || ed.accountHolder || "").trim(),
-        isGroupVerified: Boolean(card?.isGroupVerified ?? ed.isGroupVerified)
-      };
-      if (lineId && !preview.isCertified) {
-        await putDccLineDcc(lineId, snap);
-      }
-      let editingProfileId = "";
+    /* 멀티 프로필 회선 동기화 — 카톡 공유(liteShare)에서는 생략 (지연·타임아웃 원인) */
+    if (!liteShare) {
       try {
-        editingProfileId = String(localStorage.getItem("vlue_multi_dcc_editing_profile_id") || "").trim();
-      } catch {
-        /* ignore */
-      }
-      let agentId = String(preview.agentId || editingProfileId || "").trim();
-      if (!agentId) {
+        const { readSelectedDccLineId, readDccLinePreview } = await import("./dccLineState.js");
+        const { putDccLineDcc } = await import("./dccLinesApi.js");
+        const { putDccProfileBundle } = await import("./dccAgentProfilesApi.js");
+        const lineId = String(readSelectedDccLineId() || "").trim();
+        const preview = readDccLinePreview() || {};
+        const snap = {
+          organization: card?.organization || "",
+          name: card?.name || card?.displayName || "",
+          displayName: card?.name || card?.displayName || "",
+          title: card?.title || ed.title || "",
+          department: card?.department || ed.department || "",
+          phone: card?.phone || "",
+          email: clampLetteringBizcardEmail(card?.email || ed.email || ""),
+          website: noWebsite ? "" : websiteValue,
+          fax: noFax ? "" : faxValue,
+          address,
+          companyIntro: String(ed.companyIntro || card?.companyIntro || "").trim(),
+          customBackText: String(ed.customBackText || card?.customBackText || "").trim(),
+          logoUrl: noCompanyLogo ? "" : logoUrl,
+          photoUrl: noProfilePhoto ? "" : photoUrl,
+          titlePhotoUrl: noTitlePhoto ? "" : titlePhotoUrl,
+          photoFocus: normalizePhotoFocus(card?.photoFocus || ed.photoFocus),
+          accountType: String(card?.accountType || ed.accountType || "").trim(),
+          bankName: String(card?.bankName || ed.bankName || "").trim(),
+          accountNumber: String(card?.accountNumber || ed.accountNumber || "").replace(/\D/g, ""),
+          accountHolder: String(card?.accountHolder || ed.accountHolder || "").trim(),
+          isGroupVerified: Boolean(card?.isGroupVerified ?? ed.isGroupVerified)
+        };
+        if (lineId && !preview.isCertified) {
+          await putDccLineDcc(lineId, snap);
+        }
+        let editingProfileId = "";
         try {
-          const { fetchDccAgentProfiles } = await import("./dccAgentProfilesApi.js");
-          const listed = await fetchDccAgentProfiles();
-          agentId = String(listed?.activeId || listed?.representativeId || "").trim();
+          editingProfileId = String(localStorage.getItem("vlue_multi_dcc_editing_profile_id") || "").trim();
         } catch {
           /* ignore */
         }
+        let agentId = String(preview.agentId || editingProfileId || "").trim();
+        if (!agentId) {
+          try {
+            const { fetchDccAgentProfiles } = await import("./dccAgentProfilesApi.js");
+            const listed = await fetchDccAgentProfiles();
+            agentId = String(listed?.activeId || listed?.representativeId || "").trim();
+          } catch {
+            /* ignore */
+          }
+        }
+        const snapHasContent =
+          Boolean(String(snap.email || "").trim()) ||
+          Boolean(String(snap.photoUrl || "").trim()) ||
+          Boolean(String(snap.titlePhotoUrl || "").trim()) ||
+          Boolean(String(snap.organization || "").trim());
+        if (agentId && snapHasContent) {
+          await putDccProfileBundle(agentId, { dcc: snap });
+        }
+      } catch {
+        /* 회선 동기화 실패해도 마스터 저장은 성공으로 유지 */
       }
-      /* 로컬이 비어 보이는 상태에서는 프로필 번들에 빈 스냅을 쓰지 않음 */
-      const snapHasContent =
-        Boolean(String(snap.email || "").trim()) ||
-        Boolean(String(snap.photoUrl || "").trim()) ||
-        Boolean(String(snap.titlePhotoUrl || "").trim()) ||
-        Boolean(String(snap.organization || "").trim());
-      if (agentId && snapHasContent) {
-        await putDccProfileBundle(agentId, { dcc: snap });
-      }
-    } catch {
-      /* 회선 동기화 실패해도 마스터 저장은 성공으로 유지 */
     }
 
     return {

@@ -416,14 +416,24 @@ async function mapFollowListUser(
 
   let photoUrl: string | null = null;
   if (user?.digitalCard) {
+    /* SearchService 와 동일 — photo_url 컬럼 + export snapshot COALESCE */
     const snapRows = await prisma.$queryRaw<Array<{ photo_url: string | null }>>`
-      SELECT NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url
+      SELECT COALESCE(
+        NULLIF(TRIM(photo_url), ''),
+        NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '')
+      ) AS photo_url
       FROM digital_cards
       WHERE user_id = ${peerId}::uuid
       LIMIT 1
     `;
     const raw = String(snapRows[0]?.photo_url || "").trim();
-    if (raw.startsWith("http://") || raw.startsWith("https://")) photoUrl = raw;
+    if (
+      (raw.startsWith("http://") || raw.startsWith("https://")) &&
+      !raw.startsWith("data:") &&
+      !/vlue-brand-logo|vlue-shield/i.test(raw)
+    ) {
+      photoUrl = raw;
+    }
   }
 
   return {
@@ -671,9 +681,15 @@ export async function getProfileForViewer(
           NULLIF(TRIM(export_snapshot_json->>'fax'), '') AS fax,
           NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
           NULLIF(TRIM(export_snapshot_json->>'activityName'), '') AS activity_name,
-          NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '') AS photo_url,
+          COALESCE(
+            NULLIF(TRIM(photo_url), ''),
+            NULLIF(TRIM(export_snapshot_json->>'photoUrl'), '')
+          ) AS photo_url,
           NULLIF(TRIM(export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo_url,
-          NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
+          COALESCE(
+            NULLIF(TRIM(logo_url), ''),
+            NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '')
+          ) AS logo_url,
           NULLIF(TRIM(export_snapshot_json->>'photoFocus'), '') AS photo_focus,
           CASE
             WHEN export_snapshot_json ? 'noTitlePhoto'
@@ -701,11 +717,14 @@ export async function getProfileForViewer(
   const httpOnly = (v: string | null | undefined) => {
     const t = String(v || "").trim();
     if (!t || t.startsWith("data:") || t.startsWith("blob:")) return "";
+    if (/vlue-brand-logo|vlue-shield/i.test(t)) return "";
     return t;
   };
-  const photoUrl = httpOnly(s?.photo_url);
-  const titlePhotoUrl = httpOnly(s?.title_photo_url);
+  /* 프로필 사진 ≠ 회사 로고 — 로고 URL 을 photo 로 쓰지 않음 */
   const logoUrl = httpOnly(s?.logo_url);
+  let photoUrl = httpOnly(s?.photo_url);
+  if (photoUrl && logoUrl && photoUrl === logoUrl) photoUrl = "";
+  const titlePhotoUrl = httpOnly(s?.title_photo_url);
   const photoFocus = String(s?.photo_focus || "").trim();
   const noTitlePhoto = Boolean(s?.no_title_photo);
   const sub = user.subscriptions?.[0] || null;

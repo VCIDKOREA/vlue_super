@@ -166,7 +166,9 @@ export async function resolveVlueShowcasePeer(input = {}) {
         photoFocus = String(exp?.photoFocus || "center").trim() || "center";
         activityName = String(exp?.activityName || "").trim();
         /* photo ≠ logo — 로고·브랜드 마크를 프로필 사진으로 쓰지 않음 */
-        const resolvedPhoto = String(exp?.photoUrl || profile.photoUrl || "").trim();
+        const resolvedPhoto = String(
+          profRes.photoUrl || exp?.photoUrl || profile.photoUrl || ""
+        ).trim();
         const seedPhoto = String(photoUrl || "").trim();
         const logo = logoUrl;
         const pickPhoto = (...vals) => {

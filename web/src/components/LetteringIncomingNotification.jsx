@@ -37,7 +37,6 @@ import InCallKakaoShareSlot from "./call/InCallKakaoShareSlot.jsx";
 import InCallControlBar from "./call/InCallControlBar.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import CompanionMiniCase, { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
-import CompanionSamsungCallCta from "./call/CompanionSamsungCallCta.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
@@ -1044,16 +1043,11 @@ export default function LetteringIncomingNotification({
   /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
   const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
   /** Companion MVP: 실통화·「통화화면」미리보기 모두 4버튼 숨김 → 삼성 CTA */
+  /** Companion MVP: 하단「전화 화면 보기」CTA 제거 — 상단 통화 아이콘만으로 미니케이스 전환 */
   const showLegacyInCallControls = Boolean(
     !COMPANION_MVP_DELEGATE_CALL_UI && showChromePreviewControls
   );
-  const showCompanionSamsungCta = Boolean(
-    COMPANION_MVP_DELEGATE_CALL_UI &&
-      isExpandedView &&
-      !fromCallHistory &&
-      (useCompanionDelegate || showChromePreviewControls || isUnverified)
-  );
-  const showInCallControls = Boolean(showLegacyInCallControls || showCompanionSamsungCta);
+  const showInCallControls = Boolean(showLegacyInCallControls);
 
   const expandShowcaseFromMiniCase = useCallback(() => {
     /* pointerup 직후 남는 click 이 새 live-bar 에 떨어져 toggle→접힘 되는 것 차단 */
@@ -1183,8 +1177,6 @@ export default function LetteringIncomingNotification({
                 <Phone size={22} strokeWidth={2.2} aria-hidden />
               </button>
             </div>
-          ) : showCompanionSamsungCta ? (
-            <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
           ) : showLegacyInCallControls ? (
             <div className="lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--controls">
               <InCallControlBar
@@ -1748,16 +1740,6 @@ export default function LetteringIncomingNotification({
                     onTipSummaryChange={setTipSummary}
                   />
                 </div>
-                {hideUnverifiedFooter ? null : showCompanionSamsungCta ? (
-                  <footer className="lettering-unverified-expanded__footer lettering-unverified-expanded__footer--minimal">
-                    <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
-                  </footer>
-                ) : null}
-                {hideUnverifiedFooter && showCompanionSamsungCta ? (
-                  <footer className="lettering-unverified-expanded__footer lettering-unverified-expanded__footer--minimal">
-                    <CompanionSamsungCallCta onOpen={openSamsungCallOptions} />
-                  </footer>
-                ) : null}
               </div>
             </div>
           </div>

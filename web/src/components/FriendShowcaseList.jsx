@@ -18,7 +18,6 @@ import AppFullScreenView from "./AppFullScreenView.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
-import VLUE_BRAND_LOGO from "../assets/vlue-shield-eye-logo.svg?url";
 import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../lib/showcase/closeShowcaseOverlays.js";
 import { VLUE_OPEN_FRIEND_SHOWCASE_EVENT } from "../lib/openFriendShowcase.js";
 import "./friend-showcase-list.css";
@@ -42,14 +41,23 @@ function filterRows(rows, query) {
   });
 }
 
-function VlueLogoAvatar({ avatarUrl, unread }) {
+function PeerListAvatar({ name, avatarUrl, unread }) {
+  const [broken, setBroken] = useState(false);
+  const label = String(name || "?").trim().slice(0, 1) || "?";
+  const showImg = Boolean(avatarUrl) && !broken;
   return (
     <span className={`friend-showcase-list__avatar-wrap${unread ? " has-update" : ""}`}>
-      {avatarUrl ? (
-        <img className="friend-showcase-list__avatar" src={avatarUrl} alt="" />
+      {showImg ? (
+        <img
+          className="friend-showcase-list__avatar"
+          src={avatarUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setBroken(true)}
+        />
       ) : (
-        <span className="friend-showcase-list__avatar friend-showcase-list__avatar--brand" aria-hidden>
-          <img src={VLUE_BRAND_LOGO} alt="" className="friend-showcase-list__avatar-logo" />
+        <span className="friend-showcase-list__avatar friend-showcase-list__avatar--initial" aria-hidden>
+          {label}
         </span>
       )}
       {unread ? <span className="friend-showcase-list__blue-dot" aria-label="업데이트됨" /> : null}
@@ -111,7 +119,7 @@ function FollowShowcaseRow({ row, selected, unread, onOpenShowcase, onOpenIdCard
           onClick={() => onOpenShowcase(row)}
           aria-label={`${row.name} 쇼케이스 보기`}
         >
-          <VlueLogoAvatar avatarUrl={row.avatarUrl} unread={unread} />
+          <PeerListAvatar name={row.name} avatarUrl={row.avatarUrl} unread={unread} />
           <div className="friend-showcase-list__meta">
             <p className="friend-showcase-list__name">
               {row.name}

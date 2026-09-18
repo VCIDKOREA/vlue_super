@@ -8,7 +8,7 @@ import {
   readLetteringFixedIdentity,
   LETTERING_BIZCARD_CHANGED_EVENT
 } from "../lib/letteringBizcardStorage.js";
-import { syncDigitalCardExportSnapshot, ensureDigitalCardId } from "../lib/digitalCardApi.js";
+import { ensureDigitalCardId } from "../lib/digitalCardApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
   fetchVlueBadgeSnapshot,
@@ -76,18 +76,11 @@ export default function LetteringBizcardSharePanel({
   }, [card?.phone]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (isPaid && card) {
-        await syncDigitalCardExportSnapshot(card, { liteShare: true });
-        await ensureDigitalCardId();
-      }
-      if (cancelled) return;
-      setShareReady(Boolean(sharePhone));
-    })();
-    return () => {
-      cancelled = true;
-    };
+    /* 공유 가능 여부만 — 동기화는 prepareKakaoBizcardShare 가 담당 (이중 PATCH/타임아웃 방지) */
+    setShareReady(Boolean(sharePhone));
+    if (isPaid && card) {
+      void ensureDigitalCardId().catch(() => {});
+    }
   }, [
     card?.name,
     card?.organization,
