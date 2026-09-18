@@ -79,7 +79,7 @@ export default function LetteringBizcardSharePanel({
     let cancelled = false;
     (async () => {
       if (isPaid && card) {
-        await syncDigitalCardExportSnapshot(card);
+        await syncDigitalCardExportSnapshot(card, { liteShare: true });
         await ensureDigitalCardId();
       }
       if (cancelled) return;

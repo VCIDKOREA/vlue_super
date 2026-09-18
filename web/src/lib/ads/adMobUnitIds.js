@@ -8,5 +8,6 @@ export const ADMOB_TEST = {
 export const AD_SLOT = {
   RIBBON: "ribbon",
   BOTTOM: "bottom",
+  DCC_BOTTOM: "dcc_bottom",
   CENTRAL_NATIVE: "central_native"
 };

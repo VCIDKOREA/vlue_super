@@ -460,20 +460,27 @@ export async function syncDigitalCardDesignTemplate(templateId) {
   }
 }
 
-/** OG 썸네일·서버 렌더·재로그인 복원용 명함 스냅샷 동기화 */
+/** OG 썸네일·서버 렌더·재로그인 복원용 명함 스냅샷 동기화
+ * @param {object} [opts]
+ * @param {boolean} [opts.liteShare] 카카오 공유 준비용 — dataURL R2 업로드·강제 복원 생략(https만 사용)
+ */
 export async function syncDigitalCardExportSnapshot(card, opts = {}) {
+  const liteShare = Boolean(opts.liteShare);
+
   /* 멀티프로필 오삭제로 로컬이 비었으면 서버로 덮어쓰지 말고 먼저 복원 */
-  try {
-    const ed0 = readLetteringBizcardEditable();
-    const looksWiped =
-      !String(ed0.email || "").trim() &&
-      !String(ed0.titlePhotoDataUrl || ed0.titlePhotoUrl || "").trim() &&
-      Boolean(ed0.noTitlePhoto);
-    if (looksWiped || needsDigitalCardLocalRestore()) {
-      await restoreDigitalCardFromServer({ force: true });
+  if (!liteShare) {
+    try {
+      const ed0 = readLetteringBizcardEditable();
+      const looksWiped =
+        !String(ed0.email || "").trim() &&
+        !String(ed0.titlePhotoDataUrl || ed0.titlePhotoUrl || "").trim() &&
+        Boolean(ed0.noTitlePhoto);
+      if (looksWiped || needsDigitalCardLocalRestore()) {
+        await restoreDigitalCardFromServer({ force: true });
+      }
+    } catch {
+      /* continue sync with whatever local has */
     }
-  } catch {
-    /* continue sync with whatever local has */
   }
 
   const ed = readLetteringBizcardEditable();
@@ -483,50 +490,54 @@ export async function syncDigitalCardExportSnapshot(card, opts = {}) {
     combineLetteringBizcardAddress(road, detail) ||
     String(ed.address || "").trim();
 
-  const { ensureHttpMediaUrl } = await import("./mediaImageUpload.js");
+  const pickHttp = (...vals) => {
+    for (const v of vals) {
+      const s = String(v || "").trim();
+      if (/^https:\/\//i.test(s)) return s;
+    }
+    return "";
+  };
 
   let photoUrl = "";
   let titlePhotoUrl = "";
   let logoUrl = "";
   let shareCoverUrl = "";
   let mediaError = "";
-  try {
-    photoUrl = await ensureHttpMediaUrl(
-      card?.photoUrl || ed.photoDataUrl || ed.photoUrl || "",
-      "photo"
-    );
-    titlePhotoUrl = await ensureHttpMediaUrl(
-      card?.titlePhotoUrl || ed.titlePhotoDataUrl || ed.titlePhotoUrl || "",
-      "photo"
-    );
-    logoUrl = await ensureHttpMediaUrl(
-      card?.logoUrl || ed.logoDataUrl || ed.logoUrl || "",
-      "logo"
-    );
-    shareCoverUrl = await ensureHttpMediaUrl(
-      card?.shareCoverUrl || ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || "",
-      "cover"
-    );
-  } catch (e) {
-    mediaError = e instanceof Error ? e.message : "이미지 업로드 실패";
-    /* https 후보만이라도 남긴다 */
-    const pickHttp = (...vals) => {
-      for (const v of vals) {
-        const s = String(v || "").trim();
-        if (/^https?:\/\//i.test(s)) return s;
-      }
-      return "";
-    };
-    photoUrl =
-      photoUrl ||
-      pickHttp(card?.photoUrl, ed.photoDataUrl, ed.photoUrl);
-    titlePhotoUrl =
-      titlePhotoUrl ||
-      pickHttp(card?.titlePhotoUrl, ed.titlePhotoDataUrl, ed.titlePhotoUrl);
-    logoUrl = logoUrl || pickHttp(card?.logoUrl, ed.logoDataUrl, ed.logoUrl);
-    shareCoverUrl =
-      shareCoverUrl ||
-      pickHttp(card?.shareCoverUrl, ed.kakaoFeedBgDataUrl, ed.kakaoFeedBgUrl);
+
+  if (liteShare) {
+    /* 카톡 공유: 이미 공개 https 만 사용 — dataURL 업로드로 10초+ 지연/타임아웃 방지 */
+    photoUrl = pickHttp(card?.photoUrl, ed.photoDataUrl, ed.photoUrl);
+    titlePhotoUrl = pickHttp(card?.titlePhotoUrl, ed.titlePhotoDataUrl, ed.titlePhotoUrl);
+    logoUrl = pickHttp(card?.logoUrl, ed.logoDataUrl, ed.logoUrl);
+    shareCoverUrl = pickHttp(card?.shareCoverUrl, ed.kakaoFeedBgDataUrl, ed.kakaoFeedBgUrl, titlePhotoUrl);
+  } else {
+    try {
+      const { ensureHttpMediaUrl } = await import("./mediaImageUpload.js");
+      photoUrl = await ensureHttpMediaUrl(
+        card?.photoUrl || ed.photoDataUrl || ed.photoUrl || "",
+        "photo"
+      );
+      titlePhotoUrl = await ensureHttpMediaUrl(
+        card?.titlePhotoUrl || ed.titlePhotoDataUrl || ed.titlePhotoUrl || "",
+        "photo"
+      );
+      logoUrl = await ensureHttpMediaUrl(
+        card?.logoUrl || ed.logoDataUrl || ed.logoUrl || "",
+        "logo"
+      );
+      shareCoverUrl = await ensureHttpMediaUrl(
+        card?.shareCoverUrl || ed.kakaoFeedBgDataUrl || ed.kakaoFeedBgUrl || "",
+        "cover"
+      );
+    } catch (e) {
+      mediaError = e instanceof Error ? e.message : "이미지 업로드 실패";
+      photoUrl = photoUrl || pickHttp(card?.photoUrl, ed.photoDataUrl, ed.photoUrl);
+      titlePhotoUrl =
+        titlePhotoUrl || pickHttp(card?.titlePhotoUrl, ed.titlePhotoDataUrl, ed.titlePhotoUrl);
+      logoUrl = logoUrl || pickHttp(card?.logoUrl, ed.logoDataUrl, ed.logoUrl);
+      shareCoverUrl =
+        shareCoverUrl || pickHttp(card?.shareCoverUrl, ed.kakaoFeedBgDataUrl, ed.kakaoFeedBgUrl);
+    }
   }
 
   /* 빈 로컬로 서버 타이틀/사진을 지우지 않음 — URL 이 있을 때만 no* 반영 */

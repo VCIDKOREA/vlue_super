@@ -13,7 +13,6 @@ import ContactSyncConsentModal from "./components/ContactSyncConsentModal.jsx";
 import { openFriendShowcase } from "./lib/openFriendShowcase.js";
 import FeedManager from "./components/FeedManager";
 import Home from "./components/Home";
-import HomeBottomFixedBanner from "./components/ads/HomeBottomFixedBanner.jsx";
 import MyPage from "./components/MyPage";
 import MyCaseScreen from "./components/mycase/MyCaseScreen.jsx";
 import VlueCalendarScreen from "./components/calendar/VlueCalendarScreen.jsx";
@@ -4421,14 +4420,14 @@ function App() {
     root.style.setProperty("--nav-pulse-delay", `${-(performance.now() % period)}ms`);
   }, [showBottomNav]);
 
-  /** 홈이 아니면 AdMob 네이티브 오버레이를 즉시 숨김 — 마이페이지 등에서 공중 부유 방지 */
+  /** 스플래시·비홈에서는 AdMob 오버레이 전부 숨김 (로딩 화면 띠배너 방지) */
   useEffect(() => {
-    if (page === "main" && !profileOpen) return undefined;
     const hideAll = () => {
       const bridge = window.VlueLettering || window.Android;
       try {
         bridge?.hideBannerAd?.("ribbon");
         bridge?.hideBannerAd?.("bottom");
+        bridge?.hideBannerAd?.("dcc_bottom");
         bridge?.hideNativeAdFallback?.();
       } catch {
         /* ignore */
@@ -4439,9 +4438,11 @@ function App() {
         /* ignore */
       }
     };
-    hideAll();
+    if (showSplash || page !== "main" || profileOpen) {
+      hideAll();
+    }
     return hideAll;
-  }, [page, profileOpen]);
+  }, [page, profileOpen, showSplash]);
 
   const requireApp = (fn) => {
     requireAuth(fn);
@@ -5535,7 +5536,6 @@ function App() {
         className={`fixed bottom-0 left-0 right-0 z-[160] ${showBottomNav ? "block" : "hidden"}`}
         data-vlue-bottom-chrome
       >
-        {page === "main" ? <HomeBottomFixedBanner /> : null}
         <nav className="relative z-[161] flex w-full justify-center">
           <div
             ref={bottomNavPulseSyncRef}

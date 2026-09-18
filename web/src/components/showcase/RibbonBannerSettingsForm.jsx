@@ -27,8 +27,8 @@ export default function RibbonBannerSettingsForm({ isDarkMode = false, onToast }
       onToast?.("이미지 파일만 등록할 수 있습니다.");
       return;
     }
-    if (file.size > 1.5 * 1024 * 1024) {
-      onToast?.("이미지는 1.5MB 이하로 등록해 주세요.");
+    if (file.size > 800 * 1024) {
+      onToast?.("이미지는 800KB 이하로 등록해 주세요. (권장 1200×150px)");
       return;
     }
     const reader = new FileReader();
@@ -51,8 +51,8 @@ export default function RibbonBannerSettingsForm({ isDarkMode = false, onToast }
     setDraft(next);
     onToast?.(
       next.imageUrl
-        ? "띠배너가 저장됐습니다. 미등록 시 AdMob으로 자동 전환됩니다."
-        : "띠배너 이미지를 등록하면 노출됩니다. 현재는 AdMob으로 표시됩니다."
+        ? "띠배너가 저장됐습니다. DCC+ 쇼케이스 최하단에 표시됩니다."
+        : "띠배너 이미지를 등록하면 노출됩니다. 미등록 시 AdMob이 표시됩니다."
     );
   };
 
@@ -70,12 +70,23 @@ export default function RibbonBannerSettingsForm({ isDarkMode = false, onToast }
       aria-label="빅푸시 띠배너 등록"
     >
       <p className={`text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-slate-900"}`}>
-        빅푸시 하단 띠배너 (유료)
+        DCC+ 쇼케이스 하단 커스텀 띠배너 (유료)
       </p>
       <p className={`mt-1 text-[11px] leading-snug ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
-        설정에서만 미리보는 커스텀 이미지입니다. 빅푸시·통화 화면 아래에는 광고가 붙지 않으며, 홈 하단 고정
-        배너만 노출됩니다.
+        펼친 DCC+ 쇼케이스 화면 최하단에 표시됩니다. 미등록 시 AdMob 띠배너로 대체됩니다.
       </p>
+      <div
+        className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${
+          isDarkMode ? "border-white/10 bg-black/20 text-gray-300" : "border-slate-200 bg-white text-slate-600"
+        }`}
+      >
+        <p className="font-black">권장 사이즈</p>
+        <p className="mt-0.5">
+          · <strong>가로 1200×세로 150px</strong> (비율 8:1, Adaptive Banner에 맞춤)
+        </p>
+        <p>· 최소 640×80px · 최대 파일 <strong>800KB</strong></p>
+        <p>· 형식 PNG / JPG / WEBP · 중요 문구는 좌우 8% 안쪽(안전 영역)</p>
+      </div>
 
       <div
         className={`mt-2 flex h-[50px] items-center justify-center overflow-hidden rounded-lg border ${

@@ -294,6 +294,24 @@ export default function DccLineSwitcher({
   }, [loadAgents]);
 
   useEffect(() => {
+    /* 캐시 즉시 표시 — 서버 왕복 전에 드롭다운이 비어 보이지 않게 */
+    const cachedAgents = readAgentsCache();
+    if (cachedAgents?.profiles?.length) {
+      applyAgents(cachedAgents);
+      setLoading(false);
+    }
+    const cachedLines = readLinesCache();
+    if (cachedLines?.lines?.length) {
+      setLines(cachedLines.lines);
+      const preferred = readSelectedDccLineId() || cachedLines.lines[0]?.id || "";
+      if (preferred) {
+        setLineId(preferred);
+        const row = cachedLines.lines.find((l) => l.id === preferred);
+        if (row?.photoUrl) setPhotoUrl(row.photoUrl);
+        if (row?.agentId) setAgentId(row.agentId);
+      }
+      setLoading(false);
+    }
     void reload();
   }, []);
 

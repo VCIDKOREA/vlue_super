@@ -30,6 +30,7 @@ import FriendShowcaseList from "./FriendShowcaseList.jsx";
 import HomeNotificationPanel from "./HomeNotificationPanel.jsx";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import AdMobNativeFallbackSlot from "./ads/AdMobNativeFallbackSlot.jsx";
+import HomeCentralFeedBanner from "./ads/HomeCentralFeedBanner.jsx";
 
 function readHomeGeo() {
   return new Promise((resolve) => {
@@ -938,6 +939,8 @@ function Home({
         <CallBigPushPreviewSection membershipTier={membershipTier} isDarkMode={isDarkMode} />
       </div>
       ) : null}
+
+      {v1AppShell.callBigPush ? <HomeCentralFeedBanner /> : null}
       </div>
 
       {v1AppShell.friendShowcaseFeed ? (

@@ -215,7 +215,11 @@ export async function prepareKakaoBizcardShare(card) {
 
   let sync;
   try {
-    sync = await withTimeout(syncDigitalCardExportSnapshot(card), 10_000, "명함 동기화");
+    sync = await withTimeout(
+      syncDigitalCardExportSnapshot(card, { liteShare: true }),
+      8_000,
+      "명함 동기화"
+    );
   } catch (e) {
     return {
       ok: false,

@@ -41,6 +41,7 @@ import CompanionSamsungCallCta from "./call/CompanionSamsungCallCta.jsx";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import { Phone, PhoneOff, Settings, ShieldCheck } from "lucide-react";
+import ShowcaseDccBottomBanner from "./ads/ShowcaseDccBottomBanner.jsx";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
@@ -1531,19 +1532,6 @@ export default function LetteringIncomingNotification({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  openOwnerSettings(carouselSlideType === "card" ? "card" : "showcase");
-                }}
-                className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
-                aria-label={carouselSlideType === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
-                title={carouselSlideType === "card" ? "명함 설정" : "쇼케이스 설정"}
-              >
-                <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
-                설정
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
                   toggleInCallChromePreview();
                 }}
                 className={`lettering-call-icon-btn inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm active:scale-95 ${
@@ -1561,11 +1549,24 @@ export default function LetteringIncomingNotification({
                   aria-hidden
                 />
               </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openOwnerSettings(carouselSlideType === "card" ? "card" : "showcase");
+                }}
+                className="lettering-owner-settings-btn inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2.5 text-[11px] font-black text-white shadow-sm active:scale-95"
+                aria-label={carouselSlideType === "card" ? "디지털 인증명함 설정" : "블루 쇼케이스 설정"}
+                title={carouselSlideType === "card" ? "명함 설정" : "쇼케이스 설정"}
+              >
+                <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+                설정
+              </button>
             </div>
           ) : null}
         </div>
 
-        {/* 빅푸시 하단에는 광고를 두지 않음 — 홈 하단 고정 배너만 사용 */}
+        {/* 접힌 빅푸시에는 광고 없음. DCC+ 펼침 최하단만 ShowcaseDccBottomBanner */}
 
         {canExpand && !showcaseOffPreview && (isFreeMember || showcaseOffAuthExpand) ? (
           <div
@@ -1708,6 +1709,12 @@ export default function LetteringIncomingNotification({
                   )}
                 </div>
                 {renderExpandedFooter()}
+                {isExpandedView ? (
+                  <ShowcaseDccBottomBanner
+                    membershipTier={c.membershipTier || "paid"}
+                    enabled={Boolean(isExpandedView)}
+                  />
+                ) : null}
               </div>
             </div>
           </div>
