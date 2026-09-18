@@ -2,37 +2,30 @@ import { useEffect, useRef, useState } from "react";
 import { ADMOB_TEST } from "../../lib/ads/adMobUnitIds.js";
 
 const LOAD_TIMEOUT_MS = 12000;
-const POLL_MS = 750;
+const POLL_MS = 800;
 const CLIP_W = 132;
 const CLIP_H = 234;
 
 /**
- * Android WebView 위 네이티브 MediaView 슬롯 (세로 클립/릴스형).
- * - 팔로우 바텀시트 위로 뜨지 않음 (시트 mid/full 또는 교차 시 hide)
- * - 탭 복귀 시 네이티브가 다시 바인딩되도록 sync 유지
+ * 홈 클립형 썸네일 — AdMob NativeAdView 없음(순수 커스텀 UI).
+ * SDK에서 받은 mediaUrl/headline/body만 렌더. 탭 → openNativeAdShowcase().
  */
-export default function AdMobNativeFallbackSlot({
-  compact = false,
-  className = "",
-  variant = "portrait"
-}) {
-  const ref = useRef(null);
+export default function AdMobNativeFallbackSlot({ className = "" }) {
   const [status, setStatus] = useState("idle");
   const [errorText, setErrorText] = useState("");
+  const [assets, setAssets] = useState({
+    headline: "",
+    body: "",
+    advertiser: "",
+    mediaUrl: "",
+    ctaLabel: ""
+  });
   const statusRef = useRef("idle");
   const mountedAtRef = useRef(Date.now());
-  const sheetLevelRef = useRef("collapsed");
 
   const bridge =
     typeof window !== "undefined" ? window.VlueLettering || window.Android : null;
   const hasBridge = typeof bridge?.showNativeAdFallback === "function";
-
-  const isPortrait = variant === "portrait";
-  const sizeClass = isPortrait
-    ? "h-[234px] w-[132px] max-w-[132px] shrink-0 grow-0 basis-[132px]"
-    : compact
-      ? "h-[180px] min-w-[min(100%,280px)] flex-1"
-      : "h-[246px] w-full";
 
   const applyPayload = (payload) => {
     if (!payload || typeof payload !== "object") return;
@@ -41,13 +34,20 @@ export default function AdMobNativeFallbackSlot({
     const normalized = next === "showcase_open" ? "loaded" : next;
     statusRef.current = normalized;
     setStatus(normalized);
+    if (payload.headline || payload.mediaUrl || payload.body) {
+      setAssets({
+        headline: String(payload.headline || ""),
+        body: String(payload.body || ""),
+        advertiser: String(payload.advertiser || "스폰서"),
+        mediaUrl: String(payload.mediaUrl || ""),
+        ctaLabel: String(payload.ctaLabel || "방문하기")
+      });
+    }
     const msg = String(payload.message || "").trim();
     if (normalized === "failed" || normalized === "timeout") {
       setErrorText(
         msg ||
-          (normalized === "timeout"
-            ? "타임아웃: 광고 로드 실패"
-            : "광고를 불러오지 못했습니다")
+          (normalized === "timeout" ? "타임아웃: 광고 로드 실패" : "광고를 불러오지 못했습니다")
       );
     } else if (normalized === "loaded") {
       setErrorText("");
@@ -56,29 +56,18 @@ export default function AdMobNativeFallbackSlot({
 
   useEffect(() => {
     const onStatus = (ev) => applyPayload(ev?.detail);
-    const onSheet = (ev) => {
-      sheetLevelRef.current = String(ev?.detail?.level || "collapsed");
-    };
     window.addEventListener("vlue-native-ad-status", onStatus);
-    window.addEventListener("vlue-friend-sheet-level", onSheet);
-
     const pollId = window.setInterval(() => {
       try {
-        if (window.__vlueNativeAdStatus) {
-          applyPayload(window.__vlueNativeAdStatus);
-        }
+        if (window.__vlueNativeAdStatus) applyPayload(window.__vlueNativeAdStatus);
         const raw = bridge?.getNativeAdStatusJson?.();
-        if (typeof raw === "string" && raw.length > 2) {
-          applyPayload(JSON.parse(raw));
-        }
+        if (typeof raw === "string" && raw.length > 2) applyPayload(JSON.parse(raw));
       } catch {
         /* ignore */
       }
     }, POLL_MS);
-
     return () => {
       window.removeEventListener("vlue-native-ad-status", onStatus);
-      window.removeEventListener("vlue-friend-sheet-level", onSheet);
       window.clearInterval(pollId);
     };
   }, [bridge]);
@@ -90,91 +79,36 @@ export default function AdMobNativeFallbackSlot({
       setErrorText("앱에서 AdMob 맞춤 광고가 표시됩니다");
       return undefined;
     }
-    if (!ref.current) return undefined;
 
-    let pausedByShowcase = false;
-    const setPaused = (paused) => {
-      pausedByShowcase = paused;
-      if (paused) bridge.hideNativeAdFallback?.();
+    statusRef.current = "loading";
+    setStatus("loading");
+    setErrorText("");
+    mountedAtRef.current = Date.now();
+
+    const requestLoad = () => {
+      bridge.showNativeAdFallback?.(
+        JSON.stringify({
+          visible: true,
+          unitId: ADMOB_TEST.NATIVE,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight
+        })
+      );
     };
 
-    const onHideHomeNative = () => setPaused(true);
-    const onShowHome = () => {
-      /* 홈 복귀 — 일시정지 해제 후 sync */
-      pausedByShowcase = false;
+    const onHide = () => {
+      /* 홈 이탈 시 쇼케이스만 닫힘 — 에셋 캐시는 네이티브에 유지 */
     };
-    window.addEventListener("vlue-hide-home-native-ads", onHideHomeNative);
-    window.addEventListener("vlue-hide-all-ads", onHideHomeNative);
-    window.addEventListener("vlue-show-home-native-ads", onShowHome);
+    const onShow = () => requestLoad();
 
-    if (statusRef.current !== "failed" && statusRef.current !== "timeout") {
-      statusRef.current = "loading";
-      setStatus("loading");
-      setErrorText("");
-      mountedAtRef.current = Date.now();
-    }
+    window.addEventListener("vlue-hide-all-ads", onHide);
+    window.addEventListener("vlue-hide-home-native-ads", onHide);
+    window.addEventListener("vlue-show-home-native-ads", onShow);
+    window.addEventListener("vlue-home-visible", onShow);
 
-    let frame = 0;
-    let cancelled = false;
-
-    const overlapsFriendSheet = (adRect) => {
-      const panel = document.querySelector(".friend-showcase-list__sheet-panel");
-      if (!panel) return false;
-      const level = sheetLevelRef.current || panel.getAttribute("data-level") || "collapsed";
-      if (level === "mid" || level === "full") return true;
-      const sr = panel.getBoundingClientRect();
-      /* 접힌 시트와도 겹치면 숨김 (네이티브 오버레이가 시트 위에 뜨는 것 방지) */
-      return adRect.bottom > sr.top + 4 && adRect.top < sr.bottom - 4;
-    };
-
-    const buildRectJson = () => {
-      const el = ref.current;
-      if (!el) return null;
-      const rect = el.getBoundingClientRect();
-      const covered =
-        pausedByShowcase ||
-        Boolean(document.querySelector(".lettering-ongoing--expanded[data-expanded='true']")) ||
-        overlapsFriendSheet(rect);
-      const width = isPortrait ? Math.min(rect.width || CLIP_W, CLIP_W) : rect.width;
-      const height = isPortrait ? CLIP_H : rect.height;
-      return JSON.stringify({
-        left: rect.left,
-        top: rect.top,
-        width: isPortrait ? CLIP_W : width,
-        height: isPortrait ? CLIP_H : height,
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
-        visible:
-          !covered &&
-          rect.bottom > 0 &&
-          rect.top < window.innerHeight &&
-          rect.width > 8,
-        clipPortrait: isPortrait,
-        unitId: ADMOB_TEST.NATIVE
-      });
-    };
-
-    const sync = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        if (cancelled) return;
-        const json = buildRectJson();
-        if (!json) return;
-        const parsed = JSON.parse(json);
-        if (!parsed.visible) {
-          bridge.hideNativeAdFallback?.();
-          return;
-        }
-        if (pausedByShowcase) return;
-        bridge.showNativeAdFallback(json);
-      });
-    };
-
-    const onSheetLevel = () => sync();
-    window.addEventListener("vlue-friend-sheet-level", onSheetLevel);
+    requestLoad();
 
     const timeoutId = window.setTimeout(() => {
-      if (cancelled) return;
       const cur = statusRef.current;
       if (cur === "loading" || cur === "idle") {
         statusRef.current = "timeout";
@@ -183,86 +117,67 @@ export default function AdMobNativeFallbackSlot({
       }
     }, LOAD_TIMEOUT_MS);
 
-    const watchdogId = window.setInterval(() => {
-      if (cancelled) return;
-      const cur = statusRef.current;
-      if (
-        (cur === "loading" || cur === "idle") &&
-        Date.now() - mountedAtRef.current >= LOAD_TIMEOUT_MS
-      ) {
-        statusRef.current = "timeout";
-        setStatus("timeout");
-        setErrorText("타임아웃: 광고 로드 실패");
-      }
-    }, 1000);
-
-    const observer =
-      typeof ResizeObserver === "function" ? new ResizeObserver(sync) : null;
-    observer?.observe(ref.current);
-    window.addEventListener("scroll", sync, true);
-    window.addEventListener("resize", sync);
-    sync();
-
     return () => {
-      cancelled = true;
       window.clearTimeout(timeoutId);
-      window.clearInterval(watchdogId);
-      cancelAnimationFrame(frame);
-      observer?.disconnect();
-      window.removeEventListener("scroll", sync, true);
-      window.removeEventListener("resize", sync);
-      window.removeEventListener("vlue-hide-home-native-ads", onHideHomeNative);
-      window.removeEventListener("vlue-hide-all-ads", onHideHomeNative);
-      window.removeEventListener("vlue-show-home-native-ads", onShowHome);
-      window.removeEventListener("vlue-friend-sheet-level", onSheetLevel);
-      bridge.hideNativeAdFallback?.();
+      window.removeEventListener("vlue-hide-all-ads", onHide);
+      window.removeEventListener("vlue-hide-home-native-ads", onHide);
+      window.removeEventListener("vlue-show-home-native-ads", onShow);
+      window.removeEventListener("vlue-home-visible", onShow);
     };
-  }, [hasBridge, bridge, variant, isPortrait]);
+  }, [hasBridge, bridge]);
 
-  /* 홈(main) 복귀 시 다시 노출 */
-  useEffect(() => {
-    const onPage = () => {
-      window.dispatchEvent(new CustomEvent("vlue-show-home-native-ads"));
-    };
-    window.addEventListener("vlue-home-visible", onPage);
-    return () => window.removeEventListener("vlue-home-visible", onPage);
-  }, []);
+  const openShowcase = () => {
+    if (status !== "loaded") return;
+    /* 외부 랜딩 금지 — 네이티브 쇼케이스 Dialog만 */
+    bridge?.openNativeAdShowcase?.();
+  };
 
   const showLoading = status === "idle" || status === "loading";
-  const showFailed =
-    status === "failed" || status === "timeout" || status === "unsupported";
+  const showFailed = status === "failed" || status === "timeout" || status === "unsupported";
   const loaded = status === "loaded";
 
   return (
-    <div
-      ref={ref}
-      className={`vlue-native-ad-clip relative flex snap-start items-center justify-center overflow-hidden rounded-[16px] border border-slate-200/80 ${sizeClass} ${
-        loaded ? "border-transparent bg-transparent" : "bg-slate-100"
+    <button
+      type="button"
+      onClick={openShowcase}
+      disabled={!loaded}
+      className={`vlue-native-ad-clip relative shrink-0 snap-start overflow-hidden rounded-[16px] border border-slate-200/80 text-left ${
+        loaded ? "border-transparent bg-slate-900" : "bg-slate-100"
       } ${className}`.trim()}
-      style={
-        isPortrait
-          ? { width: CLIP_W, height: CLIP_H, flex: `0 0 ${CLIP_W}px`, maxWidth: CLIP_W }
-          : undefined
-      }
-      aria-label="맞춤 광고"
+      style={{ width: CLIP_W, height: CLIP_H, flex: `0 0 ${CLIP_W}px`, maxWidth: CLIP_W }}
+      aria-label="추천 스폰서 광고"
       data-ad-unit={ADMOB_TEST.NATIVE}
       data-ad-status={status}
       data-ad-clip="portrait"
     >
-      {!loaded ? <span className="vlue-ad-test-badge absolute left-2 top-2 z-[1]">Test Ad</span> : null}
-      {showLoading ? (
-        <span className="px-2 text-center text-[10px] font-bold text-slate-400">불러오는 중…</span>
+      {loaded && assets.mediaUrl ? (
+        <img src={assets.mediaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
       ) : null}
-      {showFailed ? (
-        <span className="px-2 text-center text-[10px] font-bold leading-snug text-rose-600">
-          {errorText ||
-            (status === "timeout"
-              ? "타임아웃: 광고 로드 실패"
-              : status === "unsupported"
-                ? "앱에서 AdMob 표시"
-                : "광고 로드 실패")}
+      {loaded ? (
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent px-2 pb-2.5 pt-12">
+          <p className="text-[10px] font-bold text-sky-300">{assets.advertiser || "스폰서"}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] font-black leading-snug text-white">
+            {assets.headline || "광고"}
+          </p>
+          {assets.body ? (
+            <p className="mt-0.5 line-clamp-1 text-[9px] text-slate-300">{assets.body}</p>
+          ) : null}
+        </div>
+      ) : null}
+      <span className="absolute right-1.5 top-1.5 z-[1] rounded bg-black/55 px-1 py-0.5 text-[8px] font-black text-white">
+        AD
+      </span>
+      {!loaded ? <span className="vlue-ad-test-badge absolute left-1.5 top-1.5 z-[1]">Test Ad</span> : null}
+      {showLoading ? (
+        <span className="relative z-[1] flex h-full items-center justify-center px-2 text-center text-[10px] font-bold text-slate-400">
+          불러오는 중…
         </span>
       ) : null}
-    </div>
+      {showFailed ? (
+        <span className="relative z-[1] flex h-full items-center justify-center px-2 text-center text-[10px] font-bold leading-snug text-rose-600">
+          {errorText || "광고 로드 실패"}
+        </span>
+      ) : null}
+    </button>
   );
 }

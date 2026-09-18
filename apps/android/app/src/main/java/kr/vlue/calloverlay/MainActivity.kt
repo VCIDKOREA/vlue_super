@@ -969,6 +969,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 retryNativeAdFallback:function(rectJson){
                   try{if(window.Android&&window.Android.retryNativeAdFallback)window.Android.retryNativeAdFallback(String(rectJson||'{}'));}catch(e){}
                 },
+                openNativeAdShowcase:function(){
+                  try{if(window.Android&&window.Android.openNativeAdShowcase)window.Android.openNativeAdShowcase();}catch(e){}
+                },
                 showBannerAd:function(slotKey,rectJson){
                   try{
                     if(window.Android&&window.Android.showBannerAd){
@@ -1412,6 +1415,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun retryNativeAdFallback(rectJson: String?) {
             activity.runOnUiThread { activity.nativeAdManager.retry(rectJson) }
+        }
+
+        /** 홈 클립 1차 탭 → NativeAdView 쇼케이스 오버레이 (CTA만 외부 랜딩) */
+        @android.webkit.JavascriptInterface
+        fun openNativeAdShowcase() {
+            activity.runOnUiThread { activity.nativeAdManager.openShowcase() }
         }
 
         @android.webkit.JavascriptInterface

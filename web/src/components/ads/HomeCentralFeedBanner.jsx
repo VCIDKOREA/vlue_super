@@ -12,8 +12,9 @@ const CLIP_W = 132;
 const CLIP_H = 234;
 
 /**
- * 홈 「추천 스폰서」 — 네이티브 AD만 세로 클립형.
- * 하단 띠배너는 여기 없음 (DCC+ 쇼케이스 전용).
+ * 홈 「추천 스폰서」
+ * - customSponsorList → 커스텀 클립 → SponsorShowcaseOverlay (웹 CTA)
+ * - AdMob → 커스텀 클립 → 네이티브 openNativeAdShowcase (NativeAdView CTA)
  */
 export default function HomeCentralFeedBanner({ className = "", layout: layoutProp = null }) {
   const [layout, setLayout] = useState(
@@ -62,7 +63,8 @@ export default function HomeCentralFeedBanner({ className = "", layout: layoutPr
               <img src={s.mediaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
             ) : null}
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent px-2 pb-2.5 pt-12">
-              <p className="line-clamp-2 text-[11px] font-black leading-snug text-white">{s.headline}</p>
+              <p className="text-[10px] font-bold text-sky-300">{s.advertiser || "스폰서"}</p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] font-black leading-snug text-white">{s.headline}</p>
               {s.body ? (
                 <p className="mt-0.5 line-clamp-1 text-[9px] text-slate-300">{s.body}</p>
               ) : null}
@@ -73,10 +75,10 @@ export default function HomeCentralFeedBanner({ className = "", layout: layoutPr
           </button>
         ))}
 
-        {/* 메인 = 네이티브 AD 세로 클립(릴스)만 */}
-        <AdMobNativeFallbackSlot variant="portrait" />
+        <AdMobNativeFallbackSlot />
       </div>
 
+      {/* customSponsorList 전용 오버레이 — AdMob은 네이티브 Dialog */}
       <SponsorShowcaseOverlay
         open={Boolean(activeSponsor)}
         sponsor={activeSponsor}
