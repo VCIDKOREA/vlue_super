@@ -87,10 +87,25 @@ export default function AdMobNativeFallbackSlot({
     }
     if (!ref.current) return undefined;
 
-    statusRef.current = "loading";
-    setStatus("loading");
-    setErrorText("");
-    mountedAtRef.current = Date.now();
+    let pausedByShowcase = false;
+    const setPaused = (paused) => {
+      pausedByShowcase = paused;
+      if (paused) {
+        bridge.hideNativeAdFallback?.();
+      }
+    };
+
+    const onHideHomeNative = () => setPaused(true);
+    window.addEventListener("vlue-hide-home-native-ads", onHideHomeNative);
+    window.addEventListener("vlue-hide-all-ads", onHideHomeNative);
+
+    /* 이미 실패한 상태면 로딩으로 되돌리지 않음 */
+    if (statusRef.current !== "failed" && statusRef.current !== "timeout") {
+      statusRef.current = "loading";
+      setStatus("loading");
+      setErrorText("");
+      mountedAtRef.current = Date.now();
+    }
 
     let frame = 0;
     let cancelled = false;
@@ -98,6 +113,10 @@ export default function AdMobNativeFallbackSlot({
     const buildRectJson = () => {
       const rect = ref.current?.getBoundingClientRect();
       if (!rect) return null;
+      /* 쇼케이스 펼침·화면 밖이면 네이티브 오버레이 금지 */
+      const covered =
+        pausedByShowcase ||
+        Boolean(document.querySelector(".lettering-ongoing--expanded[data-expanded='true']"));
       return JSON.stringify({
         left: rect.left,
         top: rect.top,
@@ -105,7 +124,11 @@ export default function AdMobNativeFallbackSlot({
         height: rect.height,
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
-        visible: rect.bottom > 0 && rect.top < window.innerHeight && rect.width > 8,
+        visible:
+          !covered &&
+          rect.bottom > 0 &&
+          rect.top < window.innerHeight &&
+          rect.width > 8,
         unitId: ADMOB_TEST.NATIVE
       });
     };
@@ -116,12 +139,16 @@ export default function AdMobNativeFallbackSlot({
         if (cancelled) return;
         const json = buildRectJson();
         if (!json) return;
+        const parsed = JSON.parse(json);
+        if (!parsed.visible) {
+          bridge.hideNativeAdFallback?.();
+          return;
+        }
+        if (pausedByShowcase) return;
         bridge.showNativeAdFallback(json);
       });
     };
 
-    /* 벽시계 기준 타임아웃 — effect remount 시에도 이전 타이머를 clear하지만
-       새 타이머가 다시 12초. 추가로 절대시각 체크를 rAF로 보조 */
     const timeoutId = window.setTimeout(() => {
       if (cancelled) return;
       const cur = statusRef.current;
@@ -160,6 +187,8 @@ export default function AdMobNativeFallbackSlot({
       observer?.disconnect();
       window.removeEventListener("scroll", sync, true);
       window.removeEventListener("resize", sync);
+      window.removeEventListener("vlue-hide-home-native-ads", onHideHomeNative);
+      window.removeEventListener("vlue-hide-all-ads", onHideHomeNative);
       bridge.hideNativeAdFallback?.();
     };
   }, [hasBridge, bridge, variant]);

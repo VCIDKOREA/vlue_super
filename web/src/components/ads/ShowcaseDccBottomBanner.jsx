@@ -12,7 +12,7 @@ const BANNER_H = 50;
 
 /**
  * DCC+ 쇼케이스 하단 띠배너.
- * 홈 인디케이터(safe-area) 위에 올려 가려지지 않게 한다.
+ * 앞면/뒷면·인증바 아래 전용 영역 — 본문/DCC 위를 덮지 않는다.
  */
 export default function ShowcaseDccBottomBanner({
   membershipTier = "free",
@@ -32,10 +32,24 @@ export default function ShowcaseDccBottomBanner({
     };
   }, []);
 
+  /* 마운트 시 홈 네이티브/하단 배너 숨김 — DCC 침범 방지 */
+  useEffect(() => {
+    if (!enabled) return undefined;
+    try {
+      const bridge = window.VlueLettering || window.Android;
+      bridge?.hideNativeAdFallback?.();
+      bridge?.hideBannerAd?.("bottom");
+      bridge?.hideBannerAd?.("ribbon");
+    } catch {
+      /* ignore */
+    }
+    return undefined;
+  }, [enabled]);
+
   if (!enabled) return null;
 
   const shellCls =
-    `showcase-dcc-bottom-banner shrink-0 w-full bg-[#0b1220] border-t border-white/10 ${className}`.trim();
+    `showcase-dcc-bottom-banner relative z-[3] shrink-0 w-full bg-[#0b1220] border-t border-white/10 ${className}`.trim();
   const shellStyle = {
     paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))"
   };

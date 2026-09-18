@@ -139,6 +139,16 @@ export default function CallBigPushPreviewSection({
     if (!expanded) return undefined;
     trackCallInterfaceUse(callChromePreview ? "preview_incall" : "preview");
     trackShowcaseView("home_preview");
+    /* 홈 네이티브 광고·하단 배너가 DCC 펼침 위를 덮지 않도록 숨김 (dcc_bottom 제외) */
+    try {
+      const bridge = window.VlueLettering || window.Android;
+      bridge?.hideNativeAdFallback?.();
+      bridge?.hideBannerAd?.("bottom");
+      bridge?.hideBannerAd?.("ribbon");
+      window.dispatchEvent(new CustomEvent("vlue-hide-home-native-ads"));
+    } catch {
+      /* ignore */
+    }
     return pushAndroidBackHandler(() => {
       setExpanded(false);
       setCallChromePreview(false);

@@ -67,11 +67,10 @@ class VlueNativeAdManager(
             publishStatus("loaded", "ok", 0)
             return
         }
-        /* 이미 실패/타임아웃이면 에러 UI만 재동기화 (무한 로딩 방지) */
+        /* 실패/타임아웃: 네이티브 오버레이는 숨기고 웹 슬롯에만 에러 표시 (DCC 침범 방지) */
         if (lastStatus == "failed" || lastStatus == "timeout") {
-            showErrorOnHost(lastMessage.ifBlank {
-                if (lastStatus == "timeout") "타임아웃: 광고 로드 실패" else "광고 로드 실패"
-            })
+            host.visibility = View.GONE
+            host.removeAllViews()
             notifyWeb(lastStatus, lastMessage, lastCode)
             return
         }
@@ -130,7 +129,9 @@ class VlueNativeAdManager(
                             loading = false
                             val msg = "Error Code: ${error.code} - ${error.message}"
                             Log.w(TAG, "onAdFailedToLoad $msg domain=${error.domain} cause=${error.cause}")
-                            showErrorOnHost(msg)
+                            /* DCC·쇼케이스 위를 덮지 않음 — 웹 썸네일 슬롯에만 메시지 */
+                            host.visibility = View.GONE
+                            host.removeAllViews()
                             publishStatus("failed", msg, error.code)
                         }
                     },
@@ -142,7 +143,8 @@ class VlueNativeAdManager(
             loading = false
             val msg = "Error Code: -1 - ${e.message ?: "AdLoader exception"}"
             Log.e(TAG, "startAdLoad exception", e)
-            showErrorOnHost(msg)
+            host.visibility = View.GONE
+            host.removeAllViews()
             publishStatus("failed", msg, -1)
         }
     }
@@ -155,7 +157,8 @@ class VlueNativeAdManager(
                 loading = false
                 val msg = "타임아웃: 광고 로드 실패"
                 Log.w(TAG, msg)
-                showErrorOnHost(msg)
+                host.visibility = View.GONE
+                host.removeAllViews()
                 publishStatus("timeout", msg, 408)
             }
         loadTimeoutRunnable = r
@@ -168,11 +171,9 @@ class VlueNativeAdManager(
     }
 
     fun hide() {
-        /* 로드 중 hide 되어도 콜백/타임아웃은 유지 — loading 플래그만 유지 */
         pendingRect = null
-        if (lastStatus != "failed" && lastStatus != "timeout") {
-            host.visibility = View.GONE
-        }
+        host.visibility = View.GONE
+        host.removeAllViews()
         closeShowcase()
     }
 
@@ -214,35 +215,8 @@ class VlueNativeAdManager(
         }
     }
 
-    /** 실패/타임아웃을 네이티브 오버레이에 직접 표시 (웹 상태 유실 대비) */
-    private fun showErrorOnHost(message: String) {
-        host.removeAllViews()
-        val label =
-            TextView(activity).apply {
-                text = message
-                textSize = 11f
-                setTextColor(Color.rgb(100, 116, 139))
-                gravity = Gravity.CENTER
-                setPadding(dp(12), dp(12), dp(12), dp(12))
-                setBackgroundColor(Color.rgb(248, 250, 252))
-            }
-        host.addView(
-            label,
-            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
-        )
-        pendingRect?.let { rect ->
-            if (rect.optBoolean("visible", false)) {
-                applyRectForHost(rect, forceVisible = true)
-            }
-        }
-    }
-
     private fun applyRect(rect: JSONObject) {
-        applyRectForHost(rect, forceVisible = nativeAd != null)
-    }
-
-    private fun applyRectForHost(rect: JSONObject, forceVisible: Boolean) {
-        if (!rect.optBoolean("visible", false) && !forceVisible) {
+        if (!rect.optBoolean("visible", false)) {
             host.visibility = View.GONE
             return
         }
@@ -260,11 +234,7 @@ class VlueNativeAdManager(
                 topMargin = (webView.y + rect.optDouble("top") * sy).roundToInt()
             }
         host.layoutParams = params
-        host.visibility = if (forceVisible || nativeAd != null || lastStatus == "failed" || lastStatus == "timeout") {
-            View.VISIBLE
-        } else {
-            View.GONE
-        }
+        host.visibility = if (nativeAd != null) View.VISIBLE else View.GONE
     }
 
     private fun dp(value: Int): Int {
