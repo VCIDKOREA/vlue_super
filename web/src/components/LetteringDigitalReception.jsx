@@ -1071,7 +1071,8 @@ function FrontPanel({
 
       </div>
 
-      {embeddedInPush && verified ? (
+      {/* embeddedInPush: 인증 바는 패널 밖(reception)에 두어 overflow 로 잘리지 않게 함 */}
+      {!embeddedInPush && verified ? (
         <div className={`ldr-auth-social-dock${socialOpen && hasSocial ? " is-open" : ""}`}>
           {hasSocial ? (
             <FrontSocialOutlinkButtons
@@ -1191,6 +1192,7 @@ export default function LetteringDigitalReception({
   const panelWrapRef = useRef(null);
   const useStackedPanels = embeddedInPush;
   const [dialTarget, setDialTarget] = useState(null);
+  const [authSocialOpen, setAuthSocialOpen] = useState(false);
   /* 부모가 onFaceChange 를 안 넘기면 탭이 먹통이 되므로 내부 상태로 폴백 */
   const [internalFace, setInternalFace] = useState(() => (face === "back" ? "back" : "front"));
   const faceControlled = typeof onFaceChange === "function";
@@ -1198,10 +1200,34 @@ export default function LetteringDigitalReception({
   const setActiveFace = faceControlled ? onFaceChange : setInternalFace;
   const faceSwipe = useDccFaceSwipe(activeFace, setActiveFace);
 
+  const peerUserId = String(card?.userId || card?.ownerUserId || "").trim();
+  const meId = getLocalVlueUserId();
+  const isPeerCard = Boolean(peerUserId && (!meId || peerUserId !== meId));
+  const authSocialItems = listCardSocialOutlinks(card);
+  const authHasSocial = authSocialItems.length > 0;
+  const authValidityFromItems = (items || [])
+    .map((line) => String(line || "").trim())
+    .find((line) => /만료일|인증유효기간/.test(line));
+  const authValidityResolved = resolveAuthValidityPeriod({
+    paidAt: card.authPaidAt || null,
+    cycleEndAt: card.authCycleEndAt || card.cycleEndAt || null,
+    validUntil: card.authValidUntil || null,
+    billingCycle: card.billingCycle || null,
+    useLocalFallback: !isPeerCard && !peerUserId
+  });
+  const authValidityDisplay = authValidityFromItems
+    ? authValidityFromItems.replace(/^(만료일|인증유효기간)\s*[:：]?\s*/, "").trim()
+    : authValidityResolved?.line || "";
+  const showPushAuthBar = Boolean(embeddedInPush && verified && activeFace === "front" && !keypadOpen);
+
   useEffect(() => {
     if (!faceControlled) return;
     setInternalFace(face === "back" ? "back" : "front");
   }, [face, faceControlled]);
+
+  useEffect(() => {
+    if (activeFace !== "front") setAuthSocialOpen(false);
+  }, [activeFace]);
 
   useEffect(() => {
     const root = panelWrapRef.current;
@@ -1287,6 +1313,33 @@ export default function LetteringDigitalReception({
           front
         )}
       </div>
+
+      {showPushAuthBar ? (
+        <div
+          className={`ldr-auth-social-dock ldr-auth-social-dock--push-external${
+            authSocialOpen && authHasSocial ? " is-open" : ""
+          }`}
+        >
+          {authHasSocial ? (
+            <FrontSocialOutlinkButtons
+              card={card}
+              enableContactLinks={enableContactLinks}
+              visible={authSocialOpen}
+            />
+          ) : null}
+          <VluePushAuthSeal
+            className="ldr-front-intro ldr-front-intro--verified"
+            card={card}
+            hideFollow={hideFollow}
+            fallbackToMe={!isPeerCard}
+            onToast={onToast}
+            socialToggle={authHasSocial}
+            socialExpanded={authSocialOpen}
+            onActivate={authHasSocial ? () => setAuthSocialOpen((v) => !v) : undefined}
+            expiryLine={authValidityDisplay}
+          />
+        </div>
+      ) : null}
 
       <FaceTabs face={activeFace} onFaceChange={setActiveFace} hidden={keypadOpen} />
 

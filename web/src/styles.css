@@ -6796,6 +6796,23 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   flex-shrink: 0;
 }
 
+/* 빅푸시 DCC — 패널 overflow 밖 고정 인증 바 (잘림 방지) */
+.ldr-reception--push .ldr-auth-social-dock--push-external {
+  position: relative;
+  z-index: 4;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 6px 10px 4px;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.ldr-reception--push .ldr-auth-social-dock--push-external .vlue-push-auth-seal {
+  display: block !important;
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+
 .ldr-biz-logos {
   display: flex;
   flex-wrap: wrap;

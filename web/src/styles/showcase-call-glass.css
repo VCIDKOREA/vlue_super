@@ -1944,6 +1944,18 @@
   pointer-events: auto;
 }
 
+.showcase-call-carousel .ldr-reception--push .ldr-auth-social-dock--push-external {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 4px 10px 2px;
+  z-index: 5;
+}
+
+.showcase-call-carousel .ldr-reception--push .ldr-auth-social-dock--push-external .vlue-push-auth-seal {
+  display: block !important;
+  margin: 0 !important;
+}
+
 .showcase-call-carousel .ldr-reception--push .ldr-face-tabs {
   position: relative;
   z-index: 2;
