@@ -26,7 +26,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
-import com.google.android.gms.ads.MobileAds
 import kr.vlue.calloverlay.applock.AppLockStore
 import kr.vlue.calloverlay.applock.PinLockController
 import kr.vlue.calloverlay.family.FamilyPermissionHelper
@@ -123,7 +122,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         rewardedAdViewModel = ViewModelProvider(this)[VlueRewardedAdViewModel::class.java]
-        MobileAds.initialize(applicationContext) {}
+        /* Application 에서도 초기화 — 누락 대비 MainActivity에서 재확인 */
+        VlueCallOverlayApp.initMobileAds("MainActivity.onCreate")
         /* Big Push·통화 UI는 기기 방향 따름. 쇼케이스는 웹 CSS로 세로 프레임 유지 */
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         /* Android 15+ edge-to-edge 기본값에서 WebView가 상태바 아래로 깔리면 헤더가 시계·배터리와 겹침 */
@@ -962,6 +962,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 hideNativeAdFallback:function(){
                   try{if(window.Android&&window.Android.hideNativeAdFallback)window.Android.hideNativeAdFallback();}catch(e){}
                 },
+                getNativeAdStatusJson:function(){
+                  try{return window.Android&&window.Android.getNativeAdStatusJson?window.Android.getNativeAdStatusJson():null;}
+                  catch(e){return null;}
+                },
+                retryNativeAdFallback:function(rectJson){
+                  try{if(window.Android&&window.Android.retryNativeAdFallback)window.Android.retryNativeAdFallback(String(rectJson||'{}'));}catch(e){}
+                },
                 showBannerAd:function(slotKey,rectJson){
                   try{
                     if(window.Android&&window.Android.showBannerAd){
@@ -1395,6 +1402,16 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun hideNativeAdFallback() {
             activity.runOnUiThread { activity.nativeAdManager.hide() }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getNativeAdStatusJson(): String {
+            return activity.nativeAdManager.statusJson()
+        }
+
+        @android.webkit.JavascriptInterface
+        fun retryNativeAdFallback(rectJson: String?) {
+            activity.runOnUiThread { activity.nativeAdManager.retry(rectJson) }
         }
 
         @android.webkit.JavascriptInterface

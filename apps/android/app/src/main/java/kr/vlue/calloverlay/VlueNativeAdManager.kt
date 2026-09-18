@@ -4,6 +4,9 @@ import android.app.Dialog
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +20,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.AdChoicesView
 import com.google.android.gms.ads.nativead.MediaView
 import com.google.android.gms.ads.nativead.NativeAd
@@ -38,6 +42,18 @@ class VlueNativeAdManager(
     private var loading = false
     private var pendingRect: JSONObject? = null
     private var showcaseDialog: Dialog? = null
+    private var lastStatus: String = "idle"
+    private var lastMessage: String = ""
+    private var lastCode: Int = -1
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var loadTimeoutRunnable: Runnable? = null
+
+    fun statusJson(): String =
+        JSONObject()
+            .put("status", lastStatus)
+            .put("message", lastMessage)
+            .put("code", lastCode)
+            .toString()
 
     fun show(rectJson: String?) {
         val rect = runCatching { JSONObject(rectJson ?: "{}") }.getOrNull() ?: return
@@ -48,73 +64,185 @@ class VlueNativeAdManager(
         }
         applyRect(rect)
         if (nativeAd != null) {
-            notifyWeb("loaded")
+            publishStatus("loaded", "ok", 0)
+            return
+        }
+        /* 이미 실패/타임아웃이면 에러 UI만 재동기화 (무한 로딩 방지) */
+        if (lastStatus == "failed" || lastStatus == "timeout") {
+            showErrorOnHost(lastMessage.ifBlank {
+                if (lastStatus == "timeout") "타임아웃: 광고 로드 실패" else "광고 로드 실패"
+            })
+            notifyWeb(lastStatus, lastMessage, lastCode)
             return
         }
         if (loading) return
         loading = true
-        notifyWeb("loading")
+        publishStatus("loading", "AdLoader starting", -1)
         val unitId = rect.optString("unitId").trim().ifEmpty { BuildConfig.ADMOB_NATIVE_ID }
-        AdLoader.Builder(activity, unitId)
-            .forNativeAd { ad ->
-                if (activity.isDestroyed || activity.isFinishing) {
-                    ad.destroy()
-                    return@forNativeAd
-                }
-                loading = false
-                nativeAd?.destroy()
-                nativeAd = ad
-                renderThumb(ad)
-                pendingRect?.let(::applyRect)
-                notifyWeb("loaded")
+        Log.i(TAG, "loadAd unitId=$unitId adsReady=${VlueCallOverlayApp.isMobileAdsInitialized()}")
+        scheduleLoadTimeout()
+        VlueCallOverlayApp.whenMobileAdsReady {
+            activity.runOnUiThread {
+                if (!loading || nativeAd != null) return@runOnUiThread
+                startAdLoad(unitId)
             }
-            .withNativeAdOptions(
-                NativeAdOptions.Builder()
-                    .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_PORTRAIT)
-                    .build(),
-            )
-            .withAdListener(
-                object : com.google.android.gms.ads.AdListener() {
-                    override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) {
-                        loading = false
-                        host.visibility = View.GONE
-                        notifyWeb("failed", error.message)
+        }
+    }
+
+    /** 웹 타임아웃/재시도용 — 실패 상태 초기화 후 다시 로드 */
+    fun retry(rectJson: String?) {
+        cancelLoadTimeout()
+        loading = false
+        lastStatus = "idle"
+        lastMessage = ""
+        lastCode = -1
+        nativeAd?.destroy()
+        nativeAd = null
+        host.removeAllViews()
+        show(rectJson)
+    }
+
+    private fun startAdLoad(unitId: String) {
+        try {
+            AdLoader.Builder(activity, unitId)
+                .forNativeAd { ad ->
+                    if (activity.isDestroyed || activity.isFinishing) {
+                        ad.destroy()
+                        return@forNativeAd
                     }
-                },
-            )
-            .build()
-            .loadAd(AdRequest.Builder().build())
+                    cancelLoadTimeout()
+                    loading = false
+                    nativeAd?.destroy()
+                    nativeAd = ad
+                    renderThumb(ad)
+                    pendingRect?.let(::applyRect)
+                    publishStatus("loaded", "native ad bound", 0)
+                }
+                .withNativeAdOptions(
+                    NativeAdOptions.Builder()
+                        .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_PORTRAIT)
+                        .build(),
+                )
+                .withAdListener(
+                    object : com.google.android.gms.ads.AdListener() {
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            cancelLoadTimeout()
+                            loading = false
+                            val msg = "Error Code: ${error.code} - ${error.message}"
+                            Log.w(TAG, "onAdFailedToLoad $msg domain=${error.domain} cause=${error.cause}")
+                            showErrorOnHost(msg)
+                            publishStatus("failed", msg, error.code)
+                        }
+                    },
+                )
+                .build()
+                .loadAd(AdRequest.Builder().build())
+        } catch (e: Exception) {
+            cancelLoadTimeout()
+            loading = false
+            val msg = "Error Code: -1 - ${e.message ?: "AdLoader exception"}"
+            Log.e(TAG, "startAdLoad exception", e)
+            showErrorOnHost(msg)
+            publishStatus("failed", msg, -1)
+        }
+    }
+
+    private fun scheduleLoadTimeout() {
+        cancelLoadTimeout()
+        val r =
+            Runnable {
+                if (!loading || nativeAd != null) return@Runnable
+                loading = false
+                val msg = "타임아웃: 광고 로드 실패"
+                Log.w(TAG, msg)
+                showErrorOnHost(msg)
+                publishStatus("timeout", msg, 408)
+            }
+        loadTimeoutRunnable = r
+        mainHandler.postDelayed(r, LOAD_TIMEOUT_MS)
+    }
+
+    private fun cancelLoadTimeout() {
+        loadTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        loadTimeoutRunnable = null
     }
 
     fun hide() {
+        /* 로드 중 hide 되어도 콜백/타임아웃은 유지 — loading 플래그만 유지 */
         pendingRect = null
-        host.visibility = View.GONE
+        if (lastStatus != "failed" && lastStatus != "timeout") {
+            host.visibility = View.GONE
+        }
         closeShowcase()
     }
 
     fun destroy() {
+        cancelLoadTimeout()
         closeShowcase()
         nativeAd?.destroy()
         nativeAd = null
         host.removeAllViews()
     }
 
-    private fun notifyWeb(status: String, message: String? = null) {
-        val msg = JSONObject()
-            .put("status", status)
-            .put("message", message ?: "")
-            .toString()
-            .replace("\\", "\\\\")
-            .replace("'", "\\'")
+    private fun publishStatus(status: String, message: String, code: Int) {
+        lastStatus = status
+        lastMessage = message
+        lastCode = code
+        notifyWeb(status, message, code)
+    }
+
+    private fun notifyWeb(status: String, message: String? = null, code: Int = -1) {
+        val detail =
+            JSONObject()
+                .put("status", status)
+                .put("message", message ?: "")
+                .put("code", code)
+                .toString()
+        /* window 전역 + CustomEvent — WebView에서 이벤트 유실 대비 폴링용 */
         val script =
-            "(function(){try{window.dispatchEvent(new CustomEvent('vlue-native-ad-status',{detail:$msg}));}catch(e){}})();"
+            """
+            (function(){
+              try{
+                var d=$detail;
+                window.__vlueNativeAdStatus=d;
+                window.dispatchEvent(new CustomEvent('vlue-native-ad-status',{detail:d}));
+              }catch(e){}
+            })();
+            """.trimIndent()
         webView.post {
             runCatching { webView.evaluateJavascript(script, null) }
         }
     }
 
+    /** 실패/타임아웃을 네이티브 오버레이에 직접 표시 (웹 상태 유실 대비) */
+    private fun showErrorOnHost(message: String) {
+        host.removeAllViews()
+        val label =
+            TextView(activity).apply {
+                text = message
+                textSize = 11f
+                setTextColor(Color.rgb(100, 116, 139))
+                gravity = Gravity.CENTER
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+                setBackgroundColor(Color.rgb(248, 250, 252))
+            }
+        host.addView(
+            label,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
+        )
+        pendingRect?.let { rect ->
+            if (rect.optBoolean("visible", false)) {
+                applyRectForHost(rect, forceVisible = true)
+            }
+        }
+    }
+
     private fun applyRect(rect: JSONObject) {
-        if (!rect.optBoolean("visible", false)) {
+        applyRectForHost(rect, forceVisible = nativeAd != null)
+    }
+
+    private fun applyRectForHost(rect: JSONObject, forceVisible: Boolean) {
+        if (!rect.optBoolean("visible", false) && !forceVisible) {
             host.visibility = View.GONE
             return
         }
@@ -132,12 +260,21 @@ class VlueNativeAdManager(
                 topMargin = (webView.y + rect.optDouble("top") * sy).roundToInt()
             }
         host.layoutParams = params
-        host.visibility = if (nativeAd != null) View.VISIBLE else View.GONE
+        host.visibility = if (forceVisible || nativeAd != null || lastStatus == "failed" || lastStatus == "timeout") {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
     }
 
     private fun dp(value: Int): Int {
         val density = activity.resources.displayMetrics.density
         return (value * density).roundToInt()
+    }
+
+    companion object {
+        private const val TAG = "VlueNativeAd"
+        private const val LOAD_TIMEOUT_MS = 12_000L
     }
 
     /** 홈 썸네일 — mediaContent 가득 채움 (icon 단독 금지) */
@@ -477,7 +614,7 @@ class VlueNativeAdManager(
         dialog.window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
         showcaseDialog = dialog
         dialog.show()
-        notifyWeb("showcase_open")
+        notifyWeb("showcase_open", "showcase dialog open", 0)
     }
 
     private fun closeShowcase() {
