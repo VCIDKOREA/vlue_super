@@ -893,28 +893,24 @@ export default function LetteringIncomingNotification({
   const isInCallChromePreview = Boolean(previewMode && inCallChromePreview);
   const previewStatusLabel = previewMode ? "" : statusLabel;
 
-  const openInCallChromePreview = useCallback(() => {
-    if (!previewMode) return;
-    onInCallChromePreviewChange?.(true);
-    if (!isExpandedView) setExpanded(true);
-  }, [previewMode, onInCallChromePreviewChange, isExpandedView, setExpanded]);
-
   const closeInCallChromePreview = useCallback(() => {
     setKeypadOpen(false);
     onInCallChromePreviewChange?.(false);
   }, [onInCallChromePreviewChange]);
 
-  const toggleInCallChromePreview = useCallback(
+  /**
+   * 빅푸시 우측 통화 아이콘 — 하단「통화화면」미리보기 없이 바로 접고 안내 토스트.
+   * 실통화 시에는 미니케이스·전화화면으로 전환된다는 안내만 한다.
+   */
+  const collapseBigPushViaCallIcon = useCallback(
     (e) => {
       e?.stopPropagation?.();
-      if (isInCallChromePreview) {
-        /* 쇼케이스 펼침은 유지 — 통화 옵션만 끄고 일반 미리보기로 복귀 */
-        closeInCallChromePreview();
-      } else {
-        openInCallChromePreview();
-      }
+      closeInCallChromePreview();
+      setKeypadOpen(false);
+      if (isExpandedView) setExpanded(false);
+      showGuide("통화시 전화화면으로 이동합니다.");
     },
-    [isInCallChromePreview, closeInCallChromePreview, openInCallChromePreview]
+    [closeInCallChromePreview, isExpandedView, setExpanded, showGuide]
   );
 
   const handleOpenFeed = () => {
@@ -1033,16 +1029,14 @@ export default function LetteringIncomingNotification({
   /** 통화 중: 종료 / 다시보기·미리보기: 전화걸기 */
   const showLiveEndCall = onCall && !previewMode;
   const showReplayDial = Boolean(fromCallHistory);
-  /** 홈「통화화면」미리보기 — 펼친 상태에서만 실통화와 같은 하단 제어바 */
-  const showChromePreviewControls = Boolean(isInCallChromePreview && isExpandedView);
+  /** 홈 빅푸시 — 하단 통화화면 미리보기 제거 (우측 통화 아이콘 → 접힘+토스트) */
+  const showChromePreviewControls = false;
   const showCallEndBar =
     showLiveEndCall ||
     showReplayDial ||
-    Boolean(onEndCall && onCall && !previewMode) ||
-    showChromePreviewControls;
+    Boolean(onEndCall && onCall && !previewMode);
   /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
   const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
-  /** Companion MVP: 실통화·「통화화면」미리보기 모두 4버튼 숨김 → 삼성 CTA */
   /** Companion MVP: 하단「전화 화면 보기」CTA 제거 — 상단 통화 아이콘만으로 미니케이스 전환 */
   const showLegacyInCallControls = Boolean(
     !COMPANION_MVP_DELEGATE_CALL_UI && showChromePreviewControls
@@ -1409,13 +1403,7 @@ export default function LetteringIncomingNotification({
           </span>
         </div>
         {previewMode && showOwnerSettings ? (
-          isInCallChromePreview ? (
-            <span className="lettering-live-bar__status" aria-live="polite">
-              통화화면
-            </span>
-          ) : (
-            <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />
-          )
+          <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />
         ) : previewStatusLabel ? (
           <span className="lettering-live-bar__status">{previewStatusLabel}</span>
         ) : (
@@ -1535,24 +1523,12 @@ export default function LetteringIncomingNotification({
               </button>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleInCallChromePreview();
-                }}
-                className={`lettering-call-icon-btn inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm active:scale-95 ${
-                  isInCallChromePreview
-                    ? "border-emerald-400/50 bg-emerald-500/20"
-                    : "border-slate-700/80 bg-slate-900/90"
-                }`}
-                aria-pressed={isInCallChromePreview}
-                aria-label={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
-                title={isInCallChromePreview ? "통화화면 닫기" : "통화화면 보기"}
+                onClick={collapseBigPushViaCallIcon}
+                className="lettering-call-icon-btn inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-sm active:scale-95"
+                aria-label="전화화면으로 접기"
+                title="통화시 전화화면으로 이동합니다"
               >
-                <Phone
-                  className={`h-5 w-5 ${isInCallChromePreview ? "text-emerald-300" : "text-emerald-400"}`}
-                  strokeWidth={2.6}
-                  aria-hidden
-                />
+                <Phone className="h-5 w-5 text-emerald-400" strokeWidth={2.6} aria-hidden />
               </button>
             </div>
           ) : null}
