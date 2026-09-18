@@ -32,7 +32,7 @@ import { useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 /**
  * VLUÉ Showcase — 홈 메인 통화 빅푸시(픽푸시) 미리보기
  * 켜짐/꺼짐 모두 접힘→전체화면 펼침. 꺼짐은 내용만 번호+VLUÉ 인증.
- * 우측 통화 아이콘 → 미니로 접힘 + 「통화시 전화화면으로 이동합니다」토스트 (하단 미리보기 없음).
+ * 우측 통화 아이콘 → 「통화시 전화화면으로 이동합니다」토스트만 (접힘·하단 미리보기 없음).
  *
  * @param {"portal"|"inline"} [expandMode]
  *   portal = 앱 홈(document 전체화면)

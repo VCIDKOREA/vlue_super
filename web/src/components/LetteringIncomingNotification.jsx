@@ -899,18 +899,17 @@ export default function LetteringIncomingNotification({
   }, [onInCallChromePreviewChange]);
 
   /**
-   * 빅푸시 우측 통화 아이콘 — 하단「통화화면」미리보기 없이 바로 접고 안내 토스트.
-   * 실통화 시에는 미니케이스·전화화면으로 전환된다는 안내만 한다.
+   * 빅푸시 우측 통화 아이콘 — 메인 미리보기에서는 접지 않고 안내 토스트만.
+   * 하단「통화화면」미리보기·초록 버튼은 쓰지 않는다.
    */
-  const collapseBigPushViaCallIcon = useCallback(
+  const notifyCallScreenOnCall = useCallback(
     (e) => {
       e?.stopPropagation?.();
       closeInCallChromePreview();
       setKeypadOpen(false);
-      if (isExpandedView) setExpanded(false);
       showGuide("통화시 전화화면으로 이동합니다.");
     },
-    [closeInCallChromePreview, isExpandedView, setExpanded, showGuide]
+    [closeInCallChromePreview, showGuide]
   );
 
   const handleOpenFeed = () => {
@@ -1523,9 +1522,9 @@ export default function LetteringIncomingNotification({
               </button>
               <button
                 type="button"
-                onClick={collapseBigPushViaCallIcon}
+                onClick={notifyCallScreenOnCall}
                 className="lettering-call-icon-btn inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-sm active:scale-95"
-                aria-label="전화화면으로 접기"
+                aria-label="통화시 전화화면 안내"
                 title="통화시 전화화면으로 이동합니다"
               >
                 <Phone className="h-5 w-5 text-emerald-400" strokeWidth={2.6} aria-hidden />
