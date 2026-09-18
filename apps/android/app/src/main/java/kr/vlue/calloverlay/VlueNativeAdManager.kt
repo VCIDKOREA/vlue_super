@@ -296,7 +296,7 @@ class VlueNativeAdManager(
         return (value * density).roundToInt()
     }
 
-    /** 전체화면 쇼케이스 — 여기만 NativeAdView + CTA 랜딩 */
+    /** 전체화면 쇼케이스 — VLUE 표준 쇼케이스 UI + NativeAdView 매핑 유지 */
     private fun showShowcaseDialog(ad: NativeAd) {
         closeShowcase()
         val dialog =
@@ -315,6 +315,7 @@ class VlueNativeAdManager(
                 setBackgroundColor(Color.BLACK)
             }
 
+        /* 풀블리드 미디어 */
         val media =
             MediaView(activity).apply {
                 setImageScaleType(ImageView.ScaleType.CENTER_CROP)
@@ -325,76 +326,196 @@ class VlueNativeAdManager(
             FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
         )
 
-        val topBar =
+        /* 상단 그라데이션 (숏폼 헤더 가독성) */
+        val topFade =
+            View(activity).apply {
+                background =
+                    GradientDrawable(
+                        GradientDrawable.Orientation.TOP_BOTTOM,
+                        intArrayOf(Color.argb(180, 0, 0, 0), Color.TRANSPARENT),
+                    )
+            }
+        root.addView(
+            topFade,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(120)).apply {
+                gravity = Gravity.TOP
+            },
+        )
+
+        /* —— 상단 프로필 헤더 (VLUE 스타일) —— */
+        val header =
             LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12), dp(14), dp(12), dp(10))
-                setBackgroundColor(Color.argb(120, 0, 0, 0))
+                setPadding(dp(14), dp(16), dp(10), dp(12))
             }
-        val adLabel =
+
+        val icon =
+            ImageView(activity).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background =
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.rgb(30, 41, 59))
+                    }
+                clipToOutline = true
+                outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+                ad.icon?.drawable?.let { setImageDrawable(it) }
+                    ?: run {
+                        /* 아이콘 없으면 이니셜 대체는 advertiser 옆 텍스트로 충분 */
+                        setBackgroundColor(Color.rgb(37, 99, 235))
+                    }
+            }
+        header.addView(icon, LinearLayout.LayoutParams(dp(40), dp(40)))
+
+        val nameCol =
+            LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(10), 0, dp(8), 0)
+            }
+        val nameRow =
+            LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+        val advertiser =
             TextView(activity).apply {
-                text = "[광고] AD"
-                textSize = 12f
+                text = ad.advertiser?.takeIf { it.isNotBlank() } ?: "스폰서"
+                textSize = 15f
                 setTextColor(Color.WHITE)
                 setTypeface(typeface, Typeface.BOLD)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
             }
-        val spacer = View(activity)
+        /* VLUE 공식 인증 배지 (파란 체크) */
+        val verified =
+            TextView(activity).apply {
+                text = "✓"
+                textSize = 11f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                background =
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.rgb(37, 99, 235))
+                    }
+                setPadding(0, 0, 0, 0)
+            }
+        nameRow.addView(
+            advertiser,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        nameRow.addView(
+            verified,
+            LinearLayout.LayoutParams(dp(18), dp(18)).apply { marginStart = dp(6) },
+        )
+        val subLabel =
+            TextView(activity).apply {
+                text = "VLUE 스폰서 쇼케이스"
+                textSize = 11f
+                setTextColor(Color.rgb(148, 163, 184))
+                maxLines = 1
+            }
+        nameCol.addView(nameRow)
+        nameCol.addView(subLabel)
+        header.addView(nameCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        val adBadge =
+            TextView(activity).apply {
+                text = "[광고] AD"
+                textSize = 10f
+                setTextColor(Color.WHITE)
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding(dp(8), dp(5), dp(8), dp(5))
+                background =
+                    GradientDrawable().apply {
+                        setColor(Color.argb(160, 15, 23, 42))
+                        cornerRadius = dp(8).toFloat()
+                    }
+            }
+        header.addView(
+            adBadge,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(6)
+            },
+        )
+
+        val adChoices =
+            AdChoicesView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(4) }
+            }
+        header.addView(adChoices)
+
         val close =
-            ImageButton(activity).apply {
-                setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-                setBackgroundColor(Color.TRANSPARENT)
-                setColorFilter(Color.WHITE)
+            TextView(activity).apply {
+                text = "×"
+                textSize = 22f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                background =
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.argb(140, 15, 23, 42))
+                    }
                 setOnClickListener { dialog.dismiss() }
                 contentDescription = "닫기"
             }
-        topBar.addView(adLabel)
-        topBar.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
-        topBar.addView(close, LinearLayout.LayoutParams(dp(40), dp(40)))
+        header.addView(close, LinearLayout.LayoutParams(dp(36), dp(36)))
+
         root.addView(
-            topBar,
+            header,
             FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
                 gravity = Gravity.TOP
             },
         )
 
+        /* —— 하단 그라데이션 + 타이틀/본문 + VLUE CTA —— */
         val bottom =
             LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(dp(16), dp(18), dp(16), dp(28))
+                setPadding(dp(18), dp(28), dp(18), dp(32))
                 background =
                     GradientDrawable(
                         GradientDrawable.Orientation.BOTTOM_TOP,
-                        intArrayOf(Color.argb(230, 0, 0, 0), Color.TRANSPARENT),
+                        intArrayOf(
+                            Color.argb(240, 2, 6, 23),
+                            Color.argb(160, 2, 6, 23),
+                            Color.TRANSPARENT,
+                        ),
                     )
             }
         val headline =
             TextView(activity).apply {
                 text = ad.headline.orEmpty()
-                textSize = 20f
+                textSize = 22f
                 setTextColor(Color.WHITE)
                 setTypeface(typeface, Typeface.BOLD)
                 maxLines = 3
+                setLineSpacing(0f, 1.15f)
             }
         val body =
             TextView(activity).apply {
                 text = ad.body.orEmpty()
                 textSize = 13f
-                setTextColor(Color.rgb(226, 232, 240))
+                setTextColor(Color.rgb(203, 213, 225))
                 maxLines = 4
+                setLineSpacing(0f, 1.25f)
             }
+        /* VLUE 시그니처 버튼 — 브랜드 블루 + 둥근 코너 */
         val cta =
             Button(activity).apply {
                 text = ad.callToAction ?: "방문하기"
-                textSize = 15f
+                textSize = 16f
                 isAllCaps = false
+                setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.WHITE)
                 background =
                     GradientDrawable().apply {
-                        setColor(Color.rgb(37, 99, 235))
-                        cornerRadius = dp(14).toFloat()
+                        setColor(Color.rgb(37, 99, 235)) /* blue-600 */
+                        cornerRadius = dp(16).toFloat()
                     }
-                setPadding(dp(18), dp(14), dp(18), dp(14))
+                setPadding(dp(18), dp(16), dp(18), dp(16))
+                elevation = dp(4).toFloat()
             }
         bottom.addView(headline)
         if (body.text.isNotBlank()) {
@@ -408,7 +529,7 @@ class VlueNativeAdManager(
         bottom.addView(
             cta,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = dp(14)
+                topMargin = dp(16)
             },
         )
         root.addView(
@@ -417,21 +538,6 @@ class VlueNativeAdManager(
                 gravity = Gravity.BOTTOM
             },
         )
-
-        val icon =
-            ImageView(activity).apply {
-                visibility = View.GONE
-                layoutParams = FrameLayout.LayoutParams(1, 1)
-            }
-        val adChoices =
-            AdChoicesView(activity).apply {
-                layoutParams =
-                    FrameLayout.LayoutParams(dp(24), dp(24)).apply {
-                        gravity = Gravity.TOP or Gravity.START
-                        setMargins(dp(10), dp(52), 0, 0)
-                    }
-            }
-        root.addView(adChoices)
 
         adView.addView(
             root,
