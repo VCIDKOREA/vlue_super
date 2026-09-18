@@ -46,7 +46,9 @@ export const DEFAULT_HOME_LAYOUT = {
     { id: "repair", label: "정비", emoji: "🔧" },
     { id: "recruit", label: "채용", emoji: "💼" },
     { id: "medical", label: "의료", emoji: "🏥" }
-  ]
+  ],
+  /** 유료·커스텀 쇼케이스 슬롯 — AdMob과 병행. 비어 있으면 AdMob만 */
+  customSponsorList: []
 };
 
 function pickSection(partialItems, defaultItems, minLen = 1) {
@@ -56,11 +58,29 @@ function pickSection(partialItems, defaultItems, minLen = 1) {
 
 export function mergeHomeLayout(partial) {
   if (!partial || typeof partial !== "object") return structuredClone(DEFAULT_HOME_LAYOUT);
+  const customSponsorList = Array.isArray(partial.customSponsorList)
+    ? partial.customSponsorList.map((row, i) => normalizeSponsor(row, i)).filter(Boolean)
+    : structuredClone(DEFAULT_HOME_LAYOUT.customSponsorList);
   return {
     vluePick: pickSection(partial.vluePick, DEFAULT_HOME_LAYOUT.vluePick),
     aiRecommend: pickSection(partial.aiRecommend, DEFAULT_HOME_LAYOUT.aiRecommend),
     hotPlaces: pickSection(partial.hotPlaces, DEFAULT_HOME_LAYOUT.hotPlaces),
-    categories: pickSection(partial.categories, DEFAULT_HOME_LAYOUT.categories)
+    categories: pickSection(partial.categories, DEFAULT_HOME_LAYOUT.categories),
+    customSponsorList
+  };
+}
+
+function normalizeSponsor(row, index) {
+  if (!row || typeof row !== "object") return null;
+  return {
+    id: String(row.id || `sponsor-${index + 1}`),
+    advertiser: String(row.advertiser || ""),
+    headline: String(row.headline || ""),
+    body: String(row.body || ""),
+    mediaUrl: String(row.mediaUrl || ""),
+    iconUrl: String(row.iconUrl || ""),
+    ctaLabel: String(row.ctaLabel || "방문하기"),
+    landingUrl: String(row.landingUrl || "")
   };
 }
 

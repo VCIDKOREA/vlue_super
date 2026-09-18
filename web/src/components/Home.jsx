@@ -940,7 +940,7 @@ function Home({
       </div>
       ) : null}
 
-      {v1AppShell.callBigPush ? <HomeCentralFeedBanner /> : null}
+      {v1AppShell.callBigPush ? <HomeCentralFeedBanner layout={publishedLayout} /> : null}
       </div>
 
       {v1AppShell.friendShowcaseFeed ? (
