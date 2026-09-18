@@ -173,7 +173,7 @@
   background: #f8fbff;
 }
 
-/* VLUÉ 로고형 스쿼클 — 인스타 원형 대신 */
+/* VLUÉ 스쿼클 아바타 — 사진·이니셜 공통 (이니셜은 무채색, VLUE 블루와 구분) */
 .friend-showcase-list__avatar {
   width: 48px;
   height: 48px;
@@ -181,7 +181,7 @@
   object-fit: cover;
   object-position: center top;
   flex-shrink: 0;
-  background: #2b6ff0;
+  background: #e8edf3;
 }
 
 .friend-showcase-list__avatar--initial,
@@ -189,11 +189,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #2b6ff0;
-  color: #fff;
+  background: #e8edf3;
+  color: #475569;
   font-size: 16px;
   font-weight: 900;
   overflow: hidden;
+  border: 1px solid #d5dde8;
+}
+
+.friend-showcase-list__avatar--brand {
+  background: #2b6ff0;
+  border-color: transparent;
+  color: #fff;
 }
 
 .friend-showcase-list__avatar-logo {
@@ -486,10 +493,20 @@
   color: #e2e8f0;
 }
 
-.dark-mode .friend-showcase-list__avatar--initial,
+.dark-mode .friend-showcase-list__avatar {
+  background: #334155;
+}
+
+.dark-mode .friend-showcase-list__avatar--initial {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
 .dark-mode .friend-showcase-list__avatar--brand {
   background: #2b6ff0;
   color: #fff;
+  border-color: transparent;
 }
 
 /* 홈 하단 시트 — 탭에 딱 붙음 / 올리기=쇼케이스 / 드래그=검색창 아래 */

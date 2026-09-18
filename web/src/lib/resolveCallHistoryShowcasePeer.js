@@ -22,6 +22,25 @@ function mergeCardFromProfile(baseCard, profRes) {
   const tier = String(
     profile.membershipTier || profRes.membershipTier || baseCard?.membershipTier || "free"
   ).toLowerCase();
+  const logoUrl = String(exp?.logoUrl || baseCard?.logoUrl || "").trim();
+  const pickPhoto = (...vals) => {
+    for (const v of vals) {
+      const s = String(v || "").trim();
+      if (!s || !/^https:\/\//i.test(s)) continue;
+      if (logoUrl && s === logoUrl) continue;
+      if (/vlue-brand-logo|vlue-shield|avatar-person-silhouette/i.test(s)) continue;
+      return s;
+    }
+    return "";
+  };
+  const photoUrl =
+    pickPhoto(
+      profRes.photoUrl,
+      exp?.photoUrl,
+      profile.photoUrl,
+      baseCard?.photoUrl,
+      baseCard?.avatarUrl
+    ) || "";
   return normalizeLetteringCard({
     ...baseCard,
     name:
@@ -35,10 +54,11 @@ function mergeCardFromProfile(baseCard, profRes) {
     website: String(exp?.website || baseCard?.website || "").trim(),
     fax: String(exp?.fax || baseCard?.fax || "").trim(),
     address: String(profile.address || exp?.address || baseCard?.address || "").trim(),
-    photoUrl: String(exp?.photoUrl || profile.photoUrl || baseCard?.photoUrl || "").trim(),
+    photoUrl,
+    avatarUrl: photoUrl || String(baseCard?.avatarUrl || "").trim(),
     titlePhotoUrl: String(exp?.titlePhotoUrl || baseCard?.titlePhotoUrl || "").trim(),
     noTitlePhoto: Boolean(exp?.noTitlePhoto ?? baseCard?.noTitlePhoto),
-    logoUrl: String(exp?.logoUrl || baseCard?.logoUrl || "").trim(),
+    logoUrl,
     photoFocus: String(exp?.photoFocus || baseCard?.photoFocus || "center").trim(),
     companyIntro: String(
       exp?.companyIntro || profile.companyIntro || profile.intro || baseCard?.companyIntro || ""
@@ -127,7 +147,7 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
   const [profRes, live] = await Promise.all([
     fetchFollowProfile(userId, { purpose: "full" }),
     fetchPeerLiveStylePublic(userId, {
-      force: true,
+      force: Boolean(opts.force),
       number: phoneHint
     })
   ]);
@@ -138,11 +158,20 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
       userId,
       ownerUserId: userId,
       phone: phoneDisplay,
-      photoUrl: byPhone.card?.photoUrl || opts.avatarUrl || "",
-      avatarUrl: byPhone.card?.avatarUrl || byPhone.card?.photoUrl || opts.avatarUrl || ""
+      photoUrl: byPhone.card?.photoUrl || "",
+      avatarUrl: byPhone.card?.avatarUrl || byPhone.card?.photoUrl || ""
     },
     profRes
   );
+  /* 시드 아바타(통화목록)는 https 프로필만 — 깨진/상대경로로 덮지 않음 */
+  const seedAvatar = String(opts.avatarUrl || "").trim();
+  if (
+    !merged.photoUrl &&
+    /^https:\/\//i.test(seedAvatar) &&
+    !/vlue-brand-logo|vlue-shield/i.test(seedAvatar)
+  ) {
+    merged = { ...merged, photoUrl: seedAvatar, avatarUrl: seedAvatar };
+  }
 
   const tier = merged.membershipTier || "free";
   /* live 없음 = 송출 미설정 → 인증 팝업. live.includeDigitalCard 가 송출 스위치 */

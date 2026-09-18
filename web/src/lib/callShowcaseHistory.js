@@ -227,22 +227,23 @@ export function formatCallWhen(iso) {
   return d.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
 }
 
-/** blob/data/깨진 상대경로·브랜드 마크를 걸러 로드 가능한 프로필 사진만 반환 */
-function loadableAvatarUrl(raw) {
+/** blob/data/깨진 상대경로·브랜드 마크·회사 로고를 걸러 로드 가능한 프로필 사진만 반환 */
+function loadableAvatarUrl(raw, logoUrl = "") {
   const s = String(raw || "").trim();
   if (!s) return "";
   if (/^(data:|blob:)/i.test(s)) return "";
   if (isVlueBrandAssetUrl(s)) return "";
-  if (/vlue-brand-logo|vlue-shield/i.test(s)) return "";
-  if (/^https?:\/\//i.test(s)) return s;
-  if (s.startsWith("/") && typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}${s}`;
-  }
+  if (/vlue-brand-logo|vlue-shield|avatar-person-silhouette/i.test(s)) return "";
+  const logo = String(logoUrl || "").trim();
+  if (logo && s === logo) return "";
+  if (/^https:\/\//i.test(s)) return s;
+  /* http 또는 앱 오리진 상대경로 — WebView 에서 깨지기 쉬워 제외 */
   return "";
 }
 
 /** 목록·다시보기용 아바타 URL (없으면 빈 문자열 → 이니셜) */
 export function resolveCallHistoryAvatar(call) {
+  const logo = String(call?.cardSnapshot?.logoUrl || call?.logoUrl || "").trim();
   const candidates = [
     call?.avatarUrl,
     call?.cardSnapshot?.photoUrl,
@@ -251,7 +252,7 @@ export function resolveCallHistoryAvatar(call) {
     call?.showcaseSnapshot?.platformFeed?.instagramAvatarUrl
   ];
   for (const c of candidates) {
-    const ok = loadableAvatarUrl(c);
+    const ok = loadableAvatarUrl(c, logo);
     if (ok) return ok;
   }
   /* 통화목록 prefetch 캐시 — 프로필 사진만 (회사 logoUrl 제외) */
@@ -259,7 +260,10 @@ export function resolveCallHistoryAvatar(call) {
     const phone = call?.phoneDisplay || call?.phone || "";
     const cached = readCallHistoryPeerCache(phone);
     const card = cached?.card;
-    const fromCache = loadableAvatarUrl(card?.photoUrl || card?.avatarUrl || card?.image_url);
+    const fromCache = loadableAvatarUrl(
+      card?.photoUrl || card?.avatarUrl || card?.image_url,
+      card?.logoUrl
+    );
     if (fromCache) return fromCache;
   } catch {
     /* ignore */

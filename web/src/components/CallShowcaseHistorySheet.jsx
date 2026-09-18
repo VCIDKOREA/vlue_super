@@ -24,6 +24,7 @@ import { dccLineOptionLabel } from "../lib/dccLineLabel.js";
 import { fetchLineCallHistory, fetchMemberNamesByNumbers } from "../lib/lineCallHistoryApi.js";
 import { resolveCallHistoryShowcasePeer } from "../lib/resolveCallHistoryShowcasePeer.js";
 import {
+  invalidateCallHistoryPeerCache,
   prefetchCallHistoryPeer,
   readCallHistoryPeerCache,
   writeCallHistoryPeerCache
@@ -207,7 +208,7 @@ function writeCallHistoryLineId(id) {
   }
 }
 
-function CallHistoryAvatar({ call, cacheTick = 0 }) {
+function CallHistoryAvatar({ call, cacheTick = 0, onBrokenUrl }) {
   let url = "";
   try {
     url = typeof resolveCallHistoryAvatar === "function" ? resolveCallHistoryAvatar(call) : "";
@@ -228,7 +229,15 @@ function CallHistoryAvatar({ call, cacheTick = 0 }) {
         src={url}
         alt=""
         referrerPolicy="no-referrer"
-        onError={() => setBroken(true)}
+        decoding="async"
+        onError={() => {
+          setBroken(true);
+          try {
+            onBrokenUrl?.(url, call);
+          } catch {
+            /* ignore */
+          }
+        }}
       />
     );
   }
@@ -328,7 +337,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           const url = String(
             cached?.card?.photoUrl || cached?.card?.avatarUrl || cached?.card?.image_url || ""
           ).trim();
-          if (!url || !/^https?:\/\//i.test(url)) return call;
+          if (!url || !/^https:\/\//i.test(url)) return call;
+          if (/vlue-brand-logo|vlue-shield/i.test(url)) return call;
           changed = true;
           return {
             ...call,
@@ -391,6 +401,51 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const showToast = useCallback((msg) => {
     setToast(String(msg || "").trim());
     window.setTimeout(() => setToast(""), 2600);
+  }, []);
+
+  const clearBrokenAvatarUrl = useCallback((brokenUrl, call) => {
+    const bad = String(brokenUrl || "").trim();
+    if (!bad) return;
+    const phone = call?.phoneDisplay || call?.phone || "";
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((row) => {
+        const samePhone =
+          phone &&
+          (row.phoneDisplay === phone || row.phone === phone || row.id === call?.id);
+        const hit =
+          samePhone ||
+          row.avatarUrl === bad ||
+          row.cardSnapshot?.photoUrl === bad ||
+          row.cardSnapshot?.avatarUrl === bad;
+        if (!hit) return row;
+        changed = true;
+        const snap =
+          row.cardSnapshot && typeof row.cardSnapshot === "object" ? { ...row.cardSnapshot } : {};
+        if (snap.photoUrl === bad) snap.photoUrl = "";
+        if (snap.avatarUrl === bad) snap.avatarUrl = "";
+        return {
+          ...row,
+          avatarUrl: row.avatarUrl === bad ? "" : row.avatarUrl,
+          cardSnapshot: snap
+        };
+      });
+      if (changed) writeCallHistoryListCache(next);
+      return changed ? next : prev;
+    });
+    try {
+      invalidateCallHistoryPeerCache(phone);
+    } catch {
+      /* ignore */
+    }
+    if (phone) {
+      prefetchCallHistoryPeer(phone, () =>
+        resolveCallHistoryShowcasePeer(phone, {
+          displayName: call?.name || call?.memberName || "",
+          avatarUrl: ""
+        }).then((payload) => peerPayloadFromResolve(payload))
+      );
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -696,7 +751,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           setPreviewVerified(true);
           setLoading(true);
         });
-        void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
+        void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: false });
         return;
       }
       openAuthPopupForPeer(call, cachedPeer.card);
@@ -766,7 +821,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
             setPreviewCard(optimistic.card);
             setLoading(false);
           });
-          void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
+          void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
           return;
         }
         flushSync(() => {
@@ -777,7 +832,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           setPreviewVerified(true);
           setLoading(true);
         });
-        void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
+        void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: false });
         return;
       }
       const cachedEmpty = readCallHistoryPeerCache(phone);
@@ -859,7 +914,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setPreviewCard(optimistic.card);
         setLoading(false);
       });
-      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
       return;
     }
 
@@ -871,7 +926,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setPreviewVerified(false);
       setLoading(true);
     });
-    void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
+    void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: false });
   };
 
   const closeDetail = () => {
@@ -1052,7 +1107,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               <li key={call.id}>
                 <div className="friend-showcase-list__row call-history-row">
                   <button type="button" className="call-history-row__main" onClick={() => openCall(call)}>
-                    <CallHistoryAvatar call={call} cacheTick={peerAvatarTick} />
+                    <CallHistoryAvatar
+                      call={call}
+                      cacheTick={peerAvatarTick}
+                      onBrokenUrl={clearBrokenAvatarUrl}
+                    />
                     <div className="friend-showcase-list__meta">
                       <p className="friend-showcase-list__name">
                         {formatCallGroupLabel(call)}

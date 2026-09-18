@@ -83,6 +83,15 @@ export function writeCallHistoryPeerCache(phone, payload) {
   }
 }
 
+/** 깨진 아바타 등 — 캐시 무효화 후 재조회 */
+export function invalidateCallHistoryPeerCache(phone) {
+  const k = keyFor(phone);
+  if (!k) return;
+  mem.delete(k);
+  inflight.delete(k);
+  persistToStorage();
+}
+
 const inflight = new Map();
 
 /** 동일 번호 중복 fetch 합치기 */
