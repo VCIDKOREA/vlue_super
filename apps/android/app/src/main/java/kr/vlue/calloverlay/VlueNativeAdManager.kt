@@ -30,11 +30,11 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
 /**
- * 홈 클립 = 에셋만 웹 전달.
- * 쇼케이스 = 웹 PeerShowcasePreview(ShowcaseCallCarousel) UI + 이 매니저가
- * MediaView·CTA 만 DOM 슬롯 좌표에 NativeAdView로 겹침.
- *
- * - 이미지: 웹 Signature BGM / 동영상: MediaView 오디오 + toggleNativeAdShowcaseAudio
+ * 홈 클립 = 에셋만 웹.
+ * 쇼케이스 = 웹 VLUE UI + NativeAdView.
+ * - 이미지: MediaView 숨김(웹 이미지 표시) · CTA만 하단 슬롯
+ * - 동영상: MediaView를 미디어 카드 슬롯에만 (전체화면 덮지 않음)
+ * 띠배너는 쇼케이스 동안 강제 숨김.
  */
 class VlueNativeAdManager(
     private val activity: MainActivity,
@@ -75,7 +75,6 @@ class VlueNativeAdManager(
             .put("source", "admob")
             .toString()
 
-    /** 홈 오버레이 없이 에셋만 로드 → 웹 커스텀 클립 렌더 */
     fun show(rectJson: String?) {
         host.visibility = View.GONE
         host.removeAllViews()
@@ -108,16 +107,13 @@ class VlueNativeAdManager(
         }
     }
 
-    /**
-     * 웹 PeerShowcasePreview 오픈 트리거.
-     * (레거시 클립이 openNativeAdShowcase 만 호출해도 동작하도록 JS 이벤트 발행)
-     */
     fun openShowcase() {
         val ad = nativeAd
         if (ad == null) {
             Log.w(TAG, "openShowcase: no nativeAd")
             return
         }
+        suppressBanners(true)
         lastStatus = "showcase_open"
         notifyWeb()
         val detail = statusJson()
@@ -129,6 +125,7 @@ class VlueNativeAdManager(
                 window.__vlueNativeAdStatus=d;
                 window.dispatchEvent(new CustomEvent('vlue-open-admob-showcase',{detail:d}));
                 window.dispatchEvent(new CustomEvent('vlue-native-ad-status',{detail:d}));
+                window.dispatchEvent(new CustomEvent('vlue-hide-all-ads'));
               }catch(e){}
             })();
             """.trimIndent()
@@ -137,7 +134,6 @@ class VlueNativeAdManager(
         }
     }
 
-    /** 웹 쇼케이스 DOM 슬롯(미디어 카드 · 하단 CTA)에 NativeAdView 배치 */
     fun syncShowcaseSlots(rectJson: String?) {
         val ad = nativeAd ?: return
         val root = runCatching { JSONObject(rectJson ?: "{}") }.getOrNull() ?: return
@@ -146,6 +142,7 @@ class VlueNativeAdManager(
             return
         }
         activity.runOnUiThread {
+            suppressBanners(true)
             ensureShowcaseAdView(ad)
             applySlotRects(root)
             bindVideoAudio(ad, root.optBoolean("hasVideoContent", lastHasVideo))
@@ -155,7 +152,10 @@ class VlueNativeAdManager(
     }
 
     fun closeShowcaseSlots() {
-        activity.runOnUiThread { hideShowcaseSlots() }
+        activity.runOnUiThread {
+            hideShowcaseSlots()
+            suppressBanners(false)
+        }
     }
 
     fun toggleShowcaseAudio() {
@@ -172,18 +172,21 @@ class VlueNativeAdManager(
         lastStatus = "idle"
         lastMessage = ""
         lastCode = -1
-        lastHeadline = ""
-        lastBody = ""
-        lastAdvertiser = ""
-        lastCta = ""
-        lastMediaUrl = ""
-        lastHasVideo = false
+        clearAssetFields()
         hideShowcaseSlots()
+        suppressBanners(false)
         nativeAd?.destroy()
         nativeAd = null
         host.removeAllViews()
         host.visibility = View.GONE
         show(rectJson)
+    }
+
+    private fun suppressBanners(on: Boolean) {
+        runCatching {
+            activity.bannerAds().setSuppressed(on)
+            if (on) activity.bannerAds().hide(null)
+        }
     }
 
     private fun startAdLoad(unitId: String) {
@@ -309,6 +312,8 @@ class VlueNativeAdManager(
             MediaView(activity).apply {
                 setImageScaleType(ImageView.ScaleType.CENTER_CROP)
                 if (ad.mediaContent != null) mediaContent = ad.mediaContent
+                /* 좌표 확정 전 절대 보이지 않음 — 전체화면 점유 방지 */
+                visibility = View.GONE
             }
         val cta =
             Button(activity).apply {
@@ -323,6 +328,7 @@ class VlueNativeAdManager(
                         cornerRadius = dp(16).toFloat()
                     }
                 setPadding(dp(12), dp(12), dp(12), dp(12))
+                visibility = View.GONE
             }
 
         adView.addView(media, FrameLayout.LayoutParams(1, 1))
@@ -378,7 +384,6 @@ class VlueNativeAdManager(
     }
 
     private fun applySlotRects(root: JSONObject) {
-        val adView = showcaseAdView ?: return
         val media = showcaseMediaView ?: return
         val cta = showcaseCta ?: return
         val mediaRect = root.optJSONObject("media") ?: return
@@ -392,27 +397,47 @@ class VlueNativeAdManager(
         val sy = webView.height / viewportHeight
         val webLeft = webView.x
         val webTop = webView.y
+        val hasVideo = root.optBoolean("hasVideoContent", lastHasVideo)
 
-        fun place(child: View, rect: JSONObject) {
+        fun place(child: View, left: Double, top: Double, width: Double, height: Double) {
             val lp =
                 FrameLayout.LayoutParams(
-                    (rect.optDouble("width") * sx).roundToInt().coerceAtLeast(1),
-                    (rect.optDouble("height") * sy).roundToInt().coerceAtLeast(1),
+                    (width * sx).roundToInt().coerceAtLeast(1),
+                    (height * sy).roundToInt().coerceAtLeast(1),
                 ).apply {
-                    leftMargin = (webLeft + rect.optDouble("left") * sx).roundToInt()
-                    topMargin = (webTop + rect.optDouble("top") * sy).roundToInt()
+                    leftMargin = (webLeft + left * sx).roundToInt()
+                    topMargin = (webTop + top * sy).roundToInt()
                 }
             child.layoutParams = lp
-            child.visibility = View.VISIBLE
         }
 
-        place(media, mediaRect)
-        place(cta, ctaRect)
+        /* CTA — 항상 하단 슬롯 */
+        place(
+            cta,
+            ctaRect.optDouble("left"),
+            ctaRect.optDouble("top"),
+            ctaRect.optDouble("width"),
+            ctaRect.optDouble("height"),
+        )
         val label = ctaRect.optString("label").trim()
         if (label.isNotEmpty()) cta.text = label
+        cta.visibility = View.VISIBLE
 
-        /* NativeAdView 자체는 풀스크린 투명 — 자식만 히트 */
-        adView.layoutParams =
+        if (hasVideo) {
+            /* 동영상만 MediaView — 우측·하단 inset 으로 소셜/프로필 바 확보 */
+            val insetR = 56.0
+            val insetB = 72.0
+            val mw = (mediaRect.optDouble("width") - insetR).coerceAtLeast(80.0)
+            val mh = (mediaRect.optDouble("height") - insetB).coerceAtLeast(80.0)
+            place(media, mediaRect.optDouble("left"), mediaRect.optDouble("top"), mw, mh)
+            media.visibility = View.VISIBLE
+        } else {
+            /* 이미지: 웹이 미디어 표시 — MediaView 는 등록만(1px 오프스크린) */
+            place(media, -8.0, -8.0, 1.0, 1.0)
+            media.visibility = View.INVISIBLE
+        }
+
+        showcaseAdView?.layoutParams =
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -437,9 +462,7 @@ class VlueNativeAdManager(
     }
 
     private fun hideShowcaseSlots() {
-        runCatching {
-            showcaseAdView?.removeAllViews()
-        }
+        runCatching { showcaseAdView?.removeAllViews() }
         showcaseAdView = null
         showcaseMediaView = null
         showcaseCta = null
@@ -460,9 +483,8 @@ class VlueNativeAdManager(
             Runnable {
                 if (!loading || nativeAd != null) return@Runnable
                 loading = false
-                val msg = "타임아웃: 광고 로드 실패"
                 clearAssetFields()
-                publishAssets("timeout", msg, 408)
+                publishAssets("timeout", "타임아웃: 광고 로드 실패", 408)
             }
         loadTimeoutRunnable = r
         mainHandler.postDelayed(r, LOAD_TIMEOUT_MS)
@@ -477,11 +499,13 @@ class VlueNativeAdManager(
         host.visibility = View.GONE
         host.removeAllViews()
         hideShowcaseSlots()
+        suppressBanners(false)
     }
 
     fun destroy() {
         cancelLoadTimeout()
         hideShowcaseSlots()
+        suppressBanners(false)
         nativeAd?.destroy()
         nativeAd = null
         host.removeAllViews()

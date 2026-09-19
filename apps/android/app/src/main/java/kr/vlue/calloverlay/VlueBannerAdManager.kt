@@ -27,8 +27,17 @@ class VlueBannerAdManager(
     )
 
     private val slots = linkedMapOf<String, Slot>()
+    @Volatile
+    private var suppressed: Boolean = false
+
+    /** AdMob 네이티브 쇼케이스 중 띠배너 표시 차단 */
+    fun setSuppressed(value: Boolean) {
+        suppressed = value
+        if (value) hide(null)
+    }
 
     fun show(slotKey: String?, rectJson: String?) {
+        if (suppressed) return
         val key = slotKey?.trim().orEmpty().ifEmpty { return }
         val rect = runCatching { JSONObject(rectJson ?: "{}") }.getOrNull() ?: return
         val unitId =
@@ -59,12 +68,17 @@ class VlueBannerAdManager(
     fun hide(slotKey: String?) {
         val key = slotKey?.trim().orEmpty()
         if (key.isEmpty()) {
-            slots.values.forEach { it.host.visibility = View.GONE }
+            slots.values.forEach {
+                it.pendingRect = null
+                it.host.visibility = View.GONE
+                it.adView?.visibility = View.GONE
+            }
             return
         }
         slots[key]?.let {
             it.pendingRect = null
             it.host.visibility = View.GONE
+            it.adView?.visibility = View.GONE
         }
     }
 

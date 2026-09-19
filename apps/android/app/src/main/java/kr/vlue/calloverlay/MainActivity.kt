@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private lateinit var rewardedAdViewModel: VlueRewardedAdViewModel
     private lateinit var nativeAdManager: VlueNativeAdManager
     private lateinit var bannerAdManager: VlueBannerAdManager
+
+    /** AdMob 네이티브 쇼케이스용 — 띠배너 매니저 접근 */
+    internal fun bannerAds(): VlueBannerAdManager = bannerAdManager
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: android.webkit.PermissionRequest? = null
     private var pendingWebGrantResources: Array<String>? = null
