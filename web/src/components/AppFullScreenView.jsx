@@ -62,9 +62,10 @@ export default function AppFullScreenView({
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 flex flex-col ${zClass} ${isDarkMode ? "bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
+      className={`fixed inset-x-0 top-0 flex flex-col ${zClass} ${isDarkMode ? "dark-mode bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
       style={{ bottom, margin: 0, padding: 0 }}
       data-afv-bottom={typeof bottom === "number" ? String(bottom) : "css-var"}
+      data-theme={isDarkMode ? "dark" : "light"}
       role="dialog"
       aria-modal="true"
       aria-label={title || "전체 화면"}

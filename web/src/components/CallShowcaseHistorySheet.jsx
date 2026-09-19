@@ -1048,11 +1048,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         open={open}
         onClose={closeDetail}
         title={titleName}
-        isDarkMode
+        isDarkMode={isDarkMode}
         coverBottomNav
         hideHeader
         showFloatingClose
-        className="bg-[#0B101B]"
+        className={isDarkMode ? "bg-[#0B101B]" : "bg-white"}
       >
         <div className="flex min-h-0 flex-1 flex-col">
           {toast ? (
@@ -1160,11 +1160,21 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       ) : null}
       {lineFilterBar}
       {listLoading ? (
-        <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">
+        <p
+          className={`px-4 py-16 text-center text-[13px] font-semibold ${
+            isDarkMode ? "text-slate-400" : "text-slate-500"
+          }`}
+        >
           통화기록 불러오는 중…
         </p>
       ) : items.length === 0 ? (
-        <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">{emptyHint}</p>
+        <p
+          className={`px-4 py-16 text-center text-[13px] font-semibold ${
+            isDarkMode ? "text-slate-400" : "text-slate-500"
+          }`}
+        >
+          {emptyHint}
+        </p>
       ) : (
         <ul className="call-history-samsung-list m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
           {items.map((call) => {
