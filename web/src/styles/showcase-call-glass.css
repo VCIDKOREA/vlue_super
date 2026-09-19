@@ -4714,6 +4714,14 @@
   color: #94a3b8;
 }
 
+.agency-dcp-card__ad {
+  width: 100%;
+  margin: 8px 0 12px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #0f172a;
+}
+
 .agency-dcp-card__close {
   margin-top: 4px;
   width: 100%;

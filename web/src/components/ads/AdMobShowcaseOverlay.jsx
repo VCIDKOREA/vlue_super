@@ -22,6 +22,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
   const [open, setOpen] = useState(false);
   const [assets, setAssets] = useState(null);
   const [signatureBgm, setSignatureBgm] = useState(null);
+  const [ctaPaused, setCtaPaused] = useState(false);
   const rootRef = useRef(null);
   const syncTimer = useRef(0);
 
@@ -42,19 +43,26 @@ export default function AdMobShowcaseOverlay({ onToast }) {
   const close = useCallback(() => {
     setOpen(false);
     setAssets(null);
+    setCtaPaused(false);
     try {
       bridge?.closeNativeAdShowcaseSlots?.();
     } catch {
       /* ignore */
     }
-    hideBannersHard();
-  }, [bridge, hideBannersHard]);
+    /* 쇼케이스 종료 후 일반 띠배너 재표시 */
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-resume-ads"));
+    } catch {
+      /* ignore */
+    }
+  }, [bridge]);
 
   useEffect(() => {
     const onOpen = (ev) => {
       const detail = ev?.detail && typeof ev.detail === "object" ? ev.detail : {};
       setAssets(detail);
       setOpen(true);
+      setCtaPaused(false);
       hideBannersHard();
     };
     const onClose = () => close();
@@ -71,9 +79,16 @@ export default function AdMobShowcaseOverlay({ onToast }) {
   useEffect(() => {
     if (!open) return undefined;
     hideBannersHard();
-    const id = window.setInterval(hideBannersHard, 800);
-    return () => window.clearInterval(id);
+    return undefined;
   }, [open, hideBannersHard]);
+
+  useEffect(() => {
+    const onPauseCta = (ev) => {
+      setCtaPaused(Boolean(ev?.detail?.pause));
+    };
+    window.addEventListener("vlue-admob-pause-cta", onPauseCta);
+    return () => window.removeEventListener("vlue-admob-pause-cta", onPauseCta);
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -126,7 +141,8 @@ export default function AdMobShowcaseOverlay({ onToast }) {
 
     const media = mediaEl.getBoundingClientRect();
     const cta = ctaEl.getBoundingClientRect();
-    if (media.width < 40 || media.height < 40 || cta.width < 40) return;
+    if (media.width < 40 || media.height < 40) return;
+    if (!ctaPaused && (cta.width < 40 || cta.height < 20)) return;
 
     try {
       bridge.syncNativeAdShowcaseSlots(
@@ -143,17 +159,18 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           },
           cta: {
             left: cta.left,
-            top: cta.top,
-            width: cta.width,
-            height: cta.height,
-            label: ctaLabel
+            top: ctaPaused ? window.innerHeight + 80 : cta.top,
+            width: Math.max(cta.width, 40),
+            height: Math.max(cta.height, 40),
+            label: ctaLabel,
+            visible: !ctaPaused
           }
         })
       );
     } catch {
       /* ignore */
     }
-  }, [open, bridge, hasVideo, ctaLabel]);
+  }, [open, bridge, hasVideo, ctaLabel, ctaPaused]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -172,7 +189,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
       ro?.disconnect();
       window.removeEventListener("resize", run);
     };
-  }, [open, card, syncNativeSlots]);
+  }, [open, card, syncNativeSlots, ctaPaused]);
 
   useEffect(() => {
     if (!open || !hasVideo) return undefined;
@@ -292,7 +309,15 @@ export default function AdMobShowcaseOverlay({ onToast }) {
             type="button"
             data-admob-cta-slot
             className="flex w-full items-center justify-center rounded-2xl bg-blue-600 px-4 py-3.5 text-[16px] font-black text-white"
-            style={{ pointerEvents: "none" }}
+            style={{
+              pointerEvents: "none",
+              visibility: ctaPaused ? "hidden" : "visible",
+              height: ctaPaused ? 0 : undefined,
+              paddingTop: ctaPaused ? 0 : undefined,
+              paddingBottom: ctaPaused ? 0 : undefined,
+              margin: 0,
+              overflow: "hidden"
+            }}
             tabIndex={-1}
             aria-hidden
           >

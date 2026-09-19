@@ -180,6 +180,7 @@ class CallOverlayService : Service() {
     /** DCP 정상/비정상 팝업 — BigPush 창과 분리(WRAP_CONTENT) */
     private var dcpPopupView: android.view.View? = null
     private var dcpPopupParams: WindowManager.LayoutParams? = null
+    private var dcpPopupDestroyAds: (() -> Unit)? = null
     /** 설정 DCP 테스트 — 전체 오버레이 없이 팝업만 */
     private var dcpPopupOnly = false
     /** Phase 5-C — Memory callback 관찰만 (동작 변경 없음) */
@@ -2828,7 +2829,7 @@ class CallOverlayService : Service() {
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
-        val view = DcpAbnormalWarningView.build(
+        val built = DcpAbnormalWarningView.build(
             this,
             spec,
             onConfirm = {
@@ -2861,6 +2862,8 @@ class CallOverlayService : Service() {
                 null
             }
         )
+        val view = built.view
+        dcpPopupDestroyAds = built.destroyAds
         DcpAbnormalWarningView.bindDrag(view, wm, params, enabled = !spec.abnormal && !spec.expired)
         try {
             wm.addView(view, params)
@@ -2879,12 +2882,19 @@ class CallOverlayService : Service() {
                 }
             }
         } catch (e: Exception) {
+            built.destroyAds()
+            dcpPopupDestroyAds = null
             VlueBigPushTrace.lifecycle("DCP_POPUP_ADD_FAIL", e.message ?: e.javaClass.simpleName)
         }
     }
 
     private fun removeDcpPopupWindow() {
         val view = dcpPopupView ?: return
+        try {
+            dcpPopupDestroyAds?.invoke()
+        } catch (_: Exception) {
+        }
+        dcpPopupDestroyAds = null
         try {
             windowManager?.removeView(view)
         } catch (_: Exception) {

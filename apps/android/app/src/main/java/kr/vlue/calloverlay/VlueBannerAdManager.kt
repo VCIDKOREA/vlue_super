@@ -33,7 +33,10 @@ class VlueBannerAdManager(
     /** AdMob 네이티브 쇼케이스 중 띠배너 표시 차단 */
     fun setSuppressed(value: Boolean) {
         suppressed = value
-        if (value) hide(null)
+        if (value) {
+            slots.values.forEach { it.host.visibility = View.GONE }
+        }
+        /* false 시 pendingRect 유지 — 웹 AdMobBannerSlot 이 vlue-resume-ads 로 재 show */
     }
 
     fun show(slotKey: String?, rectJson: String?) {
@@ -69,17 +72,12 @@ class VlueBannerAdManager(
         val key = slotKey?.trim().orEmpty()
         if (key.isEmpty()) {
             slots.values.forEach {
-                it.pendingRect = null
+                /* pendingRect 유지 — 재 show 시 좌표 복원 */
                 it.host.visibility = View.GONE
-                it.adView?.visibility = View.GONE
             }
             return
         }
-        slots[key]?.let {
-            it.pendingRect = null
-            it.host.visibility = View.GONE
-            it.adView?.visibility = View.GONE
-        }
+        slots[key]?.host?.visibility = View.GONE
     }
 
     fun destroy() {
@@ -164,6 +162,8 @@ class VlueBannerAdManager(
                 topMargin = (webView.y + rect.optDouble("top") * sy).roundToInt()
             }
         slot.host.layoutParams = params
+        /* hide() 후 재 show 시 AdView 가 GONE 으로 남는 버그 방지 */
+        slot.adView?.visibility = View.VISIBLE
         slot.host.visibility = if (slot.adView != null && !slot.loading) View.VISIBLE else View.INVISIBLE
     }
 }

@@ -1741,7 +1741,7 @@ export default function LetteringIncomingNotification({
             aria-hidden={!isExpandedView}
           >
             <div className="lettering-ongoing-expand-slot__inner">
-              <div className="lettering-unverified-expanded relative z-[2]">
+                <div className="lettering-unverified-expanded relative z-[2]">
                 <div className="lettering-unverified-expanded__scroll lettering-ongoing-scroll--unverified">
                   <LetteringUnverifiedReportPanel
                     incomingNumber={incoming}
@@ -1752,6 +1752,9 @@ export default function LetteringIncomingNotification({
                     onTipSummaryChange={setTipSummary}
                   />
                 </div>
+                {isExpandedView ? (
+                  <ShowcaseDccBottomBanner membershipTier="free" enabled />
+                ) : null}
               </div>
             </div>
           </div>

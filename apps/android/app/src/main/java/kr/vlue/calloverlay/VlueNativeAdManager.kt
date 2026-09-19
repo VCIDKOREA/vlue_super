@@ -411,7 +411,7 @@ class VlueNativeAdManager(
             child.layoutParams = lp
         }
 
-        /* CTA — 항상 하단 슬롯 */
+        /* CTA — 댓글 시트 등에서 visible:false 로 일시 숨김 */
         place(
             cta,
             ctaRect.optDouble("left"),
@@ -421,7 +421,8 @@ class VlueNativeAdManager(
         )
         val label = ctaRect.optString("label").trim()
         if (label.isNotEmpty()) cta.text = label
-        cta.visibility = View.VISIBLE
+        cta.visibility =
+            if (ctaRect.optBoolean("visible", true)) View.VISIBLE else View.GONE
 
         if (hasVideo) {
             /* 동영상만 MediaView — 우측·하단 inset 으로 소셜/프로필 바 확보 */

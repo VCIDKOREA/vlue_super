@@ -1,6 +1,8 @@
 import { createPortal } from "react-dom";
 import { Phone } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
+import AdMobBannerSlot from "./ads/AdMobBannerSlot.jsx";
+import { AD_SLOT, ADMOB_TEST } from "../lib/ads/adMobUnitIds.js";
 import "./vlue-auth-member-popup.css";
 
 /**
@@ -43,6 +45,17 @@ export default function VlueAuthMemberPopup({
           <Phone size={16} aria-hidden />
           <span>{phoneDisp}</span>
         </p>
+        <div className="vlue-auth-member-popup__ad" aria-label="광고">
+          <AdMobBannerSlot
+            slotId={`${AD_SLOT.DCC_BOTTOM || "dcc_bottom"}_auth_popup`}
+            heightPx={50}
+            unitId={ADMOB_TEST.BANNER}
+            label="안심 팝업 배너"
+            enabled={open}
+            preferredSize="BANNER"
+            className="w-full overflow-hidden rounded-xl"
+          />
+        </div>
         <button type="button" className="vlue-auth-member-popup__ok" onClick={() => onClose?.()}>
           확인
         </button>

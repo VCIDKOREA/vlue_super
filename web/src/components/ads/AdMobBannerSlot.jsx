@@ -81,11 +81,15 @@ export default function AdMobBannerSlot({
       hideSlot(bridge, slotId);
       setNativeReady(false);
     };
+    const onResume = () => {
+      sync();
+    };
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(sync) : null;
     observer?.observe(ref.current);
     window.addEventListener("scroll", sync, true);
     window.addEventListener("resize", sync);
     window.addEventListener("vlue-hide-all-ads", onHideAll);
+    window.addEventListener("vlue-resume-ads", onResume);
     document.addEventListener("visibilitychange", sync);
     sync();
     return () => {
@@ -94,6 +98,7 @@ export default function AdMobBannerSlot({
       window.removeEventListener("scroll", sync, true);
       window.removeEventListener("resize", sync);
       window.removeEventListener("vlue-hide-all-ads", onHideAll);
+      window.removeEventListener("vlue-resume-ads", onResume);
       document.removeEventListener("visibilitychange", sync);
       hideSlot(bridge, slotId);
       setNativeReady(false);

@@ -2,6 +2,8 @@ import { Globe, Phone } from "lucide-react";
 import { formatAgencyTelHref, formatWebHref } from "../../lib/showcase/showcaseContactActions.js";
 import { formatLetteringPhoneDisplay } from "../../lib/letteringPhoneMatch.js";
 import { ABNORMAL_REPORT_URL } from "../../lib/nationalAgencyDcpClient.js";
+import AdMobBannerSlot from "../ads/AdMobBannerSlot.jsx";
+import { ADMOB_TEST } from "../../lib/ads/adMobUnitIds.js";
 
 const DEFAULT_WARNING =
   "🚨 현재 번호는 비정상 발신 번호로 의심됩니다! 즉시 통화를 종료하고 공식 정보를 확인하세요!!";
@@ -124,6 +126,17 @@ export default function AgencyDcpCard({
       ) : (
         <p className="agency-dcp-card__web-empty">공식 웹사이트 미등록</p>
       )}
+      <div className="agency-dcp-card__ad" aria-label="광고">
+        <AdMobBannerSlot
+          slotId="dcp_popup_banner"
+          heightPx={50}
+          unitId={ADMOB_TEST.BANNER}
+          label="안심 팝업 배너"
+          enabled
+          preferredSize="BANNER"
+          className="w-full overflow-hidden rounded-xl"
+        />
+      </div>
       {onClose || abnormal || expired || contact ? (
         <button
           type="button"

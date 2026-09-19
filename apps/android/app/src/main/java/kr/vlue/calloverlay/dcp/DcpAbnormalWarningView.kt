@@ -14,11 +14,17 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
+import kr.vlue.calloverlay.BuildConfig
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /**
  * 정상·비정상 공통 DCP 팝업.
  * 비정상은 고정 + 확인=공식 제보 사이트. 정상은 미니케이스처럼 드래그·가장자리 피크.
+ * 본문 아래·확인 버튼 위에 AdMob Adaptive Banner (팝업 너비 맞춤).
  */
 object DcpAbnormalWarningView {
     const val TAG = "vlue_dcp_route_popup"
@@ -32,6 +38,7 @@ object DcpAbnormalWarningView {
     const val VLUE_AUTH_MEMBER_MESSAGE = VlueAuthMemberPopupPolicy.MESSAGE
 
     const val ACTION_TAG = "dcp_action"
+    private const val BANNER_HOST_TAG = "dcp_popup_ad_banner"
 
     data class Spec(
         val abnormal: Boolean,
@@ -50,12 +57,17 @@ object DcpAbnormalWarningView {
         val pathVerify: Boolean = false
     )
 
+    data class Built(
+        val view: View,
+        val destroyAds: () -> Unit
+    )
+
     fun build(
         context: Context,
         spec: Spec,
         onConfirm: () -> Unit,
         onShareShowcase: (() -> Unit)? = null
-    ): View {
+    ): Built {
         val ctx = context
         val card = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -177,6 +189,39 @@ object DcpAbnormalWarningView {
                 }
             )
         }
+
+        /* 본문 아래 · 확인 바로 위 — 팝업 가로에 맞춘 Adaptive Banner */
+        val bannerHost = FrameLayout(ctx).apply {
+            tag = BANNER_HOST_TAG
+            clipToOutline = true
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#0F172A"))
+                cornerRadius = dp(ctx, 10).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(ctx, 50)
+            ).apply { topMargin = dp(ctx, 12) }
+        }
+        val adWidthDp = (280f).coerceAtLeast(250f).roundToInt()
+        var popupAdView: AdView? = null
+        runCatching {
+            val adView = AdView(ctx).apply {
+                adUnitId = BuildConfig.ADMOB_BANNER_ID
+                setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(ctx, adWidthDp))
+            }
+            popupAdView = adView
+            bannerHost.addView(
+                adView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+            adView.loadAd(AdRequest.Builder().build())
+        }
+        card.addView(bannerHost)
+
         val confirm = TextView(ctx).apply {
             text = if (spec.expired) "닫기" else "확인"
             setTextColor(Color.WHITE)
@@ -225,7 +270,14 @@ object DcpAbnormalWarningView {
                 }
             )
         }
-        return card
+        val destroyAds = {
+            runCatching {
+                popupAdView?.destroy()
+                popupAdView = null
+                bannerHost.removeAllViews()
+            }
+        }
+        return Built(view = card, destroyAds = destroyAds)
     }
 
     /**

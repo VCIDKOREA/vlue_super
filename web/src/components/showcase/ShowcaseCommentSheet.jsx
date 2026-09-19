@@ -105,6 +105,32 @@ export default function ShowcaseCommentSheet({
     }
   })();
 
+  /* 네이티브 AdView/CTA 가 WebView 위에 그려져 댓글 입력을 가림 → 시트 동안 숨김 */
+  useEffect(() => {
+    if (!open) return undefined;
+    const bridge = typeof window !== "undefined" ? window.VlueLettering || window.Android : null;
+    try {
+      bridge?.hideBannerAd?.("dcc_bottom");
+      bridge?.hideBannerAd?.("bottom");
+      bridge?.hideBannerAd?.("ribbon");
+    } catch {
+      /* ignore */
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-admob-pause-cta", { detail: { pause: true } }));
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        window.dispatchEvent(new CustomEvent("vlue-admob-pause-cta", { detail: { pause: false } }));
+        window.dispatchEvent(new CustomEvent("vlue-resume-ads"));
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return undefined;
     let cancelled = false;
