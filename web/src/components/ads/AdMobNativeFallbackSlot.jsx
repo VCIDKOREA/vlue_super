@@ -129,28 +129,80 @@ export default function AdMobNativeFallbackSlot({ className = "" }) {
     };
   }, [hasBridge, bridge]);
 
+  const openLockRef = useRef(0);
+
   const openShowcase = () => {
-    if (status !== "loaded") return;
-    /* VLUE ShowcaseCallCarousel UI + NativeAdView MediaView/CTA 슬롯 */
-    openAdMobShowcase({
-      ...assets,
-      hasVideoContent: Boolean(assets.hasVideoContent)
-    });
+    const now = Date.now();
+    if (now - openLockRef.current < 600) return;
+    openLockRef.current = now;
+
+    const payload =
+      status === "loaded" || assets.mediaUrl || assets.headline
+        ? { ...assets, hasVideoContent: Boolean(assets.hasVideoContent) }
+        : (() => {
+            try {
+              const d = window.__vlueNativeAdStatus;
+              if (d && (d.status === "loaded" || d.status === "showcase_open")) {
+                return {
+                  headline: String(d.headline || ""),
+                  body: String(d.body || ""),
+                  advertiser: String(d.advertiser || "스폰서"),
+                  mediaUrl: String(d.mediaUrl || ""),
+                  ctaLabel: String(d.ctaLabel || "방문하기"),
+                  hasVideoContent: Boolean(d.hasVideoContent)
+                };
+              }
+            } catch {
+              /* ignore */
+            }
+            return null;
+          })();
+    if (!payload || (!payload.mediaUrl && !payload.headline)) return;
+    openAdMobShowcase(payload);
+    try {
+      bridge?.openNativeAdShowcase?.();
+    } catch {
+      /* ignore */
+    }
   };
 
   const showLoading = status === "idle" || status === "loading";
   const showFailed = status === "failed" || status === "timeout" || status === "unsupported";
   const loaded = status === "loaded";
+  const canOpen =
+    (loaded || Boolean(assets.mediaUrl || assets.headline)) &&
+    status !== "unsupported" &&
+    status !== "failed" &&
+    status !== "timeout";
 
   return (
     <button
       type="button"
-      onClick={openShowcase}
-      disabled={!loaded}
+      onPointerUp={(e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!canOpen) return;
+        openShowcase();
+      }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!canOpen) return;
+        openShowcase();
+      }}
+      disabled={!canOpen}
       className={`vlue-native-ad-clip relative shrink-0 snap-start overflow-hidden rounded-[16px] border border-slate-200/80 text-left ${
-        loaded ? "border-transparent bg-slate-900" : "bg-slate-100"
+        canOpen ? "border-transparent bg-slate-900" : "bg-slate-100"
       } ${className}`.trim()}
-      style={{ width: CLIP_W, height: CLIP_H, flex: `0 0 ${CLIP_W}px`, maxWidth: CLIP_W }}
+      style={{
+        width: CLIP_W,
+        height: CLIP_H,
+        flex: `0 0 ${CLIP_W}px`,
+        maxWidth: CLIP_W,
+        pointerEvents: "auto",
+        touchAction: "manipulation"
+      }}
       aria-label="추천 스폰서 광고"
       data-ad-unit={ADMOB_TEST.NATIVE}
       data-ad-status={status}

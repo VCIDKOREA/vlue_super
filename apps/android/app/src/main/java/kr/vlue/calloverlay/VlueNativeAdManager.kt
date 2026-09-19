@@ -109,8 +109,8 @@ class VlueNativeAdManager(
     }
 
     /**
-     * 레거시 브리지 — 웹이 PeerShowcasePreview를 연 뒤 syncNativeAdShowcaseSlots 호출.
-     * 단독 Dialog는 더 이상 쓰지 않음.
+     * 웹 PeerShowcasePreview 오픈 트리거.
+     * (레거시 클립이 openNativeAdShowcase 만 호출해도 동작하도록 JS 이벤트 발행)
      */
     fun openShowcase() {
         val ad = nativeAd
@@ -120,6 +120,21 @@ class VlueNativeAdManager(
         }
         lastStatus = "showcase_open"
         notifyWeb()
+        val detail = statusJson()
+        val script =
+            """
+            (function(){
+              try{
+                var d=$detail;
+                window.__vlueNativeAdStatus=d;
+                window.dispatchEvent(new CustomEvent('vlue-open-admob-showcase',{detail:d}));
+                window.dispatchEvent(new CustomEvent('vlue-native-ad-status',{detail:d}));
+              }catch(e){}
+            })();
+            """.trimIndent()
+        webView.post {
+            runCatching { webView.evaluateJavascript(script, null) }
+        }
     }
 
     /** 웹 쇼케이스 DOM 슬롯(미디어 카드 · 하단 CTA)에 NativeAdView 배치 */

@@ -9,12 +9,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- PeerShowcasePreview 위 MediaView·CTA 슬롯 — 기본 GONE, sync 시 VISIBLE -->
+    <!-- 쇼케이스 슬롯 전용. 기본 GONE — 홈 클립 터치를 가로채지 않음 -->
     <FrameLayout
         android:id="@+id/native_ad_overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"
+        android:clickable="false"
+        android:focusable="false"
         android:elevation="24dp"
         android:clipChildren="false"
         android:clipToPadding="false" />
