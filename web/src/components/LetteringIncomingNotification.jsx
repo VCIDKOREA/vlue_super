@@ -886,14 +886,18 @@ export default function LetteringIncomingNotification({
     Boolean(collapsedPhoneDisplay) &&
     normalizePhoneDigits(displayLabel) === normalizePhoneDigits(collapsedPhoneDisplay) &&
     Boolean(normalizePhoneDigits(collapsedPhoneDisplay));
-  /* 2줄: 상호 있으면 「이름 | 전화」 / 없으면 전화만 */
-  const collapsedSecondaryLine = !showcaseOffPreview && !hideBroadcastName
-    ? String(receptionLines?.secondary || "").trim()
-    : "";
-  const showCollapsedPhoneSubline =
-    (showcaseOffPreview && Boolean(collapsedPhoneDisplay)) ||
-    Boolean(collapsedSecondaryLine) ||
-    (!showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary);
+  const isAdMobSponsor = Boolean(c?.admobSponsor || c?.profileKind === "admob_sponsor");
+  /* 2줄: 상호 있으면 「이름 | 전화」 / 없으면 전화만 — AdMob 은 전화번호 숨김 */
+  const collapsedSecondaryLine = isAdMobSponsor
+    ? "VLUE 스폰서 쇼케이스"
+    : !showcaseOffPreview && !hideBroadcastName
+      ? String(receptionLines?.secondary || "").trim()
+      : "";
+  const showCollapsedPhoneSubline = isAdMobSponsor
+    ? Boolean(collapsedSecondaryLine)
+    : (showcaseOffPreview && Boolean(collapsedPhoneDisplay)) ||
+      Boolean(collapsedSecondaryLine) ||
+      (!showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary);
 
   const isInCallChromePreview = Boolean(previewMode && inCallChromePreview);
   const previewStatusLabel = previewMode ? "" : statusLabel;
@@ -1399,14 +1403,20 @@ export default function LetteringIncomingNotification({
           <span className="lettering-live-bar__brand">
             {isLookupPending
               ? "번호 확인 중"
-              : showcaseOffPreview
-                ? "VLUÉ 인증"
-                : previewShowcaseId
-                  ? `${previewShowcaseId} Showcase`
-                  : "VLUÉ Showcase"}
+              : isAdMobSponsor
+                ? `${previewShowcaseId || displayLabel || "스폰서"} AD Sponsor Showcase`
+                : showcaseOffPreview
+                  ? "VLUÉ 인증"
+                  : previewShowcaseId
+                    ? `${previewShowcaseId} Showcase`
+                    : "VLUÉ Showcase"}
           </span>
         </div>
-        {previewMode && showOwnerSettings ? (
+        {isAdMobSponsor ? (
+          <span className="lettering-live-bar__ad-badge shrink-0 rounded bg-black/55 px-2 py-0.5 text-[10px] font-black text-white">
+            [광고] AD
+          </span>
+        ) : previewMode && showOwnerSettings ? (
           <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />
         ) : previewStatusLabel ? (
           <span className="lettering-live-bar__status">{previewStatusLabel}</span>
@@ -1486,7 +1496,11 @@ export default function LetteringIncomingNotification({
                 </p>
                 {showCollapsedPhoneSubline ? (
                   <p className="lettering-ongoing-subline mt-0.5 min-w-0">
-                    {showcaseOffPreview ? (
+                    {isAdMobSponsor ? (
+                      <span className="text-[11px] font-semibold text-slate-400">
+                        {collapsedSecondaryLine}
+                      </span>
+                    ) : showcaseOffPreview ? (
                       <span className="lettering-ongoing-phone-em font-bold text-blue-700">
                         {collapsedPhoneDisplay}
                       </span>
@@ -1504,7 +1518,11 @@ export default function LetteringIncomingNotification({
                 ) : null}
               </>
             )}
-            {!isUnverified && !showCollapsedPhoneSubline && !phoneSameAsPrimary && receptionLines?.expandedContactLine ? (
+            {!isAdMobSponsor &&
+            !isUnverified &&
+            !showCollapsedPhoneSubline &&
+            !phoneSameAsPrimary &&
+            receptionLines?.expandedContactLine ? (
               <p className="lettering-ongoing-subtitle mt-0.5 truncate text-[11px] font-medium leading-snug text-slate-500">
                 {receptionLines.expandedContactLine}
               </p>
@@ -1681,7 +1699,7 @@ export default function LetteringIncomingNotification({
                   )}
                 </div>
                 {renderExpandedFooter()}
-                {isExpandedView ? (
+                {isExpandedView && !c?.admobSponsor && c?.profileKind !== "admob_sponsor" ? (
                   <ShowcaseDccBottomBanner
                     membershipTier={c.membershipTier || "paid"}
                     enabled={Boolean(isExpandedView)}

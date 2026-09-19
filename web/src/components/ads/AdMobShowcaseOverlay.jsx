@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import PeerShowcasePreview from "../showcase/PeerShowcasePreview.jsx";
 import { buildAdMobShowcaseCard } from "../../lib/ads/buildAdMobShowcaseCard.js";
@@ -12,8 +13,9 @@ import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseO
 import { pushAndroidBackHandler } from "../../lib/androidBackStack.js";
 
 /**
- * AdMob 쇼케이스 — 기존 PeerShowcasePreview(ShowcaseCallCarousel) UI 100% 재사용.
- * NativeAdView MediaView·CTA 만 DOM 슬롯 좌표로 네이티브가 겹침.
+ * AdMob 쇼케이스 — PeerShowcasePreview(ShowcaseCallCarousel) UI 재사용.
+ * NativeAdView MediaView·CTA 만 미디어 카드 / 하단 CTA 슬롯에 겹침.
+ * DCC 띠배너는 숨기고 CTA(설치/방문)가 그 자리를 차지한다.
  */
 export default function AdMobShowcaseOverlay({ onToast }) {
   const [open, setOpen] = useState(false);
@@ -30,6 +32,9 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     setAssets(null);
     try {
       bridge?.closeNativeAdShowcaseSlots?.();
+      bridge?.hideBannerAd?.("dcc_bottom");
+      bridge?.hideBannerAd?.("bottom");
+      bridge?.hideBannerAd?.("ribbon");
     } catch {
       /* ignore */
     }
@@ -40,6 +45,14 @@ export default function AdMobShowcaseOverlay({ onToast }) {
       const detail = ev?.detail && typeof ev.detail === "object" ? ev.detail : {};
       setAssets(detail);
       setOpen(true);
+      try {
+        /* 네이티브 광고 쇼케이스 — 띠배너 슬롯 전부 숨김 */
+        bridge?.hideBannerAd?.("dcc_bottom");
+        bridge?.hideBannerAd?.("bottom");
+        bridge?.hideBannerAd?.("ribbon");
+      } catch {
+        /* ignore */
+      }
     };
     const onClose = () => close();
     window.addEventListener(VLUE_OPEN_ADMOB_SHOWCASE, onOpen);
@@ -50,7 +63,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
       window.removeEventListener(VLUE_CLOSE_ADMOB_SHOWCASE, onClose);
       window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onClose);
     };
-  }, [close]);
+  }, [close, bridge]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -92,15 +105,18 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     if (!open || !bridge?.syncNativeAdShowcaseSlots) return;
     const root = rootRef.current;
     if (!root) return;
+    /* 미디어 카드만 — 래퍼/헤더/닫기/소셜 레일을 덮으면 안 됨 */
     const mediaEl =
-      root.querySelector(".showcase-call-carousel__banner") ||
+      root.querySelector(".showcase-call-carousel__banner .showcase-media-page__frame") ||
       root.querySelector(".showcase-media-page__frame") ||
-      root.querySelector("[data-admob-media-slot]");
+      root.querySelector(".showcase-call-carousel__banner");
     const ctaEl = root.querySelector("[data-admob-cta-slot]");
     if (!mediaEl || !ctaEl) return;
 
     const media = mediaEl.getBoundingClientRect();
     const cta = ctaEl.getBoundingClientRect();
+    if (media.width < 40 || media.height < 40 || cta.width < 40) return;
+
     const payload = {
       visible: true,
       viewportWidth: window.innerWidth,
@@ -131,9 +147,10 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     if (!open) return undefined;
     const run = () => {
       window.clearTimeout(syncTimer.current);
-      syncTimer.current = window.setTimeout(syncNativeSlots, 48);
+      syncTimer.current = window.setTimeout(syncNativeSlots, 64);
     };
     run();
+    const retries = [120, 280, 500, 900].map((ms) => window.setTimeout(run, ms));
     const ro =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(run) : null;
     if (rootRef.current && ro) ro.observe(rootRef.current);
@@ -141,13 +158,13 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     window.addEventListener("scroll", run, true);
     return () => {
       window.clearTimeout(syncTimer.current);
+      retries.forEach((id) => window.clearTimeout(id));
       ro?.disconnect();
       window.removeEventListener("resize", run);
       window.removeEventListener("scroll", run, true);
     };
   }, [open, card, syncNativeSlots]);
 
-  /* 동영상: 웹 BGM 칩 클릭 → AdMob MediaView mute */
   useEffect(() => {
     if (!open || !hasVideo) return undefined;
     const onClick = (e) => {
@@ -189,13 +206,40 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     >
       <div
         ref={rootRef}
-        className="flex h-full min-h-0 flex-1 flex-col"
+        className="relative flex h-full min-h-0 flex-1 flex-col"
         data-admob-showcase="1"
         data-admob-has-video={hasVideo ? "1" : "0"}
       >
-        <div className="relative min-h-0 flex-1" data-admob-media-slot>
-          {/* 동영상일 때 웹 이미지는 MediaView 아래로 숨김 */}
-          <style>{hasVideo ? `[data-admob-showcase] .showcase-media-page__img{opacity:0!important}` : ""}</style>
+        {/* 네이티브 MediaView 위에 떠 있는 닫기 — 슬롯 밖이라 터치 가능 */}
+        <button
+          type="button"
+          className="absolute right-3 z-[400] flex h-10 items-center gap-1 rounded-full bg-black/60 px-3 text-[12px] font-black text-white shadow-lg backdrop-blur-sm active:scale-95"
+          style={{ top: "max(10px, var(--vlue-safe-top, 10px))", pointerEvents: "auto" }}
+          aria-label="닫기"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            close();
+          }}
+          onPointerUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            close();
+          }}
+        >
+          <X size={16} strokeWidth={2.6} aria-hidden />
+          닫기
+        </button>
+
+        <div className="relative min-h-0 flex-1">
+          <style>
+            {hasVideo
+              ? `[data-admob-showcase] .showcase-media-page__img{opacity:0!important}`
+              : ""}
+            {`[data-admob-showcase] .showcase-dcc-bottom-banner{display:none!important}`}
+            {`[data-admob-showcase] .showcase-social-rail{z-index:50;pointer-events:auto}`}
+            {`[data-admob-showcase] .showcase-call-carousel__slide-settings{z-index:50;pointer-events:auto}`}
+          </style>
           <PeerShowcasePreview
             card={card}
             onClose={close}
@@ -205,7 +249,12 @@ export default function AdMobShowcaseOverlay({ onToast }) {
             preferContentSlide
           />
         </div>
-        <div className="shrink-0 border-t border-white/10 bg-[#0B101B] px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2">
+
+        {/* 띠배너 자리 → CTA(설치/방문). NativeAdView callToActionView 가 이 슬롯에 겹침 */}
+        <div
+          className="shrink-0 border-t border-white/10 bg-[#0B101B] px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2"
+          data-admob-cta-bar
+        >
           <button
             type="button"
             data-admob-cta-slot
@@ -222,4 +271,3 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     document.body
   );
 }
-

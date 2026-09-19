@@ -81,8 +81,11 @@ export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
   return {
     name: advertiser,
     displayName: advertiser,
+    organization: advertiser,
+    companyName: advertiser,
     photoUrl: iconUrl || mediaUrl || "",
     avatarUrl: iconUrl || "",
+    phone: "",
     membershipTier: "premium",
     showcaseStyle: style,
     userId: localId || "",

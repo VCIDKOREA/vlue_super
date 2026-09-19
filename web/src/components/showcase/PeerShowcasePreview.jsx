@@ -54,7 +54,11 @@ export default function PeerShowcasePreview({
           isRecording={false}
           callDurationSec={0}
           recordingDurationSec={0}
-          incomingNumber={previewCard.phone || ""}
+          incomingNumber={
+            previewCard?.admobSponsor || previewCard?.profileKind === "admob_sponsor"
+              ? ""
+              : previewCard.phone || ""
+          }
           savedContactName={previewCard.name || previewCard.displayName || ""}
           isKnownContact
           card={previewCard}
