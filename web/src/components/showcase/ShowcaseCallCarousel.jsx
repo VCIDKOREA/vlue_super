@@ -100,6 +100,8 @@ export default function ShowcaseCallCarousel({
   onPeerClose,
   /** 커버 우측 상단 — 설정 옆 전화 아이콘 */
   onCallIconClick,
+  /** 통화목록 다시보기 — 타이틀 프로필 우측 전화 버튼 */
+  showHistoryDial = false,
   /** @param {"card"|"banner"|"empty-slot"|"paid-identity"|"free-profile"|"free-safe"|string} type */
   onSlideTypeChange,
   /** 쇼케이스 스타일 — Instagram 인증·선택 사진 */
@@ -779,12 +781,12 @@ export default function ShowcaseCallCarousel({
       </button>
     ) : null;
     const callBtn =
-      showOwnerSettings && typeof onCallIconClick === "function" ? (
+      typeof onCallIconClick === "function" && (showOwnerSettings || showHistoryDial) ? (
         <button
           type="button"
           className="showcase-call-carousel__slide-call"
-          aria-label="통화시 전화화면 안내"
-          title="통화시 전화화면으로 이동합니다"
+          aria-label={showHistoryDial ? "전화걸기" : "통화시 전화화면 안내"}
+          title={showHistoryDial ? "전화걸기" : "통화시 전화화면으로 이동합니다"}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

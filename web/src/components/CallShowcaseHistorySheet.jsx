@@ -59,6 +59,14 @@ import {
   matchNationalAgency
 } from "../lib/nationalAgencyDcpClient.js";
 import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
+import {
+  CALL_HISTORY_ROUTE,
+  decideCallHistoryRoute,
+  decideCallHistoryRouteFromPayload,
+  mayApplyRoute,
+  resolveHistoryRowMemberState
+} from "../lib/call/callHistoryRoute.js";
+import { formatAgencyTelHref } from "../lib/showcase/showcaseContactActions.js";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
 import "./friend-showcase-list.css";
@@ -285,37 +293,93 @@ function CallHistoryAvatar({ call, cacheTick = 0, onBrokenUrl }) {
 function HistoryRowCta({ call, matrix, busy, onAction }) {
   if (!matrix?.showCallLogAction) return null;
   const variant = matrix.variant === "case" ? "case" : matrix.variant === "share" ? "share" : "";
+  const short =
+    variant === "case" ? "케이스함" : variant === "share" ? "전달" : matrix.label || "";
   return (
     <button
       type="button"
-      className={`call-history-row__cta${variant ? ` call-history-row__cta--${variant}` : ""}`}
+      className={`call-history-row__cta call-history-row__cta--inline${variant ? ` call-history-row__cta--${variant}` : ""}`}
       disabled={busy}
       onClick={(e) => {
         e.stopPropagation();
         onAction(call, matrix);
       }}
     >
-      {busy ? "…" : matrix.label}
+      {busy ? "…" : short}
     </button>
   );
 }
 
-function HistorySafeCareSave({ call, busy, onSave }) {
-  if (!needsSafeCareSave(call)) return null;
-  const phone = String(call?.phoneDisplay || call?.phone || "").trim();
-  if (!phone || phone === "—") return null;
+function openSystemDialer(phone) {
+  const href = formatAgencyTelHref(phone);
+  if (!href) return false;
+  try {
+    window.location.href = href;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 좌: 카톡/SMS 전달 / 우: 기본 전화앱 */
+function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, children }) {
+  const startRef = useRef(null);
+  const [offsetX, setOffsetX] = useState(0);
+
+  const endSwipe = (e) => {
+    const s = startRef.current;
+    startRef.current = null;
+    if (!s || (e.pointerId != null && s.id !== e.pointerId)) {
+      setOffsetX(0);
+      return;
+    }
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    setOffsetX(0);
+    if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+      if (dx > 0) {
+        openSystemDialer(call.phoneDisplay || call.phone);
+      } else {
+        onShare?.(call, matrix);
+      }
+      return;
+    }
+    if (!s.moved) onOpen?.(call);
+  };
+
   return (
-    <button
-      type="button"
-      className="call-history-row__safe"
-      disabled={busy}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSave(call);
+    <div
+      className="call-history-row call-history-row--samsung"
+      style={offsetX ? { transform: `translateX(${Math.max(-56, Math.min(56, offsetX))}px)` } : undefined}
+      onPointerDown={(e) => {
+        if (e.button != null && e.button !== 0) return;
+        if (e.target?.closest?.("button")) return;
+        startRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false };
+        try {
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      }}
+      onPointerMove={(e) => {
+        const s = startRef.current;
+        if (!s || s.id !== e.pointerId) return;
+        const dx = e.clientX - s.x;
+        const dy = e.clientY - s.y;
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) s.moved = true;
+        if (Math.abs(dx) > Math.abs(dy)) setOffsetX(dx);
+      }}
+      onPointerUp={endSwipe}
+      onPointerCancel={() => {
+        startRef.current = null;
+        setOffsetX(0);
       }}
     >
-      {busy ? "…" : "안심 저장"}
-    </button>
+      {children}
+      <div className="call-history-row__trailing">
+        <HistoryRowCta call={call} matrix={matrix} busy={busy} onAction={onAction} />
+      </div>
+    </div>
   );
 }
 
@@ -354,6 +418,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   });
   const [peerAvatarTick, setPeerAvatarTick] = useState(0);
   const openGenRef = useRef(0);
+  const routeLockRef = useRef(CALL_HISTORY_ROUTE.PENDING);
   const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
 
   useEffect(() => {
@@ -610,12 +675,22 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const next = {};
     for (const call of items) {
       const phone = call.phoneDisplay || call.phone;
-      const isVlueMember =
-        call.verified === true || Boolean(call.memberName) || Boolean(call.userId);
+      const memberState = resolveHistoryRowMemberState(call);
+      if (memberState === "unknown") {
+        next[call.id] = {
+          phone,
+          cta: CALL_PEER_CTA.NONE,
+          label: "",
+          variant: "",
+          showCallLogAction: false,
+          showInCallKakao: false
+        };
+        continue;
+      }
       next[call.id] = resolveCallPeerMatrixSync({
         phone,
-        isVlueMember,
-        verified: isVlueMember
+        isVlueMember: memberState === "member",
+        verified: memberState === "member"
       });
     }
     setRowMatrix(next);
@@ -653,28 +728,46 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const applyPeerPayload = useCallback(
     (payload, call, gen) => {
       if (gen !== openGenRef.current || !payload?.card) return;
+      const next = decideCallHistoryRouteFromPayload(call, payload);
+      if (!mayApplyRoute(routeLockRef.current, next.kind)) return;
+      routeLockRef.current = next.kind;
+
+      if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
+        openContactSafeForCall(call, resolveIsKnownContactSync(call?.phoneDisplay || call?.phone));
+        return;
+      }
+      if (next.kind === CALL_HISTORY_ROUTE.AUTH) {
+        openAuthPopupForPeer(call, next.card || payload.card);
+        return;
+      }
+      if (next.kind === CALL_HISTORY_ROUTE.AGENCY && next.agency) {
+        const dcpCard = applyShowcaseStyleToCard(
+          {
+            ...buildNationalAgencyDcpCard(next.agency),
+            showcaseStyle: silentShowcaseStyle()
+          },
+          "paid",
+          { peerMode: true, style: silentShowcaseStyle() }
+        );
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+        setContactSafePopup({ open: false, name: "", phone: "" });
+        setSelected({
+          ...call,
+          name: next.agency.agencyName,
+          verified: true,
+          membershipTier: "paid"
+        });
+        setExpanded(true);
+        setPreviewVerified(true);
+        setPreviewCard(dcpCard);
+        setLoading(false);
+        return;
+      }
+
       const tier = payload.card.membershipTier || call.membershipTier || "free";
       const verified = Boolean(payload.verified);
-      const hasContent = peerHasDccOrShowcaseContent(
-        payload.card,
-        payload.showcaseStyle || payload.card.showcaseStyle
-      );
-      const phone = call?.phoneDisplay || call?.phone || payload.phone || "";
-      const knownSync = resolveIsKnownContactSync(phone);
-      const isSavedContact = Boolean(knownSync.isKnownContact || call?.contactName);
-
-      /* 저장 연락처 · 비회원 → 미인증 쇼케이스 대신 안심 팝업 */
-      if (!verified && isSavedContact && !isNationalAgencyDcpCard(payload.card)) {
-        openContactSafeForCall(call, knownSync);
-        return;
-      }
-
-      /* 인증 회원인데 DCC·쇼케이스 없음 → 빈 풀스크린 대신 VLUÉ 인증 팝업 */
-      if (verified && !hasContent && !isNationalAgencyDcpCard(payload.card)) {
-        openAuthPopupForPeer(call, payload.card);
-        return;
-      }
-
+      setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+      setContactSafePopup({ open: false, name: "", phone: "" });
       setPreviewVerified(verified);
       setPreviewCard(payload.card);
       setLoading(false);
@@ -690,6 +783,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               }
             : prev
         );
+      } else {
+        setSelected((prev) => prev || call);
       }
     },
     [openAuthPopupForPeer, openContactSafeForCall]
@@ -790,7 +885,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const gen = ++openGenRef.current;
     const phone = call.phoneDisplay || call.phone;
 
-    /* 제스처 unlock만 — 통화 열 때 BGM을 끊지 않음 (쇼케이스/케이스함이 이어서 재생) */
     try {
       unlockAudioGesture?.();
     } catch {
@@ -798,190 +892,82 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     const cachedPeer = readCallHistoryPeerCache(phone);
-    const knownSync = resolveIsKnownContactSync(phone);
-    const isSavedContact = Boolean(knownSync.isKnownContact || call.contactName);
-    const listLooksLikeMember =
-      call.verified === true ||
-      call.peerIsVlueMember === true ||
-      Boolean(call.userId) ||
-      Boolean(cachedPeer?.verified);
+    const decision = decideCallHistoryRoute(call, cachedPeer);
+    routeLockRef.current = decision.kind;
 
-    /* 저장 연락처 · VLUE 비회원 → 안심 팝업 (미인증 쇼케이스 금지) */
-    if (isSavedContact && !listLooksLikeMember) {
-      openContactSafeForCall(call, knownSync);
-      return;
-    }
-
-    /* 캐시된 인증 회원 + 송출 없음 — 라이브 확인 전 옛 쇼케이스/낙관 페인트 금지 */
-    if (
-      cachedPeer?.verified &&
-      cachedPeer?.card &&
-      !peerHasDccOrShowcaseContent(
-        cachedPeer.card,
-        cachedPeer.showcaseStyle || cachedPeer.card.showcaseStyle
-      )
-    ) {
-      if (cachePayloadIsUsable(cachedPeer)) {
-        flushSync(() => {
-          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-          setContactSafePopup({ open: false, name: "", phone: "" });
-          setSelected(call);
-          setExpanded(true);
-          setPreviewVerified(true);
-          setPreviewCard(cachedPeer.card);
-          setLoading(false);
-        });
+    const paintShowcase = (card, verified, { backgroundHydrate = true } = {}) => {
+      flushSync(() => {
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+        setContactSafePopup({ open: false, name: "", phone: "" });
+        setSelected(call);
+        setExpanded(true);
+        setPreviewVerified(Boolean(verified));
+        setPreviewCard(card);
+        setLoading(false);
+      });
+      if (backgroundHydrate) {
         void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
-        return;
       }
+    };
+
+    const paintPending = () => {
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setContactSafePopup({ open: false, name: "", phone: "" });
         setSelected(call);
         setExpanded(true);
         setPreviewCard(null);
-        setPreviewVerified(true);
+        setPreviewVerified(false);
         setLoading(true);
       });
       void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
+    };
+
+    if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
+      openContactSafeForCall(call, resolveIsKnownContactSync(phone));
       return;
     }
 
-    const agency = matchNationalAgency(phone);
+    if (decision.kind === CALL_HISTORY_ROUTE.AUTH) {
+      openAuthPopupForPeer(call, decision.card || cachedPeer?.card || null);
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
+      return;
+    }
 
-    if (agency) {
+    if (decision.kind === CALL_HISTORY_ROUTE.AGENCY && decision.agency) {
       const dcpCard = applyShowcaseStyleToCard(
         {
-          ...buildNationalAgencyDcpCard(agency),
+          ...buildNationalAgencyDcpCard(decision.agency),
           showcaseStyle: silentShowcaseStyle()
         },
         "paid",
         { peerMode: true, style: silentShowcaseStyle() }
       );
-      flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setSelected({
-          ...call,
-          name: agency.agencyName,
-          verified: true,
-          membershipTier: "paid"
-        });
-        setExpanded(true);
-        setPreviewVerified(true);
-        setPreviewCard(dcpCard);
-        setLoading(false);
-      });
-      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+      paintShowcase(dcpCard, true, { backgroundHydrate: true });
       return;
     }
 
-    /* VLUÉ 회원 — 로컬에 송출 없으면 스피너만 → 라이브 확인 후 쇼케이스/안심 (옛 무료 쇼케이스 금지) */
-    if (
-      listLooksLikeMember &&
-      !peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot)
-    ) {
-      const cachedPack = readCallHistoryPeerCache(phone);
-      if (cachedPack?.card && cachePayloadIsUsable(cachedPack)) {
-        flushSync(() => {
-          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-          setContactSafePopup({ open: false, name: "", phone: "" });
-          setSelected(call);
-          setExpanded(true);
-          setPreviewVerified(true);
-          setPreviewCard(cachedPack.card);
-          setLoading(false);
-        });
-        void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
+    if (decision.kind === CALL_HISTORY_ROUTE.SHOWCASE && decision.card) {
+      paintShowcase(decision.card, true, { backgroundHydrate: true });
+      return;
+    }
+
+    if (decision.kind === CALL_HISTORY_ROUTE.UNVERIFIED) {
+      if (decision.card || cachedPeer?.card) {
+        paintShowcase(decision.card || cachedPeer.card, false, { backgroundHydrate: true });
         return;
       }
-      flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
-        setSelected(call);
-        setExpanded(true);
-        setPreviewCard(null);
-        setPreviewVerified(true);
-        setLoading(true);
-      });
-      void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
+      paintPending();
       return;
     }
 
-    const cached = readCallHistoryPeerCache(phone);
-    if (cached?.card && cachePayloadIsUsable(cached)) {
-      flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setSelected(call);
-        setExpanded(true);
-        setPreviewVerified(Boolean(cached.verified));
-        setPreviewCard(cached.card);
-        setLoading(false);
-      });
-      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
-      return;
-    }
-
-    if (
-      cached?.verified &&
-      cached?.card &&
-      !peerHasDccOrShowcaseContent(cached.card, cached.showcaseStyle)
-    ) {
-      flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
-        setSelected(call);
-        setExpanded(true);
-        setPreviewCard(null);
-        setPreviewVerified(true);
-        setLoading(true);
-      });
-      void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
-      return;
-    }
-
-    /* 완전한 로컬 스냅샷만 즉시 표시 — 불완전 DCC 깜빡임 방지 */
-    if (snapshotIsCompleteEnough(call)) {
-      const optimistic = buildOptimisticHistoryCard(call);
-      flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setSelected(call);
-        setExpanded(true);
-        setPreviewVerified(true);
-        setPreviewCard(optimistic.card);
-        setLoading(false);
-      });
-      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
-      return;
-    }
-
-    /* 콜드 오픈도 목록 메타로 즉시 페인트 — 스피너 대기 제거 */
-    if (canPaintOptimisticCard(call)) {
-      const optimistic = buildOptimisticHistoryCard(call);
-      flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setSelected(call);
-        setExpanded(true);
-        setPreviewVerified(Boolean(call.verified));
-        setPreviewCard(optimistic.card);
-        setLoading(false);
-      });
-      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
-      return;
-    }
-
-    flushSync(() => {
-      setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-      setSelected(call);
-      setExpanded(true);
-      setPreviewCard(null);
-      setPreviewVerified(false);
-      setLoading(true);
-    });
-    void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: false });
+    /* PENDING — 스피너만. 안심↔쇼케이스 추측 페인트 금지 */
+    paintPending();
   };
 
   const closeDetail = () => {
     openGenRef.current += 1;
+    routeLockRef.current = CALL_HISTORY_ROUTE.PENDING;
     try {
       setPlaybackPhase?.("idle", { fade: true, steal: true, owner: "call-history" });
     } catch {
@@ -1066,32 +1052,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                   }
                   expanded={expanded}
                   onExpandedChange={setExpanded}
-                  onSaveCard={async ({ card, incomingNumber }) => {
-                    const matrix = resolveCallPeerMatrixSync({
-                      phone: incomingNumber || phone,
-                      isVlueMember: isMember,
-                      knownContact: selectedKnown
-                    });
-                    if (
-                      matrix.cta === CALL_PEER_CTA.SHARE_SHOWCASE ||
-                      matrix.cta === CALL_PEER_CTA.KAKAO_SHARE
-                    ) {
-                      setSharePick({
-                        call: selected,
-                        matrix
-                      });
-                      return;
-                    }
-                    await runCallPeerMatrixAction({
-                      matrix,
-                      card,
-                      call: selected,
-                      phone: incomingNumber || phone,
-                      onToast: showToast,
-                      onBeforeNavigate: () => onClose?.()
-                    });
-                    refresh();
-                  }}
                   onToast={showToast}
                 />
               </div>
@@ -1163,53 +1123,57 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       ) : items.length === 0 ? (
         <p className="px-4 py-16 text-center text-[13px] font-semibold text-slate-500">{emptyHint}</p>
       ) : (
-        <ul className="friend-showcase-list__rows m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
+        <ul className="call-history-samsung-list m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
           {items.map((call) => {
             const matrix = rowMatrix[call.id];
-            const member = Boolean(call.memberName || call.verified);
+            const member = resolveHistoryRowMemberState(call) === "member";
             return (
-              <li key={call.id}>
-                <div className="friend-showcase-list__row call-history-row">
-                  <button type="button" className="call-history-row__main" onClick={() => openCall(call)}>
+              <li key={call.id} className="call-history-samsung-list__item">
+                <CallHistorySwipeRow
+                  call={call}
+                  matrix={matrix}
+                  busy={busyId === call.id}
+                  onOpen={openCall}
+                  onShare={(c, m) => {
+                    setSharePick({
+                      call: c,
+                      matrix:
+                        m?.showCallLogAction
+                          ? m
+                          : resolveCallPeerMatrixSync({
+                              phone: c.phoneDisplay || c.phone,
+                              isVlueMember: false,
+                              verified: false
+                            })
+                    });
+                  }}
+                  onAction={runRowAction}
+                >
+                  <div className="call-history-row__main call-history-row__main--samsung">
                     <CallHistoryAvatar
                       call={call}
                       cacheTick={peerAvatarTick}
                       onBrokenUrl={clearBrokenAvatarUrl}
                     />
-                    <div className="friend-showcase-list__meta">
-                      <p className="friend-showcase-list__name">
+                    <div className="friend-showcase-list__meta call-history-row__meta">
+                      <p className="friend-showcase-list__name call-history-row__name">
                         {formatCallGroupLabel(call)}
                         {member && isPaidLetteringTier(call.membershipTier) ? (
                           <ShieldCheck
-                            size={15}
+                            size={14}
                             strokeWidth={2.4}
-                            className="ml-1 inline-block align-[-2px] text-blue-600"
+                            className="ml-1 inline-block align-[-2px] text-blue-500"
                             aria-label="유료 · VLUÉ 보안 인증"
                           />
                         ) : null}
                       </p>
-                      <p className="friend-showcase-list__subtitle">
+                      <p className="friend-showcase-list__subtitle call-history-row__sub">
                         {formatCallDuration(call.durationSec)}
                       </p>
                     </div>
-                    <span className="shrink-0 text-[11px] font-bold text-slate-400">
-                      {formatCallWhen(call.endedAt)}
-                    </span>
-                  </button>
-                  <div className="call-history-row__actions">
-                    <HistorySafeCareSave
-                      call={call}
-                      busy={busyId === `safe:${call.id}`}
-                      onSave={saveSafeCare}
-                    />
-                    <HistoryRowCta
-                      call={call}
-                      matrix={matrix}
-                      busy={busyId === call.id}
-                      onAction={runRowAction}
-                    />
+                    <span className="call-history-row__when">{formatCallWhen(call.endedAt)}</span>
                   </div>
-                </div>
+                </CallHistorySwipeRow>
               </li>
             );
           })}

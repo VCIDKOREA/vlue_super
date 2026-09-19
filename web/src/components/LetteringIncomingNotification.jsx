@@ -1056,17 +1056,17 @@ export default function LetteringIncomingNotification({
     setReceptionFace(nextFace);
   };
 
-  /** 통화 중: 종료 / 다시보기·미리보기: 전화걸기 */
+  /** 통화 중: 종료 / 다시보기 전화는 타이틀 우측 아이콘 */
   const showLiveEndCall = onCall && !previewMode;
-  const showReplayDial = Boolean(fromCallHistory);
+  const showReplayDial = false;
   /** 홈 빅푸시 — 하단 통화화면 미리보기 제거 (우측 통화 아이콘 → 접힘+토스트) */
   const showChromePreviewControls = false;
   const showCallEndBar =
     showLiveEndCall ||
     showReplayDial ||
     Boolean(onEndCall && onCall && !previewMode);
-  /** 통화목록 다시보기에서만 저장 CTA — 홈 미리보기·실통화 풀케이스에는 미노출 */
-  const showCallLogSaveCta = Boolean(fromCallHistory && peerMatrix.showCallLogAction);
+  /** 통화목록 다시보기 — 저장 CTA 제거 (쇼케이스 저장하기 삭제) */
+  const showCallLogSaveCta = false;
   /** Companion MVP: 하단「전화 화면 보기」CTA 제거 — 상단 통화 아이콘만으로 미니케이스 전환 */
   const showLegacyInCallControls = Boolean(
     !COMPANION_MVP_DELEGATE_CALL_UI && showChromePreviewControls
@@ -1155,6 +1155,8 @@ export default function LetteringIncomingNotification({
   const renderExpandedFooter = () => {
     /* 홈·설정 쇼케이스 미리보기 — 통화화면 미리보기일 때만 하단 제어바 */
     if (previewMode && !fromCallHistory && !showChromePreviewControls) return null;
+    /* 통화목록 다시보기 — 저장/하단전화 제거 (타이틀 우측 전화만) */
+    if (fromCallHistory) return null;
 
     return (
     <div
@@ -1213,19 +1215,7 @@ export default function LetteringIncomingNotification({
                 onKeypadOpenChange={setKeypadOpen}
               />
             </div>
-          ) : fromCallHistory ? (
-            <div className="lettering-ongoing-actions-secondary__row lettering-ongoing-actions-secondary__row--dial">
-              <button
-                type="button"
-                onClick={handleDialPeer}
-                className="lettering-action lettering-action--dial-call-bar"
-                aria-label="전화걸기"
-              >
-                <Phone size={20} strokeWidth={2.2} aria-hidden />
-                <span>전화걸기</span>
-              </button>
-            </div>
-          ) : (
+          ) : fromCallHistory ? null : (
             renderCircleAction()
           )}
         </>
@@ -1614,8 +1604,13 @@ export default function LetteringIncomingNotification({
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
                       onCallIconClick={
-                        previewMode && showOwnerSettings ? notifyCallScreenOnCall : undefined
+                        fromCallHistory
+                          ? handleDialPeer
+                          : previewMode && showOwnerSettings
+                            ? notifyCallScreenOnCall
+                            : undefined
                       }
+                      showHistoryDial={Boolean(fromCallHistory)}
                       showPeerClose={Boolean(previewMode && showPeerClose)}
                       onPeerClose={onPeerClose}
                       onSlideTypeChange={setCarouselSlideType}
@@ -1684,8 +1679,13 @@ export default function LetteringIncomingNotification({
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
                       onCallIconClick={
-                        previewMode && showOwnerSettings ? notifyCallScreenOnCall : undefined
+                        fromCallHistory
+                          ? handleDialPeer
+                          : previewMode && showOwnerSettings
+                            ? notifyCallScreenOnCall
+                            : undefined
                       }
+                      showHistoryDial={Boolean(fromCallHistory)}
                       showPeerClose={Boolean(previewMode && showPeerClose)}
                       onPeerClose={onPeerClose}
                       onSlideTypeChange={setCarouselSlideType}

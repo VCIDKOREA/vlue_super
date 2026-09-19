@@ -540,60 +540,123 @@
 
 .call-history-row {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  touch-action: pan-y;
+  transition: transform 0.12s ease-out;
+}
+
+.call-history-row--samsung {
+  min-height: 52px;
+  padding: 0 10px 0 0;
+}
+
+.call-history-samsung-list {
+  background: transparent;
+}
+
+.call-history-samsung-list__item + .call-history-samsung-list__item {
+  /* 간격 밀착 */
 }
 
 .call-history-row__main {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 16px 8px;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  padding: 8px 8px 8px 14px;
   border: 0;
   background: transparent;
   text-align: left;
   color: inherit;
 }
 
-.call-history-row__cta {
-  align-self: stretch;
+.call-history-row__main--samsung {
+  pointer-events: none;
+}
+
+.call-history-row__meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.call-history-row__name {
   margin: 0;
-  min-height: 40px;
-  flex: 1;
-  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.call-history-row__sub {
+  margin: 1px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.call-history-row__when {
+  flex-shrink: 0;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.call-history-row__trailing {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+}
+
+.call-history-row__cta {
+  align-self: center;
+  margin: 0;
+  min-height: 28px;
+  flex: 0 0 auto;
+  border-radius: 999px;
   border: 1px solid rgba(59, 130, 246, 0.35);
   background: rgba(37, 99, 235, 0.12);
   color: #93c5fd;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: -0.02em;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.call-history-row__cta--inline {
+  max-width: 76px;
 }
 
 .call-history-row__cta--case {
-  border-color: rgba(99, 102, 241, 0.55);
-  background: linear-gradient(180deg, rgba(79, 70, 229, 0.92) 0%, rgba(67, 56, 202, 0.95) 100%);
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(79, 70, 229, 0.88);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(67, 56, 202, 0.28);
+  box-shadow: none;
 }
 
 .call-history-row__cta--share {
-  border-color: rgba(250, 204, 21, 0.55);
-  background: linear-gradient(180deg, #fee500 0%, #f5d800 100%);
+  border-color: rgba(250, 204, 21, 0.4);
+  background: #fee500;
   color: #191919;
-  box-shadow: 0 4px 14px rgba(250, 204, 21, 0.22);
+  box-shadow: none;
 }
 
 .call-history-row__cta:disabled {
   opacity: 0.7;
 }
 
-.call-history-row__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 16px 12px;
+.call-history-row--samsung .friend-showcase-list__avatar,
+.call-history-row--samsung .friend-showcase-list__avatar--initial {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
 }
 
 /* 쇼케이스 전달 — 채널 선택 */
