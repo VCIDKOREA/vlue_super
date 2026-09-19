@@ -11,8 +11,7 @@ import { isPaidLetteringTier } from "../../lib/letteringMembership.js";
 const BANNER_H = 50;
 
 /**
- * DCC+ 쇼케이스 하단 띠배너.
- * 앞면/뒷면·인증바 아래 전용 영역 — 라벨로 확인 가능하게 구분.
+ * DCC+ 쇼케이스 하단 띠배너 — 라벨 없이 배너 영역만 최대 활용.
  */
 export default function ShowcaseDccBottomBanner({
   membershipTier = "free",
@@ -32,7 +31,6 @@ export default function ShowcaseDccBottomBanner({
     };
   }, []);
 
-  /* 마운트 시 홈 네이티브/하단 배너 숨김 — DCC 침범 방지 */
   useEffect(() => {
     if (!enabled) return undefined;
     try {
@@ -49,27 +47,19 @@ export default function ShowcaseDccBottomBanner({
   if (!enabled) return null;
 
   const shellCls =
-    `showcase-dcc-bottom-banner relative z-[3] shrink-0 w-full border-t border-white/15 bg-[#0b1220] ${className}`.trim();
+    `showcase-dcc-bottom-banner relative z-[3] shrink-0 w-full bg-[#0b1220] ${className}`.trim();
   const shellStyle = {
-    paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))"
+    paddingBottom: "env(safe-area-inset-bottom, 0px)"
   };
-
-  const label = (
-    <div className="flex items-center justify-between gap-2 px-3 pt-1.5 pb-0.5">
-      <span className="text-[10px] font-black tracking-tight text-slate-400">하단 띠배너</span>
-      <span className="vlue-ad-test-badge">Test Ad</span>
-    </div>
-  );
 
   if (isPaid && hasCustomRibbonBanner(custom)) {
     const href = String(custom.linkUrl || "").trim();
     const img = (
-      <img src={custom.imageUrl} alt="등록 배너" className="h-full w-full object-cover" draggable={false} />
+      <img src={custom.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
     );
     return (
-      <div className={shellCls} style={shellStyle} data-vlue-dcc-banner="custom">
-        {label}
-        <div className="mx-auto w-full overflow-hidden rounded-sm" style={{ height: BANNER_H, minHeight: BANNER_H }}>
+      <div className={shellCls} style={shellStyle} data-vlue-dcc-banner="custom" aria-label="하단 배너">
+        <div className="mx-auto w-full overflow-hidden" style={{ height: BANNER_H, minHeight: BANNER_H }}>
           {href ? (
             <a href={href} target="_blank" rel="noopener noreferrer" className="block h-full w-full">
               {img}
@@ -83,13 +73,12 @@ export default function ShowcaseDccBottomBanner({
   }
 
   return (
-    <div className={shellCls} style={shellStyle} data-vlue-dcc-banner="ad">
-      {label}
+    <div className={shellCls} style={shellStyle} data-vlue-dcc-banner="ad" aria-label="하단 배너">
       <AdMobBannerSlot
         slotId={AD_SLOT.DCC_BOTTOM || "dcc_bottom"}
         heightPx={BANNER_H}
         unitId={ADMOB_TEST.BANNER}
-        label="쇼케이스 하단 띠배너"
+        label="하단 배너"
         enabled={enabled}
         preferredSize="BANNER"
         className="w-full"
