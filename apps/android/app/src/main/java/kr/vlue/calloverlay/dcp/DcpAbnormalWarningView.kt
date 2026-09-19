@@ -270,12 +270,13 @@ object DcpAbnormalWarningView {
                 }
             )
         }
-        val destroyAds = {
+        val destroyAds: () -> Unit = {
             runCatching {
                 popupAdView?.destroy()
                 popupAdView = null
                 bannerHost.removeAllViews()
             }
+            Unit
         }
         return Built(view = card, destroyAds = destroyAds)
     }
