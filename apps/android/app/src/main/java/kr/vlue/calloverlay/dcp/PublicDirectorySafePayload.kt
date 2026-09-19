@@ -6,5 +6,6 @@ package kr.vlue.calloverlay.dcp
  */
 object PublicDirectorySafePayload {
     const val PROFILE_KIND = "public_directory_safe"
-    const val AUTH_LABEL = "VLUE 인증"
+    /** 디렉터리 신뢰 라벨 — VLUÉ 회원 인증마크와 혼동되지 않게 */
+    const val AUTH_LABEL = "안심 디렉터리"
 }

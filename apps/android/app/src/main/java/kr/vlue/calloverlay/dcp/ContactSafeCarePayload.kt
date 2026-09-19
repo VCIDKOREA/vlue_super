@@ -29,6 +29,7 @@ object ContactSafeCarePayload {
         return JSONObject()
             .put("matched", false)
             .put("is_verified", false)
+            .put("vlue_verified_badge", false)
             .put("source", "device_contact_safe_care")
             .put("profileKind", PROFILE_KIND)
             .put("displayName", contactName)

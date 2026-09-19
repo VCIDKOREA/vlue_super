@@ -146,10 +146,12 @@ object BigPushShowcaseBar {
                 avatarKind = AvatarKind.SILHOUETTE
             )
         }
-        /* 안심케어(비회원) — 인증 체크 배지 금지 */
+        /* 안심케어·공공디렉터리(비회원) — 인증 체크 배지 금지 */
         val contactSafeCare = profileKind == "contact_safe_care"
+        val directorySafe = profileKind == "public_directory_safe"
         val brand = when {
             contactSafeCare -> "VLUÉ 안심케어"
+            directorySafe -> "VLUÉ 안심 디렉터리"
             !org.isNullOrBlank() -> "$org Showcase"
             !hideBroadcastName && !displayName.isNullOrBlank() -> "$displayName Showcase"
             hideBroadcastName -> "VLUÉ ID Showcase"
@@ -174,6 +176,7 @@ object BigPushShowcaseBar {
         }
         val secondary = when {
             contactSafeCare -> phoneDisp.ifBlank { "VLUÉ 비회원 · 안심케어" }
+            directorySafe -> phoneDisp.ifBlank { "안심 디렉터리" }
             !org.isNullOrBlank() -> {
                 val parts = listOfNotNull(
                     displayName?.takeIf { it.isNotBlank() },
@@ -192,7 +195,7 @@ object BigPushShowcaseBar {
             brandLabel = brand,
             primaryLine = primary,
             secondaryLine = secondary,
-            verified = !contactSafeCare && (
+            verified = !contactSafeCare && !directorySafe && (
                 verified ||
                     json?.optBoolean("is_verified", false) == true ||
                     json?.optBoolean("verified", false) == true ||

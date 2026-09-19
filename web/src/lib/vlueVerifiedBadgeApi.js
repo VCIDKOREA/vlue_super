@@ -38,12 +38,45 @@ export function writeVlueBadgeLocal({ vlueVerifiedBadge, showcaseShareCount } = 
   }
 }
 
+/**
+ * 청록 인증 실(seal) 표시 여부.
+ * @param {{ vlueVerifiedBadge?: boolean|null, allowLocalFallback?: boolean }} ctx
+ * - allowLocalFallback: 기본 true — **본인** 쇼케이스/미리보기만.
+ *   상대(피어) 통화·빅푸시에서는 false 로 두고, 카드의 명시적 배지만 본다.
+ */
 export function shouldShowVlueVerifiedSeal(ctx = {}) {
   if (ctx.vlueVerifiedBadge === true) return true;
   if (ctx.vlueVerifiedBadge === false) return false;
+  if (ctx.allowLocalFallback === false) return false;
   const local = readVlueVerifiedBadgeLocal();
   if (local === true) return true;
   return false;
+}
+
+/**
+ * 상대 통화·빅푸시·피어 오버레이용.
+ * 수신자 localStorage 배지를 절대 쓰지 않음. VLUÉ 회원(verified) + 상대 카드 배지만.
+ */
+export function shouldShowPeerVlueVerifiedSeal({
+  verified = false,
+  vlueVerifiedBadge = null,
+  profileKind = "",
+  contactSafeCare = false
+} = {}) {
+  if (!verified) return false;
+  const kind = String(profileKind || "").trim();
+  if (
+    contactSafeCare ||
+    kind === "contact_safe_care" ||
+    kind === "public_directory_safe" ||
+    kind === "unverified" ||
+    kind === "lookup_pending" ||
+    kind === "expired_line" ||
+    kind === "admob_sponsor"
+  ) {
+    return false;
+  }
+  return vlueVerifiedBadge === true;
 }
 
 export async function fetchVlueBadgeSnapshot() {

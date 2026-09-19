@@ -129,7 +129,8 @@ object CardLookupRepository {
             e164,
             CardLookupResult(
                 matched = true,
-                verified = true,
+                /* 안심 저장·디렉터리 ≠ VLUÉ 회원 인증 */
+                verified = false,
                 displayName = name,
                 rawJson = json
             )
@@ -190,7 +191,7 @@ object CardLookupRepository {
                     val json = buildPublicDirectorySafeJson(rawNumber, hit.displayName)
                     val synth = CardLookupResult(
                         matched = true,
-                        verified = true,
+                        verified = false,
                         displayName = hit.displayName,
                         rawJson = json
                     )
@@ -233,7 +234,9 @@ object CardLookupRepository {
         val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: rawNumber
         return JSONObject()
             .put("matched", true)
-            .put("is_verified", true)
+            /* 공공 디렉터리·안심 저장은 신뢰 경로이지 VLUÉ 회원 인증이 아님 */
+            .put("is_verified", false)
+            .put("vlue_verified_badge", false)
             .put("source", "public_directory_local")
             .put("profileKind", "public_directory_safe")
             .put("displayName", displayName)
@@ -242,7 +245,7 @@ object CardLookupRepository {
             .put("membershipTier", "free")
             .put(
                 "directory",
-                JSONObject().put("vlueAuthLabel", "VLUE 인증")
+                JSONObject().put("vlueAuthLabel", "안심 디렉터리")
             )
             .put(
                 "dcp",
@@ -307,7 +310,7 @@ object CardLookupRepository {
             DiskLookup(
                 result = CardLookupResult(
                     matched = true,
-                    verified = prefs.getBoolean("${key}_verified", json.optBoolean("is_verified", true)),
+                    verified = prefs.getBoolean("${key}_verified", json.optBoolean("is_verified", false)),
                     displayName =
                         prefs.getString("${key}_name", null)?.ifBlank { null }
                             ?: json.optString("displayName", ""),
@@ -361,7 +364,7 @@ object CardLookupRepository {
                 val matched = json.optBoolean("matched", false)
                 CardLookupResult(
                     matched = matched,
-                    verified = json.optBoolean("is_verified", matched),
+                    verified = json.optBoolean("is_verified", false),
                     displayName = json.optString("displayName", ""),
                     rawJson = body
                 )

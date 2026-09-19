@@ -157,7 +157,9 @@ export function buildPublicDirectorySafeLookupBody(hit: PublicDirectoryHit) {
   const phoneDisplay = phone ? formatPhoneDisplayKR(phone.startsWith("+") ? phone : phone) : "";
   return {
     matched: true,
-    is_verified: true,
+    /* 공공·학교 등 디렉터리 매칭 ≠ VLUÉ 회원 본인인증 */
+    is_verified: false,
+    vlue_verified_badge: false,
     source: "public_directory",
     profileKind: PUBLIC_DIRECTORY_PROFILE_KIND,
     displayName: hit.displayName,
@@ -178,7 +180,7 @@ export function buildPublicDirectorySafeLookupBody(hit: PublicDirectoryHit) {
       category: hit.category,
       region: hit.region,
       businessNumber: hit.businessNumber,
-      vlueAuthLabel: "VLUE 인증"
+      vlueAuthLabel: "안심 디렉터리"
     },
     dcp: {
       routeStatus: "normal",

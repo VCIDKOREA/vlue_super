@@ -352,6 +352,9 @@ function buildContactSafeCareCard(phone, name, route = "normal") {
     name: display,
     displayName: display,
     profileKind: "contact_safe_care",
+    /* 비회원 연락처 — 수신자 로컬 청록뱃지 폴백 방지 */
+    vlueVerifiedBadge: false,
+    vlue_verified_badge: false,
     dcp: {
       contactSafeCare: true,
       contactName: display,

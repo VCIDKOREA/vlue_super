@@ -23,7 +23,10 @@ import { LETTERING_DEMO_COMPANY_LOGO } from "../lib/letteringDemoAssets.js";
 import { normalizeLetteringCard } from "../lib/letteringCardNormalize.js";
 import { resolveShowcasePeerAvatar } from "../lib/showcase/resolveShowcasePeerAvatar.js";
 import { buildAuthValidityVerificationItems } from "../lib/authValidityPeriod.js";
-import { shouldShowVlueVerifiedSeal } from "../lib/vlueVerifiedBadgeApi.js";
+import {
+  shouldShowPeerVlueVerifiedSeal,
+  shouldShowVlueVerifiedSeal
+} from "../lib/vlueVerifiedBadgeApi.js";
 import { getLocalVlueUserId } from "../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { nativeEndCall, nativeEndCallKeepOverlay, nativeRevealSystemCallUi, nativeRestoreShowcaseOverlay } from "../lib/call/nativeCallControl.js";
 import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
@@ -414,9 +417,6 @@ export default function LetteringIncomingNotification({
             verificationItems: []
           }
   );
-  const officialBadgeActive = shouldShowVlueVerifiedSeal({
-    vlueVerifiedBadge: c.vlueVerifiedBadge ?? c.vlue_verified_badge
-  });
   /** prop + 상대 쇼케이스 스타일(includeDigitalCard) 모두 허용할 때만 DCC 슬라이드 */
   const isContactSafeCareCardFlag =
     String(c?.profileKind || "").trim() === "contact_safe_care" || Boolean(c?.dcp?.contactSafeCare);
@@ -605,6 +605,20 @@ export default function LetteringIncomingNotification({
   const isLookupPending = String(c.profileKind || "") === "lookup_pending";
   const isUnverified =
     !isExpiredLine && !verified && !isDcp && !isContactSafeCare && !isLookupPending;
+  /*
+   * 청록 인증마크 — 본인 미리보기만 localStorage 폴백.
+   * 상대 통화/빅푸시는 상대 카드 배지 + verified 만 (수신자 배지 절대 금지).
+   */
+  const peerBadgeExplicit = c.vlueVerifiedBadge ?? c.vlue_verified_badge;
+  const isOwnShowcasePreview = Boolean(previewMode && showOwnerSettings);
+  const officialBadgeActive = isOwnShowcasePreview
+    ? shouldShowVlueVerifiedSeal({ vlueVerifiedBadge: peerBadgeExplicit })
+    : shouldShowPeerVlueVerifiedSeal({
+        verified,
+        vlueVerifiedBadge: peerBadgeExplicit,
+        profileKind: c?.profileKind,
+        contactSafeCare: isContactSafeCare
+      });
   /** DCC 인증 바 — 송출 verified 와 동기 (청록 배지 플래그와 분리) */
   const dccReceptionVerified = Boolean(verified) && !isUnverified && !isExpiredLine;
   const { setPlaybackPhase } = useShowcaseBgm();
