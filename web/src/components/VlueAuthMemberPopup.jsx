@@ -7,7 +7,7 @@ import "./vlue-auth-member-popup.css";
 
 /**
  * DCC·쇼케이스 미설정 회원 — 「경로 검증 · 정상」스타일 (웹 폴백).
- * 통화 오버레이(Android)는 네이티브 별도 창을 사용한다.
+ * 띠배너는 카드 상자 외부 하단에 분리 부착.
  */
 export default function VlueAuthMemberPopup({
   open = false,
@@ -33,18 +33,23 @@ export default function VlueAuthMemberPopup({
         if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <article className="vlue-auth-member-popup">
-        <p className="vlue-auth-member-popup__badge">경로 검증 · 정상</p>
-        <p className="vlue-auth-member-popup__msg">
-          VLUÉ 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다.
-        </p>
-        <h1 id="vlue-auth-member-popup-title" className="vlue-auth-member-popup__name">
-          {title}
-        </h1>
-        <p className="vlue-auth-member-popup__phone">
-          <Phone size={16} aria-hidden />
-          <span>{phoneDisp}</span>
-        </p>
+      <div className="vlue-auth-member-popup-stack">
+        <article className="vlue-auth-member-popup">
+          <p className="vlue-auth-member-popup__badge">경로 검증 · 정상</p>
+          <p className="vlue-auth-member-popup__msg">
+            VLUÉ 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다.
+          </p>
+          <h1 id="vlue-auth-member-popup-title" className="vlue-auth-member-popup__name">
+            {title}
+          </h1>
+          <p className="vlue-auth-member-popup__phone">
+            <Phone size={16} aria-hidden />
+            <span>{phoneDisp}</span>
+          </p>
+          <button type="button" className="vlue-auth-member-popup__ok" onClick={() => onClose?.()}>
+            확인
+          </button>
+        </article>
         <div className="vlue-auth-member-popup__ad" aria-label="광고">
           <AdMobBannerSlot
             slotId={`${AD_SLOT.DCC_BOTTOM || "dcc_bottom"}_auth_popup`}
@@ -56,10 +61,7 @@ export default function VlueAuthMemberPopup({
             className="w-full overflow-hidden rounded-xl"
           />
         </div>
-        <button type="button" className="vlue-auth-member-popup__ok" onClick={() => onClose?.()}>
-          확인
-        </button>
-      </article>
+      </div>
     </div>,
     document.body
   );

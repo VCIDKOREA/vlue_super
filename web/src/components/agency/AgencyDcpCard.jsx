@@ -10,7 +10,7 @@ const DEFAULT_WARNING =
 const NORMAL_MESSAGE =
   "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요.";
 const CONTACT_NORMAL_MESSAGE =
-  "기기에 저장된 번호입니다. VLUÉ 비회원 · 안심케어 정상 경로입니다.";
+  "VLUÉ 비회원 · 저장된 번호입니다. 발신 경로 이상없음.";
 
 function websiteLabel(url) {
   return String(url || "")
@@ -37,7 +37,9 @@ export default function AgencyDcpCard({
   warning = "",
   contactSafeCare = false,
   onClose,
-  onShareShowcase
+  onShareShowcase,
+  /** true면 카드 내부 배너 숨김 — 외부 하단에 별도 부착 */
+  hideBanner = false
 }) {
   const dcp = card?.dcp && typeof card.dcp === "object" ? card.dcp : {};
   const expired = variant === "expired";
@@ -126,17 +128,19 @@ export default function AgencyDcpCard({
       ) : (
         <p className="agency-dcp-card__web-empty">공식 웹사이트 미등록</p>
       )}
-      <div className="agency-dcp-card__ad" aria-label="광고">
-        <AdMobBannerSlot
-          slotId="dcp_popup_banner"
-          heightPx={50}
-          unitId={ADMOB_TEST.BANNER}
-          label="안심 팝업 배너"
-          enabled
-          preferredSize="BANNER"
-          className="w-full overflow-hidden rounded-xl"
-        />
-      </div>
+      {!hideBanner ? (
+        <div className="agency-dcp-card__ad" aria-label="광고">
+          <AdMobBannerSlot
+            slotId="dcp_popup_banner"
+            heightPx={50}
+            unitId={ADMOB_TEST.BANNER}
+            label="안심 팝업 배너"
+            enabled
+            preferredSize="BANNER"
+            className="w-full overflow-hidden rounded-xl"
+          />
+        </div>
+      ) : null}
       {onClose || abnormal || expired || contact ? (
         <button
           type="button"

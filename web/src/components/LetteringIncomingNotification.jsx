@@ -1449,6 +1449,7 @@ export default function LetteringIncomingNotification({
       </div>
 
       <div className="lettering-ongoing-body relative flex min-h-0 flex-col">
+        {!isExpandedView ? (
         <div
           className={`lettering-ongoing-summary relative z-[2] flex gap-2.5 px-3 py-2.5 items-center ${
             isFreeMember ? "lettering-ongoing-summary--free" : ""
@@ -1566,18 +1567,10 @@ export default function LetteringIncomingNotification({
                 <Settings className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
                 설정
               </button>
-              <button
-                type="button"
-                onClick={notifyCallScreenOnCall}
-                className="lettering-call-icon-btn inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700/80 bg-slate-900/90 shadow-sm active:scale-95"
-                aria-label="통화시 전화화면 안내"
-                title="통화시 전화화면으로 이동합니다"
-              >
-                <Phone className="h-5 w-5 text-emerald-400" strokeWidth={2.6} aria-hidden />
-              </button>
             </div>
           ) : null}
         </div>
+        ) : null}
 
         {/* 접힌 빅푸시에는 광고 없음. DCC+ 펼침 최하단만 ShowcaseDccBottomBanner */}
 
@@ -1621,6 +1614,9 @@ export default function LetteringIncomingNotification({
                       onReport={handleReport}
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
+                      onCallIconClick={
+                        previewMode && showOwnerSettings ? notifyCallScreenOnCall : undefined
+                      }
                       showPeerClose={Boolean(previewMode && showPeerClose)}
                       onPeerClose={onPeerClose}
                       onSlideTypeChange={setCarouselSlideType}
@@ -1692,6 +1688,9 @@ export default function LetteringIncomingNotification({
                       onReport={handleReport}
                       showOwnerSettings={Boolean(previewMode && showOwnerSettings)}
                       onOpenSlideSettings={openOwnerSettings}
+                      onCallIconClick={
+                        previewMode && showOwnerSettings ? notifyCallScreenOnCall : undefined
+                      }
                       showPeerClose={Boolean(previewMode && showPeerClose)}
                       onPeerClose={onPeerClose}
                       onSlideTypeChange={setCarouselSlideType}

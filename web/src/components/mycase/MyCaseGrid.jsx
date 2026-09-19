@@ -238,8 +238,24 @@ export default function MyCaseGrid({
         .replace(/^@+/, "")
         .trim() ||
       (loading && !remoteProfile
-        ? String(peerHintHandle || peerHintName || "").replace(/^@+/, "").trim() || "…"
+        ? String(peerHintHandle || "").replace(/^@+/, "").trim() || "…"
         : "");
+  const companyName = isMine
+    ? (() => {
+        try {
+          return String(buildUserLetteringCard()?.organization || "").trim();
+        } catch {
+          return "";
+        }
+      })()
+    : String(
+        remoteProfile?.profile?.companyName || remoteProfile?.cardExport?.organization || ""
+      ).trim();
+  /** 케이스함 상단: 1순위 사업자명 · 2순위 VLUE ID (개인 이름 중복 표시 금지) */
+  const topBarTitle =
+    companyName ||
+    (displayHandle ? displayHandle : "") ||
+    (loading && !isMine ? "…" : "");
   const displayName = isMine
     ? self.name
     : String(
@@ -852,7 +868,7 @@ export default function MyCaseGrid({
           </button>
         ) : null}
         <div className="ig-mycase__topbar-title">
-          <h1 className="ig-mycase__username">{displayHandle}</h1>
+          <h1 className="ig-mycase__username">{topBarTitle || "케이스함"}</h1>
           {showVerifiedSeal ? (
             <VlueCyanVerifiedSeal size={14} className="ig-mycase__verified-seal" />
           ) : null}

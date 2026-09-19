@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Settings, X } from "lucide-react";
+import { Phone, Settings, X } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import RenderErrorGuard from "../RenderErrorGuard.jsx";
 import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
@@ -99,6 +99,8 @@ export default function ShowcaseCallCarousel({
   /** 상대 열람 — 설정 버튼 자리에 닫기 */
   showPeerClose = false,
   onPeerClose,
+  /** 커버 우측 상단 — 설정 옆 전화 아이콘 */
+  onCallIconClick,
   /** @param {"card"|"banner"|"empty-slot"|"paid-identity"|"free-profile"|"free-safe"|string} type */
   onSlideTypeChange,
   /** 쇼케이스 스타일 — Instagram 인증·선택 사진 */
@@ -781,12 +783,32 @@ export default function ShowcaseCallCarousel({
         설정
       </button>
     ) : null;
-    if (!settingsBtn) return null;
+    const callBtn =
+      showOwnerSettings && typeof onCallIconClick === "function" ? (
+        <button
+          type="button"
+          className="showcase-call-carousel__slide-call"
+          aria-label="통화시 전화화면 안내"
+          title="통화시 전화화면으로 이동합니다"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onCallIconClick(e);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Phone className="h-4 w-4" strokeWidth={2.6} aria-hidden />
+        </button>
+      ) : null;
+    if (!settingsBtn && !callBtn) return null;
     return (
       <div
         className={`showcase-call-carousel__slide-corner${banner ? " showcase-call-carousel__slide-corner--banner" : ""}`}
       >
-        {settingsBtn}
+        <div className="showcase-call-carousel__slide-corner-row">
+          {settingsBtn}
+          {callBtn}
+        </div>
       </div>
     );
   };

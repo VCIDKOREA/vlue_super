@@ -95,11 +95,14 @@ export function invalidateCallHistoryPeerCache(phone) {
 const inflight = new Map();
 
 /** 동일 번호 중복 fetch 합치기 */
-export function prefetchCallHistoryPeer(phone, loader) {
+export function prefetchCallHistoryPeer(phone, loader, opts = {}) {
   const k = keyFor(phone);
   if (!k || typeof loader !== "function") return Promise.resolve(null);
-  const cached = readCallHistoryPeerCache(phone);
-  if (cached) return Promise.resolve(cached);
+  const force = Boolean(opts.force);
+  if (!force) {
+    const cached = readCallHistoryPeerCache(phone);
+    if (cached) return Promise.resolve(cached);
+  }
   const existing = inflight.get(k);
   if (existing) return existing;
   const run = loader()

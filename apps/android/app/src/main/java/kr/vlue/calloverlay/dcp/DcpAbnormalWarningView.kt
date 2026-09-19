@@ -24,7 +24,7 @@ import kotlin.math.roundToInt
 /**
  * 정상·비정상 공통 DCP 팝업.
  * 비정상은 고정 + 확인=공식 제보 사이트. 정상은 미니케이스처럼 드래그·가장자리 피크.
- * 본문 아래·확인 버튼 위에 AdMob Adaptive Banner (팝업 너비 맞춤).
+ * 본문 카드 외부 하단에 AdMob Adaptive Banner 분리 부착.
  */
 object DcpAbnormalWarningView {
     const val TAG = "vlue_dcp_route_popup"
@@ -33,7 +33,7 @@ object DcpAbnormalWarningView {
         "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요."
 
     const val CONTACT_NORMAL_MESSAGE =
-        "기기에 저장된 번호입니다. VLUÉ 비회원 · 안심케어 정상 경로입니다."
+        "VLUÉ 비회원 · 저장된 번호입니다. 발신 경로 이상없음."
 
     const val VLUE_AUTH_MEMBER_MESSAGE = VlueAuthMemberPopupPolicy.MESSAGE
 
@@ -89,7 +89,10 @@ object DcpAbnormalWarningView {
             val pad = dp(ctx, 20)
             setPadding(pad, pad, pad, pad)
             tag = TAG
-            layoutParams = LinearLayout.LayoutParams(dp(ctx, 320), LinearLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         card.addView(
             TextView(ctx).apply {
@@ -190,7 +193,7 @@ object DcpAbnormalWarningView {
             )
         }
 
-        /* 본문 아래 · 확인 바로 위 — 팝업 가로에 맞춘 Adaptive Banner */
+        /* 카드 외부 하단 — Adaptive Banner */
         val bannerHost = FrameLayout(ctx).apply {
             tag = BANNER_HOST_TAG
             clipToOutline = true
@@ -201,7 +204,7 @@ object DcpAbnormalWarningView {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(ctx, 50)
-            ).apply { topMargin = dp(ctx, 12) }
+            ).apply { topMargin = dp(ctx, 10) }
         }
         val adWidthDp = (280f).coerceAtLeast(250f).roundToInt()
         var popupAdView: AdView? = null
@@ -220,7 +223,6 @@ object DcpAbnormalWarningView {
             )
             adView.loadAd(AdRequest.Builder().build())
         }
-        card.addView(bannerHost)
 
         val confirm = TextView(ctx).apply {
             text = if (spec.expired) "닫기" else "확인"
@@ -270,6 +272,18 @@ object DcpAbnormalWarningView {
                 }
             )
         }
+
+        val stack = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = FrameLayout.LayoutParams(
+                dp(ctx, 320),
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            addView(card)
+            addView(bannerHost)
+        }
+
         val destroyAds: () -> Unit = {
             runCatching {
                 popupAdView?.destroy()
@@ -278,7 +292,7 @@ object DcpAbnormalWarningView {
             }
             Unit
         }
-        return Built(view = card, destroyAds = destroyAds)
+        return Built(view = stack, destroyAds = destroyAds)
     }
 
     /**

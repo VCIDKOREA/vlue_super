@@ -2934,6 +2934,20 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   flex-shrink: 0;
 }
 
+/* 2단계 오버레이 — 빅푸시 프로필바 제거 여백 → DCC 커버 확장 */
+.lettering-ongoing--expanded .ldr-hero__visual,
+.lettering-ongoing--expanded .ldr-profile-media--hero,
+.lettering-ongoing--expanded .ldr-back-hero,
+.lettering-ongoing--fullscreen-tent .ldr-hero__visual,
+.lettering-ongoing--fullscreen-tent .ldr-profile-media--hero,
+.lettering-ongoing--fullscreen-tent .ldr-back-hero,
+.lettering-ongoing--showcase-preview .ldr-hero__visual,
+.lettering-ongoing--showcase-preview .ldr-profile-media--hero,
+.lettering-ongoing--showcase-preview .ldr-back-hero {
+  height: 280px;
+  max-height: 280px;
+}
+
 /* ?? ????(???? WebView) ? ?? ?? ?? ?? */
 .lettering-overlay-host .lettering-ongoing {
   width: calc(100% - var(--lettering-sheet-gutter, 16px));
