@@ -1,6 +1,5 @@
 package kr.vlue.calloverlay
 
-import android.app.Dialog
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -12,20 +11,16 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.util.Log
-import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
-import android.view.Window
-import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.nativead.AdChoicesView
+import com.google.android.gms.ads.VideoController
+import com.google.android.gms.ads.VideoOptions
 import com.google.android.gms.ads.nativead.MediaView
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdOptions
@@ -35,8 +30,11 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
 /**
- * 홈 클립 = 커스텀 UI(에셋만 전달). NativeAdView는 쇼케이스 오버레이에서만.
- * 1차 탭 → openShowcase / 2차 CTA → 광고주 랜딩.
+ * 홈 클립 = 에셋만 웹 전달.
+ * 쇼케이스 = 웹 PeerShowcasePreview(ShowcaseCallCarousel) UI + 이 매니저가
+ * MediaView·CTA 만 DOM 슬롯 좌표에 NativeAdView로 겹침.
+ *
+ * - 이미지: 웹 Signature BGM / 동영상: MediaView 오디오 + toggleNativeAdShowcaseAudio
  */
 class VlueNativeAdManager(
     private val activity: MainActivity,
@@ -45,7 +43,12 @@ class VlueNativeAdManager(
 ) {
     private var nativeAd: NativeAd? = null
     private var loading = false
-    private var showcaseDialog: Dialog? = null
+    private var showcaseAdView: NativeAdView? = null
+    private var showcaseMediaView: MediaView? = null
+    private var showcaseCta: Button? = null
+    private var showcaseHasVideo = false
+    private var showcaseUserMuted = false
+    private var showcaseVideoController: VideoController? = null
     private var lastStatus: String = "idle"
     private var lastMessage: String = ""
     private var lastCode: Int = -1
@@ -54,6 +57,7 @@ class VlueNativeAdManager(
     private var lastAdvertiser: String = ""
     private var lastCta: String = ""
     private var lastMediaUrl: String = ""
+    private var lastHasVideo: Boolean = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var loadTimeoutRunnable: Runnable? = null
 
@@ -67,6 +71,7 @@ class VlueNativeAdManager(
             .put("advertiser", lastAdvertiser)
             .put("ctaLabel", lastCta)
             .put("mediaUrl", lastMediaUrl)
+            .put("hasVideoContent", lastHasVideo)
             .put("source", "admob")
             .toString()
 
@@ -103,13 +108,47 @@ class VlueNativeAdManager(
         }
     }
 
+    /**
+     * 레거시 브리지 — 웹이 PeerShowcasePreview를 연 뒤 syncNativeAdShowcaseSlots 호출.
+     * 단독 Dialog는 더 이상 쓰지 않음.
+     */
     fun openShowcase() {
         val ad = nativeAd
         if (ad == null) {
             Log.w(TAG, "openShowcase: no nativeAd")
             return
         }
-        activity.runOnUiThread { showShowcaseDialog(ad) }
+        lastStatus = "showcase_open"
+        notifyWeb()
+    }
+
+    /** 웹 쇼케이스 DOM 슬롯(미디어 카드 · 하단 CTA)에 NativeAdView 배치 */
+    fun syncShowcaseSlots(rectJson: String?) {
+        val ad = nativeAd ?: return
+        val root = runCatching { JSONObject(rectJson ?: "{}") }.getOrNull() ?: return
+        if (!root.optBoolean("visible", false)) {
+            hideShowcaseSlots()
+            return
+        }
+        activity.runOnUiThread {
+            ensureShowcaseAdView(ad)
+            applySlotRects(root)
+            bindVideoAudio(ad, root.optBoolean("hasVideoContent", lastHasVideo))
+            lastStatus = "showcase_open"
+            notifyWeb()
+        }
+    }
+
+    fun closeShowcaseSlots() {
+        activity.runOnUiThread { hideShowcaseSlots() }
+    }
+
+    fun toggleShowcaseAudio() {
+        activity.runOnUiThread {
+            if (!showcaseHasVideo) return@runOnUiThread
+            showcaseUserMuted = !showcaseUserMuted
+            runCatching { showcaseVideoController?.mute(showcaseUserMuted) }
+        }
     }
 
     fun retry(rectJson: String?) {
@@ -123,6 +162,8 @@ class VlueNativeAdManager(
         lastAdvertiser = ""
         lastCta = ""
         lastMediaUrl = ""
+        lastHasVideo = false
+        hideShowcaseSlots()
         nativeAd?.destroy()
         nativeAd = null
         host.removeAllViews()
@@ -140,6 +181,7 @@ class VlueNativeAdManager(
                     }
                     cancelLoadTimeout()
                     loading = false
+                    hideShowcaseSlots()
                     nativeAd?.destroy()
                     nativeAd = ad
                     captureAssets(ad)
@@ -150,6 +192,12 @@ class VlueNativeAdManager(
                 .withNativeAdOptions(
                     NativeAdOptions.Builder()
                         .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_PORTRAIT)
+                        .setVideoOptions(
+                            VideoOptions.Builder()
+                                .setCustomControlsRequested(true)
+                                .setStartMuted(false)
+                                .build(),
+                        )
                         .build(),
                 )
                 .withAdListener(
@@ -184,6 +232,9 @@ class VlueNativeAdManager(
         lastAdvertiser = ad.advertiser?.takeIf { it.isNotBlank() } ?: "스폰서"
         lastCta = ad.callToAction?.takeIf { it.isNotBlank() } ?: "방문하기"
         lastMediaUrl = extractMediaUrl(ad)
+        val media = ad.mediaContent
+        lastHasVideo =
+            media?.hasVideoContent() == true || media?.videoController?.hasVideoContent() == true
     }
 
     private fun clearAssetFields() {
@@ -192,9 +243,9 @@ class VlueNativeAdManager(
         lastAdvertiser = ""
         lastCta = ""
         lastMediaUrl = ""
+        lastHasVideo = false
     }
 
-    /** mediaContent/images 우선 — 웹 클립용 URL 또는 data URI */
     private fun extractMediaUrl(ad: NativeAd): String {
         ad.images?.firstOrNull()?.uri?.toString()?.takeIf { it.isNotBlank() }?.let { return it }
         ad.images?.firstOrNull()?.drawable?.let { d ->
@@ -233,6 +284,161 @@ class VlueNativeAdManager(
         }.getOrNull()
     }
 
+    private fun ensureShowcaseAdView(ad: NativeAd) {
+        if (showcaseAdView != null) {
+            host.visibility = View.VISIBLE
+            return
+        }
+        val adView = NativeAdView(activity)
+        val media =
+            MediaView(activity).apply {
+                setImageScaleType(ImageView.ScaleType.CENTER_CROP)
+                if (ad.mediaContent != null) mediaContent = ad.mediaContent
+            }
+        val cta =
+            Button(activity).apply {
+                text = ad.callToAction ?: lastCta.ifBlank { "방문하기" }
+                textSize = 16f
+                isAllCaps = false
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.WHITE)
+                background =
+                    GradientDrawable().apply {
+                        setColor(Color.rgb(37, 99, 235))
+                        cornerRadius = dp(16).toFloat()
+                    }
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+            }
+
+        adView.addView(media, FrameLayout.LayoutParams(1, 1))
+        adView.addView(cta, FrameLayout.LayoutParams(1, 1))
+        adView.mediaView = media
+        adView.callToActionView = cta
+        adView.setNativeAd(ad)
+
+        val passThrough =
+            object : FrameLayout(activity) {
+                override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+                    val targets = listOfNotNull(showcaseMediaView, showcaseCta)
+                    for (child in targets) {
+                        if (child.visibility != View.VISIBLE) continue
+                        if (
+                            ev.x >= child.left &&
+                            ev.x < child.right &&
+                            ev.y >= child.top &&
+                            ev.y < child.bottom
+                        ) {
+                            return super.dispatchTouchEvent(ev)
+                        }
+                    }
+                    return false
+                }
+            }
+        passThrough.addView(
+            adView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        host.removeAllViews()
+        host.addView(
+            passThrough,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        host.setBackgroundColor(Color.TRANSPARENT)
+        host.visibility = View.VISIBLE
+        host.isClickable = false
+        host.isFocusable = false
+        media.isClickable = true
+        cta.isClickable = true
+
+        showcaseAdView = adView
+        showcaseMediaView = media
+        showcaseCta = cta
+    }
+
+    private fun applySlotRects(root: JSONObject) {
+        val adView = showcaseAdView ?: return
+        val media = showcaseMediaView ?: return
+        val cta = showcaseCta ?: return
+        val mediaRect = root.optJSONObject("media") ?: return
+        val ctaRect = root.optJSONObject("cta") ?: return
+        val viewportWidth = root.optDouble("viewportWidth", 0.0)
+        val viewportHeight = root.optDouble("viewportHeight", 0.0)
+        if (viewportWidth <= 0.0 || viewportHeight <= 0.0 || webView.width <= 0 || webView.height <= 0) {
+            return
+        }
+        val sx = webView.width / viewportWidth
+        val sy = webView.height / viewportHeight
+        val webLeft = webView.x
+        val webTop = webView.y
+
+        fun place(child: View, rect: JSONObject) {
+            val lp =
+                FrameLayout.LayoutParams(
+                    (rect.optDouble("width") * sx).roundToInt().coerceAtLeast(1),
+                    (rect.optDouble("height") * sy).roundToInt().coerceAtLeast(1),
+                ).apply {
+                    leftMargin = (webLeft + rect.optDouble("left") * sx).roundToInt()
+                    topMargin = (webTop + rect.optDouble("top") * sy).roundToInt()
+                }
+            child.layoutParams = lp
+            child.visibility = View.VISIBLE
+        }
+
+        place(media, mediaRect)
+        place(cta, ctaRect)
+        val label = ctaRect.optString("label").trim()
+        if (label.isNotEmpty()) cta.text = label
+
+        /* NativeAdView 자체는 풀스크린 투명 — 자식만 히트 */
+        adView.layoutParams =
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+        host.bringToFront()
+        host.visibility = View.VISIBLE
+    }
+
+    private fun bindVideoAudio(ad: NativeAd, hasVideoHint: Boolean) {
+        val media = ad.mediaContent
+        val vc = media?.videoController
+        val hasVideo =
+            hasVideoHint ||
+                media?.hasVideoContent() == true ||
+                vc?.hasVideoContent() == true
+        showcaseHasVideo = hasVideo
+        showcaseVideoController = vc
+        showcaseUserMuted = false
+        if (hasVideo) {
+            runCatching { vc?.mute(false) }
+        }
+    }
+
+    private fun hideShowcaseSlots() {
+        runCatching {
+            showcaseAdView?.removeAllViews()
+        }
+        showcaseAdView = null
+        showcaseMediaView = null
+        showcaseCta = null
+        showcaseVideoController = null
+        showcaseHasVideo = false
+        showcaseUserMuted = false
+        host.removeAllViews()
+        host.visibility = View.GONE
+        if (lastStatus == "showcase_open") {
+            lastStatus = "loaded"
+            notifyWeb()
+        }
+    }
+
     private fun scheduleLoadTimeout() {
         cancelLoadTimeout()
         val r =
@@ -255,12 +461,12 @@ class VlueNativeAdManager(
     fun hide() {
         host.visibility = View.GONE
         host.removeAllViews()
-        closeShowcase()
+        hideShowcaseSlots()
     }
 
     fun destroy() {
         cancelLoadTimeout()
-        closeShowcase()
+        hideShowcaseSlots()
         nativeAd?.destroy()
         nativeAd = null
         host.removeAllViews()
@@ -293,277 +499,6 @@ class VlueNativeAdManager(
     private fun dp(value: Int): Int {
         val density = activity.resources.displayMetrics.density
         return (value * density).roundToInt()
-    }
-
-    /** 전체화면 쇼케이스 — VLUE 표준 쇼케이스 UI + NativeAdView 매핑 유지 */
-    private fun showShowcaseDialog(ad: NativeAd) {
-        closeShowcase()
-        val dialog =
-            Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
-                requestWindowFeature(Window.FEATURE_NO_TITLE)
-                setCancelable(true)
-                setOnDismissListener {
-                    showcaseDialog = null
-                    lastStatus = "loaded"
-                    notifyWeb()
-                }
-            }
-        val adView = NativeAdView(activity)
-        val root =
-            FrameLayout(activity).apply {
-                setBackgroundColor(Color.BLACK)
-            }
-
-        /* 풀블리드 미디어 */
-        val media =
-            MediaView(activity).apply {
-                setImageScaleType(ImageView.ScaleType.CENTER_CROP)
-                if (ad.mediaContent != null) mediaContent = ad.mediaContent
-            }
-        root.addView(
-            media,
-            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
-        )
-
-        /* 상단 그라데이션 (숏폼 헤더 가독성) */
-        val topFade =
-            View(activity).apply {
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(Color.argb(180, 0, 0, 0), Color.TRANSPARENT),
-                    )
-            }
-        root.addView(
-            topFade,
-            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(120)).apply {
-                gravity = Gravity.TOP
-            },
-        )
-
-        /* —— 상단 프로필 헤더 (VLUE 스타일) —— */
-        val header =
-            LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(16), dp(10), dp(12))
-            }
-
-        val icon =
-            ImageView(activity).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                background =
-                    GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(Color.rgb(30, 41, 59))
-                    }
-                clipToOutline = true
-                outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-                ad.icon?.drawable?.let { setImageDrawable(it) }
-                    ?: run {
-                        /* 아이콘 없으면 이니셜 대체는 advertiser 옆 텍스트로 충분 */
-                        setBackgroundColor(Color.rgb(37, 99, 235))
-                    }
-            }
-        header.addView(icon, LinearLayout.LayoutParams(dp(40), dp(40)))
-
-        val nameCol =
-            LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(10), 0, dp(8), 0)
-            }
-        val nameRow =
-            LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-            }
-        val advertiser =
-            TextView(activity).apply {
-                text = ad.advertiser?.takeIf { it.isNotBlank() } ?: "스폰서"
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                setTypeface(typeface, Typeface.BOLD)
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            }
-        /* VLUE 공식 인증 배지 (파란 체크) */
-        val verified =
-            TextView(activity).apply {
-                text = "✓"
-                textSize = 11f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                background =
-                    GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(Color.rgb(37, 99, 235))
-                    }
-                setPadding(0, 0, 0, 0)
-            }
-        nameRow.addView(
-            advertiser,
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
-        )
-        nameRow.addView(
-            verified,
-            LinearLayout.LayoutParams(dp(18), dp(18)).apply { marginStart = dp(6) },
-        )
-        val subLabel =
-            TextView(activity).apply {
-                text = "VLUE 스폰서 쇼케이스"
-                textSize = 11f
-                setTextColor(Color.rgb(148, 163, 184))
-                maxLines = 1
-            }
-        nameCol.addView(nameRow)
-        nameCol.addView(subLabel)
-        header.addView(nameCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-        val adBadge =
-            TextView(activity).apply {
-                text = "[광고] AD"
-                textSize = 10f
-                setTextColor(Color.WHITE)
-                setTypeface(typeface, Typeface.BOLD)
-                setPadding(dp(8), dp(5), dp(8), dp(5))
-                background =
-                    GradientDrawable().apply {
-                        setColor(Color.argb(160, 15, 23, 42))
-                        cornerRadius = dp(8).toFloat()
-                    }
-            }
-        header.addView(
-            adBadge,
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                marginEnd = dp(6)
-            },
-        )
-
-        val adChoices =
-            AdChoicesView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(4) }
-            }
-        header.addView(adChoices)
-
-        val close =
-            TextView(activity).apply {
-                text = "×"
-                textSize = 22f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                background =
-                    GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(Color.argb(140, 15, 23, 42))
-                    }
-                setOnClickListener { dialog.dismiss() }
-                contentDescription = "닫기"
-            }
-        header.addView(close, LinearLayout.LayoutParams(dp(36), dp(36)))
-
-        root.addView(
-            header,
-            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.TOP
-            },
-        )
-
-        /* —— 하단 그라데이션 + 타이틀/본문 + VLUE CTA —— */
-        val bottom =
-            LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(18), dp(28), dp(18), dp(32))
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.BOTTOM_TOP,
-                        intArrayOf(
-                            Color.argb(240, 2, 6, 23),
-                            Color.argb(160, 2, 6, 23),
-                            Color.TRANSPARENT,
-                        ),
-                    )
-            }
-        val headline =
-            TextView(activity).apply {
-                text = ad.headline.orEmpty()
-                textSize = 22f
-                setTextColor(Color.WHITE)
-                setTypeface(typeface, Typeface.BOLD)
-                maxLines = 3
-                setLineSpacing(0f, 1.15f)
-            }
-        val body =
-            TextView(activity).apply {
-                text = ad.body.orEmpty()
-                textSize = 13f
-                setTextColor(Color.rgb(203, 213, 225))
-                maxLines = 4
-                setLineSpacing(0f, 1.25f)
-            }
-        /* VLUE 시그니처 버튼 — 브랜드 블루 + 둥근 코너 */
-        val cta =
-            Button(activity).apply {
-                text = ad.callToAction ?: "방문하기"
-                textSize = 16f
-                isAllCaps = false
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.WHITE)
-                background =
-                    GradientDrawable().apply {
-                        setColor(Color.rgb(37, 99, 235)) /* blue-600 */
-                        cornerRadius = dp(16).toFloat()
-                    }
-                setPadding(dp(18), dp(16), dp(18), dp(16))
-                elevation = dp(4).toFloat()
-            }
-        bottom.addView(headline)
-        if (body.text.isNotBlank()) {
-            bottom.addView(
-                body,
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = dp(8)
-                },
-            )
-        }
-        bottom.addView(
-            cta,
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = dp(16)
-            },
-        )
-        root.addView(
-            bottom,
-            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.BOTTOM
-            },
-        )
-
-        adView.addView(
-            root,
-            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
-        )
-        adView.mediaView = media
-        adView.headlineView = headline
-        adView.bodyView = body
-        adView.callToActionView = cta
-        adView.iconView = icon
-        adView.adChoicesView = adChoices
-        adView.setNativeAd(ad)
-
-        dialog.setContentView(
-            adView,
-            ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
-        )
-        dialog.window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-        showcaseDialog = dialog
-        dialog.show()
-        lastStatus = "showcase_open"
-        notifyWeb()
-    }
-
-    private fun closeShowcase() {
-        runCatching { showcaseDialog?.dismiss() }
-        showcaseDialog = null
     }
 
     companion object {

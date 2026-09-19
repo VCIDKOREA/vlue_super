@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ADMOB_TEST } from "../../lib/ads/adMobUnitIds.js";
+import { openAdMobShowcase } from "../../lib/ads/openAdMobShowcase.js";
 
 const LOAD_TIMEOUT_MS = 12000;
 const POLL_MS = 800;
@@ -18,7 +19,8 @@ export default function AdMobNativeFallbackSlot({ className = "" }) {
     body: "",
     advertiser: "",
     mediaUrl: "",
-    ctaLabel: ""
+    ctaLabel: "",
+    hasVideoContent: false
   });
   const statusRef = useRef("idle");
   const mountedAtRef = useRef(Date.now());
@@ -34,13 +36,14 @@ export default function AdMobNativeFallbackSlot({ className = "" }) {
     const normalized = next === "showcase_open" ? "loaded" : next;
     statusRef.current = normalized;
     setStatus(normalized);
-    if (payload.headline || payload.mediaUrl || payload.body) {
+    if (payload.headline || payload.mediaUrl || payload.body || payload.ctaLabel) {
       setAssets({
         headline: String(payload.headline || ""),
         body: String(payload.body || ""),
         advertiser: String(payload.advertiser || "스폰서"),
         mediaUrl: String(payload.mediaUrl || ""),
-        ctaLabel: String(payload.ctaLabel || "방문하기")
+        ctaLabel: String(payload.ctaLabel || "방문하기"),
+        hasVideoContent: Boolean(payload.hasVideoContent)
       });
     }
     const msg = String(payload.message || "").trim();
@@ -128,8 +131,11 @@ export default function AdMobNativeFallbackSlot({ className = "" }) {
 
   const openShowcase = () => {
     if (status !== "loaded") return;
-    /* 외부 랜딩 금지 — 네이티브 쇼케이스 Dialog만 */
-    bridge?.openNativeAdShowcase?.();
+    /* VLUE ShowcaseCallCarousel UI + NativeAdView MediaView/CTA 슬롯 */
+    openAdMobShowcase({
+      ...assets,
+      hasVideoContent: Boolean(assets.hasVideoContent)
+    });
   };
 
   const showLoading = status === "idle" || status === "loading";

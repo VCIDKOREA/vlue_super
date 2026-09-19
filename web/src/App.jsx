@@ -32,6 +32,7 @@ import WalletHubModal from "./components/WalletHubModal.jsx";
 import AppNotificationSheet from "./components/AppNotificationSheet.jsx";
 import ShowcaseStyleSettingsSheet from "./components/showcase/ShowcaseStyleSettingsSheet.jsx";
 import OwnShowcaseSlideOverlay from "./components/showcase/OwnShowcaseSlideOverlay.jsx";
+import AdMobShowcaseOverlay from "./components/ads/AdMobShowcaseOverlay.jsx";
 import HashtagSearchPopup from "./components/showcase/HashtagSearchPopup.jsx";
 import UserCaseArchiveView from "./components/mycase/UserCaseArchiveView.jsx";
 import CallShowcaseHistorySheet from "./components/CallShowcaseHistorySheet.jsx";
@@ -5520,6 +5521,12 @@ function App() {
         }}
       />
       <OwnShowcaseSlideOverlay
+        onToast={(msg) => {
+          setBottomToast(msg);
+          setTimeout(() => setBottomToast(""), 2200);
+        }}
+      />
+      <AdMobShowcaseOverlay
         onToast={(msg) => {
           setBottomToast(msg);
           setTimeout(() => setBottomToast(""), 2200);

@@ -9,11 +9,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- PeerShowcasePreview 위 MediaView·CTA 슬롯 — 기본 GONE, sync 시 VISIBLE -->
     <FrameLayout
         android:id="@+id/native_ad_overlay"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:visibility="gone"
-        android:elevation="0dp"
-        android:clipChildren="true" />
+        android:elevation="24dp"
+        android:clipChildren="false"
+        android:clipToPadding="false" />
 </FrameLayout>

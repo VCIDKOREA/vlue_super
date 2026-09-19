@@ -14,7 +14,7 @@ const CLIP_H = 234;
 /**
  * 홈 「추천 스폰서」
  * - customSponsorList → 커스텀 클립 → SponsorShowcaseOverlay (웹 CTA)
- * - AdMob → 커스텀 클립 → 네이티브 openNativeAdShowcase (NativeAdView CTA)
+ * - AdMob → 커스텀 클립 → PeerShowcasePreview(쇼케이스 UI) + NativeAdView 슬롯 CTA
  */
 export default function HomeCentralFeedBanner({ className = "", layout: layoutProp = null }) {
   const [layout, setLayout] = useState(
@@ -78,7 +78,7 @@ export default function HomeCentralFeedBanner({ className = "", layout: layoutPr
         <AdMobNativeFallbackSlot />
       </div>
 
-      {/* customSponsorList 전용 오버레이 — AdMob은 네이티브 Dialog */}
+      {/* customSponsorList 전용 — AdMob은 App AdMobShowcaseOverlay(PeerShowcasePreview) */}
       <SponsorShowcaseOverlay
         open={Boolean(activeSponsor)}
         sponsor={activeSponsor}

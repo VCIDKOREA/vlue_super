@@ -972,6 +972,15 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 openNativeAdShowcase:function(){
                   try{if(window.Android&&window.Android.openNativeAdShowcase)window.Android.openNativeAdShowcase();}catch(e){}
                 },
+                syncNativeAdShowcaseSlots:function(rectJson){
+                  try{if(window.Android&&window.Android.syncNativeAdShowcaseSlots)window.Android.syncNativeAdShowcaseSlots(String(rectJson||'{}'));}catch(e){}
+                },
+                closeNativeAdShowcaseSlots:function(){
+                  try{if(window.Android&&window.Android.closeNativeAdShowcaseSlots)window.Android.closeNativeAdShowcaseSlots();}catch(e){}
+                },
+                toggleNativeAdShowcaseAudio:function(){
+                  try{if(window.Android&&window.Android.toggleNativeAdShowcaseAudio)window.Android.toggleNativeAdShowcaseAudio();}catch(e){}
+                },
                 showBannerAd:function(slotKey,rectJson){
                   try{
                     if(window.Android&&window.Android.showBannerAd){
@@ -1417,10 +1426,25 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             activity.runOnUiThread { activity.nativeAdManager.retry(rectJson) }
         }
 
-        /** 홈 클립 1차 탭 → NativeAdView 쇼케이스 오버레이 (CTA만 외부 랜딩) */
+        /** 웹 PeerShowcasePreview 열린 뒤 MediaView·CTA 슬롯 동기화 */
         @android.webkit.JavascriptInterface
         fun openNativeAdShowcase() {
             activity.runOnUiThread { activity.nativeAdManager.openShowcase() }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun syncNativeAdShowcaseSlots(rectJson: String?) {
+            activity.runOnUiThread { activity.nativeAdManager.syncShowcaseSlots(rectJson) }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun closeNativeAdShowcaseSlots() {
+            activity.runOnUiThread { activity.nativeAdManager.closeShowcaseSlots() }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun toggleNativeAdShowcaseAudio() {
+            activity.runOnUiThread { activity.nativeAdManager.toggleShowcaseAudio() }
         }
 
         @android.webkit.JavascriptInterface
