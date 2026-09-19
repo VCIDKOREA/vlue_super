@@ -4586,6 +4586,24 @@
   z-index: 90;
 }
 
+/* 통화목록·미리보기 안심케어 — 중앙 모달 (MiniCase peek/띠배너만 노출 방지) */
+.agency-dcp-center-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 18px;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.agency-dcp-center-layer__stack {
+  width: min(100%, 320px);
+  pointer-events: auto;
+}
+
 .agency-dcp-popup-stack {
   display: flex;
   flex-direction: column;

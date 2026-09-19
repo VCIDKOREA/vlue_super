@@ -602,14 +602,14 @@ object LetteringCallCoordinator {
 
     /** 링잉 첫 페인트 — API·경로검증 전 주소록 이름·안심케어 카드 */
     private fun contactSafeCareSeedJson(app: Context, raw: String): String? {
-        val contactName = DeviceContactsReader.findDisplayName(app, raw) ?: return null
+        val contactName = DeviceContactsReader.resolveDisplayNameForSafeCare(app, raw) ?: return null
         if (contactName.isBlank()) return null
         val verdict = CallPathSession.lastVerdict ?: CallPathVerdict.normal()
         return ContactSafeCarePayload.toJson(raw, contactName, verdict)
     }
 
     private fun applyContactSafeCareIfSaved(app: Context, raw: String, outgoing: Boolean): Boolean {
-        val contactName = DeviceContactsReader.findDisplayName(app, raw) ?: return false
+        val contactName = DeviceContactsReader.resolveDisplayNameForSafeCare(app, raw) ?: return false
         if (contactName.isBlank()) return false
         val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(app)
         val json = ContactSafeCarePayload.toJson(raw, contactName, verdict)

@@ -1099,7 +1099,7 @@ class CallOverlayService : Service() {
         val authOnly = VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)
         val pendingLookup =
             pendingCardJson.isNullOrBlank() || isLookupPendingCard(pendingCardJson)
-        val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
+        val contactName = DeviceContactsReader.resolveDisplayNameForSafeCare(this, currentPhone)
         val canPromote =
             !safeCare && !contactName.isNullOrBlank() &&
                 (pendingLookup || !verified)
@@ -1197,7 +1197,7 @@ class CallOverlayService : Service() {
                      * 발신 로고 탭인데 조회 중/빈 경로 — peer 상단 바로 바꾸지 않음.
                      * 주소록 있으면 안심 팝업 승격, 없으면 중앙 로고 유지.
                      */
-                    val name = DeviceContactsReader.findDisplayName(this, currentPhone)
+                    val name = DeviceContactsReader.resolveDisplayNameForSafeCare(this, currentPhone)
                     if (!name.isNullOrBlank() && !safeCare) {
                         val verdict =
                             CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
@@ -1596,7 +1596,7 @@ class CallOverlayService : Service() {
             )
             return
         }
-        val contactName = DeviceContactsReader.findDisplayName(this, currentPhone)
+        val contactName = DeviceContactsReader.resolveDisplayNameForSafeCare(this, currentPhone)
         if (!contactName.isNullOrBlank() &&
             (pendingCardJson.isNullOrBlank() ||
                 isLookupPendingCard(pendingCardJson) ||
@@ -2996,7 +2996,7 @@ class CallOverlayService : Service() {
             presentCenterSafePopup(source = source, authMember = false)
             return dcpPopupView?.isAttachedToWindow == true
         }
-        val name = DeviceContactsReader.findDisplayName(this, currentPhone)?.trim().orEmpty()
+        val name = DeviceContactsReader.resolveDisplayNameForSafeCare(this, currentPhone)?.trim().orEmpty()
         if (name.isBlank()) return false
         val verdict = CallPathSession.lastVerdict ?: CallPathSession.consumeOrVerify(this)
         val safeJson = ContactSafeCarePayload.toJson(currentPhone, name, verdict)

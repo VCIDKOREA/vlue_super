@@ -802,7 +802,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const isSavedContact = Boolean(knownSync.isKnownContact || call.contactName);
     const listLooksLikeMember =
       call.verified === true ||
-      Boolean(call.memberName) ||
+      call.peerIsVlueMember === true ||
       Boolean(call.userId) ||
       Boolean(cachedPeer?.verified);
 
