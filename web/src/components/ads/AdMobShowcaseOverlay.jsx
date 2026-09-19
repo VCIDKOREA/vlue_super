@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import PeerShowcasePreview from "../showcase/PeerShowcasePreview.jsx";
-import ShowcaseIdentityCertMark from "../showcase/ShowcaseIdentityCertMark.jsx";
 import { buildAdMobShowcaseCard } from "../../lib/ads/buildAdMobShowcaseCard.js";
 import {
   VLUE_CLOSE_ADMOB_SHOWCASE,
@@ -14,7 +13,7 @@ import { CLOSE_SHOWCASE_OVERLAYS_EVENT } from "../../lib/showcase/closeShowcaseO
 import { pushAndroidBackHandler } from "../../lib/androidBackStack.js";
 
 /**
- * AdMob 쇼케이스 — VLUE 쇼케이스 크롬 + 명시적 빅푸시.
+ * AdMob 쇼케이스 — VLUE 쇼케이스 크롬 + 슬림 타이틀(빅푸시 프로필 바 없음).
  * 이미지: 웹 미디어 / 동영상만 MediaView 슬롯.
  * 띠배너 금지 → 하단 CTA(설치/방문).
  */
@@ -126,7 +125,6 @@ export default function AdMobShowcaseOverlay({ onToast }) {
   const ctaLabel = String(assets?.ctaLabel || "방문하기").trim() || "방문하기";
   const hasVideo = Boolean(assets?.hasVideoContent);
   const advertiser = String(assets?.advertiser || card?.name || "스폰서").trim() || "스폰서";
-  const avatarUrl = String(assets?.iconUrl || assets?.mediaUrl || card?.photoUrl || "").trim();
 
   const syncNativeSlots = useCallback(() => {
     if (!open || !bridge?.syncNativeAdShowcaseSlots) return;
@@ -245,12 +243,12 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           ${hasVideo ? "[data-admob-showcase] .showcase-media-page__img{opacity:0!important}" : ""}
         `}</style>
 
-        {/* 빅푸시 — 이퀄라이저 + AD Sponsor · 우측에 ⓧ 단독 */}
+        {/* 슬림 타이틀만 — 빅푸시 프로필 바 제거 */}
         <header
-          className="admob-big-push shrink-0 border-b border-white/10 bg-[#0B101B] px-3 pb-2.5 pt-[max(10px,var(--vlue-safe-top,10px))]"
-          data-admob-big-push
+          className="admob-slim-title shrink-0 border-b border-white/10 bg-[#0B101B] px-3 pb-2.5 pt-[max(10px,var(--vlue-safe-top,10px))]"
+          data-admob-slim-title
         >
-          <div className="mb-2 flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="lettering-live-indicator" aria-hidden>
               <span className="lettering-live-indicator__bar" />
               <span className="lettering-live-indicator__bar" />
@@ -261,22 +259,6 @@ export default function AdMobShowcaseOverlay({ onToast }) {
                 ? `${advertiser} AD Sponsor Showcase`
                 : "AD Sponsor Showcase"}
             </p>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-800 ring-1 ring-white/15">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" draggable={false} />
-              ) : (
-                <span className="text-[14px] font-black text-white">{advertiser.slice(0, 1)}</span>
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1.5 text-[14px] font-black text-white">
-                <span className="truncate">스폰서 광고주</span>
-                <ShowcaseIdentityCertMark verified size={15} />
-              </p>
-              <p className="truncate text-[11px] font-semibold text-slate-400">Sponsor</p>
-            </div>
             <button
               type="button"
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/55 text-white active:scale-95"
