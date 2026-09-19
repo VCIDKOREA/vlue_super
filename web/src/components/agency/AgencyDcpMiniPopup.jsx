@@ -26,34 +26,35 @@ export default function AgencyDcpMiniPopup({
 }) {
   if (!open || typeof document === "undefined") return null;
   const variant = expired ? "expired" : abnormal ? "abnormal" : "normal";
-  const stack = (
-    <div className="agency-dcp-popup-stack">
-      <AgencyDcpCard
-        card={card}
-        incomingNumber={incomingNumber}
-        compact
-        variant={variant}
-        warning={warning || (expired ? "" : DEFAULT_WARNING)}
-        contactSafeCare={contactSafeCare}
-        hideBanner
-        onClose={onClose}
-        onShareShowcase={onShareShowcase}
+  const cardEl = (
+    <AgencyDcpCard
+      card={card}
+      incomingNumber={incomingNumber}
+      compact
+      variant={variant}
+      warning={warning || (expired ? "" : DEFAULT_WARNING)}
+      contactSafeCare={contactSafeCare}
+      hideBanner
+      onClose={onClose}
+      onShareShowcase={onShareShowcase}
+    />
+  );
+  const adEl = (
+    <div className="agency-dcp-popup-stack__ad" aria-label="광고">
+      <AdMobBannerSlot
+        slotId={contactSafeCare ? "contact_safe_popup_banner" : "dcp_popup_banner"}
+        heightPx={50}
+        unitId={ADMOB_TEST.BANNER}
+        label="안심 팝업 배너"
+        enabled={open}
+        preferredSize="BANNER"
+        className="w-full overflow-hidden rounded-xl"
       />
-      <div className="agency-dcp-popup-stack__ad" aria-label="광고">
-        <AdMobBannerSlot
-          slotId={contactSafeCare ? "contact_safe_popup_banner" : "dcp_popup_banner"}
-          heightPx={50}
-          unitId={ADMOB_TEST.BANNER}
-          label="안심 팝업 배너"
-          enabled={open}
-          preferredSize="BANNER"
-          className="w-full overflow-hidden rounded-xl"
-        />
-      </div>
     </div>
   );
 
   if (contactSafeCare) {
+    /* MiniCase 껍질 없이 중앙 모달 — 카드에 어두운 셸을 직접 부여 (배경 없으면 글자만 떠 보임) */
     return createPortal(
       <div
         className="agency-dcp-center-layer"
@@ -64,11 +65,21 @@ export default function AgencyDcpMiniPopup({
           if (e.target === e.currentTarget) onClose?.();
         }}
       >
-        <div className="agency-dcp-center-layer__stack">{stack}</div>
+        <div className="agency-dcp-center-layer__stack">
+          <div className="agency-dcp-center-shell">{cardEl}</div>
+          {adEl}
+        </div>
       </div>,
       document.body
     );
   }
+
+  const stack = (
+    <div className="agency-dcp-popup-stack">
+      {cardEl}
+      {adEl}
+    </div>
+  );
 
   return createPortal(
     <div className="agency-dcp-mini-layer" data-dcp-popup={variant}>
