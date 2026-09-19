@@ -46,8 +46,17 @@ export default function PeerShowcasePreview({
           verified
           previewMode
           showOwnerSettings={false}
-          showPeerClose={!publicLinkMode}
-          onPeerClose={publicLinkMode ? undefined : onClose}
+          showPeerClose={
+            !publicLinkMode &&
+            !(previewCard?.admobSponsor || previewCard?.profileKind === "admob_sponsor")
+          }
+          onPeerClose={
+            publicLinkMode ||
+            previewCard?.admobSponsor ||
+            previewCard?.profileKind === "admob_sponsor"
+              ? undefined
+              : onClose
+          }
           hideUnverifiedFooter
           callPhase="connected"
           platform="android"

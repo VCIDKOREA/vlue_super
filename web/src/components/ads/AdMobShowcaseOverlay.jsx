@@ -217,35 +217,33 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           [data-admob-showcase] .lettering-ongoing-summary { display: none !important; }
           [data-admob-showcase] .showcase-dcc-bottom-banner { display: none !important; }
           [data-admob-showcase] .lettering-ongoing-actions-secondary { display: none !important; }
+          [data-admob-showcase] .showcase-call-carousel__slide-settings { display: none !important; }
           [data-admob-showcase] .showcase-social-rail { z-index: 40; pointer-events: auto !important; }
+          [data-admob-showcase] .lettering-live-indicator__bar {
+            background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 50%, #06b6d4 100%);
+          }
+          [data-admob-showcase] .lettering-live-indicator {
+            filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.9));
+          }
           ${hasVideo ? "[data-admob-showcase] .showcase-media-page__img{opacity:0!important}" : ""}
         `}</style>
 
-        {/* 빅푸시 — 전화번호 없음 · 스폰서 광고주 + Sponsor */}
+        {/* 빅푸시 — 이퀄라이저 + AD Sponsor · 우측에 ⓧ 단독 */}
         <header
           className="admob-big-push shrink-0 border-b border-white/10 bg-[#0B101B] px-3 pb-2.5 pt-[max(10px,var(--vlue-safe-top,10px))]"
           data-admob-big-push
         >
-          <div className="mb-2 flex items-center gap-2">
-            <p className="min-w-0 flex-1 truncate text-[12px] font-black tracking-tight text-white">
-              {advertiser} AD Sponsor Showcase
-            </p>
-            <span className="shrink-0 rounded bg-black/70 px-2 py-0.5 text-[10px] font-black text-white">
-              [광고] AD
+          <div className="mb-2 flex min-w-0 items-center gap-2">
+            <span className="lettering-live-indicator" aria-hidden>
+              <span className="lettering-live-indicator__bar" />
+              <span className="lettering-live-indicator__bar" />
+              <span className="lettering-live-indicator__bar" />
             </span>
-            <button
-              type="button"
-              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-black/55 px-2.5 text-[11px] font-black text-white active:scale-95"
-              aria-label="닫기"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                close();
-              }}
-            >
-              <X size={15} strokeWidth={2.6} aria-hidden />
-              닫기
-            </button>
+            <p className="min-w-0 flex-1 truncate text-[12px] font-black tracking-tight text-white">
+              {advertiser && advertiser !== "스폰서"
+                ? `${advertiser} AD Sponsor Showcase`
+                : "AD Sponsor Showcase"}
+            </p>
           </div>
           <div className="flex items-center gap-2.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-800 ring-1 ring-white/15">
@@ -262,6 +260,18 @@ export default function AdMobShowcaseOverlay({ onToast }) {
               </p>
               <p className="truncate text-[11px] font-semibold text-slate-400">Sponsor</p>
             </div>
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/55 text-white active:scale-95"
+              aria-label="닫기"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                close();
+              }}
+            >
+              <X size={18} strokeWidth={2.6} aria-hidden />
+            </button>
           </div>
         </header>
 

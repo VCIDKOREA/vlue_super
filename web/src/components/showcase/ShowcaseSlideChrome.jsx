@@ -128,7 +128,9 @@ export default function ShowcaseSlideChrome({
     onSocialDockChange?.(socialOpen && hasSocial);
   }, [socialOpen, hasSocial, onSocialDockChange]);
 
-  const showFollow = shouldShowShowcaseFollow(targetUserId, { hideFollow });
+  const isAdMob = Boolean(card?.admobSponsor || card?.profileKind === "admob_sponsor");
+  const showFollow = !isAdMob && shouldShowShowcaseFollow(targetUserId, { hideFollow });
+  const showAdBadge = isAdMob;
 
   const openCaseArchive = () => {
     if (typeof onOpenCaseArchive === "function") {
@@ -245,8 +247,16 @@ export default function ShowcaseSlideChrome({
               </span>
             </span>
           </button>
-          {(showFollow || hasSocial) ? (
+          {(showFollow || hasSocial || showAdBadge) ? (
             <div className="showcase-slide-chrome__vlue-actions">
+              {showAdBadge ? (
+                <span
+                  className="showcase-slide-chrome__ad-badge"
+                  aria-label="광고"
+                >
+                  [광고] AD
+                </span>
+              ) : null}
               {showFollow ? (
                 <FollowActionButton
                   targetUserId={targetUserId}
