@@ -6,7 +6,6 @@ import { saveProfileToDeviceContacts } from "../lib/contactVcfSave.js";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import B2BLineCartPanel from "./B2BLineCartPanel.jsx";
 import VaultSavedFileRow from "./VaultSavedFileRow.jsx";
-import VaultSavedShowcaseRow from "./VaultSavedShowcaseRow.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import { useHorizontalScrollStrip } from "../lib/useHorizontalScrollStrip.js";
 import { fetchOfficeFiles } from "../lib/vlueOfficeApi.js";
@@ -31,7 +30,6 @@ const FULL_TABS = [
 
 const V1_VAULT_TABS = [
   { id: "received", label: "명함저장" },
-  { id: "showcases", label: "저장된케이스" },
   { id: "mydocs", label: "내문서" }
 ];
 
@@ -290,12 +288,11 @@ export default function WalletHubModal({
     }
   }, [open]);
 
-  const { showcases: showcaseCards, received: receivedCards } = useMemo(
+  const { received: receivedCards } = useMemo(
     () => partitionCardWallet(walletCards),
     [walletCards]
   );
   const receivedCount = receivedCards.length;
-  const showcaseCount = showcaseCards.length;
   const activeTabLabel = tabs.find((t) => t.id === tab)?.label || "";
   const mergedStorageFiles = useMemo(() => {
     const seen = new Set();
@@ -385,11 +382,6 @@ export default function WalletHubModal({
                           {receivedCount}
                         </span>
                       ) : null}
-                      {t.id === "showcases" && showcaseCount > 0 ? (
-                        <span className="vlue-tab-strip__badge ml-1.5 rounded-full bg-indigo-500 font-bold text-white">
-                          {showcaseCount}
-                        </span>
-                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -430,39 +422,6 @@ export default function WalletHubModal({
                         />
                       );
                     })}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {tab === "showcases" && (
-              <div className="space-y-4">
-                {showcaseCount === 0 ? (
-                  <div
-                    className={`rounded-2xl py-14 text-center ring-1 ${
-                      isDarkMode ? "bg-white/5 ring-white/10" : "bg-white ring-slate-100"
-                    }`}
-                  >
-                    <p className={`text-[14px] font-bold ${isDarkMode ? "text-gray-300" : "text-slate-500"}`}>
-                      저장된 케이스가 없습니다
-                    </p>
-                    <p className={`mt-2 px-6 text-[12px] leading-relaxed ${isDarkMode ? "text-gray-500" : "text-slate-400"}`}>
-                      통화 목록에서 쇼케이스를 다시 본 뒤 「업체 저장하기」를 누르면 여기에 모입니다.
-                    </p>
-                  </div>
-                ) : (
-                  <ul className="space-y-4">
-                    {showcaseCards.map((item) => (
-                      <VaultSavedShowcaseRow
-                        key={item.userId || item.savedAt}
-                        item={item}
-                        isDarkMode={isDarkMode}
-                        onRemove={(userId) => {
-                          onRemoveCardFromWallet?.(userId);
-                          showToast("삭제했습니다.");
-                        }}
-                      />
-                    ))}
                   </ul>
                 )}
               </div>

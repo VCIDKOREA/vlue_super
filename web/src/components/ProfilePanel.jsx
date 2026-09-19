@@ -1135,7 +1135,7 @@ function ProfilePanel({
                   <br />
                   케이스
                 </p>
-                <p className="mt-1 text-[9px] font-bold text-orange-700">명함저장 · 저장된케이스 · 내문서</p>
+                <p className="mt-1 text-[9px] font-bold text-orange-700">명함저장 · 내문서</p>
               </div>
             </button>
             ) : null}

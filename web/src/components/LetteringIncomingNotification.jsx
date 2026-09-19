@@ -36,6 +36,8 @@ import {
   resolveInCallKakaoSlot
 } from "../lib/call/callPeerMatrix.js";
 import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
+import ShareShowcaseChannelSheet from "./call/ShareShowcaseChannelSheet.jsx";
+import { CALL_PEER_CTA } from "../lib/call/callPeerMatrix.js";
 import { openShowcaseSmsCompose } from "../lib/showcaseSmsShare.js";
 import InCallKakaoShareSlot from "./call/InCallKakaoShareSlot.jsx";
 import InCallControlBar from "./call/InCallControlBar.jsx";
@@ -1000,30 +1002,37 @@ export default function LetteringIncomingNotification({
   );
   const inCallKakao = resolveInCallKakaoSlot(peerMatrix);
   const [matrixBusy, setMatrixBusy] = useState(false);
+  const [sharePickOpen, setSharePickOpen] = useState(false);
   const inCallDemoMode = Boolean(previewMode);
   /** 실통화 중에도 펼친 쇼케이스에서는 좋아요·댓글·공유·신고 노출 (Test 3.0) */
   const socialOverlayEnabled = Boolean(
     previewMode || fromCallHistory || !onCall || (onCall && isExpandedView)
   );
 
-  const handleMatrixAction = async () => {
+  const handleMatrixAction = async (shareChannel = null) => {
     if (!peerMatrix.showCallLogAction || matrixBusy) return;
+    const cta = peerMatrix.cta;
+    if (
+      (cta === CALL_PEER_CTA.SHARE_SHOWCASE || cta === CALL_PEER_CTA.KAKAO_SHARE) &&
+      !shareChannel
+    ) {
+      setSharePickOpen(true);
+      return;
+    }
     setMatrixBusy(true);
     try {
-      if (peerMatrix.cta === "kakao_share") {
-        await shareShowcaseInviteViaKakao({
-          inviteeName: peerMatrix.contactName || c.name || savedContactName,
-          phone: incoming || c.phone,
-          onToast: showGuide
-        });
-      } else {
-        await runCallPeerMatrixAction({
-          matrix: peerMatrix,
-          card: c,
-          phone: incoming || c.phone,
-          onToast: showGuide
-        });
+      const result = await runCallPeerMatrixAction({
+        matrix: peerMatrix,
+        card: c,
+        phone: incoming || c.phone,
+        shareChannel,
+        onToast: showGuide
+      });
+      if (result?.needsChannel) {
+        setSharePickOpen(true);
+        return;
       }
+      setSharePickOpen(false);
     } finally {
       setMatrixBusy(false);
     }
@@ -1789,6 +1798,14 @@ export default function LetteringIncomingNotification({
         phone={incoming}
         handle={authPopupIdentity.handle}
         onClose={() => setAuthMemberPopupOpen(false)}
+      />
+      <ShareShowcaseChannelSheet
+        open={sharePickOpen}
+        busy={matrixBusy}
+        onClose={() => setSharePickOpen(false)}
+        onPick={(channel) => {
+          void handleMatrixAction(channel);
+        }}
       />
     </article>
   );

@@ -45,6 +45,8 @@ import {
   resolveCallPeerMatrixSync
 } from "../lib/call/callPeerMatrix.js";
 import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
+import ShareShowcaseChannelSheet from "./call/ShareShowcaseChannelSheet.jsx";
+import { CALL_PEER_CTA } from "../lib/call/callPeerMatrix.js";
 import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js";
 import {
   DEVICE_CONTACTS_CHANGED,
@@ -259,10 +261,11 @@ function CallHistoryAvatar({ call, cacheTick = 0, onBrokenUrl }) {
 
 function HistoryRowCta({ call, matrix, busy, onAction }) {
   if (!matrix?.showCallLogAction) return null;
+  const variant = matrix.variant === "case" ? "case" : matrix.variant === "share" ? "share" : "";
   return (
     <button
       type="button"
-      className="call-history-row__cta"
+      className={`call-history-row__cta${variant ? ` call-history-row__cta--${variant}` : ""}`}
       disabled={busy}
       onClick={(e) => {
         e.stopPropagation();
@@ -319,6 +322,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [rowMatrix, setRowMatrix] = useState({});
   const [busyId, setBusyId] = useState("");
   const [toast, setToast] = useState("");
+  const [sharePick, setSharePick] = useState(null);
   const [authPopup, setAuthPopup] = useState({ open: false, name: "", phone: "", handle: "" });
   const [peerAvatarTick, setPeerAvatarTick] = useState(0);
   const openGenRef = useRef(0);
@@ -668,23 +672,41 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     [applyPeerPayload, loadPeerPayload]
   );
 
-  const runRowAction = async (call, matrix) => {
+  const runRowAction = async (call, matrix, shareChannel = null) => {
+    const cta = matrix?.cta;
+    if (
+      (cta === CALL_PEER_CTA.SHARE_SHOWCASE || cta === CALL_PEER_CTA.KAKAO_SHARE) &&
+      !shareChannel
+    ) {
+      setSharePick({ call, matrix });
+      return;
+    }
     setBusyId(call.id);
     try {
       let card = call.cardSnapshot || null;
-      if (!card && matrix.cta !== "kakao_share") {
+      if (!card && cta !== CALL_PEER_CTA.SHARE_SHOWCASE && cta !== CALL_PEER_CTA.KAKAO_SHARE) {
         const payload = await resolveCallHistoryShowcasePeer(call.phoneDisplay || call.phone);
         card = payload.card;
       }
-      await runCallPeerMatrixAction({
+      const result = await runCallPeerMatrixAction({
         matrix,
-        card: card || { name: call.name, phone: call.phoneDisplay || call.phone },
+        card: card || { name: call.name, phone: call.phoneDisplay || call.phone, userId: call.userId },
+        call,
         phone: call.phoneDisplay || call.phone,
-        onToast: showToast
+        shareChannel,
+        onToast: showToast,
+        onBeforeNavigate: () => {
+          onClose?.();
+        }
       });
+      if (result?.needsChannel) {
+        setSharePick({ call, matrix });
+        return;
+      }
       refresh();
     } finally {
       setBusyId("");
+      setSharePick(null);
     }
   };
 
@@ -1020,11 +1042,23 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                       isVlueMember: isMember,
                       knownContact: selectedKnown
                     });
+                    if (
+                      matrix.cta === CALL_PEER_CTA.SHARE_SHOWCASE ||
+                      matrix.cta === CALL_PEER_CTA.KAKAO_SHARE
+                    ) {
+                      setSharePick({
+                        call: selected,
+                        matrix
+                      });
+                      return;
+                    }
                     await runCallPeerMatrixAction({
                       matrix,
                       card,
+                      call: selected,
                       phone: incomingNumber || phone,
-                      onToast: showToast
+                      onToast: showToast,
+                      onBeforeNavigate: () => onClose?.()
                     });
                     refresh();
                   }}
@@ -1158,6 +1192,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       phone={authPopup.phone}
       handle={authPopup.handle}
       onClose={closeAuthPopup}
+    />
+    <ShareShowcaseChannelSheet
+      open={Boolean(sharePick)}
+      busy={Boolean(busyId)}
+      onClose={() => setSharePick(null)}
+      onPick={(channel) => {
+        if (!sharePick) return;
+        void runRowAction(sharePick.call, sharePick.matrix, channel);
+      }}
     />
     </>
   );

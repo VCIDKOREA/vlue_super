@@ -83,7 +83,7 @@ export const v1AppShell = {
   digitalBizcard: true,
   familyProtection: true,
   personalVault: true,
-  /** 개인케이스 — V1 탭(명함저장·저장된케이스·내문서) */
+  /** 개인케이스 — V1 탭(명함저장·내문서) */
   vaultTabsMinimal: true,
   contacts: true,
   notificationInbox: true,

@@ -13,14 +13,15 @@ const FALLBACK_DOWNLOAD = "https://www.vlue.kr/download";
 /**
  * @param {{
  *   inviteeName?: string,
+ *   omitInvitee?: boolean,
  *   phone?: string,
  *   onToast?: (msg: string) => void
  * }} opts
  * @returns {Promise<{ ok: boolean, channel?: string, cancelled?: boolean, error?: string }>}
  */
 export async function shareShowcaseInviteViaKakao(opts = {}) {
-  const inviteeName = String(opts.inviteeName || "").trim();
-  const text = buildVlueInviteMessage(inviteeName);
+  const omitInvitee = Boolean(opts.omitInvitee) || !String(opts.inviteeName || "").trim();
+  const text = buildVlueInviteMessage(opts.inviteeName, { omitInvitee });
   const title = `${getInviteSenderName()}님이 VLUÉ 쇼케이스를 보냅니다`;
   const viral = getVlueViralLinks();
   const linkUrl =

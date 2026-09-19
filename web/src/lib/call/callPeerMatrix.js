@@ -1,13 +1,11 @@
 /**
  * V1 통화·통화목록 — 정제된 규제 매트릭스
  *
- * 판별축: VLUÉ 회원 / 기기 주소록 / 앱 보관함(쇼케이스 스크랩)
- * 0.1초 내 동기 판별 → resolveCallPeerMatrixSync
- * 네이티브 주소록 갱신 → resolveCallPeerMatrix (async)
+ * 판별축: VLUÉ 회원 / 기기 주소록
+ * VLUE 회원 → 케이스함 보기
+ * 비회원 → 쇼케이스 전달하기 (카톡·SMS 선택)
  */
 
-import { isShowcaseScrapWalletItem, readCardWallet } from "../cardWalletStorage.js";
-import { normalizePhoneDigits } from "../letteringPhoneMatch.js";
 import {
   phonesMatchLoose,
   resolveIsKnownContact,
@@ -16,39 +14,23 @@ import {
 import { readDeviceContactsCache } from "../contacts/deviceContactsCache.js";
 import { readContactMatchCache } from "../contactSyncStorage.js";
 
-/** @typedef {'none'|'save_contacts_and_vault'|'save_vault_only'|'kakao_share'} CallPeerCta */
+/** @typedef {'none'|'open_case_archive'|'share_showcase'} CallPeerCta */
 
 export const CALL_PEER_CTA = Object.freeze({
   NONE: "none",
-  /** 회원 + 주소록 없음 + 보관함 없음 → 주소록+보관함 */
+  /** VLUE 회원 — 상대 케이스함(피드) */
+  OPEN_CASE_ARCHIVE: "open_case_archive",
+  /** 비회원 — 카톡/SMS 전달 선택 */
+  SHARE_SHOWCASE: "share_showcase",
+  /** @deprecated 보관함 담기 제거 — 하위 호환 */
   SAVE_CONTACTS_AND_VAULT: "save_contacts_and_vault",
-  /** 회원 + 주소록 있음 + 보관함 없음 → 보관함만 */
+  /** @deprecated */
   SAVE_VAULT_ONLY: "save_vault_only",
-  /** 미회원 + 주소록 있음 → 카톡 전달 */
+  /** @deprecated → SHARE_SHOWCASE */
   KAKAO_SHARE: "kakao_share"
 });
 
 const DEVICE_SOURCES = new Set(["device", "device_synced"]);
-
-/**
- * 앱 보관함(개인 쇼케이스 스크랩)에 이미 있는지
- * @param {string} phone
- */
-export function isInShowcaseVault(phone) {
-  const digits = normalizePhoneDigits(phone);
-  if (!digits) return false;
-  const wantId = `showcase-${digits}`;
-
-  for (const item of readCardWallet()) {
-    if (!isShowcaseScrapWalletItem(item)) continue;
-    if (String(item.userId || "") === wantId) return true;
-    const idDigits = String(item.userId || "").replace(/^showcase-/, "").replace(/\D/g, "");
-    if (idDigits && (idDigits === digits || phonesMatchLoose(idDigits, digits))) return true;
-    const snapPhone = item?.snapshot?.phone;
-    if (snapPhone && phonesMatchLoose(snapPhone, phone)) return true;
-  }
-  return false;
-}
 
 /**
  * 기기 실제 전화번호부(및 동기화 미가입 연락처)만 — VLUÉ 친구 인덱스는 제외
@@ -60,7 +42,9 @@ export function isInDeviceAddressBook(phone, knownHint = null) {
   if (!target) return { inContacts: false, matchedName: "" };
 
   if (knownHint?.sources?.length) {
-    const deviceSrc = knownHint.sources.filter((s) => DEVICE_SOURCES.has(s) || s === "device" || s === "device_synced");
+    const deviceSrc = knownHint.sources.filter(
+      (s) => DEVICE_SOURCES.has(s) || s === "device" || s === "device_synced"
+    );
     if (deviceSrc.length) {
       return { inContacts: true, matchedName: String(knownHint.matchedName || "").trim() };
     }
@@ -85,6 +69,11 @@ export function isInDeviceAddressBook(phone, knownHint = null) {
   return { inContacts: false, matchedName: "" };
 }
 
+/** @deprecated 보관함 CTA 제거 — 호출부 호환용 */
+export function isInShowcaseVault(_phone) {
+  return false;
+}
+
 /**
  * @param {{
  *   phone?: string,
@@ -98,30 +87,25 @@ export function resolveCallPeerMatrixSync(input = {}) {
   const isVlueMember = Boolean(input.isVlueMember ?? input.verified);
   const known = input.knownContact || null;
   const contacts = isInDeviceAddressBook(phone, known);
-  const inVault = isInShowcaseVault(phone);
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
 
   /** @type {CallPeerCta} */
   let cta = CALL_PEER_CTA.NONE;
   let label = "";
   let description = "";
+  /** @type {'case'|'share'|''} */
+  let variant = "";
 
   if (isVlueMember) {
-    if (inVault) {
-      cta = CALL_PEER_CTA.NONE;
-    } else if (contacts.inContacts) {
-      cta = CALL_PEER_CTA.SAVE_VAULT_ONLY;
-      label = "쇼케이스 보관함에 담기";
-      description = "앱 보관함에만 저장합니다.";
-    } else {
-      cta = CALL_PEER_CTA.SAVE_CONTACTS_AND_VAULT;
-      label = "상대방 쇼케이스 저장하기";
-      description = "기기 주소록과 앱 보관함에 저장합니다.";
-    }
-  } else if (contacts.inContacts) {
-    cta = CALL_PEER_CTA.KAKAO_SHARE;
-    label = "카톡으로 쇼케이스 전달하기";
-    description = "VLUÉ 앱 미사용자입니다. 쇼케이스를 전달하세요.";
+    cta = CALL_PEER_CTA.OPEN_CASE_ARCHIVE;
+    label = "케이스함 보기";
+    description = "상대 VLUÉ 케이스함(피드)으로 이동합니다.";
+    variant = "case";
+  } else if (phone) {
+    cta = CALL_PEER_CTA.SHARE_SHOWCASE;
+    label = "쇼케이스 전달하기";
+    description = "카카오톡 또는 SMS로 VLUÉ 초대를 보냅니다.";
+    variant = "share";
   }
 
   const elapsedMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
@@ -131,13 +115,14 @@ export function resolveCallPeerMatrixSync(input = {}) {
     isVlueMember,
     inDeviceContacts: contacts.inContacts,
     contactName: contacts.matchedName || String(known?.matchedName || "").trim(),
-    inShowcaseVault: inVault,
+    inShowcaseVault: false,
     cta,
     label,
     description,
-    /** 통화 중 화면: 카톡 CTA만 허용 */
-    showInCallKakao: cta === CALL_PEER_CTA.KAKAO_SHARE,
-    /** 통화 목록: 저장/카톡 버튼 */
+    variant,
+    /** 통화 중 화면: 비회원 전달 CTA */
+    showInCallKakao: cta === CALL_PEER_CTA.SHARE_SHOWCASE,
+    /** 통화 목록: 액션 버튼 */
     showCallLogAction: cta !== CALL_PEER_CTA.NONE,
     elapsedMs
   };
@@ -151,7 +136,6 @@ export async function resolveCallPeerMatrix(input = {}) {
   let known = input.knownContact || null;
   if (phone && !known) {
     try {
-      /* 목록·CTA는 캐시 우선 — 행마다 refreshDevice 하면 주소록 전체 dump로 UI가 수 초씩 멈춤 */
       known = await resolveIsKnownContact(phone, {
         refreshDevice: input.refreshDevice === true
       });
@@ -163,7 +147,7 @@ export async function resolveCallPeerMatrix(input = {}) {
 }
 
 /**
- * 통화 중 중앙 하단 — 카톡 영역만 (그 외 전부·문구 없음)
+ * 통화 중 중앙 하단 — 전달 영역
  * @param {ReturnType<typeof resolveCallPeerMatrixSync>} matrix
  */
 export function resolveInCallKakaoSlot(matrix) {
@@ -172,7 +156,7 @@ export function resolveInCallKakaoSlot(matrix) {
   }
   return {
     visible: true,
-    label: matrix.label || "카톡으로 쇼케이스 전달하기",
-    description: matrix.description || "VLUÉ 앱 미사용자입니다. 쇼케이스를 전달하세요."
+    label: matrix.label || "쇼케이스 전달하기",
+    description: matrix.description || "카카오톡 또는 SMS로 VLUÉ 초대를 보냅니다."
   };
 }
