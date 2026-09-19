@@ -12,7 +12,7 @@ import {
   formatCooldownHint,
   setMycaseBroadcast
 } from "../../lib/mycaseApi.js";
-import { fetchFollowCounts } from "../../lib/followApi.js";
+import { fetchFollowCounts, fetchFollowProfile } from "../../lib/followApi.js";
 import { fetchPeerShowcaseStyleBundle } from "../../lib/showcase/showcaseStyleApi.js";
 import { readShowcaseStyle, readLiveShowcaseStyle, writeShowcaseStyle, SHOWCASE_OPEN_SETTINGS_EVENT, SHOWCASE_STYLE_CHANGED_EVENT, createDefaultShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 import {
@@ -122,6 +122,7 @@ export default function MyCaseGrid({
   ownerUserId = null,
   peerHintName = "",
   peerHintHandle = "",
+  peerHintOrganization = "",
   onBack,
   onOpenDetail,
   onOpenDigitalCard,
@@ -236,10 +237,7 @@ export default function MyCaseGrid({
     ? self.handle
     : String(remoteProfile?.profile?.publicHandle || peerHintHandle || "")
         .replace(/^@+/, "")
-        .trim() ||
-      (loading && !remoteProfile
-        ? String(peerHintHandle || "").replace(/^@+/, "").trim() || "…"
-        : "");
+        .trim();
   const companyName = isMine
     ? (() => {
         try {
@@ -249,13 +247,13 @@ export default function MyCaseGrid({
         }
       })()
     : String(
-        remoteProfile?.profile?.companyName || remoteProfile?.cardExport?.organization || ""
+        remoteProfile?.profile?.companyName ||
+          remoteProfile?.cardExport?.organization ||
+          peerHintOrganization ||
+          ""
       ).trim();
-  /** 케이스함 상단: 1순위 사업자명 · 2순위 VLUE ID (개인 이름 중복 표시 금지) */
-  const topBarTitle =
-    companyName ||
-    (displayHandle ? displayHandle : "") ||
-    (loading && !isMine ? "…" : "");
+  /** 케이스함 상단: 1순위 사업자명 · 2순위 VLUE ID (개인 이름·「케이스함」 금지) */
+  const topBarTitle = companyName || displayHandle || "";
   const displayName = isMine
     ? self.name
     : String(
@@ -312,7 +310,10 @@ export default function MyCaseGrid({
   const hasLiveBroadcast = !accessDenied && mainBroadcast.length > 0;
 
   const loadFirst = useCallback(async () => {
-    const showFullLoading = !initialLoadDoneRef.current;
+    const hasPeerHint = Boolean(
+      String(peerHintHandle || "").trim() || String(peerHintOrganization || "").trim()
+    );
+    const showFullLoading = !initialLoadDoneRef.current && (isMine || !hasPeerHint);
     if (showFullLoading) setLoading(true);
     try {
       if (isMine) {
@@ -331,13 +332,31 @@ export default function MyCaseGrid({
           const c = await fetchFollowCounts(self.userId);
           if (c.ok && c.counts) setFollowCounts(c.counts);
         }
-        /* 라이브 스타일 동기화는 CallBigPush/오버레이 hydrate 에 맡김.
-           여기서 apply 하면 STYLE 이벤트로 목록이 재귀 갱신될 수 있음. */
       } else {
         if (!ownerUserId) return;
+        /* 프로필 먼저 시드 — 상단 사업자명/ID 즉시 표시 */
+        const profilePromise = fetchFollowProfile(ownerUserId, { purpose: "follow" })
+          .then((prof) => {
+            if (prof?.ok) {
+              setRemoteProfile((prev) => prev || {
+                profile: prof.profile,
+                cardExport: prof.cardExport,
+                photoUrl: prof.photoUrl,
+                membershipTier: prof.membershipTier,
+                digitalCardIssued: prof.digitalCardIssued,
+                vlueVerifiedBadge: prof.vlueVerifiedBadge,
+                follow: prof.follow
+              });
+              if (prof.follow?.counts) setFollowCounts(prof.follow.counts);
+            }
+            return prof;
+          })
+          .catch(() => null);
+
         const [data, styleRes] = await Promise.all([
           fetchUserMycase(ownerUserId, { limit: 30 }),
-          fetchPeerShowcaseStyleBundle(ownerUserId).catch(() => ({ ok: false }))
+          fetchPeerShowcaseStyleBundle(ownerUserId).catch(() => ({ ok: false })),
+          profilePromise
         ]);
         if (!data.ok) {
           toast(data.message || "케이스함을 불러오지 못했습니다.");
@@ -347,7 +366,7 @@ export default function MyCaseGrid({
           styleRes?.ok && styleRes.live && typeof styleRes.live === "object" ? styleRes.live : null;
         if (liveStyle) setPeerLiveStyle(liveStyle);
 
-        setRemoteProfile(data.profile || null);
+        if (data.profile) setRemoteProfile(data.profile);
         setAccessDenied(Boolean(data.accessDenied));
         setDenyReason(data.reason || null);
         let mains = data.mainBroadcast || [];
@@ -384,9 +403,21 @@ export default function MyCaseGrid({
       }
       initialLoadDoneRef.current = true;
     } finally {
-      if (showFullLoading) setLoading(false);
+      setLoading(false);
     }
-  }, [isMine, ownerUserId, self.userId, toast]);
+  }, [isMine, ownerUserId, self.userId, toast, peerHintHandle, peerHintOrganization]);
+
+  useEffect(() => {
+    if (isMine) return undefined;
+    initialLoadDoneRef.current = false;
+    setRemoteProfile(null);
+    setPeerLiveStyle(null);
+    setItems([]);
+    setMainBroadcast([]);
+    setAccessDenied(false);
+    setDenyReason(null);
+    return undefined;
+  }, [isMine, ownerUserId]);
 
   useEffect(() => {
     void loadFirst();
@@ -848,7 +879,8 @@ export default function MyCaseGrid({
   const postsCount = filteredItems.length;
   const policyLine = isMine && policy ? formatCooldownHint(policy) : "";
   const highlightItems = mainBroadcast;
-  const peerProfileLoading = !isMine && loading;
+  const peerProfileLoading =
+    !isMine && loading && !topBarTitle && !String(peerHintName || "").trim();
 
   return (
     <section
@@ -868,7 +900,9 @@ export default function MyCaseGrid({
           </button>
         ) : null}
         <div className="ig-mycase__topbar-title">
-          <h1 className="ig-mycase__username">{topBarTitle || "케이스함"}</h1>
+          <h1 className="ig-mycase__username">
+            {topBarTitle || (loading ? "…" : "")}
+          </h1>
           {showVerifiedSeal ? (
             <VlueCyanVerifiedSeal size={14} className="ig-mycase__verified-seal" />
           ) : null}

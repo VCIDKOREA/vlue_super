@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Phone, Settings, X } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import RenderErrorGuard from "../RenderErrorGuard.jsx";
-import FreeTierCallShowcase from "./FreeTierCallShowcase.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
 import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
 import ShowcaseMediaPage from "./ShowcaseMediaPage.jsx";
@@ -447,12 +446,8 @@ export default function ShowcaseCallCarousel({
           }
         ];
       }
-      return [
-        {
-          type: isKnownContact ? "free-profile" : "free-safe",
-          id: isKnownContact ? "free-profile" : "free-safe"
-        }
-      ];
+      /* 레거시 FreeTier/Tent 쇼케이스 삭제 — 콘텐츠 없으면 빈 슬라이드 */
+      return [];
     }
 
     let content = buildFromPages(contentPages, maxIgPages);
@@ -1101,18 +1096,6 @@ export default function ShowcaseCallCarousel({
                 {near && slide.type === "paid-identity" ? (
                   <div className="showcase-call-carousel__paid-sheet">
                     <div className="showcase-call-carousel__paid-sheet-stage" aria-hidden />
-                  </div>
-                ) : null}
-
-                {near && (slide.type === "free-profile" || slide.type === "free-safe") ? (
-                  <div className="showcase-call-carousel__free">
-                    <FreeTierCallShowcase
-                      isKnownContact={slide.type === "free-profile" && !showcaseOffPreview}
-                      card={card}
-                      phone={incomingNumber}
-                      verified={verified}
-                      showcaseOffPreview={showcaseOffPreview}
-                    />
                   </div>
                 ) : null}
 

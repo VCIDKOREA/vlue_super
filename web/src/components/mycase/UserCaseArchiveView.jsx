@@ -15,6 +15,7 @@ export default function UserCaseArchiveView({
   userId,
   displayName = "",
   peerHandle = "",
+  peerOrganization = "",
   onClose,
   onToast,
   isDarkMode = false,
@@ -84,6 +85,7 @@ export default function UserCaseArchiveView({
             ownerUserId={userId}
             peerHintName={displayName}
             peerHintHandle={peerHandle}
+            peerHintOrganization={peerOrganization}
             onBack={onClose}
             onToast={onToast}
             bgmEnabled={!cardOpen}

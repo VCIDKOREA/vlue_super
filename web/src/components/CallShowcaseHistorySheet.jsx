@@ -812,7 +812,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
-    /* 캐시된 인증 회원 + 송출 없음 — 라이브 확인 전 즉시 안심 팝업하지 않음 */
+    /* 캐시된 인증 회원 + 송출 없음 — 라이브 확인 전 옛 쇼케이스/낙관 페인트 금지 */
     if (
       cachedPeer?.verified &&
       cachedPeer?.card &&
@@ -829,20 +829,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           setExpanded(true);
           setPreviewVerified(true);
           setPreviewCard(cachedPeer.card);
-          setLoading(false);
-        });
-        void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
-        return;
-      }
-      if (canPaintOptimisticCard(call)) {
-        const optimistic = buildOptimisticHistoryCard(call);
-        flushSync(() => {
-          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-          setContactSafePopup({ open: false, name: "", phone: "" });
-          setSelected(call);
-          setExpanded(true);
-          setPreviewVerified(true);
-          setPreviewCard(optimistic.card);
           setLoading(false);
         });
         void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
@@ -889,7 +875,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
-    /* VLUÉ 회원 — 로컬에 송출 스냅샷 없어도 라이브 확인 후 쇼케이스/안심 결정 */
+    /* VLUÉ 회원 — 로컬에 송출 없으면 스피너만 → 라이브 확인 후 쇼케이스/안심 (옛 무료 쇼케이스 금지) */
     if (
       listLooksLikeMember &&
       !peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot)
@@ -903,20 +889,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           setExpanded(true);
           setPreviewVerified(true);
           setPreviewCard(cachedPack.card);
-          setLoading(false);
-        });
-        void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
-        return;
-      }
-      if (canPaintOptimisticCard(call)) {
-        const optimistic = buildOptimisticHistoryCard(call);
-        flushSync(() => {
-          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-          setContactSafePopup({ open: false, name: "", phone: "" });
-          setSelected(call);
-          setExpanded(true);
-          setPreviewVerified(true);
-          setPreviewCard(optimistic.card);
           setLoading(false);
         });
         void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
@@ -954,20 +926,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       cached?.card &&
       !peerHasDccOrShowcaseContent(cached.card, cached.showcaseStyle)
     ) {
-      if (canPaintOptimisticCard(call)) {
-        const optimistic = buildOptimisticHistoryCard(call);
-        flushSync(() => {
-          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-          setContactSafePopup({ open: false, name: "", phone: "" });
-          setSelected(call);
-          setExpanded(true);
-          setPreviewVerified(true);
-          setPreviewCard(optimistic.card);
-          setLoading(false);
-        });
-        void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
-        return;
-      }
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setContactSafePopup({ open: false, name: "", phone: "" });

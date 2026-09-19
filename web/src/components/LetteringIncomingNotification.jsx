@@ -12,7 +12,6 @@ import { dcpCardMatchesIncoming } from "../lib/nationalAgencyDcpClient.js";
 import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
 import LetteringUnverifiedReportPanel from "./LetteringUnverifiedReportPanel.jsx";
 import ShowcaseCallCarousel from "./showcase/ShowcaseCallCarousel.jsx";
-import FreeTierCallShowcase from "./showcase/FreeTierCallShowcase.jsx";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 import { getLetteringReportsForPhone, summarizeLetteringTipsFromEntries } from "../lib/letteringPhoneReports.js";
 import { fetchLetteringTipSummary } from "../lib/letteringApi.js";
@@ -1633,13 +1632,9 @@ export default function LetteringIncomingNotification({
                       onToast={showGuide}
                     />
                   ) : (
-                    <FreeTierCallShowcase
-                      isKnownContact={isKnownContact}
-                      card={c}
-                      phone={incoming}
-                      verified={officialBadgeActive}
-                      showcaseOffPreview={showcaseOffPreview}
-                    />
+                    <p className="px-6 py-10 text-center text-[13px] font-semibold text-slate-400">
+                      공개 쇼케이스가 없습니다.
+                    </p>
                   )}
                 </div>
                 {renderExpandedFooter()}

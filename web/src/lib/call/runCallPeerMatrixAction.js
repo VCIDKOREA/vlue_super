@@ -6,6 +6,7 @@ import { CALL_PEER_CTA } from "./callPeerMatrix.js";
 import { shareShowcaseInviteViaKakao } from "./shareShowcaseInviteKakao.js";
 import { shareVlueInviteViaSms } from "../contactInviteShare.js";
 import { resolveCallHistoryShowcasePeer } from "../resolveCallHistoryShowcasePeer.js";
+import { fetchFollowProfile } from "../followApi.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -88,6 +89,7 @@ export async function runCallPeerMatrixAction({
     let userId = pickPeerUserId(card, call);
     let handle = String(card?.publicHandle || call?.publicHandle || "").replace(/^@/, "").trim();
     let name = String(card?.name || call?.name || matrix.contactName || "").trim();
+    let organization = String(card?.organization || card?.companyName || "").trim();
 
     if (!userId && peerPhone) {
       try {
@@ -95,6 +97,32 @@ export async function runCallPeerMatrixAction({
         userId = pickPeerUserId(payload?.card, call);
         if (!handle) handle = String(payload?.card?.publicHandle || "").replace(/^@/, "").trim();
         if (!name) name = String(payload?.card?.name || "").trim();
+        if (!organization) {
+          organization = String(payload?.card?.organization || payload?.card?.companyName || "").trim();
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (userId) {
+      try {
+        const prof = await fetchFollowProfile(userId, { purpose: "follow" });
+        if (prof?.ok) {
+          if (!handle) {
+            handle = String(prof.profile?.publicHandle || "").replace(/^@/, "").trim();
+          }
+          if (!organization) {
+            organization = String(
+              prof.profile?.companyName || prof.cardExport?.organization || ""
+            ).trim();
+          }
+          if (!name) {
+            name = String(
+              prof.profile?.displayName || prof.profile?.legalName || prof.cardExport?.name || ""
+            ).trim();
+          }
+        }
       } catch {
         /* ignore */
       }
@@ -112,7 +140,12 @@ export async function runCallPeerMatrixAction({
     }
     window.dispatchEvent(
       new CustomEvent("vlue-open-case-user", {
-        detail: { userId, handle, name: name || "케이스함" }
+        detail: {
+          userId,
+          handle,
+          name: name || handle || "",
+          organization
+        }
       })
     );
     return { ok: true, channel: "case_archive" };

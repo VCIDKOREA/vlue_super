@@ -3763,7 +3763,7 @@ function App() {
       }
     };
 
-    const openAccountCase = ({ userId = "", name = "", handle = "" } = {}) => {
+    const openAccountCase = ({ userId = "", name = "", handle = "", organization = "" } = {}) => {
       const id = String(userId || "").trim();
       const bareHandle = String(handle || "")
         .replace(/^@+/, "")
@@ -3786,10 +3786,11 @@ function App() {
       if (!id) return;
       setCaseArchiveUser({
         userId: id,
-        name: String(name || handle || "").trim() || "케이스함",
+        name: String(name || handle || "").trim(),
         handle: String(handle || "")
           .replace(/^@+/, "")
-          .trim()
+          .trim(),
+        organization: String(organization || "").trim()
       });
     };
 
@@ -3804,7 +3805,8 @@ function App() {
       openAccountCase({
         userId: e?.detail?.userId,
         name: e?.detail?.name,
-        handle: e?.detail?.handle
+        handle: e?.detail?.handle,
+        organization: e?.detail?.organization
       });
     };
     const onMention = async (e) => {
@@ -6084,6 +6086,7 @@ function App() {
         userId={caseArchiveUser?.userId || null}
         displayName={caseArchiveUser?.name || ""}
         peerHandle={caseArchiveUser?.handle || ""}
+        peerOrganization={caseArchiveUser?.organization || ""}
         layout={isWideApp ? "desktop" : "mobile"}
         onClose={() => setCaseArchiveUser(null)}
         onToast={(msg) => {
