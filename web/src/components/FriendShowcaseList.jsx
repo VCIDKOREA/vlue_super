@@ -440,17 +440,34 @@ export default function FriendShowcaseList({
     setPreviewSessionKey((k) => k + 1);
     setSelected(row);
     setPreviewKind(kind);
-    setPreviewCard(null);
     markFriendShowcaseSeen(row.id, row.updatedAt || Date.now());
     setActivityTick((n) => n + 1);
     const uid = OWNER_UUID_RE.test(String(row.userId || "")) ? String(row.userId).trim() : "";
     const handle = String(row.publicHandle || "").replace(/^@/, "").trim();
     const phone = row.phone || row.phoneDisplay || "";
     if (!uid && !handle && !phone) {
+      setPreviewCard(null);
       setPreviewLoading(false);
       return;
     }
-    setPreviewLoading(true);
+    /* 목록 메타로 즉시 페인트 — 네트워크 완료 전 빈 화면 방지 */
+    const seedTier = row.membershipTier || "free";
+    const seedStyle = createDefaultShowcaseStyle();
+    const optimisticCard = {
+      userId: uid,
+      ownerUserId: uid,
+      name: row.name || "",
+      phone: phone || "",
+      phoneDisplay: row.phoneDisplay || phone || "",
+      publicHandle: handle,
+      membershipTier: seedTier,
+      photoUrl: row.avatarUrl || "",
+      avatarUrl: row.avatarUrl || "",
+      showcaseStyle: seedStyle,
+      _optimistic: true
+    };
+    setPreviewCard(optimisticCard);
+    setPreviewLoading(false);
     try {
       const payload = await resolveVlueShowcasePeer({
         userId: uid,
@@ -502,8 +519,8 @@ export default function FriendShowcaseList({
         setFollowing(patch);
         setHashtagRows(patch);
       }
-    } finally {
-      setPreviewLoading(false);
+    } catch {
+      /* 낙관적 카드 유지 */
     }
   }, [activeTab, unlockAudioGesture, setPlaybackPhase]);
 
@@ -760,7 +777,7 @@ export default function FriendShowcaseList({
         className="bg-[#0B101B]"
       >
         <div className="flex min-h-0 flex-1 flex-col">
-          {previewLoading ? (
+          {previewLoading && !previewCard ? (
             <p className="py-16 text-center text-[13px] font-semibold text-slate-400">불러오는 중…</p>
           ) : previewCard && previewKind === "idcard" ? (
             previewPaid ? (

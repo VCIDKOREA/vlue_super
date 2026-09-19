@@ -4,7 +4,7 @@
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
-import { fetchFollowProfile } from "./followApi.js";
+import { fetchFollowProfile, writeFollowStateCache } from "./followApi.js";
 import { fetchPeerLiveStylePublic } from "./showcase/showcaseStyleApi.js";
 import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { resolveVlueShowcaseByPhone } from "./resolveVlueShowcaseByPhone.js";
@@ -151,6 +151,10 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
       number: phoneHint
     })
   ]);
+
+  if (profRes?.ok && profRes.follow?.relation) {
+    writeFollowStateCache(userId, profRes.follow);
+  }
 
   let merged = mergeCardFromProfile(
     {

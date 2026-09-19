@@ -20,12 +20,36 @@ import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
  * @property {{ userId: string, isPrivateFollow: boolean }} target
  */
 
+const followStateCache = new Map();
+const FOLLOW_STATE_TTL_MS = 120_000;
+
+/** @param {string} targetUserId */
+export function readFollowStateCache(targetUserId) {
+  const id = String(targetUserId || "").trim();
+  if (!id) return null;
+  const row = followStateCache.get(id);
+  if (!row) return null;
+  if (Date.now() - row.at > FOLLOW_STATE_TTL_MS) {
+    followStateCache.delete(id);
+    return null;
+  }
+  return row.state || null;
+}
+
+/** @param {string} targetUserId @param {FollowState|null|undefined} state */
+export function writeFollowStateCache(targetUserId, state) {
+  const id = String(targetUserId || "").trim();
+  if (!id || !state || typeof state !== "object") return;
+  followStateCache.set(id, { at: Date.now(), state });
+}
+
 /** @param {string} targetUserId */
 export async function fetchFollowState(targetUserId) {
   try {
     const res = await vlueAuthFetch(apiUrl(`/api/follow/state/${encodeURIComponent(targetUserId)}`));
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, state: null, error: data.error || "fetch_failed" };
+    if (data.state) writeFollowStateCache(targetUserId, data.state);
     return { ok: true, state: data.state };
   } catch (e) {
     return { ok: false, state: null, error: e?.message || "network" };
@@ -49,6 +73,7 @@ export async function toggleFollow(targetUserId) {
         status: res.status
       };
     }
+    if (data.state) writeFollowStateCache(targetUserId, data.state);
     return { ok: true, action: data.action, state: data.state, follow: data.follow };
   } catch (e) {
     return { ok: false, error: e?.message || "network", state: null };
@@ -181,6 +206,9 @@ export async function fetchFollowProfile(userId, opts = {}) {
         authPaidAt: data.authPaidAt || null,
         cardIssuedAt: data.cardIssuedAt || null
       };
+      if (data.follow && typeof data.follow === "object" && data.follow.relation) {
+        writeFollowStateCache(id, data.follow);
+      }
       followProfileCache.set(cacheKey, { at: Date.now(), value });
       return value;
     } catch (e) {

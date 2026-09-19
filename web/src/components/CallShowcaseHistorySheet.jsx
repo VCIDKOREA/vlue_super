@@ -96,28 +96,41 @@ function buildOptimisticHistoryCard(call) {
   const matchedHint = call.verified === true;
   const tier = call.membershipTier || snap.membershipTier || "free";
   const snapUserId = String(snap.userId || call.userId || "").trim();
+  const listAvatar = String(call.avatarUrl || snap.photoUrl || snap.avatarUrl || "").trim();
   const peerStyle =
-    matchedHint && snapStyle && snapUserId
+    matchedHint && snapStyle
       ? normalizeHistoryReplayStyle(snapStyle, tier)
-      : silentShowcaseStyle();
+      : snapStyle && typeof snapStyle === "object"
+        ? normalizeHistoryReplayStyle(snapStyle, tier)
+        : silentShowcaseStyle();
+  const name = matchedHint
+    ? String(snap.name || call.memberName || call.name || "").trim()
+    : String(snap.name || "").trim();
   const card = applyShowcaseStyleToCard(
     {
-      userId: String(snap.userId || call.userId || "").trim(),
-      ownerUserId: String(snap.userId || call.userId || "").trim(),
-      name: matchedHint ? String(snap.name || call.name || "").trim() : "",
+      userId: snapUserId,
+      ownerUserId: snapUserId,
+      name,
       phone,
       organization: matchedHint ? String(snap.organization || "").trim() : "",
       title: matchedHint ? String(snap.title || "").trim() : "",
       email: matchedHint ? String(snap.email || "").trim() : "",
       website: matchedHint ? String(snap.website || "").trim() : "",
       logoUrl: matchedHint ? String(snap.logoUrl || "").trim() : "",
-      photoUrl: matchedHint ? String(snap.photoUrl || call.avatarUrl || "").trim() : "",
+      photoUrl: matchedHint
+        ? String(snap.photoUrl || call.avatarUrl || "").trim()
+        : /^https:\/\//i.test(listAvatar)
+          ? listAvatar
+          : "",
       avatarUrl: matchedHint
         ? String(snap.avatarUrl || snap.photoUrl || call.avatarUrl || "").trim()
-        : "",
+        : /^https:\/\//i.test(listAvatar)
+          ? listAvatar
+          : "",
       photoFocus: String(snap.photoFocus || "center").trim() || "center",
       membershipTier: tier,
-      showcaseStyle: peerStyle
+      showcaseStyle: peerStyle,
+      _optimistic: true
     },
     isPaidLetteringTier(tier) ? tier : "free",
     { peerMode: true, style: peerStyle }
@@ -146,6 +159,15 @@ function snapshotIsCompleteEnough(call) {
   if (!hasUsableLocalSnapshot(call)) return false;
   /* DCC·쇼케이스 미디어가 있을 때만 풀 화면 — 없으면 VLUÉ 인증 팝업 */
   return peerHasDccOrShowcaseContent(call.cardSnapshot, call.showcaseSnapshot);
+}
+
+/** 네트워크 전에도 즉시 페인트를 시도할 수 있는지 */
+function canPaintOptimisticCard(call) {
+  if (!call) return false;
+  if (snapshotIsCompleteEnough(call)) return true;
+  if (call.verified === true) return true;
+  if (call.phoneDisplay || call.phone) return true;
+  return Boolean(call.name || call.memberName || call.avatarUrl);
 }
 
 function styleHasPages(style) {
@@ -362,23 +384,16 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     return () => window.removeEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
   }, []);
 
-  /* 목록에 보이는 VLUÉ 회원 — 사진 없는 행만 가벼운 prefetch (상위 8) */
+  /* 목록 상위 VLUÉ 회원 쇼케이스 prefetch — 탭 시 즉시 오픈용 */
   useEffect(() => {
     if (!open || !items.length) return undefined;
     const tops = items
-      .filter(
-        (c) =>
-          (c.verified === true || c.userId || c.memberName) &&
-          !resolveCallHistoryAvatar(c)
-      )
-      .slice(0, 8);
+      .filter((c) => c.verified === true || c.userId || c.memberName)
+      .slice(0, 12);
     for (const call of tops) {
       const phone = call.phoneDisplay || call.phone;
       if (!phone) continue;
-      const cached = readCallHistoryPeerCache(phone);
-      if (cached?.card && resolveCallHistoryAvatar({ ...call, ...cached, cardSnapshot: cached.card })) {
-        continue;
-      }
+      if (cachePayloadIsUsable(readCallHistoryPeerCache(phone))) continue;
       prefetchCallHistoryPeer(phone, () =>
         resolveCallHistoryShowcasePeer(phone, {
           displayName: call.name || call.memberName || "",
@@ -765,6 +780,19 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
           return;
         }
+        if (canPaintOptimisticCard(call)) {
+          const optimistic = buildOptimisticHistoryCard(call);
+          flushSync(() => {
+            setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+            setSelected(call);
+            setExpanded(true);
+            setPreviewVerified(true);
+            setPreviewCard(optimistic.card);
+            setLoading(false);
+          });
+          void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+          return;
+        }
         flushSync(() => {
           setAuthPopup({ open: false, name: "", phone: "", handle: "" });
           setSelected(call);
@@ -834,6 +862,20 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           return;
         }
         if (snapshotIsCompleteEnough(call)) {
+          const optimistic = buildOptimisticHistoryCard(call);
+          flushSync(() => {
+            setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+            setSelected(call);
+            setExpanded(true);
+            setPreviewVerified(true);
+            setPreviewCard(optimistic.card);
+            setLoading(false);
+          });
+          void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+          return;
+        }
+        /* 스냅샷 불완전해도 목록 메타로 즉시 페인트 → 백그라운드 하이드레이트 */
+        if (canPaintOptimisticCard(call)) {
           const optimistic = buildOptimisticHistoryCard(call);
           flushSync(() => {
             setAuthPopup({ open: false, name: "", phone: "", handle: "" });
@@ -933,6 +975,21 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setSelected(call);
         setExpanded(true);
         setPreviewVerified(true);
+        setPreviewCard(optimistic.card);
+        setLoading(false);
+      });
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: false });
+      return;
+    }
+
+    /* 콜드 오픈도 목록 메타로 즉시 페인트 — 스피너 대기 제거 */
+    if (canPaintOptimisticCard(call)) {
+      const optimistic = buildOptimisticHistoryCard(call);
+      flushSync(() => {
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+        setSelected(call);
+        setExpanded(true);
+        setPreviewVerified(Boolean(call.verified));
         setPreviewCard(optimistic.card);
         setLoading(false);
       });

@@ -3,7 +3,9 @@ import {
   fetchFollowState,
   followButtonLabel,
   isFollowActiveState,
-  toggleFollow
+  readFollowStateCache,
+  toggleFollow,
+  writeFollowStateCache
 } from "../lib/followApi.js";
 import {
   hasVlueLoggedInSession,
@@ -13,12 +15,15 @@ import {
 /**
  * 팔로우 상태 조회 + 낙관적 토글
  * @param {string|null|undefined} targetUserId
- * @param {{ enabled?: boolean, onError?: (msg: string) => void }} [opts]
+ * @param {{ enabled?: boolean, initialState?: object|null, onError?: (msg: string) => void }} [opts]
  */
 export function useFollowState(targetUserId, opts = {}) {
   const enabled = opts.enabled !== false && Boolean(targetUserId);
-  const [state, setState] = useState(null);
-  const [loading, setLoading] = useState(Boolean(enabled));
+  const seed =
+    (opts.initialState && typeof opts.initialState === "object" ? opts.initialState : null) ||
+    (enabled ? readFollowStateCache(targetUserId) : null);
+  const [state, setState] = useState(seed);
+  const [loading, setLoading] = useState(Boolean(enabled) && !seed);
   const [busy, setBusy] = useState(false);
   const rollbackRef = useRef(null);
   const pendingRef = useRef(0);
@@ -40,8 +45,10 @@ export function useFollowState(targetUserId, opts = {}) {
       setLoading(false);
       return;
     }
-    if (res.ok) setState(res.state);
-    else onErrorRef.current?.(res.error || "상태를 불러오지 못했습니다.");
+    if (res.ok) {
+      setState(res.state);
+      if (res.state) writeFollowStateCache(targetUserId, res.state);
+    } else onErrorRef.current?.(res.error || "상태를 불러오지 못했습니다.");
     setLoading(false);
   }, [targetUserId]);
 
@@ -54,15 +61,29 @@ export function useFollowState(targetUserId, opts = {}) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const cached = readFollowStateCache(targetUserId);
+    const nextSeed =
+      (opts.initialState && typeof opts.initialState === "object" ? opts.initialState : null) ||
+      cached;
+    if (nextSeed) {
+      setState(nextSeed);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     reload();
-  }, [enabled, reload]);
+    // initialState는 마운트/타겟 변경 시만 시드로 사용
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, reload, targetUserId]);
 
   const optimisticNextRelation = useCallback((current) => {
     if (!current) return "following";
     if (current.relation === "mutual") return "followed_by";
     if (current.relation === "following") return "none";
     if (current.relation === "pending_out") return "none";
+    /* 상대가 이미 나를 팔로우 중이면 탭 즉시 맞팔로우 */
+    if (current.relation === "followed_by" || current.isFollowedBy) return "mutual";
+    if (current.relation === "pending_in") return "mutual";
     if (current.target?.isPrivateFollow) return "pending_out";
     return "following";
   }, []);
@@ -133,6 +154,7 @@ export function useFollowState(targetUserId, opts = {}) {
     dirtyRef.current = false;
     if (last.ok && last.state) {
       setState(last.state);
+      writeFollowStateCache(targetRef.current, last.state);
       return last;
     }
     if (!last.ok) {
@@ -158,6 +180,7 @@ export function useFollowState(targetUserId, opts = {}) {
     dirtyRef.current = true;
     const nextState = applyOptimistic(state);
     setState(nextState);
+    if (nextState) writeFollowStateCache(targetUserId, nextState);
     pendingRef.current += 1;
     const action =
       nextState?.isPendingOut ? "requested" : nextState?.isFollowing || nextState?.isMutual ? "followed" : "unfollowed";
@@ -165,8 +188,13 @@ export function useFollowState(targetUserId, opts = {}) {
     return { ok: true, action, state: nextState, optimistic: true };
   }, [targetUserId, state, applyOptimistic, drain]);
 
-  const label = state?.label || followButtonLabel(state?.relation || "none");
-  const isActive = isFollowActiveState(state?.relation || "none");
+  const relation = state?.relation || null;
+  const label = state
+    ? state.label || followButtonLabel(relation || "none")
+    : loading
+      ? "…"
+      : followButtonLabel("none");
+  const isActive = isFollowActiveState(relation || "none");
 
   return {
     state,

@@ -5,7 +5,7 @@
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
 import { isPaidLetteringTier } from "./letteringMembership.js";
-import { fetchFollowProfile } from "./followApi.js";
+import { fetchFollowProfile, writeFollowStateCache } from "./followApi.js";
 import { lookupUserByHandle } from "./showcase/showcaseSocialApi.js";
 import {
   fetchPeerLiveStylePublic,
@@ -110,6 +110,10 @@ export async function resolveVlueShowcasePeer(input = {}) {
       fetchFollowProfile(userId, { purpose: viewContext }),
       fetchPeerShowcaseStyleBundle(userId, { force: Boolean(input.forceStyle) })
     ]);
+
+    if (profRes?.ok && profRes.follow?.relation) {
+      writeFollowStateCache(userId, profRes.follow);
+    }
 
     /* 탈퇴·고아 UUID(연락처/명함 잔존) — 번호·핸들로 ACTIVE 계정 재해석 후 1회 재시도 */
     if (!profRes.ok && /user_not_found/i.test(String(profRes.error || ""))) {

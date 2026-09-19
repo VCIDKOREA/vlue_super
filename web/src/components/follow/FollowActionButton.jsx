@@ -12,10 +12,17 @@ import {
  *
  * @param {{ targetUserId?: string|null, className?: string, disabled?: boolean, onToast?: (msg: string) => void }} props
  */
-export default function FollowActionButton({ targetUserId, className = "", disabled = false, onToast }) {
+export default function FollowActionButton({
+  targetUserId,
+  className = "",
+  disabled = false,
+  initialState = null,
+  onToast
+}) {
   const isSelf = isFollowTargetSelf(targetUserId);
-  const { label, isActive, isMutual, busy, toggle } = useFollowState(targetUserId, {
+  const { label, isActive, isMutual, busy, loading, toggle } = useFollowState(targetUserId, {
     enabled: Boolean(targetUserId) && !isSelf,
+    initialState,
     onError: (msg) => onToast?.(msg)
   });
 
@@ -54,10 +61,10 @@ export default function FollowActionButton({ targetUserId, className = "", disab
   return (
     <button
       type="button"
-      className={`follow-action-btn ${isActive ? "follow-action-btn--active" : ""} ${isMutual ? "follow-action-btn--mutual" : ""} ${className}`.trim()}
+      className={`follow-action-btn ${isActive ? "follow-action-btn--active" : ""} ${isMutual ? "follow-action-btn--mutual" : ""} ${loading && !isActive && label === "…" ? "follow-action-btn--loading" : ""} ${className}`.trim()}
       disabled={disabled}
       aria-pressed={isActive}
-      aria-busy={busy}
+      aria-busy={busy || loading}
       data-follow-relation={isMutual ? "mutual" : isActive ? "active" : "none"}
       onClick={handleClick}
       onPointerDown={(e) => e.stopPropagation()}
