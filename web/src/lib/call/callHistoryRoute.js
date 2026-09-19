@@ -178,13 +178,14 @@ export function mayApplyRoute(lockedKind, nextKind) {
 }
 
 /**
- * 목록 CTA — 회원여부 미확정이면 버튼 숨김(노란 플래시 금지).
+ * 목록 CTA — 회원여부 미확정이면 버튼 숨김(노란→보라 플래시 금지).
+ * 저장 연락처만으로 비회원 단정하지 않음(김광덕·김진현 등 가입 테스터).
  */
 export function resolveHistoryRowMemberState(call) {
   if (isVlueMemberHint(call)) return "member";
   const phone = phoneOf(call);
   const cached = phone ? readCallHistoryPeerCache(phone) : null;
+  if (cached?.verified === true) return "member";
   if (cached?.verified === false || call?.verified === false) return "nonmember";
-  if (isSavedContactHint(call)) return "nonmember";
   return "unknown";
 }

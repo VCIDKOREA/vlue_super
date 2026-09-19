@@ -11,6 +11,7 @@ import {
 } from "./callShowcaseHistory.js";
 import { matchNationalAgency } from "./nationalAgencyDcpClient.js";
 import { resolveIsKnownContactSync } from "./contacts/hybridKnownContact.js";
+import { readCallHistoryPeerCache } from "./callHistoryPeerCache.js";
 
 /** 목록 아바타 — https(또는 사이트 상대경로)만. data/blob·브랜드 마크·회사로고 제외 */
 function pickListAvatarUrl(...candidates) {
@@ -260,6 +261,75 @@ export function applyLocalKnownPeersToCallGroups(groups) {
       };
     }
     return g;
+  });
+}
+
+/**
+ * 새로 만든 CallLog 행에 이전 목록·피어 캐시의 회원 플래그를 즉시 이어붙임.
+ * (없으면 전부 전부「전달」→ 수 초 뒤「케이스함」으로 바뀌는 CTA 플리커)
+ */
+export function preserveMemberHintsToCallGroups(groups, prevGroups = []) {
+  const byKey = new Map();
+  for (const row of Array.isArray(prevGroups) ? prevGroups : []) {
+    const key = row.phoneKey || callLogPhoneKey(row.phoneDisplay || row.phone);
+    if (!key) continue;
+    byKey.set(key, row);
+  }
+
+  return (Array.isArray(groups) ? groups : []).map((g) => {
+    const key = g.phoneKey || callLogPhoneKey(g.phoneDisplay || g.phone);
+    const prev = key ? byKey.get(key) : null;
+    const phone = g.phoneDisplay || g.phone;
+    const cached = readCallHistoryPeerCache(phone);
+    const verified =
+      g.verified === true ||
+      prev?.verified === true ||
+      prev?.peerIsVlueMember === true ||
+      cached?.verified === true ||
+      Boolean(g.userId || prev?.userId || cached?.card?.userId);
+    if (!verified && !prev?.userId && !cached?.verified) return g;
+    const userId = String(g.userId || prev?.userId || cached?.card?.userId || "").trim();
+    const memberName =
+      String(g.memberName || "").trim() ||
+      String(prev?.memberName || "").trim() ||
+      (verified ? String(cached?.card?.name || "").trim() : "");
+    const tier =
+      g.membershipTier ||
+      prev?.membershipTier ||
+      cached?.card?.membershipTier ||
+      "free";
+    const snap = g.cardSnapshot && typeof g.cardSnapshot === "object" ? g.cardSnapshot : {};
+    const prevSnap =
+      prev?.cardSnapshot && typeof prev.cardSnapshot === "object" ? prev.cardSnapshot : {};
+    const cachedCard = cached?.card && typeof cached.card === "object" ? cached.card : {};
+    return {
+      ...g,
+      verified: verified || g.verified === true,
+      peerIsVlueMember: verified || g.peerIsVlueMember === true,
+      userId: userId || g.userId || "",
+      memberName: memberName || g.memberName || "",
+      membershipTier: tier,
+      name: memberName || g.name || "",
+      avatarUrl:
+        pickListAvatarUrl(
+          g.avatarUrl,
+          prev?.avatarUrl,
+          cachedCard.photoUrl,
+          cachedCard.avatarUrl,
+          snap.photoUrl
+        ) || "",
+      cardSnapshot: {
+        ...prevSnap,
+        ...snap,
+        userId: snap.userId || prevSnap.userId || userId || "",
+        name: snap.name || prevSnap.name || memberName || "",
+        membershipTier: snap.membershipTier || prevSnap.membershipTier || tier,
+        photoUrl:
+          pickListAvatarUrl(snap.photoUrl, prevSnap.photoUrl, cachedCard.photoUrl) || "",
+        avatarUrl:
+          pickListAvatarUrl(snap.avatarUrl, prevSnap.avatarUrl, cachedCard.avatarUrl) || ""
+      }
+    };
   });
 }
 

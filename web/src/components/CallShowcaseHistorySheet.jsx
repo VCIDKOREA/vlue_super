@@ -6,6 +6,7 @@ import {
   applyLocalKnownPeersToCallGroups,
   applyMemberDirectoryToCallGroups,
   applyKnownContactsToCallGroups,
+  preserveMemberHintsToCallGroups,
   buildCallHistoryList,
   fetchDeviceCallLogEntries,
   formatCallDuration,
@@ -462,26 +463,41 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   useEffect(() => {
     const onPeerCache = () => {
       setPeerAvatarTick((n) => n + 1);
-      /* peer 캐시에 사진이 생기면 목록 row 에도 바로 반영 (이니셜 고착 방지) */
       setItems((prev) => {
         let changed = false;
         const next = prev.map((call) => {
-          if (resolveCallHistoryAvatar(call)) return call;
           const phone = call.phoneDisplay || call.phone;
           const cached = readCallHistoryPeerCache(phone);
+          if (!cached) return call;
           const url = String(
             cached?.card?.photoUrl || cached?.card?.avatarUrl || cached?.card?.image_url || ""
           ).trim();
-          if (!url || !/^https:\/\//i.test(url)) return call;
-          if (/vlue-brand-logo|vlue-shield/i.test(url)) return call;
+          const becomeMember = cached.verified === true && call.verified !== true;
+          const avatarMissing = !resolveCallHistoryAvatar(call);
+          const goodUrl =
+            url &&
+            /^https:\/\//i.test(url) &&
+            !/vlue-brand-logo|vlue-shield/i.test(url);
+          if (!becomeMember && !(avatarMissing && goodUrl)) return call;
           changed = true;
           return {
             ...call,
-            avatarUrl: url,
+            verified: becomeMember ? true : call.verified,
+            peerIsVlueMember: becomeMember ? true : call.peerIsVlueMember,
+            userId: call.userId || cached.card?.userId || "",
+            memberName:
+              call.memberName ||
+              (cached.verified ? String(cached.card?.name || "").trim() : "") ||
+              call.memberName,
+            membershipTier: call.membershipTier || cached.card?.membershipTier || "free",
+            avatarUrl: goodUrl && avatarMissing ? url : call.avatarUrl,
             cardSnapshot: {
-              ...(call.cardSnapshot && typeof call.cardSnapshot === "object" ? call.cardSnapshot : {}),
-              photoUrl: url,
-              avatarUrl: url
+              ...(call.cardSnapshot && typeof call.cardSnapshot === "object"
+                ? call.cardSnapshot
+                : {}),
+              userId: call.userId || cached.card?.userId || "",
+              photoUrl: goodUrl ? url : call.cardSnapshot?.photoUrl,
+              avatarUrl: goodUrl ? url : call.cardSnapshot?.avatarUrl
             }
           };
         });
@@ -493,12 +509,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     return () => window.removeEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
   }, []);
 
-  /* 목록 상위 VLUÉ 회원 쇼케이스 prefetch — memberName 단독 제외(저장명 오인 방지) */
+  /* 상위 번호 peer prefetch — 회원 여부·쇼케이스 즉시 오픈용 */
   useEffect(() => {
     if (!open || !items.length) return undefined;
-    const tops = items
-      .filter((c) => c.verified === true || c.peerIsVlueMember === true || c.userId)
-      .slice(0, 12);
+    const tops = items.slice(0, 16);
     for (const call of tops) {
       const phone = call.phoneDisplay || call.phone;
       if (!phone) continue;
@@ -606,19 +620,34 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     try {
       /* 주소록 캐시를 먼저 맞춰 CallLog만으로도 저장 이름이 바로 붙게 */
       await syncDeviceContactsFromNative().catch(() => {});
-      const raw = await fetchDeviceCallLogEntries(200);
-      /* 1차: 기기 로그 + 로컬 히스토리 + CEO 시드 — 번호만 보이다가 이름 붙는 깜빡임 방지 */
-      const quick = applySafeCareLocalToCallGroups(
-        applyKnownContactsToCallGroups(
-          applyLocalKnownPeersToCallGroups(
-            buildCallHistoryList({
-              deviceEntries: raw,
-              lineEvents: [],
-              selectedLine: "all",
-              lines: []
-            })
+      const prevHint = readCallHistoryListCache() || items;
+      const phonesWarm = [
+        ...new Set(prevHint.map((g) => g.phoneDisplay || g.phone).filter(Boolean))
+      ].slice(0, 48);
+      /* CallLog + 회원 디렉터리 병행 — 김광덕·김진현 CTA 가「전달」로 먼저 뜨지 않게 */
+      const [raw, membersWarm] = await Promise.all([
+        fetchDeviceCallLogEntries(200),
+        phonesWarm.length
+          ? fetchMemberNamesByNumbers(phonesWarm).catch(() => [])
+          : Promise.resolve([])
+      ]);
+      const quick = preserveMemberHintsToCallGroups(
+        applySafeCareLocalToCallGroups(
+          applyKnownContactsToCallGroups(
+            applyLocalKnownPeersToCallGroups(
+              applyMemberDirectoryToCallGroups(
+                buildCallHistoryList({
+                  deviceEntries: raw,
+                  lineEvents: [],
+                  selectedLine: "all",
+                  lines: []
+                }),
+                membersWarm
+              )
+            )
           )
-        )
+        ),
+        prevHint
       );
       setItems(quick);
       if (quick.length) writeCallHistoryListCache(quick);
@@ -632,7 +661,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           .then((d) => (Array.isArray(d.lines) ? d.lines : []))
           .catch(() => []),
         fetchLineCallHistory(lineFilter).catch(() => []),
-        fetchMemberNamesByNumbers(phonesForLookup).catch(() => [])
+        /* 이미 warm 한 번호는 재사용, 신규 번호만 보강 */
+        phonesForLookup.length && phonesForLookup.some((p) => !phonesWarm.includes(p))
+          ? fetchMemberNamesByNumbers(phonesForLookup).catch(() => membersWarm)
+          : Promise.resolve(membersWarm)
       ]);
       setLines(lineRows);
       const selectedLine =
@@ -643,10 +675,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         selectedLine,
         lines: lineRows
       });
-      const enriched = applySafeCareLocalToCallGroups(
-        applyKnownContactsToCallGroups(
-          applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
-        )
+      const enriched = preserveMemberHintsToCallGroups(
+        applySafeCareLocalToCallGroups(
+          applyKnownContactsToCallGroups(
+            applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
+          )
+        ),
+        quick
       );
       setItems(enriched);
       if (enriched.length) writeCallHistoryListCache(enriched);
