@@ -321,63 +321,101 @@ function openSystemDialer(phone) {
   }
 }
 
-/** 좌: 카톡/SMS 전달 / 우: 기본 전화앱 */
+/** 좌: 카톡/SMS 전달 / 우: 기본 전화앱 — 배경 액션 노출 애니메이션 */
 function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, children }) {
   const startRef = useRef(null);
   const [offsetX, setOffsetX] = useState(0);
+  const [settling, setSettling] = useState(false);
+
+  const snapBack = () => {
+    setSettling(true);
+    setOffsetX(0);
+    window.setTimeout(() => setSettling(false), 220);
+  };
 
   const endSwipe = (e) => {
     const s = startRef.current;
     startRef.current = null;
     if (!s || (e.pointerId != null && s.id !== e.pointerId)) {
-      setOffsetX(0);
+      snapBack();
       return;
     }
     const dx = e.clientX - s.x;
     const dy = e.clientY - s.y;
-    setOffsetX(0);
     if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.15) {
       if (dx > 0) {
-        openSystemDialer(call.phoneDisplay || call.phone);
+        setOffsetX(88);
+        setSettling(true);
+        window.setTimeout(() => {
+          openSystemDialer(call.phoneDisplay || call.phone);
+          snapBack();
+        }, 160);
       } else {
-        onShare?.(call, matrix);
+        setOffsetX(-88);
+        setSettling(true);
+        window.setTimeout(() => {
+          onShare?.(call, matrix);
+          snapBack();
+        }, 160);
       }
       return;
     }
+    snapBack();
     if (!s.moved) onOpen?.(call);
   };
 
+  const reveal = Math.max(-96, Math.min(96, offsetX));
+  const showRight = reveal > 8;
+  const showLeft = reveal < -8;
+
   return (
-    <div
-      className="call-history-row call-history-row--samsung"
-      style={offsetX ? { transform: `translateX(${Math.max(-56, Math.min(56, offsetX))}px)` } : undefined}
-      onPointerDown={(e) => {
-        if (e.button != null && e.button !== 0) return;
-        if (e.target?.closest?.("button")) return;
-        startRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false };
-        try {
-          e.currentTarget.setPointerCapture?.(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      }}
-      onPointerMove={(e) => {
-        const s = startRef.current;
-        if (!s || s.id !== e.pointerId) return;
-        const dx = e.clientX - s.x;
-        const dy = e.clientY - s.y;
-        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) s.moved = true;
-        if (Math.abs(dx) > Math.abs(dy)) setOffsetX(dx);
-      }}
-      onPointerUp={endSwipe}
-      onPointerCancel={() => {
-        startRef.current = null;
-        setOffsetX(0);
-      }}
-    >
-      {children}
-      <div className="call-history-row__trailing">
-        <HistoryRowCta call={call} matrix={matrix} busy={busy} onAction={onAction} />
+    <div className="call-history-swipe">
+      <div
+        className={`call-history-swipe__under call-history-swipe__under--dial${showRight ? " is-visible" : ""}`}
+        aria-hidden
+      >
+        <Phone size={18} strokeWidth={2.4} />
+        <span>전화</span>
+      </div>
+      <div
+        className={`call-history-swipe__under call-history-swipe__under--share${showLeft ? " is-visible" : ""}`}
+        aria-hidden
+      >
+        <span>전달</span>
+        <span className="call-history-swipe__under-sub">카톡 · SMS</span>
+      </div>
+      <div
+        className={`call-history-row call-history-row--samsung${settling ? " is-settling" : ""}`}
+        style={{ transform: `translateX(${reveal}px)` }}
+        onPointerDown={(e) => {
+          if (e.button != null && e.button !== 0) return;
+          if (e.target?.closest?.("button")) return;
+          setSettling(false);
+          startRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false };
+          try {
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+        }}
+        onPointerMove={(e) => {
+          const s = startRef.current;
+          if (!s || s.id !== e.pointerId) return;
+          const dx = e.clientX - s.x;
+          const dy = e.clientY - s.y;
+          if (Math.abs(dx) > 10 || Math.abs(dy) > 10) s.moved = true;
+          if (Math.abs(dx) > Math.abs(dy)) setOffsetX(dx);
+        }}
+        onPointerUp={endSwipe}
+        onPointerCancel={() => {
+          startRef.current = null;
+          snapBack();
+        }}
+      >
+        {children}
+        <div className="call-history-row__trailing">
+          <HistoryRowCta call={call} matrix={matrix} busy={busy} onAction={onAction} />
+        </div>
       </div>
     </div>
   );
@@ -455,11 +493,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     return () => window.removeEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
   }, []);
 
-  /* 목록 상위 VLUÉ 회원 쇼케이스 prefetch — 탭 시 즉시 오픈용 */
+  /* 목록 상위 VLUÉ 회원 쇼케이스 prefetch — memberName 단독 제외(저장명 오인 방지) */
   useEffect(() => {
     if (!open || !items.length) return undefined;
     const tops = items
-      .filter((c) => c.verified === true || c.userId || c.memberName)
+      .filter((c) => c.verified === true || c.peerIsVlueMember === true || c.userId)
       .slice(0, 12);
     for (const call of tops) {
       const phone = call.phoneDisplay || call.phone;
@@ -924,12 +962,17 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     };
 
     if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
-      openContactSafeForCall(call, resolveIsKnownContactSync(phone));
+      flushSync(() => {
+        openContactSafeForCall(call, resolveIsKnownContactSync(phone));
+      });
       return;
     }
 
     if (decision.kind === CALL_HISTORY_ROUTE.AUTH) {
-      openAuthPopupForPeer(call, decision.card || cachedPeer?.card || null);
+      flushSync(() => {
+        openAuthPopupForPeer(call, decision.card || cachedPeer?.card || null);
+      });
+      /* 송출 ON 교정만 백그라운드 — 안심→쇼케이스 플리커 최소화 */
       void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
       return;
     }
