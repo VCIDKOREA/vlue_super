@@ -9,8 +9,9 @@ const DEFAULT_WARNING =
   "🚨 현재 번호는 비정상 발신 번호로 의심됩니다! 즉시 통화를 종료하고 공식 정보를 확인하세요!!";
 const NORMAL_MESSAGE =
   "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요.";
-const CONTACT_NORMAL_MESSAGE =
-  "VLUÉ 비회원 · 저장된 번호입니다. 발신 경로 이상없음.";
+const CONTACT_NORMAL_LINE1 = "VLUÉ 비회원 저장된번호입니다.";
+const CONTACT_NORMAL_LINE2 = "발신 상태 정상 경로 입니다.";
+const CONTACT_NORMAL_MESSAGE = `${CONTACT_NORMAL_LINE1}\n${CONTACT_NORMAL_LINE2}`;
 
 function websiteLabel(url) {
   return String(url || "")
@@ -75,7 +76,14 @@ export default function AgencyDcpCard({
       <p className="agency-dcp-card__badge">
         {expired ? "인증기간 만료" : abnormal ? "경로 검증 · 비정상" : "경로 검증 · 정상"}
       </p>
-      <p className="agency-dcp-card__warn">{warnText}</p>
+      {contact && !abnormal && !expired ? (
+        <>
+          <p className="agency-dcp-card__warn">{CONTACT_NORMAL_LINE1}</p>
+          <p className="agency-dcp-card__warn agency-dcp-card__warn--line2">{CONTACT_NORMAL_LINE2}</p>
+        </>
+      ) : (
+        <p className="agency-dcp-card__warn">{warnText}</p>
+      )}
       <h1 className="agency-dcp-card__name">{expired ? phone || agencyName || "만료된 번호" : agencyName || (contact ? "저장된 연락처" : "국가기관")}</h1>
       {expired ? (
         telHref ? (
@@ -110,9 +118,7 @@ export default function AgencyDcpCard({
           <span>{phone || "—"}</span>
         </p>
       )}
-      {expired ? null : contact ? (
-        <p className="agency-dcp-card__member">VLUÉ 비회원</p>
-      ) : webHref ? (
+      {expired ? null : contact ? null : webHref ? (
         <a
           className="agency-dcp-card__web"
           href={webHref}

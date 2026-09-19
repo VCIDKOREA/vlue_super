@@ -33,7 +33,7 @@ object DcpAbnormalWarningView {
         "공식 국가기관 번호로 확인되었습니다. 디지털인증프로필을 확인하세요."
 
     const val CONTACT_NORMAL_MESSAGE =
-        "VLUÉ 비회원 · 저장된 번호입니다. 발신 경로 이상없음."
+        "VLUÉ 비회원 저장된번호입니다.\n발신 상태 정상 경로 입니다."
 
     const val VLUE_AUTH_MEMBER_MESSAGE = VlueAuthMemberPopupPolicy.MESSAGE
 
@@ -133,6 +133,9 @@ object DcpAbnormalWarningView {
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
                 setPadding(0, dp(ctx, 10), 0, 0)
+                if (spec.contactSafeCare) {
+                    setLineSpacing(0f, 1.15f)
+                }
             }
         )
         if (spec.agencyName.isNotBlank()) {
@@ -161,7 +164,7 @@ object DcpAbnormalWarningView {
                 }
             )
         }
-        if (spec.vlueNonMember) {
+        if (spec.vlueNonMember && !spec.contactSafeCare) {
             card.addView(
                 TextView(ctx).apply {
                     text = "VLUÉ 비회원"

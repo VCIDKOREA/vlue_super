@@ -7,7 +7,7 @@ object ContactSafeCarePayload {
     const val PROFILE_KIND = "contact_safe_care"
 
     const val NORMAL_MESSAGE =
-        "VLUÉ 비회원 · 저장된 번호입니다. 발신 경로 이상없음."
+        "VLUÉ 비회원 저장된번호입니다.\n발신 상태 정상 경로 입니다."
 
     fun toJson(
         phone: String,

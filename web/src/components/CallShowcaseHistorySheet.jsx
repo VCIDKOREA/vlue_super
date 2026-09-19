@@ -538,18 +538,22 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const openContactSafeForCall = useCallback((call, known = null) => {
     const phone = call?.phoneDisplay || call?.phone || "";
     const knownSync = known || resolveIsKnownContactSync(phone);
+    const name =
+      String(knownSync.matchedName || call?.contactName || call?.name || "").trim() ||
+      "저장된 연락처";
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
     setSelected(null);
     setPreviewCard(null);
     setPreviewVerified(false);
     setExpanded(true);
     setLoading(false);
-    setContactSafePopup({
-      open: true,
-      name:
-        String(knownSync.matchedName || call?.contactName || call?.name || "").trim() ||
-        "저장된 연락처",
-      phone
+    /* 같은 번호 안심이 이미 열려 있으면 상태만 유지 — 닫혔다 다시 뜨는 플리커 방지 */
+    setContactSafePopup((prev) => {
+      if (prev.open && String(prev.phone || "") === String(phone || "")) {
+        if (prev.name === name) return prev;
+        return { ...prev, name };
+      }
+      return { open: true, name, phone };
     });
   }, []);
 
@@ -806,6 +810,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       routeLockRef.current = next.kind;
 
       if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
+        /* 이미 안심 표시 중이면 재오픈하지 않음 */
         openContactSafeForCall(call, resolveIsKnownContactSync(call?.phoneDisplay || call?.phone));
         return;
       }
@@ -986,7 +991,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const paintPending = () => {
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
+        /* 안심 팝업은 유지 — selected 로딩으로 트리에서 빼며 끊기던 문제 방지 */
         setSelected(call);
         setExpanded(true);
         setPreviewCard(null);
@@ -1071,75 +1076,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     return resolveIsKnownContactSync(selected.phoneDisplay || selected.phone);
   }, [selected]);
 
-  if (selected) {
-    const tier = previewCard?.membershipTier || selected.membershipTier || "free";
-    const phone = previewCard?.phone || selected.phoneDisplay || selected.phone;
-    const isMember = previewVerified;
-    const titleName =
-      (isMember && (previewCard?.name || selected.name)) || formatCallGroupLabel(selected);
-
-    return (
-      <AppFullScreenView
-        open={open}
-        onClose={closeDetail}
-        title={titleName}
-        isDarkMode={isDarkMode}
-        coverBottomNav
-        hideHeader
-        showFloatingClose
-        className={isDarkMode ? "bg-[#0B101B]" : "bg-white"}
-      >
-        <div className="flex min-h-0 flex-1 flex-col">
-          {toast ? (
-            <p className="call-history-toast" role="status">
-              {toast}
-            </p>
-          ) : null}
-          {loading || !previewCard ? (
-            <CallHistoryLoadingGuide />
-          ) : (
-            <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
-              <div className="lettering-showcase-fs__shell">
-                  <LetteringIncomingNotification
-                  className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--history-replay"
-                  previewMode={false}
-                  fromCallHistory
-                  verified={isMember}
-                  callPhase="connected"
-                  platform="android"
-                  isRecording={false}
-                  callDurationSec={0}
-                  recordingDurationSec={0}
-                  incomingNumber={phone}
-                  savedContactName={
-                    isMember
-                      ? selectedKnown.matchedName || previewCard.name || selected.name
-                      : selectedKnown.matchedName || ""
-                  }
-                  isKnownContact={selectedKnown.isKnownContact}
-                  card={{
-                    ...previewCard,
-                    membershipTier: tier,
-                    showcaseStyle: isMember
-                      ? previewCard.showcaseStyle
-                      : silentShowcaseStyle()
-                  }}
-                  includeDigitalCard={
-                    isNationalAgencyDcpCard(previewCard) ||
-                    (isMember && isPaidLetteringTier(tier))
-                  }
-                  expanded={expanded}
-                  onExpandedChange={setExpanded}
-                  onToast={showToast}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </AppFullScreenView>
-    );
-  }
-
   const emptyHint = (() => {
     if (loadError) return loadError;
     if (lineFilter !== "all") {
@@ -1177,8 +1113,77 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       </div>
     ) : null;
 
-  return (
-    <>
+  const detailView = (() => {
+    if (!selected) return null;
+    const tier = previewCard?.membershipTier || selected.membershipTier || "free";
+    const phone = previewCard?.phone || selected.phoneDisplay || selected.phone;
+    const isMember = previewVerified;
+    const titleName =
+      (isMember && (previewCard?.name || selected.name)) || formatCallGroupLabel(selected);
+
+    return (
+      <AppFullScreenView
+        open={open}
+        onClose={closeDetail}
+        title={titleName}
+        isDarkMode={isDarkMode}
+        coverBottomNav
+        hideHeader
+        showFloatingClose
+        className={isDarkMode ? "bg-[#0B101B]" : "bg-white"}
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          {toast ? (
+            <p className="call-history-toast" role="status">
+              {toast}
+            </p>
+          ) : null}
+          {loading || !previewCard ? (
+            <CallHistoryLoadingGuide />
+          ) : (
+            <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
+              <div className="lettering-showcase-fs__shell">
+                <LetteringIncomingNotification
+                  className="lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--history-replay"
+                  previewMode={false}
+                  fromCallHistory
+                  verified={isMember}
+                  callPhase="connected"
+                  platform="android"
+                  isRecording={false}
+                  callDurationSec={0}
+                  recordingDurationSec={0}
+                  incomingNumber={phone}
+                  savedContactName={
+                    isMember
+                      ? selectedKnown.matchedName || previewCard.name || selected.name
+                      : selectedKnown.matchedName || ""
+                  }
+                  isKnownContact={selectedKnown.isKnownContact}
+                  card={{
+                    ...previewCard,
+                    membershipTier: tier,
+                    showcaseStyle: isMember
+                      ? previewCard.showcaseStyle
+                      : silentShowcaseStyle()
+                  }}
+                  includeDigitalCard={
+                    isNationalAgencyDcpCard(previewCard) ||
+                    (isMember && isPaidLetteringTier(tier))
+                  }
+                  expanded={expanded}
+                  onExpandedChange={setExpanded}
+                  onToast={showToast}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </AppFullScreenView>
+    );
+  })();
+
+  const listView = selected ? null : (
     <AppFullScreenView
       open={open}
       onClose={onClose}
@@ -1268,38 +1273,44 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         </ul>
       )}
     </AppFullScreenView>
-    <VlueAuthMemberPopup
-      open={Boolean(open && authPopup.open)}
-      name={authPopup.name}
-      phone={authPopup.phone}
-      handle={authPopup.handle}
-      onClose={closeAuthPopup}
-    />
-    <AgencyDcpMiniPopup
-      open={Boolean(open && contactSafePopup.open)}
-      contactSafeCare
-      incomingNumber={contactSafePopup.phone}
-      card={{
-        name: contactSafePopup.name,
-        displayName: contactSafePopup.name,
-        phone: contactSafePopup.phone,
-        dcp: {
-          contactSafeCare: true,
-          contactName: contactSafePopup.name,
-          shortNumber: contactSafePopup.phone
-        }
-      }}
-      onClose={closeContactSafePopup}
-    />
-    <ShareShowcaseChannelSheet
-      open={Boolean(sharePick)}
-      busy={Boolean(busyId)}
-      onClose={() => setSharePick(null)}
-      onPick={(channel) => {
-        if (!sharePick) return;
-        void runRowAction(sharePick.call, sharePick.matrix, channel);
-      }}
-    />
+  );
+
+  return (
+    <>
+      {detailView}
+      {listView}
+      <VlueAuthMemberPopup
+        open={Boolean(open && authPopup.open)}
+        name={authPopup.name}
+        phone={authPopup.phone}
+        handle={authPopup.handle}
+        onClose={closeAuthPopup}
+      />
+      <AgencyDcpMiniPopup
+        open={Boolean(open && contactSafePopup.open)}
+        contactSafeCare
+        incomingNumber={contactSafePopup.phone}
+        card={{
+          name: contactSafePopup.name,
+          displayName: contactSafePopup.name,
+          phone: contactSafePopup.phone,
+          dcp: {
+            contactSafeCare: true,
+            contactName: contactSafePopup.name,
+            shortNumber: contactSafePopup.phone
+          }
+        }}
+        onClose={closeContactSafePopup}
+      />
+      <ShareShowcaseChannelSheet
+        open={Boolean(sharePick)}
+        busy={Boolean(busyId)}
+        onClose={() => setSharePick(null)}
+        onPick={(channel) => {
+          if (!sharePick) return;
+          void runRowAction(sharePick.call, sharePick.matrix, channel);
+        }}
+      />
     </>
   );
 }

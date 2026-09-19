@@ -154,8 +154,8 @@ export function decideCallHistoryRouteFromPayload(call, payload) {
 /**
  * 라우트 잠금.
  * - PENDING → 최종 허용
- * - SAFE 오판(회원인데 저장으로 잠금) → SHOWCASE/AUTH 로 교정 허용
- * - AUTH → SHOWCASE 업그레이드 허용(송출 ON 확정)
+ * - SAFE 확정 후 같은 SAFE 재적용은 무시(플리커 방지) — 호출부에서 처리
+ * - SAFE 오판(회원) → SHOWCASE/AUTH 교정만 허용
  * - SHOWCASE 다운그레이드 금지
  */
 export function mayApplyRoute(lockedKind, nextKind) {
@@ -174,6 +174,8 @@ export function mayApplyRoute(lockedKind, nextKind) {
   ) {
     return true;
   }
+  /* SAFE 중 UNVERIFIED 등으로 끊지 않음 */
+  if (lockedKind === CALL_HISTORY_ROUTE.SAFE) return false;
   return false;
 }
 

@@ -4632,6 +4632,12 @@
   font-weight: 700;
 }
 
+.agency-dcp-center-shell .agency-dcp-card__warn--line2 {
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .agency-dcp-center-shell .agency-dcp-card__name {
   font-size: 16px;
   color: #fff;
@@ -4757,6 +4763,12 @@
   font-weight: 800;
   line-height: 1.45;
   color: #fecaca;
+  white-space: pre-line;
+}
+
+.agency-dcp-card__warn--line2 {
+  margin-top: 2px;
+  color: #fff;
 }
 
 .agency-dcp-card__name {
