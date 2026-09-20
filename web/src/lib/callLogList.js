@@ -156,19 +156,23 @@ export function enrichCallLogGroupsWithShowcaseHistory(groups) {
     const contactName =
       pickSavedContactName(g.contactName, g.phone, g.phoneKey) ||
       pickSavedContactName(meta?.contactName, g.phone, g.phoneKey);
-    const verified = agency
-      ? true
-      : g.verified === true || g.peerIsVlueMember === true
-        ? true
-        : meta
-          ? meta.verified === true
-          : false;
+    /* meta 없으면 verified 를 false 로 단정하지 않음 — 단정 시 CTA「전달」→수초 후「케이스함」플래시 */
+    let verified = g.verified;
+    if (agency || g.peerIsVlueMember === true || Boolean(g.userId || snapUserId)) {
+      verified = true;
+    } else if (meta?.verified === true) {
+      verified = true;
+    } else if (meta && meta.verified === false && g.verified !== true) {
+      verified = false;
+    }
     return {
       ...g,
       memberName,
       contactName,
       name: memberName || contactName || g.name || "",
       verified,
+      peerIsVlueMember:
+        verified === true ? true : g.peerIsVlueMember === true ? true : g.peerIsVlueMember,
       membershipTier: g.membershipTier || meta?.membershipTier || null,
       avatarUrl:
         pickListAvatarUrl(

@@ -10,8 +10,9 @@
 
 import { resolveIsKnownContactSync } from "../contacts/hybridKnownContact.js";
 import { matchNationalAgency } from "../nationalAgencyDcpClient.js";
-import { peerHasDccOrShowcaseContent, peerShowcaseBroadcastOn } from "../peerShowcaseContent.js";
+import { peerHasDccOrShowcaseContent } from "../peerShowcaseContent.js";
 import { readCallHistoryPeerCache } from "../callHistoryPeerCache.js";
+import { readCallHistoryMemberHint } from "../callHistoryMemberIndex.js";
 
 export const CALL_HISTORY_ROUTE = Object.freeze({
   SAFE: "safe",
@@ -35,7 +36,10 @@ function isPhoneLikeLabel(raw) {
 
 /** VLUE 회원 힌트 — 저장연락처보다 우선 (김광덕 안심 오판 방지) */
 export function isVlueMemberHint(call, cached = null) {
-  const pack = cached || (phoneOf(call) ? readCallHistoryPeerCache(phoneOf(call)) : null);
+  const phone = phoneOf(call);
+  const memberHint = phone ? readCallHistoryMemberHint(phone) : null;
+  if (memberHint?.verified === true) return true;
+  const pack = cached || (phone ? readCallHistoryPeerCache(phone) : null);
   if (pack?.verified === true) return true;
   if (call?.verified === true || call?.peerIsVlueMember === true) return true;
   if (call?.userId) return true;
@@ -57,7 +61,12 @@ export function isSavedContactHint(call, known = null) {
 }
 
 function isExplicitNonMember(call, cached) {
-  if (cached?.verified === false) return true;
+  const phone = phoneOf(call);
+  const memberHint = phone ? readCallHistoryMemberHint(phone) : null;
+  /* 회원 힌트가 있으면 peer unmatched(verified:false) 로 비회원 단정 금지 */
+  if (memberHint?.verified === true || isVlueMemberHint(call, cached)) return false;
+  if (memberHint?.verified === false) return true;
+  /* peer 캐시 unmatched 는 lookup 레이스 — 목록 CTA·라우트에 쓰지 않음 */
   if (call?.verified === false) return true;
   return false;
 }
@@ -104,7 +113,7 @@ export function decideCallHistoryRoute(call, cachedPeer = null) {
     return { kind: CALL_HISTORY_ROUTE.PENDING };
   }
 
-  /* 3) 저장 비회원 → 안심 (법인지원설립센터 등) */
+  /* 3) 저장 연락처 → 안심 (회원은 2단계에서 이미 제외) */
   if (saved) {
     return { kind: CALL_HISTORY_ROUTE.SAFE };
   }
@@ -180,14 +189,21 @@ export function mayApplyRoute(lockedKind, nextKind) {
 }
 
 /**
- * 목록 CTA — 회원여부 미확정이면 버튼 숨김(노란→보라 플래시 금지).
- * 저장 연락처만으로 비회원 단정하지 않음(김광덕·김진현 등 가입 테스터).
+ * 목록 CTA
+ * - 회원 확정 → 케이스함
+ * - 영속 인덱스·목록에서 비회원 확정 → 전달
+ * - peer 캐시 unmatched(verified:false) 는 무시 (lookup 레이스가 노란 전달을 먼저 띄움)
+ * - 미확정 → 버튼 숨김 (노란→보라 플래시 금지)
  */
 export function resolveHistoryRowMemberState(call) {
   if (isVlueMemberHint(call)) return "member";
   const phone = phoneOf(call);
-  const cached = phone ? readCallHistoryPeerCache(phone) : null;
-  if (cached?.verified === true) return "member";
-  if (cached?.verified === false || call?.verified === false) return "nonmember";
+  const hint = phone ? readCallHistoryMemberHint(phone) : null;
+  if (hint?.verified === true) return "member";
+  if (hint?.verified === false) return "nonmember";
+  if (call?.verified === true || call?.peerIsVlueMember === true || call?.userId) {
+    return "member";
+  }
+  if (call?.verified === false) return "nonmember";
   return "unknown";
 }

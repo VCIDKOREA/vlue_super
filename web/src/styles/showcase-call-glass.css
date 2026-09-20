@@ -4599,6 +4599,11 @@
   pointer-events: auto;
 }
 
+.agency-dcp-center-layer.is-hidden {
+  display: none;
+  pointer-events: none;
+}
+
 .agency-dcp-center-layer__stack {
   width: min(100%, 320px);
   display: flex;

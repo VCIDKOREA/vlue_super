@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useRef } from "react";
 import CompanionMiniCase from "../call/CompanionMiniCase.jsx";
 import AgencyDcpCard from "./AgencyDcpCard.jsx";
 import AdMobBannerSlot from "../ads/AdMobBannerSlot.jsx";
@@ -10,7 +11,7 @@ const DEFAULT_WARNING =
 
 /**
  * 국가기관 DCP / 안심케어 팝업
- * - contactSafeCare: 중앙 모달(인증회원 팝업과 동일) — MiniCase peek 시 띠배너만 보이는 버그 방지
+ * - contactSafeCare: 중앙 모달 — 한 번 연 뒤 DOM 유지(AdMob·카드 언마운트 플리커 방지)
  * - 그 외(라이브 DCP): 가장자리 MiniCase + 외부 하단 띠배너
  */
 export default function AgencyDcpMiniPopup({
@@ -24,7 +25,11 @@ export default function AgencyDcpMiniPopup({
   onClose,
   onShareShowcase
 }) {
-  if (!open || typeof document === "undefined") return null;
+  const everOpenedRef = useRef(false);
+  if (open) everOpenedRef.current = true;
+
+  if (typeof document === "undefined") return null;
+
   const variant = expired ? "expired" : abnormal ? "abnormal" : "normal";
   const cardEl = (
     <AgencyDcpCard
@@ -46,7 +51,7 @@ export default function AgencyDcpMiniPopup({
         heightPx={50}
         unitId={ADMOB_TEST.BANNER}
         label="안심 팝업 배너"
-        enabled={open}
+        enabled={Boolean(open)}
         preferredSize="BANNER"
         className="w-full overflow-hidden rounded-xl"
       />
@@ -54,14 +59,17 @@ export default function AgencyDcpMiniPopup({
   );
 
   if (contactSafeCare) {
-    /* MiniCase 껍질 없이 중앙 모달 — 카드에 어두운 셸을 직접 부여 (배경 없으면 글자만 떠 보임) */
+    /* 최초 오픈 전엔 마운트하지 않음. 이후엔 open=false 여도 DOM 유지 */
+    if (!everOpenedRef.current && !open) return null;
     return createPortal(
       <div
-        className="agency-dcp-center-layer"
+        className={`agency-dcp-center-layer${open ? "" : " is-hidden"}`}
         data-dcp-popup={variant}
         role="dialog"
-        aria-modal="true"
+        aria-modal={open ? "true" : undefined}
+        aria-hidden={open ? undefined : "true"}
         onMouseDown={(e) => {
+          if (!open) return;
           if (e.target === e.currentTarget) onClose?.();
         }}
       >
@@ -73,6 +81,8 @@ export default function AgencyDcpMiniPopup({
       document.body
     );
   }
+
+  if (!open) return null;
 
   const stack = (
     <div className="agency-dcp-popup-stack">

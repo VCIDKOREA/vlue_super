@@ -36,6 +36,10 @@ import {
   warmCallHistoryList,
   writeCallHistoryListCache
 } from "../lib/callHistoryListCache.js";
+import {
+  applyPersistedMemberHintsToCallGroups,
+  rememberMemberDirectoryResults
+} from "../lib/callHistoryMemberIndex.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -435,7 +439,9 @@ function CallHistoryLoadingGuide({ syncing = false }) {
 }
 
 export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false }) {
-  const [items, setItems] = useState(() => readCallHistoryListCache() || []);
+  const [items, setItems] = useState(() =>
+    applyPersistedMemberHintsToCallGroups(readCallHistoryListCache() || [])
+  );
   const [lines, setLines] = useState([]);
   const [lineFilter, setLineFilter] = useState(() => readCallHistoryLineId() || "all");
   const [loadError, setLoadError] = useState("");
@@ -632,21 +638,24 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       const [raw, membersWarm] = await Promise.all([
         fetchDeviceCallLogEntries(200),
         phonesWarm.length
-          ? fetchMemberNamesByNumbers(phonesWarm).catch(() => [])
+          ? fetchMemberNamesByNumbers(phonesWarm).catch(() => null)
           : Promise.resolve([])
       ]);
+      if (membersWarm) rememberMemberDirectoryResults(phonesWarm, membersWarm);
       const quick = preserveMemberHintsToCallGroups(
-        applySafeCareLocalToCallGroups(
-          applyKnownContactsToCallGroups(
-            applyLocalKnownPeersToCallGroups(
-              applyMemberDirectoryToCallGroups(
-                buildCallHistoryList({
-                  deviceEntries: raw,
-                  lineEvents: [],
-                  selectedLine: "all",
-                  lines: []
-                }),
-                membersWarm
+        applyPersistedMemberHintsToCallGroups(
+          applySafeCareLocalToCallGroups(
+            applyKnownContactsToCallGroups(
+              applyLocalKnownPeersToCallGroups(
+                applyMemberDirectoryToCallGroups(
+                  buildCallHistoryList({
+                    deviceEntries: raw,
+                    lineEvents: [],
+                    selectedLine: "all",
+                    lines: []
+                  }),
+                  membersWarm || []
+                )
               )
             )
           )
@@ -665,8 +674,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           .then((d) => (Array.isArray(d.lines) ? d.lines : []))
           .catch(() => []),
         fetchLineCallHistory(lineFilter).catch(() => []),
-        /* 이미 warm 한 번호는 재사용, 신규 번호만 보강 */
-        phonesForLookup.length && phonesForLookup.some((p) => !phonesWarm.includes(p))
+        phonesForLookup.length && phonesForLookup.some((p) => !(phonesWarm || []).includes(p))
           ? fetchMemberNamesByNumbers(phonesForLookup).catch(() => membersWarm)
           : Promise.resolve(membersWarm)
       ]);
@@ -679,10 +687,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         selectedLine,
         lines: lineRows
       });
+      if (members) rememberMemberDirectoryResults(phonesForLookup, members);
       const enriched = preserveMemberHintsToCallGroups(
-        applySafeCareLocalToCallGroups(
-          applyKnownContactsToCallGroups(
-            applyLocalKnownPeersToCallGroups(applyMemberDirectoryToCallGroups(merged, members))
+        applyPersistedMemberHintsToCallGroups(
+          applySafeCareLocalToCallGroups(
+            applyKnownContactsToCallGroups(
+              applyLocalKnownPeersToCallGroups(
+                applyMemberDirectoryToCallGroups(merged, members || [])
+              )
+            )
           )
         ),
         quick
@@ -712,7 +725,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const onWarmed = () => {
       const cached = readCallHistoryListCache();
       if (!cached?.length) return;
-      setItems(cached);
+      /* warm 스냅샷이 회원 플래그를 깎지 않게 — 현재 목록 힌트 유지 */
+      setItems((prev) => {
+        const merged = preserveMemberHintsToCallGroups(
+          applyPersistedMemberHintsToCallGroups(cached),
+          prev
+        );
+        writeCallHistoryListCache(merged);
+        return merged;
+      });
       setListLoading(false);
     };
     window.addEventListener(CALL_HISTORY_LIST_WARMED, onWarmed);
@@ -721,9 +742,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   useEffect(() => {
     if (!open) return undefined;
-    const cached = readCallHistoryListCache();
+    const cached = applyPersistedMemberHintsToCallGroups(readCallHistoryListCache() || []);
     if (cached?.length) {
-      setItems(cached);
+      setItems((prev) => {
+        const merged = preserveMemberHintsToCallGroups(cached, prev);
+        writeCallHistoryListCache(merged);
+        return merged;
+      });
       setListLoading(false);
     }
     const frame = requestAnimationFrame(() => {
@@ -807,10 +832,16 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       if (gen !== openGenRef.current || !payload?.card) return;
       const next = decideCallHistoryRouteFromPayload(call, payload);
       if (!mayApplyRoute(routeLockRef.current, next.kind)) return;
+      /* 이미 안심 확정·동일 번호면 재페인트 금지 — 언마운트 플리커 */
+      if (
+        next.kind === CALL_HISTORY_ROUTE.SAFE &&
+        routeLockRef.current === CALL_HISTORY_ROUTE.SAFE
+      ) {
+        return;
+      }
       routeLockRef.current = next.kind;
 
       if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
-        /* 이미 안심 표시 중이면 재오픈하지 않음 */
         openContactSafeForCall(call, resolveIsKnownContactSync(call?.phoneDisplay || call?.phone));
         return;
       }
@@ -970,7 +1001,14 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     const cachedPeer = readCallHistoryPeerCache(phone);
-    const decision = decideCallHistoryRoute(call, cachedPeer);
+    let decision = decideCallHistoryRoute(call, cachedPeer);
+    /* 저장 회원인데 enrich 가 verified 미확정이면 SAFE 로 잠기지 않게 — PENDING 후 네트워크 */
+    if (
+      decision.kind === CALL_HISTORY_ROUTE.SAFE &&
+      resolveHistoryRowMemberState(call) === "member"
+    ) {
+      decision = { kind: CALL_HISTORY_ROUTE.PENDING };
+    }
     routeLockRef.current = decision.kind;
 
     const paintShowcase = (card, verified, { backgroundHydrate = true } = {}) => {
@@ -1075,6 +1113,20 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     if (!selected) return { isKnownContact: false, matchedName: "", sources: [] };
     return resolveIsKnownContactSync(selected.phoneDisplay || selected.phone);
   }, [selected]);
+
+  const contactSafeCard = useMemo(
+    () => ({
+      name: contactSafePopup.name,
+      displayName: contactSafePopup.name,
+      phone: contactSafePopup.phone,
+      dcp: {
+        contactSafeCare: true,
+        contactName: contactSafePopup.name,
+        shortNumber: contactSafePopup.phone
+      }
+    }),
+    [contactSafePopup.name, contactSafePopup.phone]
+  );
 
   const emptyHint = (() => {
     if (loadError) return loadError;
@@ -1290,16 +1342,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         open={Boolean(open && contactSafePopup.open)}
         contactSafeCare
         incomingNumber={contactSafePopup.phone}
-        card={{
-          name: contactSafePopup.name,
-          displayName: contactSafePopup.name,
-          phone: contactSafePopup.phone,
-          dcp: {
-            contactSafeCare: true,
-            contactName: contactSafePopup.name,
-            shortNumber: contactSafePopup.phone
-          }
-        }}
+        card={contactSafeCard}
         onClose={closeContactSafePopup}
       />
       <ShareShowcaseChannelSheet
