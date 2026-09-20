@@ -1,11 +1,15 @@
 /**
  * 통화·공유에서 상대가 DCC/쇼케이스 송출 콘텐츠가 있는지.
- * 송출 OFF 이거나 실콘텐츠 없으면 VLUÉ 인증 팝업만 (빈 쇼케이스 금지).
+ * 명시 includeDigitalCard:false 만 인증 팝업. 키 누락 + 실 DCC 는 쇼케이스.
  */
 
 /** 라이브 송출 ON — LetteringOverlayHost 와 동일 (includeDigitalCard === true) */
 export function peerShowcaseBroadcastOn(style) {
   return Boolean(style && typeof style === "object" && style.includeDigitalCard === true);
+}
+
+export function peerShowcaseBroadcastOff(style) {
+  return Boolean(style && typeof style === "object" && style.includeDigitalCard === false);
 }
 
 export function styleHasShowcaseMedia(style) {
@@ -58,21 +62,19 @@ export function cardHasSoftIdentityHints(card) {
 /**
  * true = 풀 쇼케이스 허용.
  * 명시 includeDigitalCard:false → false.
- * 송출 ON → 미디어·상호·약한힌트·핸들.
- * 키 누락 → 상호/로고/미디어만 (이메일·사진·handle 단독 금지 — 이슬기 빈 FULLSCREEN 방지).
+ * 그 외(송출 ON · 키 누락) → 미디어·상호·DCC 실체·핸들이면 쇼케이스.
  */
 export function peerHasDccOrShowcaseContent(card, style) {
   const st = style || card?.showcaseStyle || null;
-  if (st && typeof st === "object" && st.includeDigitalCard === false) return false;
-  /* live.includeDigitalCard===true 만 풀 쇼케이스 — 키 누락·캐시 pages 로 DCC/쇼케이스 깜빡임 금지 */
-  if (!peerShowcaseBroadcastOn(st)) return false;
+  if (peerShowcaseBroadcastOff(st)) return false;
   const media = styleHasShowcaseMedia(st);
   const body = cardHasDccBody(card);
   const soft = cardHasSoftIdentityHints(card);
   const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
     .trim()
     .replace(/^@/, "");
-  if (media || body || soft || handle) return true;
+  const digitalActive = card?.digitalCardActive === true || card?.digitalCardIssued === true;
+  if (media || body || soft || handle || digitalActive) return true;
   return false;
 }
 

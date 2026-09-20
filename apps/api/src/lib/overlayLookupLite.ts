@@ -31,7 +31,10 @@ export async function loadOverlayShowcaseStyleLite(
         (
           NULLIF(
             TRIM(
-              COALESCE(showcase_live_style_json, showcase_style_json)->>'includeDigitalCard'
+              COALESCE(
+                showcase_live_style_json->>'includeDigitalCard',
+                showcase_style_json->>'includeDigitalCard'
+              )
             ),
             ''
           )

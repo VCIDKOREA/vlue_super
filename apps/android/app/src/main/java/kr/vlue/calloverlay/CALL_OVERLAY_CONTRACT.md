@@ -51,8 +51,9 @@ Decision order (first match wins):
 1. User already Mini / auth confirmed → stay `MINI_CASE` (no re-open popup/showcase)
 2. **Path abnormal** (`dcp_route=abnormal` / `pathVerify` / `CallPathSession` 비정상) → `CENTER_SAFE_POPUP` only — **FULL_SHOWCASE 금지** (회원 DCC·쇼케이스·미인증 신고 패널 포함)
 3. `profileKind == contact_safe_care` **or** `public_directory_safe` → `CENTER_SAFE_POPUP` (안심팝업 · 신고/제보 없음)
-4. Auth-member-only (verified + no public DCC/showcase) → `CENTER_AUTH_POPUP`
-5. Broadcast ON **and** real DCC/showcase content → `FULL_SHOWCASE`
+4. Auth-member-only (verified + **explicit** broadcast OFF, or no DCC/showcase content) → `CENTER_AUTH_POPUP`
+5. Verified member with real DCC **or** showcase content, unless `includeDigitalCard:false` → `FULL_SHOWCASE`
+   (missing `includeDigitalCard` key must **not** be treated as OFF when a digital card exists)
 6. Resolved unverified (lookup done, `matched:false`, not pending, not safe-care, no device-contact promote) → `FULL_SHOWCASE` (**미인증 신고 패널**)
 7. Else (pending lookup / blank) → `KEEP_BIG_PUSH`
 
@@ -83,6 +84,9 @@ never remain permanently in `KEEP_BIG_PUSH`. Path-abnormal sessions remain
 ## 4. Layout rules
 
 - BigPush window `y >= statusBarHeightPx + 8dp` (never under system status bar)
+- Overlay WebView must inject `--vlue-status-inset: {statusBarHeightPx}px` so Showcase live-bar / DCC chrome sit below the system status bar (`FLAG_LAYOUT_IN_SCREEN` is edge-to-edge; `env(safe-area-inset-top)` is often 0)
+- MiniCase window `y >= statusBarHeightPx + 8dp`, size = bar only (never `MATCH_PARENT`); `FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL` so touches outside the bar pass through to the system phone UI
+- MiniCase must expose an explicit control to restore `FULL_SHOWCASE` (tap-only is not enough)
 - Center popups are separate overlay windows; attach popup **before** tearing down BigPush chrome when possible
 - Once a center popup attaches, BigPush chrome must be soft-hidden; popup and BigPush must never remain visibly stacked
 - Mini tap restores the session’s prior destination: Showcase sessions → `FULL_SHOWCASE`, popup-only sessions → the same center popup
@@ -117,8 +121,11 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 - [ ] Incoming: BigPush → answer → immediate showcase/popup → Confirm → Mini (unchanged)
 - [ ] Answered pending lookup (incoming): BigPush remains until resolve — no blank dark case
 - [ ] BigPush not covered by status bar clock/battery
-- [ ] Auth member broadcast OFF: center auth popup, not empty Showcase
+- [ ] Auth member explicit broadcast OFF: center auth popup, not empty Showcase
+- [ ] Auth member DCC exists (even if `includeDigitalCard` key missing): full Showcase / call-history 케이스함
 - [ ] Auth member broadcast ON + content: full Showcase
+- [ ] In-call Showcase / MiniCase not covered by Android status bar
+- [ ] MiniCase: phone app under the bar is tappable; bar has 쇼케이스 보기
 - [ ] Path abnormal + member showcase: 안심 팝업 only (no FULL_SHOWCASE)
 - [ ] Call history row「안심 저장」→ next call uses local PublicDirectory/CardLookup cache (ENABLE_DIRECTORY_SYNC remains false)
 

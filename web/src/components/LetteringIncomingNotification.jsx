@@ -1614,7 +1614,7 @@ export default function LetteringIncomingNotification({
                           ? handleDialPeer
                           : previewMode && showOwnerSettings
                             ? notifyCallScreenOnCall
-                            : undefined
+                            : openSamsungCallOptions
                       }
                       showHistoryDial={Boolean(fromCallHistory)}
                       showPeerClose={Boolean(previewMode && showPeerClose)}
@@ -1689,7 +1689,7 @@ export default function LetteringIncomingNotification({
                           ? handleDialPeer
                           : previewMode && showOwnerSettings
                             ? notifyCallScreenOnCall
-                            : undefined
+                            : openSamsungCallOptions
                       }
                       showHistoryDial={Boolean(fromCallHistory)}
                       showPeerClose={Boolean(previewMode && showPeerClose)}

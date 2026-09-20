@@ -10,7 +10,7 @@ import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 import { resolveVlueShowcaseByPhone } from "./resolveVlueShowcaseByPhone.js";
 import { isNationalAgencyDcpCard } from "./nationalAgencyDcpClient.js";
 import { applyShowcaseStyleToCard } from "./showcase/applyShowcaseStyleToCard.js";
-import { peerShowcaseBroadcastOn } from "./peerShowcaseContent.js";
+import { cardHasDccBody, cardHasSoftIdentityHints, peerShowcaseBroadcastOn } from "./peerShowcaseContent.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -111,9 +111,28 @@ function authOnlyReplayStyle() {
   };
 }
 
-function normalizeReplayStyle(style) {
-  if (!style || typeof style !== "object") return authOnlyReplayStyle();
-  return style;
+/** 회원 재생 — 키 누락을 송출 OFF 로 강제하지 않음 (DCC 보유 회원의 인증팝업 고착 방지) */
+function memberReplayStyle(card) {
+  const snap = card?.showcaseStyle;
+  if (snap && typeof snap === "object") {
+    if (snap.includeDigitalCard === false) return snap;
+    if (snap.includeDigitalCard === true) return snap;
+    return { ...snap, includeDigitalCard: true };
+  }
+  const issued = card?.digitalCardActive === true || card?.digitalCardIssued === true;
+  const hasDcc = issued || cardHasDccBody(card) || cardHasSoftIdentityHints(card);
+  return {
+    ...createDefaultShowcaseStyle(),
+    includeDigitalCard: hasDcc,
+    verifiedBadgeOn: true
+  };
+}
+
+function normalizeReplayStyle(style, card) {
+  if (!style || typeof style !== "object") return memberReplayStyle(card);
+  if (style.includeDigitalCard === false) return style;
+  if (style.includeDigitalCard === true) return style;
+  return { ...style, includeDigitalCard: true };
 }
 
 /**
@@ -160,10 +179,7 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
 
   /* light: by-number 만 — 목록 예열용. profile/live 는 탭 시에만 */
   if (opts.light) {
-    const snapStyle =
-      byPhone.card?.showcaseStyle && typeof byPhone.card.showcaseStyle === "object"
-        ? normalizeReplayStyle(byPhone.card.showcaseStyle)
-        : authOnlyReplayStyle();
+    const snapStyle = normalizeReplayStyle(byPhone.card?.showcaseStyle, byPhone.card);
     const tier = byPhone.card?.membershipTier || "free";
     const card = applyShowcaseStyleToCard(
       {
@@ -228,7 +244,9 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
 
   const tier = merged.membershipTier || "free";
   let peerStyle =
-    live && typeof live === "object" ? normalizeReplayStyle(live) : authOnlyReplayStyle();
+    live && typeof live === "object"
+      ? normalizeReplayStyle(live, merged)
+      : memberReplayStyle(merged);
   if (
     peerShowcaseBroadcastOn(peerStyle) &&
     !(Array.isArray(peerStyle.pages) && peerStyle.pages.some((p) => p && typeof p === "object")) &&
@@ -236,13 +254,16 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
     typeof byPhone.card.showcaseStyle === "object"
   ) {
     const snap = byPhone.card.showcaseStyle;
-    peerStyle = normalizeReplayStyle({
-      ...peerStyle,
-      pages: snap.pages || peerStyle.pages,
-      gallery: snap.gallery || peerStyle.gallery,
-      bgm: snap.bgm || peerStyle.bgm,
-      includeDigitalCard: peerStyle.includeDigitalCard
-    });
+    peerStyle = normalizeReplayStyle(
+      {
+        ...peerStyle,
+        pages: snap.pages || peerStyle.pages,
+        gallery: snap.gallery || peerStyle.gallery,
+        bgm: snap.bgm || peerStyle.bgm,
+        includeDigitalCard: peerStyle.includeDigitalCard
+      },
+      merged
+    );
   }
   const card = applyShowcaseStyleToCard(
     {

@@ -188,7 +188,7 @@ class LetteringJavascriptBridge(
             service.getScreenSizeJson()
         } catch (e: Exception) {
             Log.e(TAG, "getScreenSizeJson failed", e)
-            """{"w":360,"h":640,"d":1}"""
+            """{"w":360,"h":640,"d":1,"sb":0}"""
         }
     }
 

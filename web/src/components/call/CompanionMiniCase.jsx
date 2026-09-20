@@ -39,6 +39,7 @@ function readViewport() {
       vw: native.w / d,
       vh: native.h / d,
       density: d,
+      statusBar: (Number(native.sb) || 0) / d,
       nativeSync: hasNativeMiniOverlay()
     };
   }
@@ -46,22 +47,23 @@ function readViewport() {
     vw: typeof window !== "undefined" ? window.innerWidth || 360 : 360,
     vh: typeof window !== "undefined" ? window.innerHeight || 640 : 640,
     density: 1,
+    statusBar: 28,
     nativeSync: false
   };
 }
 
-function defaultPos(w, vw) {
+function defaultPos(w, vw, statusBar = 28) {
   return {
     x: Math.max(16, Math.round((vw - w) / 2)),
-    y: 56
+    y: Math.max(12, Math.round(statusBar + 8))
   };
 }
 
-function clampPos(x, y, w, h, vw, vh) {
+function clampPos(x, y, w, h, vw, vh, statusBar = 0) {
   /* 최소 EDGE_KEEP_PX 는 화면 안 — 완전 이탈 방지. 가장자리 자동 스냅 없음 */
   const minX = EDGE_KEEP_PX - w;
   const maxX = vw - EDGE_KEEP_PX;
-  const minY = EDGE_KEEP_PX - h;
+  const minY = Math.max(statusBar + 8, 8);
   const maxY = vh - EDGE_KEEP_PX;
   return {
     x: Math.min(maxX, Math.max(minX, x)),
@@ -147,10 +149,10 @@ export default function CompanionMiniCase({
 
   const applyPos = useCallback(
     (next, { commitVisibility = false } = {}) => {
-      const { vw, vh } = viewportRef.current;
+      const { vw, vh, statusBar } = viewportRef.current;
       const cw = cardSizeRef.current.w;
       const ch = cardSizeRef.current.h;
-      const clamped = clampPos(next.x, next.y, cw, ch, vw, vh);
+      const clamped = clampPos(next.x, next.y, cw, ch, vw, vh, statusBar);
       posRef.current = clamped;
       sessionMiniCasePos = clamped;
       setPos(clamped);
@@ -173,7 +175,7 @@ export default function CompanionMiniCase({
 
     const measureCard = () => {
       viewportRef.current = readViewport();
-      const { vw, vh } = viewportRef.current;
+      const { vw, vh, statusBar } = viewportRef.current;
       if (
         !el.classList.contains("is-peek-right") &&
         !el.classList.contains("is-peek-left")
@@ -193,8 +195,8 @@ export default function CompanionMiniCase({
       const base = sessionMiniCasePos || posRef.current;
       const cw = cardSizeRef.current.w;
       const ch = cardSizeRef.current.h;
-      const raw = sessionMiniCasePos ? base : defaultPos(cw, vw);
-      const clamped = clampPos(raw.x, raw.y, cw, ch, vw, vh);
+      const raw = sessionMiniCasePos ? base : defaultPos(cw, vw, statusBar);
+      const clamped = clampPos(raw.x, raw.y, cw, ch, vw, vh, statusBar);
       posRef.current = clamped;
       sessionMiniCasePos = clamped;
       setPos(clamped);
@@ -344,8 +346,8 @@ export default function CompanionMiniCase({
       role="group"
       tabIndex={-1}
       aria-label={
-        expandOnTap
-          ? "VLUÉ 미니케이스 · 탭하면 쇼케이스로 복원 · 드래그로 위치 이동"
+        onExpand
+          ? "VLUÉ 미니케이스 · 쇼케이스 보기 또는 탭으로 복원 · 드래그로 위치 이동"
           : "VLUÉ 미니케이스 · 드래그로 위치 이동"
       }
       style={style}
@@ -393,6 +395,32 @@ export default function CompanionMiniCase({
               </p>
             </div>
           )}
+          {typeof onExpand === "function" ? (
+            <button
+              type="button"
+              className="companion-mini-case__expand"
+              aria-label="쇼케이스 전체화면"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                  window.Android?.logBigPushTrace?.("MINI_CASE_EXPAND_BTN", "click");
+                } catch {
+                  /* ignore */
+                }
+                onExpand();
+              }}
+            >
+              <span className="companion-mini-case__expand-shine" aria-hidden />
+              <span className="companion-mini-case__expand-icon" aria-hidden>
+                ⌃
+              </span>
+              <span className="companion-mini-case__expand-label">쇼케이스 보기</span>
+            </button>
+          ) : null}
         </>
       )}
     </div>

@@ -43,7 +43,7 @@ object VlueAuthMemberPopupPolicy {
                 jsonVerified(cardJson) ||
                 verified
         if (!matched) return false
-        /* DCC·쇼케이스 있으면(또는 판단 불가하면) 인증-only 팝업 금지 */
+        /* DCC·쇼케이스가 있으면 인증-only 팝업 금지 — 키 누락만으로 팝업 고착 금지 */
         if (hasPublicDccOrShowcase(root, card)) return false
         return true
     }
@@ -71,8 +71,9 @@ object VlueAuthMemberPopupPolicy {
     }
 
     /**
-     * 송출 ON + 공개 DCC/쇼케이스 실콘텐츠 여부.
+     * 공개 DCC/쇼케이스 실콘텐츠 여부.
      * true 일 때만 FULLSCREEN Showcase 허용 (빈 다크 케이스·터치 차단 방지).
+     * 명시 includeDigitalCard:false 만 송출 OFF. 키 누락 + DCC 실체는 쇼케이스.
      */
     fun hasBroadcastShowcaseContent(cardJson: String?): Boolean {
         if (cardJson.isNullOrBlank()) return false
@@ -119,10 +120,9 @@ object VlueAuthMemberPopupPolicy {
                 else -> null
             }
         /* 송출 OFF 가 명시되면 빈 쇼케이스 금지 → 인증 팝업만 */
-        if (style != null && style.has("includeDigitalCard") && !style.optBoolean("includeDigitalCard", false)) {
+        if (style != null && style.has("includeDigitalCard") && !style.optBoolean("includeDigitalCard", true)) {
             return false
         }
-        val broadcastOn = style?.optBoolean("includeDigitalCard", false) == true
         val media = styleHasMedia(style)
         val orgHints = hasBroadcastOrgHints(root, card)
         val softHints = hasSoftIdentityHints(root, card)
@@ -133,18 +133,14 @@ object VlueAuthMemberPopupPolicy {
                 card.optString("loginId"),
                 root.optString("loginId")
             ) != null
+        val digitalActive =
+            root.optBoolean("digitalCardActive", false) ||
+                card.optBoolean("digitalCardActive", false) ||
+                root.optBoolean("digitalCardIssued", false) ||
+                card.optBoolean("digitalCardIssued", false)
 
-        if (broadcastOn) {
-            /* 송출 ON: 미디어·상호·로고·이메일·사진·핸들이면 쇼케이스 */
-            if (media || orgHints || softHints || handle) return true
-            return false
-        }
-
-        /*
-         * includeDigitalCard 키 누락 → 송출 OFF (캐시 pages·상호만으로 DCC/쇼케이스 금지).
-         * 명시 true 는 위 broadcastOn 분기에서 처리.
-         */
-        return false
+        /* 키 누락 = 기본 송출 ON. 실 DCC/미디어/상호가 있으면 쇼케이스 */
+        return media || orgHints || softHints || handle || digitalActive
     }
 
     /** 공개 송출 실체(상호·로고·타이틀샷) — 프로필 사진/이메일과 구분 */

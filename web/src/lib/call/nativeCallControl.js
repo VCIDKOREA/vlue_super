@@ -164,7 +164,7 @@ export function nativeGetScreenSize() {
     const h = Number(o?.h) || 0;
     const d = Number(o?.d) || 1;
     if (w < 1 || h < 1) return null;
-    return { w, h, d };
+    return { w, h, d, sb: Number(o?.sb) || 0 };
   } catch {
     return null;
   }

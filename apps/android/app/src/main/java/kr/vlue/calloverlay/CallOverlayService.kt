@@ -768,6 +768,7 @@ class CallOverlayService : Service() {
                          * loadUrl 직후 notify 는 리스너 전에 사라져 사진1 바가 고착된다.
                          * 페이지 준비 후 MiniCase(사진2) 상태로 재주입.
                          */
+                        commitMiniCaseLayout(source = "onPageFinished_mini")
                         notifyWebCallState("minimize_showcase")
                         notifyWebCallState("connected")
                         webView?.evaluateJavascript(
@@ -1774,6 +1775,7 @@ class CallOverlayService : Service() {
         webView?.setBackgroundColor(Color.TRANSPARENT)
         /* 전체화면 제보 input은 Window 포커스가 있어야 WebView IME가 열린다. */
         applyFullscreenInteractiveFlags(params)
+        injectOverlaySafeInsets()
         nativeBanner?.visibility = android.view.View.GONE
         try {
             CompanionPerfTracker.measureUpdateViewLayout {
@@ -3204,7 +3206,25 @@ class CallOverlayService : Service() {
                     "}catch(e){}"
             }
         view?.evaluateJavascript(js, null)
+        injectOverlaySafeInsets(view)
         pendingCardJson?.let { injectCardLookupJson(view, it) }
+    }
+
+    /**
+     * 오버레이 WebView 는 edge-to-edge 라 env(safe-area-inset-top) 이 0인 경우가 많다.
+     * 상태바 높이를 CSS 변수로 넣어 쇼케이스/미니케이스 크롬이 시계·배터리 뒤로 들어가지 않게 한다.
+     */
+    private fun injectOverlaySafeInsets(view: WebView? = webView) {
+        val sb = statusBarHeightPx()
+        val script =
+            "(function(){try{" +
+                "var r=document.documentElement;" +
+                "r.classList.add('vlue-android-app');" +
+                "r.classList.add('vlue-overlay-webview');" +
+                "r.classList.add('vlue-status-inset-ready');" +
+                "r.style.setProperty('--vlue-status-inset','${sb}px');" +
+                "}catch(e){}})();"
+        view?.evaluateJavascript(script, null)
     }
 
     private fun dp(v: Int): Int =
@@ -3475,7 +3495,9 @@ class CallOverlayService : Service() {
             val peekLikely = wPx <= dp(48)
             val minW = if (peekLikely) keep else (sw * 0.72f).toInt().coerceIn(dp(260), sw - dp(16))
             val w = wPx.coerceIn(minW, sw)
-            val h = hPx.coerceIn(keep, sh)
+            /* MATCH_PARENT 잔존 금지 — 높이 상한으로 전화앱 터치 통과 */
+            val maxH = if (peekLikely) dp(140) else dp(220)
+            val h = hPx.coerceIn(keep, maxH)
             /*
              * 좌/우 테두리·라운드가 WebView 창 가장자리에서 잘리지 않게 inset.
              * (증상: 왼쪽 모서리만 수직으로 잘린 것처럼 보임)
@@ -3483,14 +3505,19 @@ class CallOverlayService : Service() {
             val edgePad = if (peekLikely) 0 else dp(4)
             val minX = keep - w
             val maxX = sw - keep
-            val minY = keep - h
+            val minY = if (peekLikely) keep - h else statusBarHeightPx() + dp(8)
             val maxY = sh - keep
             params.width = (w + edgePad * 2).coerceAtMost(sw)
-            params.height = (h + edgePad * 2).coerceAtMost(sh)
+            params.height = (h + edgePad * 2).coerceAtMost(maxH + edgePad * 2)
             params.x = (xPx - edgePad).coerceIn(minX, maxX)
             params.y = (yPx - edgePad).coerceIn(minY, maxY)
             params.gravity = Gravity.TOP or Gravity.START
             params.format = PixelFormat.TRANSLUCENT
+            applyPassThroughTouchFlags(params)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+            }
             view.visibility = android.view.View.VISIBLE
             nativeBanner?.visibility = android.view.View.GONE
             view.setBackgroundColor(Color.TRANSPARENT)
@@ -3609,15 +3636,19 @@ class CallOverlayService : Service() {
             val (sw, _) = screenSizePx()
             /* 가로형 기본 창 — JS updateMiniOverlayFrame 이 이어서 정밀 맞춤 */
             val w = (sw * 0.86f).toInt().coerceIn(dp(280), sw - dp(16))
-            val h = dp(140)
+            val h = dp(168)
             val x = ((sw - w) / 2).coerceAtLeast(dp(8))
-            val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
+            val y = (statusBarHeightPx() + dp(8)).coerceAtLeast(dp(36))
             params.width = w
             params.height = h
             params.x = x
             params.y = y
             params.gravity = Gravity.TOP or Gravity.START
             params.format = PixelFormat.TRANSLUCENT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+            }
             nativeBanner?.visibility = android.view.View.GONE
             webView?.visibility = android.view.View.VISIBLE
             view.setBackgroundColor(Color.TRANSPARENT)
@@ -4071,7 +4102,7 @@ class CallOverlayService : Service() {
     /** CSS px 클램프용 — WebView가 Mini Case로 줄어든 뒤에도 전체 화면 크기 제공 */
     fun getScreenSizeJson(): String {
         val dm = resources.displayMetrics
-        return """{"w":${dm.widthPixels},"h":${dm.heightPixels},"d":${dm.density}}"""
+        return """{"w":${dm.widthPixels},"h":${dm.heightPixels},"d":${dm.density},"sb":${statusBarHeightPx()}}"""
     }
 
     fun notifyWebCallState(state: String) {
@@ -4674,9 +4705,9 @@ class CallOverlayService : Service() {
         }
         val (sw, _) = screenSizePx()
         val w = (sw * 0.86f).toInt().coerceIn(dp(280), sw - dp(16))
-        val h = dp(140)
+        val h = dp(168)
         val x = ((sw - w) / 2).coerceAtLeast(dp(8))
-        val y = (statusBarHeightPx() + dp(48)).coerceAtLeast(dp(72))
+        val y = (statusBarHeightPx() + dp(8)).coerceAtLeast(dp(36))
         return WindowManager.LayoutParams(
             w,
             h,
@@ -4691,7 +4722,7 @@ class CallOverlayService : Service() {
             this.y = y
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
             }
         }
     }

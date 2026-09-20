@@ -781,7 +781,7 @@ export default function ShowcaseCallCarousel({
       </button>
     ) : null;
     const callBtn =
-      typeof onCallIconClick === "function" && (showOwnerSettings || showHistoryDial) ? (
+      typeof onCallIconClick === "function" ? (
         <button
           type="button"
           className="showcase-call-carousel__slide-call"

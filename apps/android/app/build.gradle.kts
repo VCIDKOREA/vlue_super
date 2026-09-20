@@ -61,8 +61,8 @@ android {
         applicationId = "kr.vlue.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 61
-        versionName = "1.0.19"
+        versionCode = 62
+        versionName = "1.0.20"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
         buildConfigField("String", "ADMOB_REWARDED_15_ID", "\"$admobRewarded15Id\"")

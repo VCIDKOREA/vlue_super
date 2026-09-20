@@ -2,9 +2,9 @@
  * 통화목록 라우팅 — 표 규정 (단일 소스)
  *
  * | 구분 | 대상 조건 | 노출 |
- * | DCC+쇼케이스 | 유료회원 + DCC등록완료 + 쇼케이스 콘텐츠 + 송출ON | DCC+풀 오버레이 |
- * | 일반 쇼케이스 | 유/무료회원 + DCC미등록 + 쇼케이스 콘텐츠 + 송출ON | 일반 쇼케이스 오버레이 |
- * | 안심(정상) | 저장 비회원 · 회원 송출OFF · 회원 DCC/쇼케이스 미등록 · VLUE인증DB 적재 | 안심카드+띠배너 |
+ * | DCC+쇼케이스 | 유료회원 + DCC등록완료 + (쇼케이스 콘텐츠 또는 DCC) · 명시 송출OFF 제외 | DCC+풀 오버레이 |
+ * | 일반 쇼케이스 | 유/무료회원 + DCC미등록 + 쇼케이스 콘텐츠 · 명시 송출OFF 제외 | 일반 쇼케이스 오버레이 |
+ * | 안심(정상) | 저장 비회원 · 회원 명시 송출OFF · 회원 DCC/쇼케이스 미등록 · VLUE인증DB 적재 | 안심카드+띠배너 |
  * | 안심(비정상) | 스팸·피싱·사기 신고DB · 경로검증 이상 | 경고형 안심카드 |
  * | 미인증 | 미저장 + 비회원 + VLUE DB 없음 | 미인증 기본 케이스 |
  *
@@ -16,7 +16,7 @@ import { matchNationalAgency } from "../nationalAgencyDcpClient.js";
 import {
   cardHasDccBody,
   peerHasDccOrShowcaseContent,
-  peerShowcaseBroadcastOn
+  peerShowcaseBroadcastOff
 } from "../peerShowcaseContent.js";
 import { readCallHistoryPeerCache } from "../callHistoryPeerCache.js";
 import { readCallHistoryMemberHint } from "../callHistoryMemberIndex.js";
@@ -149,7 +149,7 @@ export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = nul
   const tier =
     card?.membershipTier || call?.membershipTier || cached?.card?.membershipTier || "free";
   const isPaid = isPaidLetteringTier(tier);
-  const broadcastOn = peerShowcaseBroadcastOn(style);
+  const broadcastOff = peerShowcaseBroadcastOff(style);
   const hasDcc = isDccRegistered(card);
   const hasShowcaseContent = peerHasDccOrShowcaseContent(card, style);
   const isSaved = isSavedContactHint(call, known);
@@ -164,7 +164,7 @@ export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = nul
     phone,
     isMember,
     isPaid,
-    broadcastOn,
+    broadcastOff,
     hasDcc,
     hasShowcaseContent,
     isSaved,
@@ -186,7 +186,7 @@ export function decideBucketFromFacts(facts, agency = null) {
   const {
     isMember,
     isPaid,
-    broadcastOn,
+    broadcastOff,
     hasDcc,
     hasShowcaseContent,
     isSaved,
@@ -207,8 +207,8 @@ export function decideBucketFromFacts(facts, agency = null) {
     };
   }
 
-  /* DCC+ / 일반 쇼케이스 — 회원 + 송출 ON + 쇼케이스 콘텐츠 */
-  if (isMember && broadcastOn && hasShowcaseContent) {
+  /* DCC+ / 일반 쇼케이스 — 회원 + 실 DCC/쇼케이스 (명시 송출 OFF 제외) */
+  if (isMember && !broadcastOff && hasShowcaseContent) {
     const variant =
       isPaid && hasDcc ? SHOWCASE_VARIANT.DCC_PLUS : SHOWCASE_VARIANT.NORMAL;
     return {
@@ -221,11 +221,11 @@ export function decideBucketFromFacts(facts, agency = null) {
 
   /* 안심(정상)
    * - 저장 비회원
-   * - 회원 송출 OFF
+   * - 회원 명시 송출 OFF
    * - 회원 DCC/쇼케이스 미등록(콘텐츠 없음)
    * - VLUE 인증 DB 적재 비회원
    */
-  if (isMember && facts.conclusive && (!broadcastOn || !hasShowcaseContent)) {
+  if (isMember && facts.conclusive && (broadcastOff || !hasShowcaseContent)) {
     return {
       kind: CALL_HISTORY_ROUTE.SAFE,
       variant: SAFE_VARIANT.NORMAL,

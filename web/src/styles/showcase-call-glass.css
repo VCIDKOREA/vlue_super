@@ -128,6 +128,11 @@
   padding-top: max(10px, var(--vlue-safe-top, env(safe-area-inset-top, 0px)));
 }
 
+html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-ongoing--fullscreen-tent > .lettering-live-bar,
+html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar--glass {
+  padding-top: max(12px, var(--vlue-status-inset, 0px), env(safe-area-inset-top, 0px)) !important;
+}
+
 .lettering-ongoing--fullscreen-tent > .lettering-live-bar::after,
 .lettering-live-bar--glass::after {
   display: none !important;
@@ -4253,6 +4258,7 @@
 }
 
 .companion-mini-case__expand {
+  pointer-events: auto;
   appearance: none;
   position: relative;
   overflow: hidden;
