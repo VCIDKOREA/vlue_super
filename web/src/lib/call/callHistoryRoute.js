@@ -1,13 +1,14 @@
 /**
- * 통화목록 탭 — 4분류 규정 (단일 소스)
+ * 통화목록 라우팅 — 표 규정 (단일 소스)
  *
- * ① DCC+쇼케이스  : 유료회원 + DCC 본문 + 쇼케이스 송출 ON
- * ② 일반 쇼케이스 : 유/무료 회원 + 송출 ON (DCC 없음·또는 유료가 아님)
- * ③ 안심팝업      : 저장번호 · VLUE 비회원 · 회원(송출 OFF) · VLUE DB 적재번호
- * ④ 미인증        : 비회원 + 미저장 + VLUE DB 없음
+ * | 구분 | 대상 조건 | 노출 |
+ * | DCC+쇼케이스 | 유료회원 + DCC등록완료 + 쇼케이스 콘텐츠 + 송출ON | DCC+풀 오버레이 |
+ * | 일반 쇼케이스 | 유/무료회원 + DCC미등록 + 쇼케이스 콘텐츠 + 송출ON | 일반 쇼케이스 오버레이 |
+ * | 안심(정상) | 저장 비회원 · 회원 송출OFF · 회원 DCC/쇼케이스 미등록 · VLUE인증DB 적재 | 안심카드+띠배너 |
+ * | 안심(비정상) | 스팸·피싱·사기 신고DB · 경로검증 이상 | 경고형 안심카드 |
+ * | 미인증 | 미저장 + 비회원 + VLUE DB 없음 | 미인증 기본 케이스 |
  *
- * 회원 가입/탈퇴·유료↔무료·송출 ON/OFF 는 네트워크 확정(facts.conclusive)일 때만
- * 버킷을 바꾼다. 추측 페인트로 ③↔①② 를 오가지 않는다.
+ * 가입/탈퇴·유료↔무료·송출 ON/OFF 는 conclusive(네트워크)일 때만 버킷 전이.
  */
 
 import { resolveIsKnownContactSync } from "../contacts/hybridKnownContact.js";
@@ -22,21 +23,23 @@ import { readCallHistoryMemberHint } from "../callHistoryMemberIndex.js";
 import { isPaidLetteringTier } from "../letteringMembership.js";
 
 export const CALL_HISTORY_ROUTE = Object.freeze({
-  /** ① DCC+ / ② 일반 — UI 동일(Lettering), variant 로 구분 */
   SHOWCASE: "showcase",
-  /** ③ 안심 */
   SAFE: "safe",
-  /** ④ 미인증 */
   UNVERIFIED: "unverified",
   AGENCY: "agency",
   PENDING: "pending",
-  /** @deprecated 규정 ③으로 통합 — 송출 OFF 회원은 안심 */
+  /** @deprecated → SAFE */
   AUTH: "safe"
 });
 
 export const SHOWCASE_VARIANT = Object.freeze({
   DCC_PLUS: "dcc_plus",
   NORMAL: "normal"
+});
+
+export const SAFE_VARIANT = Object.freeze({
+  NORMAL: "normal",
+  ABNORMAL: "abnormal"
 });
 
 const UUID_RE =
@@ -55,6 +58,13 @@ function isPhoneLikeLabel(raw) {
 
 function hasUuidUserId(cardOrCall) {
   return UUID_RE.test(String(cardOrCall?.userId || cardOrCall?.ownerUserId || "").trim());
+}
+
+/** DCC 등록 완료 — 상호·로고 등 본문 또는 발급 플래그 */
+function isDccRegistered(card) {
+  if (cardHasDccBody(card)) return true;
+  if (card?.digitalCardIssued === true || card?.digitalCardActive === true) return true;
+  return false;
 }
 
 export function isVlueMemberHint(call, cached = null) {
@@ -91,7 +101,8 @@ function packStyle(cached, call, card) {
   );
 }
 
-function isInVlueDb(card, payload) {
+/** VLUE 인증 DB 적재 (회원 UUID · 공개 디렉터리 안심 등) */
+function isInVlueVerifyDb(card, payload) {
   if (hasUuidUserId(card)) return true;
   if (payload?.verified === true) return true;
   if (
@@ -105,22 +116,24 @@ function isInVlueDb(card, payload) {
   return false;
 }
 
-/**
- * 관측 사실을 한 객체로 모은다.
- * @returns {{
- *   phone: string,
- *   isMember: boolean,
- *   isPaid: boolean,
- *   broadcastOn: boolean,
- *   hasDcc: boolean,
- *   hasShowcaseContent: boolean,
- *   isSaved: boolean,
- *   inVlueDb: boolean,
- *   card: object|null,
- *   style: object|null,
- *   conclusive: boolean
- * }}
- */
+/** 스팸·피싱·사기 / 경로검증 비정상 */
+function isAbnormalPath(card, payload, call) {
+  const dcp = card?.dcp && typeof card.dcp === "object" ? card.dcp : {};
+  const status = String(
+    payload?.routeStatus ||
+      payload?.dcpRoute ||
+      dcp.routeStatus ||
+      call?.routeStatus ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+  if (status === "abnormal") return true;
+  if (payload?.abnormal === true || dcp.abnormal === true || call?.abnormal === true) return true;
+  if (String(payload?.warning || dcp.warning || "").trim() && status === "abnormal") return true;
+  return false;
+}
+
 export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = null) {
   const phone = phoneOf(call);
   const cached = cachedPeer || (phone ? readCallHistoryPeerCache(phone) : null);
@@ -137,10 +150,14 @@ export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = nul
     card?.membershipTier || call?.membershipTier || cached?.card?.membershipTier || "free";
   const isPaid = isPaidLetteringTier(tier);
   const broadcastOn = peerShowcaseBroadcastOn(style);
-  const hasDcc = cardHasDccBody(card);
+  const hasDcc = isDccRegistered(card);
   const hasShowcaseContent = peerHasDccOrShowcaseContent(card, style);
   const isSaved = isSavedContactHint(call, known);
-  const inVlueDb = isInVlueDb(card, payload);
+  const inVlueDb = isInVlueVerifyDb(card, payload);
+  const abnormal = isAbnormalPath(card, payload, call);
+  const warning = String(
+    payload?.warning || card?.dcp?.warning || call?.warning || ""
+  ).trim();
   const conclusive = payload != null;
 
   return {
@@ -152,6 +169,8 @@ export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = nul
     hasShowcaseContent,
     isSaved,
     inVlueDb,
+    abnormal,
+    warning,
     card,
     style,
     conclusive
@@ -159,8 +178,7 @@ export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = nul
 }
 
 /**
- * 4분류 결정 — 규정 그대로.
- * @returns {{ kind: string, variant?: string, card?: object, verified?: boolean, agency?: object }}
+ * @returns {{ kind: string, variant?: string, card?: object, verified?: boolean, agency?: object, warning?: string }}
  */
 export function decideBucketFromFacts(facts, agency = null) {
   if (agency) return { kind: CALL_HISTORY_ROUTE.AGENCY, agency };
@@ -173,10 +191,23 @@ export function decideBucketFromFacts(facts, agency = null) {
     hasShowcaseContent,
     isSaved,
     inVlueDb,
+    abnormal,
+    warning,
     card
   } = facts;
 
-  /* ①② 회원 + 송출 ON + 실콘텐츠 */
+  /* 안심(비정상) — 스팸·피싱·경로이상 (쇼케이스보다 우선) */
+  if (abnormal) {
+    return {
+      kind: CALL_HISTORY_ROUTE.SAFE,
+      variant: SAFE_VARIANT.ABNORMAL,
+      card,
+      verified: Boolean(isMember),
+      warning
+    };
+  }
+
+  /* DCC+ / 일반 쇼케이스 — 회원 + 송출 ON + 쇼케이스 콘텐츠 */
   if (isMember && broadcastOn && hasShowcaseContent) {
     const variant =
       isPaid && hasDcc ? SHOWCASE_VARIANT.DCC_PLUS : SHOWCASE_VARIANT.NORMAL;
@@ -188,25 +219,50 @@ export function decideBucketFromFacts(facts, agency = null) {
     };
   }
 
-  /* ③ 안심 — 저장 · 비회원 DB적재 · 회원 송출 OFF · (회원인데 송출/콘텐츠 미확정이면 PENDING) */
+  /* 안심(정상)
+   * - 저장 비회원
+   * - 회원 송출 OFF
+   * - 회원 DCC/쇼케이스 미등록(콘텐츠 없음)
+   * - VLUE 인증 DB 적재 비회원
+   */
   if (isMember && facts.conclusive && (!broadcastOn || !hasShowcaseContent)) {
-    return { kind: CALL_HISTORY_ROUTE.SAFE, card, verified: true };
+    return {
+      kind: CALL_HISTORY_ROUTE.SAFE,
+      variant: SAFE_VARIANT.NORMAL,
+      card,
+      verified: true
+    };
   }
   if (!isMember && (isSaved || inVlueDb)) {
-    return { kind: CALL_HISTORY_ROUTE.SAFE, card, verified: false };
-  }
-  if (isSaved && !isMember) {
-    return { kind: CALL_HISTORY_ROUTE.SAFE, card, verified: false };
+    return {
+      kind: CALL_HISTORY_ROUTE.SAFE,
+      variant: SAFE_VARIANT.NORMAL,
+      card,
+      verified: false
+    };
   }
 
-  /* 회원인데 송출 여부를 아직 모름 → 네트워크 */
   if (isMember && !facts.conclusive) {
     return { kind: CALL_HISTORY_ROUTE.PENDING };
   }
 
-  /* ④ 미인증 — 비회원 · 미저장 · DB 없음 (확정 시에만) */
+  /* 미인증 — 미저장 + 비회원 + DB 없음 */
   if (facts.conclusive && !isMember && !isSaved && !inVlueDb) {
-    return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card, verified: false };
+    return {
+      kind: CALL_HISTORY_ROUTE.UNVERIFIED,
+      card,
+      verified: false
+    };
+  }
+
+  /* 저장만 있고 회원 힌트 없음 → 안심(정상) 즉시 */
+  if (isSaved && !isMember) {
+    return {
+      kind: CALL_HISTORY_ROUTE.SAFE,
+      variant: SAFE_VARIANT.NORMAL,
+      card,
+      verified: false
+    };
   }
 
   return { kind: CALL_HISTORY_ROUTE.PENDING };
@@ -226,13 +282,6 @@ export function decideCallHistoryRouteFromPayload(call, payload) {
   return decideBucketFromFacts(facts, agency);
 }
 
-/**
- * 버킷 전이.
- * - PENDING → 최종 허용
- * - 동일 버킷 유지
- * - conclusive(네트워크 확정) 일 때만 ①②③④ 상호 전이 허용
- *   (가입·탈퇴·송출 ON/OFF·유료↔무료)
- */
 export function mayApplyRoute(lockedKind, nextKind, opts = {}) {
   const conclusive = Boolean(opts.conclusive);
   if (!lockedKind || lockedKind === CALL_HISTORY_ROUTE.PENDING) return true;

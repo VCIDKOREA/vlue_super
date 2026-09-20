@@ -67,6 +67,7 @@ import {
 import { peerHasDccOrShowcaseContent } from "../lib/peerShowcaseContent.js";
 import {
   CALL_HISTORY_ROUTE,
+  SAFE_VARIANT,
   decideCallHistoryRoute,
   decideCallHistoryRouteFromPayload,
   mayApplyRoute,
@@ -460,7 +461,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [contactSafePopup, setContactSafePopup] = useState({
     open: false,
     name: "",
-    phone: ""
+    phone: "",
+    abnormal: false,
+    warning: ""
   });
   const [peerAvatarTick, setPeerAvatarTick] = useState(0);
   const openGenRef = useRef(0);
@@ -540,33 +543,39 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   }, []);
 
   const closeContactSafePopup = useCallback(() => {
-    setContactSafePopup({ open: false, name: "", phone: "" });
+    setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
   }, []);
 
-  const openContactSafeForCall = useCallback((call, known = null) => {
+  const openContactSafeForCall = useCallback((call, known = null, opts = {}) => {
     const phone = call?.phoneDisplay || call?.phone || "";
     const knownSync = known || resolveIsKnownContactSync(phone);
     const name =
       String(knownSync.matchedName || call?.contactName || call?.name || "").trim() ||
       "저장된 연락처";
+    const abnormal = Boolean(opts.abnormal);
+    const warning = String(opts.warning || "").trim();
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
     setSelected(null);
     setPreviewCard(null);
     setPreviewVerified(false);
     setExpanded(true);
     setLoading(false);
-    /* 같은 번호 안심이 이미 열려 있으면 상태만 유지 — 닫혔다 다시 뜨는 플리커 방지 */
     setContactSafePopup((prev) => {
-      if (prev.open && String(prev.phone || "") === String(phone || "")) {
-        if (prev.name === name) return prev;
-        return { ...prev, name };
+      if (
+        prev.open &&
+        String(prev.phone || "") === String(phone || "") &&
+        prev.abnormal === abnormal &&
+        prev.name === name &&
+        prev.warning === warning
+      ) {
+        return prev;
       }
-      return { open: true, name, phone };
+      return { open: true, name, phone, abnormal, warning };
     });
   }, []);
 
   const openAuthPopupForPeer = useCallback((call, card = null) => {
-    setContactSafePopup({ open: false, name: "", phone: "" });
+    setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
     setSelected(null);
     setPreviewCard(null);
     setPreviewVerified(false);
@@ -868,10 +877,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       routeLockRef.current = next.kind;
 
-      /* ③ 안심 (송출 OFF 회원 포함 — AUTH 팝업 쓰지 않음) */
+      /* ③ 안심 (정상/비정상) */
       if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        openContactSafeForCall(call, resolveIsKnownContactSync(phone));
+        openContactSafeForCall(call, resolveIsKnownContactSync(phone), {
+          abnormal: next.variant === SAFE_VARIANT.ABNORMAL,
+          warning: next.warning || ""
+        });
         return;
       }
 
@@ -885,7 +897,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           { peerMode: true, style: silentShowcaseStyle() }
         );
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
+        setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
         setSelected({
           ...call,
           name: next.agency.agencyName,
@@ -904,7 +916,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         const card = next.card || payload.card;
         const tier = card.membershipTier || call.membershipTier || "free";
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
+        setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
         setSelected({
           ...call,
           name: card.name || call.name,
@@ -931,7 +943,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
             showcaseStyle: silentShowcaseStyle()
           };
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
+        setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
         setSelected(call);
         setExpanded(true);
         setPreviewVerified(false);
@@ -1052,7 +1064,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const paintShowcase = (card, verified, { backgroundHydrate = false, forceStyle = false } = {}) => {
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
+        setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
         setSelected(call);
         setExpanded(true);
         setPreviewVerified(Boolean(verified));
@@ -1067,14 +1079,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const paintPending = () => {
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "" });
+        setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
         setSelected(call);
         setExpanded(true);
         setPreviewCard(null);
         setPreviewVerified(false);
         setLoading(true);
       });
-      /* force 기본 false — 캐시·light prefetch 활용, 30초 live 강제 재조회 금지 */
       void hydrateCallFromNetwork(call, gen, {
         background: false,
         forceStyle: !readCallHistoryPeerCache(phone)
@@ -1082,14 +1093,16 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     };
 
     if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
-      /* ③ 안심 — 저장비회원·송출OFF 회원. light 로 ①② 상향만 허용 */
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected(null);
         setPreviewCard(null);
         setPreviewVerified(false);
         setLoading(false);
-        openContactSafeForCall(call, resolveIsKnownContactSync(phone));
+        openContactSafeForCall(call, resolveIsKnownContactSync(phone), {
+          abnormal: decision.variant === SAFE_VARIANT.ABNORMAL,
+          warning: decision.warning || ""
+        });
       });
       void hydrateCallFromNetwork(call, gen, {
         background: true,
@@ -1136,7 +1149,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setExpanded(true);
     setLoading(false);
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-    setContactSafePopup({ open: false, name: "", phone: "" });
+    setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
   };
 
   useEffect(() => {
@@ -1162,10 +1175,17 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       dcp: {
         contactSafeCare: true,
         contactName: contactSafePopup.name,
-        shortNumber: contactSafePopup.phone
+        shortNumber: contactSafePopup.phone,
+        routeStatus: contactSafePopup.abnormal ? "abnormal" : "normal",
+        warning: contactSafePopup.warning || undefined
       }
     }),
-    [contactSafePopup.name, contactSafePopup.phone]
+    [
+      contactSafePopup.name,
+      contactSafePopup.phone,
+      contactSafePopup.abnormal,
+      contactSafePopup.warning
+    ]
   );
 
   const emptyHint = (() => {
@@ -1381,6 +1401,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       <AgencyDcpMiniPopup
         open={Boolean(open && contactSafePopup.open)}
         contactSafeCare
+        abnormal={Boolean(contactSafePopup.abnormal)}
+        warning={contactSafePopup.warning || ""}
         incomingNumber={contactSafePopup.phone}
         card={contactSafeCard}
         onClose={closeContactSafePopup}
