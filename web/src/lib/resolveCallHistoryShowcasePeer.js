@@ -1,5 +1,5 @@
 /**
- * 통화목록 탭 — 최소 RTT 로 상대 쇼케이스 (by-number 1회 + profile·live 병렬)
+ * 통화목록 탭 — 최소 RTT 로 상대 쇼케이스 (by-number 1회 + profile·live 병렬, 타임아웃)
  */
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { formatLetteringPhoneDisplay } from "./letteringPhoneMatch.js";
@@ -14,6 +14,21 @@ import { peerShowcaseBroadcastOn } from "./peerShowcaseContent.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** profile/live 가 길어도 통화목록 탭은 이 안에 반드시 페인트 */
+const ENRICH_TIMEOUT_MS = 2800;
+
+function withTimeout(promise, ms, fallback) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => {
+      if (timer) clearTimeout(timer);
+    }),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms);
+    })
+  ]);
+}
 
 function mergeCardFromProfile(baseCard, profRes) {
   if (!profRes?.ok) return baseCard;
@@ -96,7 +111,6 @@ function authOnlyReplayStyle() {
   };
 }
 
-/** 라이브 스타일 그대로 — 유료라도 includeDigitalCard 를 강제로 켜지 않음(송출 OFF 유지) */
 function normalizeReplayStyle(style) {
   if (!style || typeof style !== "object") return authOnlyReplayStyle();
   return style;
@@ -104,7 +118,7 @@ function normalizeReplayStyle(style) {
 
 /**
  * @param {string} phoneRaw
- * @param {{ force?: boolean, displayName?: string, avatarUrl?: string }} [opts]
+ * @param {{ force?: boolean, displayName?: string, avatarUrl?: string, light?: boolean }} [opts]
  */
 export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
   const phoneHint = String(phoneRaw || "").trim();
@@ -138,18 +152,54 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
     );
     return {
       phone: phoneDisplay,
-      verified: Boolean(byPhone.verified),
+      verified: false,
       card,
       showcaseStyle: style
     };
   }
 
+  /* light: by-number 만 — 목록 예열용. profile/live 는 탭 시에만 */
+  if (opts.light) {
+    const snapStyle =
+      byPhone.card?.showcaseStyle && typeof byPhone.card.showcaseStyle === "object"
+        ? normalizeReplayStyle(byPhone.card.showcaseStyle)
+        : authOnlyReplayStyle();
+    const tier = byPhone.card?.membershipTier || "free";
+    const card = applyShowcaseStyleToCard(
+      {
+        ...byPhone.card,
+        userId,
+        ownerUserId: userId,
+        phone: phoneDisplay,
+        name: byPhone.card?.name || opts.displayName || "",
+        showcaseStyle: snapStyle,
+        verificationItems: ["VLUÉ 인증"]
+      },
+      isPaidLetteringTier(tier) ? tier : "free",
+      { peerMode: true, style: snapStyle }
+    );
+    return {
+      phone: phoneDisplay,
+      verified: true,
+      card,
+      showcaseStyle: snapStyle
+    };
+  }
+
   const [profRes, live] = await Promise.all([
-    fetchFollowProfile(userId, { purpose: "full" }),
-    fetchPeerLiveStylePublic(userId, {
-      force: Boolean(opts.force),
-      number: phoneHint
-    })
+    withTimeout(
+      fetchFollowProfile(userId, { purpose: "follow" }),
+      ENRICH_TIMEOUT_MS,
+      null
+    ),
+    withTimeout(
+      fetchPeerLiveStylePublic(userId, {
+        force: Boolean(opts.force),
+        number: phoneHint
+      }),
+      ENRICH_TIMEOUT_MS,
+      null
+    )
   ]);
 
   if (profRes?.ok && profRes.follow?.relation) {
@@ -167,7 +217,6 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
     },
     profRes
   );
-  /* 시드 아바타(통화목록)는 https 프로필만 — 깨진/상대경로로 덮지 않음 */
   const seedAvatar = String(opts.avatarUrl || "").trim();
   if (
     !merged.photoUrl &&
@@ -178,7 +227,6 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
   }
 
   const tier = merged.membershipTier || "free";
-  /* live 없음 = 송출 미설정 → 인증 팝업. live.includeDigitalCard 가 송출 스위치 */
   let peerStyle =
     live && typeof live === "object" ? normalizeReplayStyle(live) : authOnlyReplayStyle();
   if (
@@ -193,7 +241,6 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
       pages: snap.pages || peerStyle.pages,
       gallery: snap.gallery || peerStyle.gallery,
       bgm: snap.bgm || peerStyle.bgm,
-      /* 송출 플래그는 live 값 유지 */
       includeDigitalCard: peerStyle.includeDigitalCard
     });
   }

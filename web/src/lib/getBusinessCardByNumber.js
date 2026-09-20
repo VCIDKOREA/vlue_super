@@ -38,9 +38,21 @@ export async function getBusinessCardByNumber(raw, opts = {}) {
       const route = String(opts.dcpRoute || "").trim();
       if (route) params.set("dcp_route", route);
       if (opts.forCallOverlay) params.set("purpose", "call_overlay");
+      const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timer =
+        ctrl &&
+        setTimeout(() => {
+          try {
+            ctrl.abort();
+          } catch {
+            /* ignore */
+          }
+        }, opts.forCallOverlay ? 8000 : 15000);
       const res = await vlueAuthFetch(apiUrl(`/api/cards/by-number?${params.toString()}`), {
-        headers: vlueAuthHeaders()
+        headers: vlueAuthHeaders(),
+        signal: ctrl?.signal
       });
+      if (timer) clearTimeout(timer);
       const data = await res.json().catch(() => ({}));
       const value = !res.ok ? { ok: false, status: res.status, ...data } : { ok: true, ...data };
       byNumberCache.set(key, { at: Date.now(), value });

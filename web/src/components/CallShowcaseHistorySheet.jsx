@@ -516,16 +516,17 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     return () => window.removeEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
   }, []);
 
-  /* 상위 번호 peer prefetch — 회원 여부·쇼케이스 즉시 오픈용 */
+  /* 상위 번호 light prefetch — by-number 만 (full profile/live 16개 동시 호출이 30초 지연 원인) */
   useEffect(() => {
     if (!open || !items.length) return undefined;
-    const tops = items.slice(0, 16);
+    const tops = items.slice(0, 8);
     for (const call of tops) {
       const phone = call.phoneDisplay || call.phone;
       if (!phone) continue;
-      if (cachePayloadIsUsable(readCallHistoryPeerCache(phone))) continue;
+      if (readCallHistoryPeerCache(phone)) continue;
       prefetchCallHistoryPeer(phone, () =>
         resolveCallHistoryShowcasePeer(phone, {
+          light: true,
           displayName: call.name || call.memberName || "",
           avatarUrl: call.avatarUrl || ""
         }).then((payload) => peerPayloadFromResolve(payload))
@@ -835,10 +836,14 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       if (!mayApplyRoute(routeLockRef.current, next.kind)) return;
 
       const phone = call?.phoneDisplay || call?.phone || "";
-      if (payload?.verified === true && phone) {
+      const uuidOk =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          String(payload?.card?.userId || "").trim()
+        );
+      if (payload?.verified === true && uuidOk && phone) {
         writeCallHistoryMemberHint(phone, {
           verified: true,
-          userId: payload?.card?.userId || call?.userId || "",
+          userId: payload?.card?.userId || "",
           name: payload?.card?.name || call?.memberName || call?.name || "",
           membershipTier: payload?.card?.membershipTier || call?.membershipTier || "free"
         });
@@ -1041,7 +1046,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const decision = decideCallHistoryRoute(call, cachedPeer);
     routeLockRef.current = decision.kind;
 
-    const paintShowcase = (card, verified, { backgroundHydrate = false } = {}) => {
+    const paintShowcase = (card, verified, { backgroundHydrate = false, forceStyle = false } = {}) => {
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setContactSafePopup({ open: false, name: "", phone: "" });
@@ -1052,7 +1057,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setLoading(false);
       });
       if (backgroundHydrate) {
-        void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
+        void hydrateCallFromNetwork(call, gen, { background: true, forceStyle });
       }
     };
 
@@ -1066,11 +1071,15 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setPreviewVerified(false);
         setLoading(true);
       });
-      void hydrateCallFromNetwork(call, gen, { background: false, forceStyle: true });
+      /* force 기본 false — 캐시·light prefetch 활용, 30초 live 강제 재조회 금지 */
+      void hydrateCallFromNetwork(call, gen, {
+        background: false,
+        forceStyle: !readCallHistoryPeerCache(phone)
+      });
     };
 
     if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
-      /* 안심만 연다 — selected/쇼케이스 잔상 제거, 팝업은 유지·갱신 */
+      /* 안심은 단말 — hydrate 로 팝업을 닫지 않음 */
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected(null);
@@ -1079,8 +1088,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setLoading(false);
         openContactSafeForCall(call, resolveIsKnownContactSync(phone));
       });
-      /* 회원 오판 시 AUTH/SHOWCASE 로만 상향 */
-      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
       return;
     }
 
@@ -1093,7 +1100,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setLoading(false);
         openAuthPopupForPeer(call, decision.card || cachedPeer?.card || null);
       });
-      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
+      void hydrateCallFromNetwork(call, gen, {
+        background: true,
+        forceStyle: !cachePayloadIsUsable(cachedPeer)
+      });
       return;
     }
 
@@ -1111,7 +1121,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     if (decision.kind === CALL_HISTORY_ROUTE.SHOWCASE && decision.card) {
-      paintShowcase(decision.card, true, { backgroundHydrate: true });
+      paintShowcase(decision.card, true, { backgroundHydrate: true, forceStyle: false });
       return;
     }
 
