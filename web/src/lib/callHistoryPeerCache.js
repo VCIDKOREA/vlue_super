@@ -102,9 +102,12 @@ export function prefetchCallHistoryPeer(phone, loader, opts = {}) {
   if (!force) {
     const cached = readCallHistoryPeerCache(phone);
     if (cached) return Promise.resolve(cached);
+    const existing = inflight.get(k);
+    if (existing) return existing;
+  } else {
+    /* force: 진행 중 prefetch(목록 예열)에 묶이지 않음 — 낡은 unmatched 결과로 팝업이 비는 것 방지 */
+    inflight.delete(k);
   }
-  const existing = inflight.get(k);
-  if (existing) return existing;
   const run = loader()
     .then((payload) => {
       if (payload?.card) writeCallHistoryPeerCache(phone, payload);

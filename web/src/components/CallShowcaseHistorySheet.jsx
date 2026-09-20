@@ -38,7 +38,8 @@ import {
 } from "../lib/callHistoryListCache.js";
 import {
   applyPersistedMemberHintsToCallGroups,
-  rememberMemberDirectoryResults
+  rememberMemberDirectoryResults,
+  writeCallHistoryMemberHint
 } from "../lib/callHistoryMemberIndex.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
@@ -829,16 +830,37 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   const applyPeerPayload = useCallback(
     (payload, call, gen) => {
-      if (gen !== openGenRef.current || !payload?.card) return;
-      const next = decideCallHistoryRouteFromPayload(call, payload);
+      if (gen !== openGenRef.current) return;
+      const next = decideCallHistoryRouteFromPayload(call, payload || {});
       if (!mayApplyRoute(routeLockRef.current, next.kind)) return;
-      /* 이미 안심 확정·동일 번호면 재페인트 금지 — 언마운트 플리커 */
-      if (
-        next.kind === CALL_HISTORY_ROUTE.SAFE &&
-        routeLockRef.current === CALL_HISTORY_ROUTE.SAFE
-      ) {
+
+      const phone = call?.phoneDisplay || call?.phone || "";
+      if (payload?.verified === true && phone) {
+        writeCallHistoryMemberHint(phone, {
+          verified: true,
+          userId: payload?.card?.userId || call?.userId || "",
+          name: payload?.card?.name || call?.memberName || call?.name || "",
+          membershipTier: payload?.card?.membershipTier || call?.membershipTier || "free"
+        });
+      } else if (payload && payload.verified === false && phone) {
+        writeCallHistoryMemberHint(phone, {
+          verified: false,
+          userId: "",
+          name: call?.name || "",
+          membershipTier: "free"
+        });
+      }
+
+      /* 동일 단말 라우트 재적용 스킵 — 팝업/쇼케이스 리마운트 플리커 방지 */
+      if (routeLockRef.current === next.kind && next.kind !== CALL_HISTORY_ROUTE.PENDING) {
+        if (next.kind === CALL_HISTORY_ROUTE.SHOWCASE && payload?.card) {
+          setPreviewCard(payload.card);
+          setPreviewVerified(true);
+          setLoading(false);
+        }
         return;
       }
+
       routeLockRef.current = next.kind;
 
       if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
@@ -846,7 +868,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         return;
       }
       if (next.kind === CALL_HISTORY_ROUTE.AUTH) {
-        openAuthPopupForPeer(call, next.card || payload.card);
+        openAuthPopupForPeer(call, next.card || payload?.card || null);
         return;
       }
       if (next.kind === CALL_HISTORY_ROUTE.AGENCY && next.agency) {
@@ -873,27 +895,42 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         return;
       }
 
-      const tier = payload.card.membershipTier || call.membershipTier || "free";
-      const verified = Boolean(payload.verified);
-      setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-      setContactSafePopup({ open: false, name: "", phone: "" });
-      setPreviewVerified(verified);
-      setPreviewCard(payload.card);
-      setLoading(false);
-      if (verified && payload.card?.name) {
-        setSelected((prev) =>
-          prev
-            ? {
-                ...prev,
-                name: payload.card.name || prev.name,
-                verified: true,
-                membershipTier: tier,
-                avatarUrl: payload.card.photoUrl || payload.card.avatarUrl || prev.avatarUrl
-              }
-            : prev
-        );
-      } else {
-        setSelected((prev) => prev || call);
+      if (next.kind === CALL_HISTORY_ROUTE.SHOWCASE && (next.card || payload?.card)) {
+        const card = next.card || payload.card;
+        const tier = card.membershipTier || call.membershipTier || "free";
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+        setContactSafePopup({ open: false, name: "", phone: "" });
+        setSelected({
+          ...call,
+          name: card.name || call.name,
+          verified: true,
+          membershipTier: tier,
+          avatarUrl: card.photoUrl || card.avatarUrl || call.avatarUrl
+        });
+        setExpanded(true);
+        setPreviewVerified(true);
+        setPreviewCard(card);
+        setLoading(false);
+        return;
+      }
+
+      /* UNVERIFIED — 미저장 비회원: 빈 화면 대신 미인증 카드(또는 최소 셸) */
+      {
+        const card =
+          next.card ||
+          payload?.card || {
+            name: call.name || "",
+            phone: call.phoneDisplay || call.phone || "",
+            membershipTier: "free",
+            showcaseStyle: silentShowcaseStyle()
+          };
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+        setContactSafePopup({ open: false, name: "", phone: "" });
+        setSelected(call);
+        setExpanded(true);
+        setPreviewVerified(false);
+        setPreviewCard(card);
+        setLoading(false);
       }
     },
     [openAuthPopupForPeer, openContactSafeForCall]
@@ -1001,17 +1038,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     const cachedPeer = readCallHistoryPeerCache(phone);
-    let decision = decideCallHistoryRoute(call, cachedPeer);
-    /* 저장 회원인데 enrich 가 verified 미확정이면 SAFE 로 잠기지 않게 — PENDING 후 네트워크 */
-    if (
-      decision.kind === CALL_HISTORY_ROUTE.SAFE &&
-      resolveHistoryRowMemberState(call) === "member"
-    ) {
-      decision = { kind: CALL_HISTORY_ROUTE.PENDING };
-    }
+    const decision = decideCallHistoryRoute(call, cachedPeer);
     routeLockRef.current = decision.kind;
 
-    const paintShowcase = (card, verified, { backgroundHydrate = true } = {}) => {
+    const paintShowcase = (card, verified, { backgroundHydrate = false } = {}) => {
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setContactSafePopup({ open: false, name: "", phone: "" });
@@ -1029,7 +1059,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const paintPending = () => {
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        /* 안심 팝업은 유지 — selected 로딩으로 트리에서 빼며 끊기던 문제 방지 */
+        setContactSafePopup({ open: false, name: "", phone: "" });
         setSelected(call);
         setExpanded(true);
         setPreviewCard(null);
@@ -1040,17 +1070,29 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     };
 
     if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
+      /* 안심만 연다 — selected/쇼케이스 잔상 제거, 팝업은 유지·갱신 */
       flushSync(() => {
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+        setSelected(null);
+        setPreviewCard(null);
+        setPreviewVerified(false);
+        setLoading(false);
         openContactSafeForCall(call, resolveIsKnownContactSync(phone));
       });
+      /* 회원 오판 시 AUTH/SHOWCASE 로만 상향 */
+      void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
       return;
     }
 
     if (decision.kind === CALL_HISTORY_ROUTE.AUTH) {
       flushSync(() => {
+        setContactSafePopup({ open: false, name: "", phone: "" });
+        setSelected(null);
+        setPreviewCard(null);
+        setPreviewVerified(false);
+        setLoading(false);
         openAuthPopupForPeer(call, decision.card || cachedPeer?.card || null);
       });
-      /* 송출 ON 교정만 백그라운드 — 안심→쇼케이스 플리커 최소화 */
       void hydrateCallFromNetwork(call, gen, { background: true, forceStyle: true });
       return;
     }
@@ -1064,7 +1106,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         "paid",
         { peerMode: true, style: silentShowcaseStyle() }
       );
-      paintShowcase(dcpCard, true, { backgroundHydrate: true });
+      paintShowcase(dcpCard, true, { backgroundHydrate: false });
       return;
     }
 
@@ -1073,16 +1115,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
-    if (decision.kind === CALL_HISTORY_ROUTE.UNVERIFIED) {
-      if (decision.card || cachedPeer?.card) {
-        paintShowcase(decision.card || cachedPeer.card, false, { backgroundHydrate: true });
-        return;
-      }
-      paintPending();
-      return;
-    }
-
-    /* PENDING — 스피너만. 안심↔쇼케이스 추측 페인트 금지 */
+    /* PENDING / UNVERIFIED — 네트워크 1회 후 단일 화면 */
     paintPending();
   };
 

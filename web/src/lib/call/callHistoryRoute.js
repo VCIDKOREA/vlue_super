@@ -1,11 +1,19 @@
 /**
- * 통화목록 탭 → 단일 확정 라우트 (정책 고정)
+ * 통화목록 탭 → 단일 확정 라우트
  *
- * DCC+쇼케이스 / 일반 쇼케이스: 회원 + 송출 ON + 콘텐츠
- * 안심: 저장 비회원 · 회원 송출 OFF · VLUE DB 적재(비송출)
- * 미인증: 미저장 · DB 없음 · 모르는 비회원
+ * 우선순위 (위에서 막히면 아래 안 봄):
+ * 1) 국가기관 DCP
+ * 2) VLUE 회원 + 송출 콘텐츠 → 쇼케이스
+ * 3) VLUE 회원 + 송출 OFF → 인증 팝업
+ * 4) VLUE 회원(송출 미확정) → PENDING (네트워크) — 절대 안심 금지
+ * 5) 저장 연락처(비회원) → 안심
+ * 6) 명시 비회원 → 미인증
+ * 7) 그 외 → PENDING
  *
- * 금지: 회원(케이스함)을 안심으로 잠그기, 안심↔쇼케이스 플리커
+ * 금지:
+ * - verified/회원 없이 hasContent 만으로 쇼케이스
+ * - 회원 → 안심
+ * - 쇼케이스/인증 ↔ 안심 교차 페인트
  */
 
 import { resolveIsKnownContactSync } from "../contacts/hybridKnownContact.js";
@@ -34,11 +42,12 @@ function isPhoneLikeLabel(raw) {
   return false;
 }
 
-/** VLUE 회원 힌트 — 저장연락처보다 우선 (김광덕 안심 오판 방지) */
+/** VLUE 회원 — 주소록/이름보다 항상 우선 */
 export function isVlueMemberHint(call, cached = null) {
   const phone = phoneOf(call);
   const memberHint = phone ? readCallHistoryMemberHint(phone) : null;
   if (memberHint?.verified === true) return true;
+  if (memberHint?.verified === false) return false;
   const pack = cached || (phone ? readCallHistoryPeerCache(phone) : null);
   if (pack?.verified === true) return true;
   if (call?.verified === true || call?.peerIsVlueMember === true) return true;
@@ -47,8 +56,10 @@ export function isVlueMemberHint(call, cached = null) {
 }
 
 /**
- * 저장된 번호 — 주소록·CallLog 표시명(번호가 아닌 이름).
- * contactName 비어 있어도 name/cachedName 이 이름이면 저장으로 본다 (법인지원설립센터).
+ * 저장 연락처 힌트.
+ * - 기기 주소록·contactName 확정
+ * - CallLog 캐시 이름(번호가 아닌 표시명) — 안심 대상(재호민성·법인지원 등)
+ * - 단, VLUE 회원으로 이미 확정된 경우는 호출부에서 회원 분기가 먼저 먹음
  */
 export function isSavedContactHint(call, known = null) {
   const phone = phoneOf(call);
@@ -63,10 +74,8 @@ export function isSavedContactHint(call, known = null) {
 function isExplicitNonMember(call, cached) {
   const phone = phoneOf(call);
   const memberHint = phone ? readCallHistoryMemberHint(phone) : null;
-  /* 회원 힌트가 있으면 peer unmatched(verified:false) 로 비회원 단정 금지 */
   if (memberHint?.verified === true || isVlueMemberHint(call, cached)) return false;
   if (memberHint?.verified === false) return true;
-  /* peer 캐시 unmatched 는 lookup 레이스 — 목록 CTA·라우트에 쓰지 않음 */
   if (call?.verified === false) return true;
   return false;
 }
@@ -84,6 +93,13 @@ function packStyle(cached, call, card) {
   );
 }
 
+function packVerified(cached, call) {
+  if (isVlueMemberHint(call, cached)) return true;
+  if (cached?.verified === true) return true;
+  if (call?.verified === true) return true;
+  return false;
+}
+
 /**
  * @returns {{ kind: string, agency?: object, card?: object, verified?: boolean }}
  */
@@ -99,13 +115,14 @@ export function decideCallHistoryRoute(call, cachedPeer = null) {
   const card = packCard(cached, call);
   const style = packStyle(cached, call, card);
   const hasContent = peerHasDccOrShowcaseContent(card, style);
+  const verified = packVerified(cached, call);
 
-  /* 1) 송출 ON + 콘텐츠 → 쇼케이스 (DCC+ / 일반) */
-  if (hasContent) {
+  /* 1) 회원 + 송출 콘텐츠 → 쇼케이스 (회원·verified 필수) */
+  if (member && verified && hasContent) {
     return { kind: CALL_HISTORY_ROUTE.SHOWCASE, card, verified: true };
   }
 
-  /* 2) VLUE 회원 — 절대 SAFE 로 잠그지 않음. 네트워크로 송출 확정 */
+  /* 2) 회원 — 송출 OFF 확정이면 인증 팝업, 아니면 네트워크 */
   if (member) {
     if (style && typeof style === "object" && style.includeDigitalCard === false) {
       return { kind: CALL_HISTORY_ROUTE.AUTH, card, verified: true };
@@ -113,14 +130,14 @@ export function decideCallHistoryRoute(call, cachedPeer = null) {
     return { kind: CALL_HISTORY_ROUTE.PENDING };
   }
 
-  /* 3) 저장 연락처 → 안심 (회원은 2단계에서 이미 제외) */
+  /* 3) 저장 비회원 → 안심 (회원 분기에서 이미 제외됨) */
   if (saved) {
     return { kind: CALL_HISTORY_ROUTE.SAFE };
   }
 
   /* 4) 명시 비회원 · 미저장 → 미인증 */
   if (isExplicitNonMember(call, cached)) {
-    return { kind: CALL_HISTORY_ROUTE.UNVERIFIED };
+    return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card };
   }
 
   return { kind: CALL_HISTORY_ROUTE.PENDING };
@@ -147,30 +164,33 @@ export function decideCallHistoryRouteFromPayload(call, payload) {
       card?.profileKind === "contact_safe_care"
   );
 
+  /* 회원 확정 */
   if (verified && hasContent) {
     return { kind: CALL_HISTORY_ROUTE.SHOWCASE, card, verified: true };
   }
   if (verified && !hasContent) {
     return { kind: CALL_HISTORY_ROUTE.AUTH, card, verified: true };
   }
-  /* VLUE DB 적재·저장 비회원 → 안심 */
+
+  /* 비회원 — 저장/디렉터리 안심 */
   if (!verified && (saved || publicDir)) {
     return { kind: CALL_HISTORY_ROUTE.SAFE };
   }
+
   return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card, verified: false };
 }
 
 /**
- * 라우트 잠금.
- * - PENDING → 최종 허용
- * - SAFE 확정 후 같은 SAFE 재적용은 무시(플리커 방지) — 호출부에서 처리
- * - SAFE 오판(회원) → SHOWCASE/AUTH 교정만 허용
- * - SHOWCASE 다운그레이드 금지
+ * 라우트 잠금 — 한 번 깔린 화면을 다른 종류로 덮지 않음.
+ * 예외: 안심/인증 → 회원 쇼케이스로만 상향 (오판 교정).
+ * 쇼케이스 → 안심 하향 절대 금지.
  */
 export function mayApplyRoute(lockedKind, nextKind) {
   if (!lockedKind || lockedKind === CALL_HISTORY_ROUTE.PENDING) return true;
   if (lockedKind === nextKind) return true;
   if (lockedKind === CALL_HISTORY_ROUTE.SHOWCASE) return false;
+  if (lockedKind === CALL_HISTORY_ROUTE.UNVERIFIED) return false;
+  if (lockedKind === CALL_HISTORY_ROUTE.AGENCY) return false;
   if (
     lockedKind === CALL_HISTORY_ROUTE.SAFE &&
     (nextKind === CALL_HISTORY_ROUTE.SHOWCASE || nextKind === CALL_HISTORY_ROUTE.AUTH)
@@ -183,17 +203,16 @@ export function mayApplyRoute(lockedKind, nextKind) {
   ) {
     return true;
   }
-  /* SAFE 중 UNVERIFIED 등으로 끊지 않음 */
   if (lockedKind === CALL_HISTORY_ROUTE.SAFE) return false;
+  if (lockedKind === CALL_HISTORY_ROUTE.AUTH) return false;
   return false;
 }
 
 /**
  * 목록 CTA
- * - 회원 확정 → 케이스함
- * - 영속 인덱스·목록에서 비회원 확정 → 전달
- * - peer 캐시 unmatched(verified:false) 는 무시 (lookup 레이스가 노란 전달을 먼저 띄움)
- * - 미확정 → 버튼 숨김 (노란→보라 플래시 금지)
+ * - 회원 → 케이스함
+ * - 비회원 확정 → 전달
+ * - 미확정 → 숨김
  */
 export function resolveHistoryRowMemberState(call) {
   if (isVlueMemberHint(call)) return "member";
