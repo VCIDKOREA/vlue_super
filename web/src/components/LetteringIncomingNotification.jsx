@@ -846,6 +846,9 @@ export default function LetteringIncomingNotification({
     c.companyName,
     c.name,
     c.displayName,
+    c.publicHandle,
+    c.loginId,
+    c.vlueId,
     c.hideBroadcastName,
     c.showcaseStyle
   ]);
@@ -881,14 +884,17 @@ export default function LetteringIncomingNotification({
     ? null
     : showcaseOffPreview
       ? showcaseOffAuthLabel
-      : hideBroadcastName
+        : hideBroadcastName
         ? resolveShowcaseBarOwnerLabel(c, { hideBroadcastName: true })
-        : /* 쇼케이스 ON 빅푸시: 상호 우선 → 없으면 이름 (CEO=VCID KOREA, 전중희=이름) */
+        : /* 쇼케이스 ON: 상호 → 이름 → @아이디 → 저장명/번호 */
           (() => {
+            const handleLabel = peerPublicHandle ? `@${peerPublicHandle}` : "";
             const pick = [
               receptionLines?.primary,
               peerVerifiedName,
               receptionLines?.name,
+              resolveShowcaseBarOwnerLabel(c, { hideBroadcastName: false }),
+              handleLabel,
               contactSavedName,
               collapsedPhoneDisplay,
               formatLetteringPhoneDisplay(incoming)

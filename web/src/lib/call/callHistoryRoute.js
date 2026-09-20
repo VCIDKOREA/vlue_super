@@ -233,17 +233,22 @@ export function decideBucketFromFacts(facts, agency = null) {
       verified: true
     };
   }
-  if (!isMember && (isSaved || inVlueDb)) {
+
+  if (isMember && !facts.conclusive) {
+    return { kind: CALL_HISTORY_ROUTE.PENDING };
+  }
+
+  /*
+   * 저장 연락처라도 회원 여부가 미확정이면 즉시 비회원 안심 금지.
+   * (김광덕 등: 전화부 저장명 → isSaved, 인덱스 miss → 비회원 안심 고착)
+   */
+  if (!isMember && facts.conclusive && (isSaved || inVlueDb)) {
     return {
       kind: CALL_HISTORY_ROUTE.SAFE,
       variant: SAFE_VARIANT.NORMAL,
       card,
       verified: false
     };
-  }
-
-  if (isMember && !facts.conclusive) {
-    return { kind: CALL_HISTORY_ROUTE.PENDING };
   }
 
   /* 미인증 — 미저장 + 비회원 + DB 없음 */
@@ -255,14 +260,9 @@ export function decideBucketFromFacts(facts, agency = null) {
     };
   }
 
-  /* 저장만 있고 회원 힌트 없음 → 안심(정상) 즉시 */
-  if (isSaved && !isMember) {
-    return {
-      kind: CALL_HISTORY_ROUTE.SAFE,
-      variant: SAFE_VARIANT.NORMAL,
-      card,
-      verified: false
-    };
+  /* 저장만 있고 회원 힌트·네트워크 모두 없음 → 조회 대기 */
+  if (isSaved && !isMember && !facts.conclusive) {
+    return { kind: CALL_HISTORY_ROUTE.PENDING };
   }
 
   return { kind: CALL_HISTORY_ROUTE.PENDING };

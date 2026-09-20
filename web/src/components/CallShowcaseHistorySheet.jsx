@@ -122,13 +122,22 @@ function buildOptimisticHistoryCard(call) {
   const name = matchedHint
     ? String(snap.name || call.memberName || call.name || "").trim()
     : String(snap.name || "").trim();
+  const publicHandle = matchedHint
+    ? String(snap.publicHandle || call.publicHandle || "").replace(/^@+/, "").trim()
+    : "";
   const card = applyShowcaseStyleToCard(
     {
       userId: snapUserId,
       ownerUserId: snapUserId,
       name,
+      publicHandle,
+      loginId: publicHandle,
+      vlueId: publicHandle,
       phone,
-      organization: matchedHint ? String(snap.organization || "").trim() : "",
+      organization: matchedHint
+        ? String(snap.organization || snap.companyName || "").trim()
+        : "",
+      companyName: matchedHint ? String(snap.companyName || snap.organization || "").trim() : "",
       title: matchedHint ? String(snap.title || "").trim() : "",
       email: matchedHint ? String(snap.email || "").trim() : "",
       website: matchedHint ? String(snap.website || "").trim() : "",
@@ -878,14 +887,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           name: payload?.card?.name || call?.memberName || call?.name || "",
           membershipTier: payload?.card?.membershipTier || call?.membershipTier || "free"
         });
-      } else if (payload && payload.verified === false && phone) {
-        writeCallHistoryMemberHint(phone, {
-          verified: false,
-          userId: "",
-          name: call?.name || "",
-          membershipTier: "free"
-        });
       }
+      /* verified:false 는 인덱스에 쓰지 않음 — miss/일시 실패가 비회원으로 고착되는 경로 차단 */
 
       if (routeLockRef.current === next.kind && next.kind !== CALL_HISTORY_ROUTE.PENDING) {
         if (next.kind === CALL_HISTORY_ROUTE.SHOWCASE && payload?.card) {
@@ -898,13 +901,25 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       routeLockRef.current = next.kind;
 
-      /* ③ 안심 (정상/비정상) */
+      /* ③ 안심 — 회원(송출OFF 등)은 인증 팝업, 비회원 저장만 contact-safe */
       if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        openContactSafeForCall(call, resolveIsKnownContactSync(phone), {
-          abnormal: next.variant === SAFE_VARIANT.ABNORMAL,
-          warning: next.warning || ""
-        });
+        if (next.verified === true || next.variant === SAFE_VARIANT.ABNORMAL) {
+          if (next.variant === SAFE_VARIANT.ABNORMAL) {
+            setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+            openContactSafeForCall(call, resolveIsKnownContactSync(phone), {
+              abnormal: true,
+              warning: next.warning || ""
+            });
+          } else {
+            openAuthPopupForPeer(call, next.card || payload?.card || null);
+          }
+        } else {
+          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+          openContactSafeForCall(call, resolveIsKnownContactSync(phone), {
+            abnormal: false,
+            warning: next.warning || ""
+          });
+        }
         return;
       }
 
@@ -972,7 +987,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setLoading(false);
       }
     },
-    [openContactSafeForCall]
+    [openContactSafeForCall, openAuthPopupForPeer]
   );
 
   const loadPeerPayload = useCallback(async (call, opts = {}) => {
@@ -1119,20 +1134,24 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
     if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
       flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected(null);
         setPreviewCard(null);
         setPreviewVerified(false);
         setLoading(false);
-        openContactSafeForCall(call, resolveIsKnownContactSync(phone), {
-          abnormal: decision.variant === SAFE_VARIANT.ABNORMAL,
-          warning: decision.warning || ""
-        });
+        if (decision.verified === true && decision.variant !== SAFE_VARIANT.ABNORMAL) {
+          openAuthPopupForPeer(call, decision.card || cachedPeer?.card || null);
+        } else {
+          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+          openContactSafeForCall(call, resolveIsKnownContactSync(phone), {
+            abnormal: decision.variant === SAFE_VARIANT.ABNORMAL,
+            warning: decision.warning || ""
+          });
+        }
       });
       void hydrateCallFromNetwork(call, gen, {
         background: true,
         forceStyle: false,
-        light: true
+        light: false
       });
       return;
     }

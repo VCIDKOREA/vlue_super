@@ -24,10 +24,10 @@ export const SHOWCASE_BAR_VLUE_ID_LABEL = "VLUÉ ID";
 
 /**
  * 상단 「… Showcase」소유자 라벨
- * - 상호 있음 → 상호
+ * - 상호(사업자명) 있음 → 상호
  * - 상호 없음·이름 노출 → 이름
- * - DCC 없이 쇼케이스만 / 이름 숨김 → VLUÉ ID
- * (로그인 아이디·핸들은 쓰지 않음)
+ * - 둘 다 없음(또는 이름 숨김) → @아이디(publicHandle)
+ * - 아이디도 없음 → VLUÉ ID
  */
 export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
   const hideName = Boolean(
@@ -41,13 +41,19 @@ export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
     const name = String(card.name || card.displayName || "").trim();
     if (!isBlankCallIdentityLabel(name)) return name;
   }
+  const handle = String(card.publicHandle || card.loginId || card.vlueId || card.feedId || "")
+    .replace(/^@+/, "")
+    .trim();
+  if (handle && !/^phone-/i.test(handle) && !isBlankCallIdentityLabel(handle)) {
+    return `@${handle}`;
+  }
   return SHOWCASE_BAR_VLUE_ID_LABEL;
 }
 
 /**
  * 쇼케이스 하단 VLUÉ 프로필 바 — 상호 없음
  * - 이름 공개 → 이름
- * - 이름 비공개 → VLUÉ ID
+ * - 이름 비공개/없음 → @아이디 → VLUÉ ID
  */
 export function resolveShowcaseProfileBarLabel(card = {}, opts = {}) {
   const hideName = Boolean(
@@ -58,6 +64,10 @@ export function resolveShowcaseProfileBarLabel(card = {}, opts = {}) {
     const name = String(card.name || card.displayName || card.legalName || "").trim();
     if (name) return name;
   }
+  const handle = String(card.publicHandle || card.loginId || card.vlueId || "")
+    .replace(/^@+/, "")
+    .trim();
+  if (handle && !isBlankCallIdentityLabel(handle)) return `@${handle}`;
   return SHOWCASE_BAR_VLUE_ID_LABEL;
 }
 
