@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import CompanionMiniCase from "../call/CompanionMiniCase.jsx";
 import AgencyDcpCard from "./AgencyDcpCard.jsx";
 import AdMobBannerSlot from "../ads/AdMobBannerSlot.jsx";
@@ -8,6 +8,9 @@ import "../../styles/showcase-call-glass.css";
 
 const DEFAULT_WARNING =
   "🚨 현재 번호는 비정상 발신 번호로 의심됩니다! 즉시 통화를 종료하고 공식 정보를 확인하세요!!";
+
+/** pointerUp → flushSync 오픈 직후 touch→mouse mousedown 이 백드롭을 닫는 고스트 방지 */
+const DISMISS_GUARD_MS = 450;
 
 /**
  * 국가기관 DCP / 안심케어 팝업
@@ -26,7 +29,12 @@ export default function AgencyDcpMiniPopup({
   onShareShowcase
 }) {
   const everOpenedRef = useRef(false);
+  const openedAtRef = useRef(0);
   if (open) everOpenedRef.current = true;
+
+  useEffect(() => {
+    if (open) openedAtRef.current = Date.now();
+  }, [open]);
 
   if (typeof document === "undefined") return null;
 
@@ -58,8 +66,15 @@ export default function AgencyDcpMiniPopup({
     </div>
   );
 
+  const onBackdropDismiss = (e) => {
+    if (!open) return;
+    if (e.target !== e.currentTarget) return;
+    /* 통화목록 pointerUp 직후 호환 mousedown 이 백드롭을 닫던 경로 */
+    if (contactSafeCare && Date.now() - openedAtRef.current < DISMISS_GUARD_MS) return;
+    onClose?.();
+  };
+
   if (contactSafeCare) {
-    /* 최초 오픈 전엔 마운트하지 않음. 이후엔 open=false 여도 DOM 유지 */
     if (!everOpenedRef.current && !open) return null;
     return createPortal(
       <div
@@ -68,10 +83,8 @@ export default function AgencyDcpMiniPopup({
         role="dialog"
         aria-modal={open ? "true" : undefined}
         aria-hidden={open ? undefined : "true"}
-        onMouseDown={(e) => {
-          if (!open) return;
-          if (e.target === e.currentTarget) onClose?.();
-        }}
+        onMouseDown={onBackdropDismiss}
+        onClick={onBackdropDismiss}
       >
         <div className="agency-dcp-center-layer__stack">
           <div className="agency-dcp-center-shell">{cardEl}</div>

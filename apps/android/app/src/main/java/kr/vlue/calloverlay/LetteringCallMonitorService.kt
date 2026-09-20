@@ -142,11 +142,18 @@ class LetteringCallMonitorService : Service() {
                     "state=OFFHOOK prev=$lastState"
                 )
                 if (lastState == TelephonyManager.CALL_STATE_RINGING) {
-                    /* 수신 Answer → Showcase */
+                    /* 수신 Answer → Showcase / 안심 팝업 */
+                    CallOverlayService.notifyConnected(applicationContext)
+                } else if (CallOverlayService.shouldConnectOnOffhook()) {
+                    /*
+                     * Monitor 가 RINGING 을 놓친 경우(늦게 기동·콜백 누락)에도
+                     * 수신 BigPush 가 떠 있으면 수화 전환을 놓치지 않는다.
+                     * LetteringCallReceiver OFFHOOK 와 동일 게이트.
+                     */
                     CallOverlayService.notifyConnected(applicationContext)
                 } else if (CallOverlayService.isRunning()) {
-                    /* 발신 OFFHOOK — NEW_OUTGOING_CALL 로 이미 번호와 함께 기동됨. unknown 재기동 금지 */
-                    Log.i(TAG, "OFFHOOK outgoing — overlay running, skip unknown onRinging")
+                    /* 발신 다이얼 중 — NEW_OUTGOING_CALL 로 이미 기동됨 */
+                    Log.i(TAG, "OFFHOOK outgoing dialing — overlay running, skip connect")
                 } else {
                     LetteringCallCoordinator.onRinging(this, null, outgoing = true)
                 }

@@ -1031,13 +1031,21 @@ class CallOverlayService : Service() {
         source: String,
         trustedPeerConnected: Boolean = false
     ) {
-        if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+        if (dismissing) {
             CompanionRuntimeStabilityDiag.noteStaleEvent(
                 "CONNECTED",
                 source,
-                detail = "enterShowcaseFromAnswer ignored dismissing=$dismissing sessionActive=${CompanionRuntimeStabilityDiag.isCallSessionActive()}"
+                detail = "enterShowcaseFromAnswer ignored dismissing=true"
             )
             return
+        }
+        /* 세션 플래그만 꺼진 채 오버레이가 남은 경우 — 수화 UI 를 버리지 않고 세션 복구 */
+        if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+            CompanionRuntimeStabilityDiag.beginCallSession("enterShowcaseFromAnswer_$source")
+            VlueBigPushTrace.lifecycle(
+                "CALL_SESSION_REACTIVATE",
+                "source=$source — session was inactive, overlay still up"
+            )
         }
         if (!CallUiPhasePolicy.mayAdvancePastBigPush(
                 outgoing = currentOutgoing,
@@ -1985,7 +1993,7 @@ class CallOverlayService : Service() {
             "source=$source authMember=$authMember " +
                 "popupOnly=$authPopupOnlyMode attached=${dcpPopupView?.isAttachedToWindow == true}"
         )
-        if (authMember && webView != null) {
+        if (webView != null) {
             notifyWebCallState("connected")
         }
     }

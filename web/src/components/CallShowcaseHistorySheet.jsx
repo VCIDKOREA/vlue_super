@@ -468,6 +468,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [peerAvatarTick, setPeerAvatarTick] = useState(0);
   const openGenRef = useRef(0);
   const routeLockRef = useRef(CALL_HISTORY_ROUTE.PENDING);
+  const lastOpenAtRef = useRef(0);
   const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
 
   useEffect(() => {
@@ -519,21 +520,41 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     return () => window.removeEventListener("vlue-call-history-peer-cache-changed", onPeerCache);
   }, []);
 
-  /* 상위 번호 light prefetch — by-number 만 (full profile/live 16개 동시 호출이 30초 지연 원인) */
+  /* 상위 번호 light prefetch + 회원 상위 3건 full 사전 캐시(최초 쇼케이스 지연 완화) */
   useEffect(() => {
     if (!open || !items.length) return undefined;
     const tops = items.slice(0, 8);
+    let fullBudget = 3;
     for (const call of tops) {
       const phone = call.phoneDisplay || call.phone;
       if (!phone) continue;
-      if (readCallHistoryPeerCache(phone)) continue;
-      prefetchCallHistoryPeer(phone, () =>
-        resolveCallHistoryShowcasePeer(phone, {
-          light: true,
+      if (!readCallHistoryPeerCache(phone)) {
+        prefetchCallHistoryPeer(phone, () =>
+          resolveCallHistoryShowcasePeer(phone, {
+            light: true,
+            displayName: call.name || call.memberName || "",
+            avatarUrl: call.avatarUrl || ""
+          }).then((payload) => peerPayloadFromResolve(payload))
+        );
+      }
+      if (
+        fullBudget > 0 &&
+        resolveHistoryRowMemberState(call) === "member" &&
+        !cachePayloadIsUsable(readCallHistoryPeerCache(phone))
+      ) {
+        fullBudget -= 1;
+        void resolveCallHistoryShowcasePeer(phone, {
+          light: false,
+          force: false,
           displayName: call.name || call.memberName || "",
           avatarUrl: call.avatarUrl || ""
-        }).then((payload) => peerPayloadFromResolve(payload))
-      );
+        })
+          .then((payload) => {
+            const packed = peerPayloadFromResolve(payload);
+            writeCallHistoryPeerCache(phone, packed);
+          })
+          .catch(() => {});
+      }
     }
     return undefined;
   }, [open, items]);
@@ -1048,6 +1069,10 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   };
 
   const openCall = (call) => {
+    const now = Date.now();
+    if (now - lastOpenAtRef.current < 300) return;
+    lastOpenAtRef.current = now;
+
     const gen = ++openGenRef.current;
     const phone = call.phoneDisplay || call.phone;
 
@@ -1131,7 +1156,27 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       return;
     }
 
-    /* PENDING / ④ 후보 — 네트워크 1회로 버킷 확정 */
+    /* PENDING — 회원은 셸 즉시 노출, 미디어는 hydrate 바인딩 */
+    if (resolveHistoryRowMemberState(call) === "member") {
+      const optimistic = buildOptimisticHistoryCard(call);
+      if (optimistic?.card) {
+        flushSync(() => {
+          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+          setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
+          setSelected(call);
+          setExpanded(true);
+          setPreviewVerified(true);
+          setPreviewCard(optimistic.card);
+          setLoading(true);
+        });
+        void hydrateCallFromNetwork(call, gen, {
+          background: true,
+          forceStyle: !cachePayloadIsUsable(cachedPeer)
+        });
+        return;
+      }
+    }
+
     paintPending();
   };
 

@@ -19,7 +19,11 @@ object VlueAuthMemberPopupPolicy {
         /* 미수화(거는 중·링잉) — 중앙 정상 팝업 금지 */
         if (!callAnswered) return false
         if (popupOnlyTest) return true
-        return overlayState == OverlayState.SHOWCASE
+        /* ContactSafeCarePolicy 와 동일 — BIG_PUSH 에서도 수화 후 팝업 허용.
+         * (SHOWCASE 전제만 두면 presentCenterSafePopup 이 onAnswer 전에 sync 할 때 팝업이 제거됨) */
+        return overlayState == OverlayState.SHOWCASE ||
+            overlayState == OverlayState.BIG_PUSH ||
+            overlayState == OverlayState.IDLE
     }
 
     fun isAuthMemberOnly(cardJson: String?, verified: Boolean): Boolean {
