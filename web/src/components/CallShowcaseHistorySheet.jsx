@@ -833,7 +833,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     (payload, call, gen) => {
       if (gen !== openGenRef.current) return;
       const next = decideCallHistoryRouteFromPayload(call, payload || {});
-      if (!mayApplyRoute(routeLockRef.current, next.kind)) return;
+      /* 네트워크 페이로드 = conclusive — 가입/탈퇴·송출 ON/OFF 반영 */
+      if (!mayApplyRoute(routeLockRef.current, next.kind, { conclusive: true })) return;
 
       const phone = call?.phoneDisplay || call?.phone || "";
       const uuidOk =
@@ -848,7 +849,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           membershipTier: payload?.card?.membershipTier || call?.membershipTier || "free"
         });
       } else if (payload && payload.verified === false && phone) {
-        /* 비회원 기록은 by-number 확정 후에만 — CTA 용. 독성 일괄 false 아님 */
         writeCallHistoryMemberHint(phone, {
           verified: false,
           userId: "",
@@ -857,7 +857,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         });
       }
 
-      /* 동일 단말 라우트 재적용 스킵 — 팝업/쇼케이스 리마운트 플리커 방지 */
       if (routeLockRef.current === next.kind && next.kind !== CALL_HISTORY_ROUTE.PENDING) {
         if (next.kind === CALL_HISTORY_ROUTE.SHOWCASE && payload?.card) {
           setPreviewCard(payload.card);
@@ -869,14 +868,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       routeLockRef.current = next.kind;
 
+      /* ③ 안심 (송출 OFF 회원 포함 — AUTH 팝업 쓰지 않음) */
       if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
-        openContactSafeForCall(call, resolveIsKnownContactSync(call?.phoneDisplay || call?.phone));
+        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+        openContactSafeForCall(call, resolveIsKnownContactSync(phone));
         return;
       }
-      if (next.kind === CALL_HISTORY_ROUTE.AUTH) {
-        openAuthPopupForPeer(call, next.card || payload?.card || null);
-        return;
-      }
+
       if (next.kind === CALL_HISTORY_ROUTE.AGENCY && next.agency) {
         const dcpCard = applyShowcaseStyleToCard(
           {
@@ -901,6 +899,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         return;
       }
 
+      /* ①② 쇼케이스 */
       if (next.kind === CALL_HISTORY_ROUTE.SHOWCASE && (next.card || payload?.card)) {
         const card = next.card || payload.card;
         const tier = card.membershipTier || call.membershipTier || "free";
@@ -911,7 +910,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           name: card.name || call.name,
           verified: true,
           membershipTier: tier,
-          avatarUrl: card.photoUrl || card.avatarUrl || call.avatarUrl
+          avatarUrl: card.photoUrl || card.avatarUrl || call.avatarUrl,
+          showcaseVariant: next.variant || ""
         });
         setExpanded(true);
         setPreviewVerified(true);
@@ -920,7 +920,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         return;
       }
 
-      /* UNVERIFIED — 미저장 비회원: 빈 화면 대신 미인증 카드(또는 최소 셸) */
+      /* ④ 미인증 */
       {
         const card =
           next.card ||
@@ -939,7 +939,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setLoading(false);
       }
     },
-    [openAuthPopupForPeer, openContactSafeForCall]
+    [openContactSafeForCall]
   );
 
   const loadPeerPayload = useCallback(async (call, opts = {}) => {
@@ -1082,7 +1082,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     };
 
     if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
-      /* 안심 즉시 표시 — UNVERIFIED 로 닫지 않음. UUID 회원만 쇼케이스/인증으로 상향 */
+      /* ③ 안심 — 저장비회원·송출OFF 회원. light 로 ①② 상향만 허용 */
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected(null);
@@ -1095,22 +1095,6 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         background: true,
         forceStyle: false,
         light: true
-      });
-      return;
-    }
-
-    if (decision.kind === CALL_HISTORY_ROUTE.AUTH) {
-      flushSync(() => {
-        setContactSafePopup({ open: false, name: "", phone: "" });
-        setSelected(null);
-        setPreviewCard(null);
-        setPreviewVerified(false);
-        setLoading(false);
-        openAuthPopupForPeer(call, decision.card || cachedPeer?.card || null);
-      });
-      void hydrateCallFromNetwork(call, gen, {
-        background: true,
-        forceStyle: !cachePayloadIsUsable(cachedPeer)
       });
       return;
     }
@@ -1129,11 +1113,12 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     }
 
     if (decision.kind === CALL_HISTORY_ROUTE.SHOWCASE && decision.card) {
+      /* ①② 즉시 — 백그라운드에서 최신 스타일만 보강 */
       paintShowcase(decision.card, true, { backgroundHydrate: true, forceStyle: false });
       return;
     }
 
-    /* PENDING / UNVERIFIED — 네트워크 1회 후 단일 화면 */
+    /* PENDING / ④ 후보 — 네트워크 1회로 버킷 확정 */
     paintPending();
   };
 
@@ -1156,9 +1141,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   useEffect(() => {
     const onCloseOverlays = () => {
-      /* 안심만 열린 상태에서는 글로벌 close 로 팝업을 끄지 않음(깜빡임 방지) */
+      /* ③ 안심만 열린 상태 — 글로벌 close 로 끄지 않음 */
       if (routeLockRef.current === CALL_HISTORY_ROUTE.SAFE) return;
-      if (routeLockRef.current === CALL_HISTORY_ROUTE.AUTH) return;
       closeDetail();
     };
     window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);

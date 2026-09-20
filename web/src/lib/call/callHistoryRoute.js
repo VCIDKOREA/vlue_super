@@ -1,27 +1,42 @@
 /**
- * 통화목록 탭 → 단일 확정 라우트
+ * 통화목록 탭 — 4분류 규정 (단일 소스)
  *
- * 1) 국가기관
- * 2) VLUE 회원 + 송출 → 쇼케이스
- * 3) VLUE 회원 + 송출 OFF → 인증
- * 4) VLUE 회원 미확정 송출 → PENDING
- * 5) 저장 비회원 → 안심
- * 6) 그 외 → PENDING / 미인증
+ * ① DCC+쇼케이스  : 유료회원 + DCC 본문 + 쇼케이스 송출 ON
+ * ② 일반 쇼케이스 : 유/무료 회원 + 송출 ON (DCC 없음·또는 유료가 아님)
+ * ③ 안심팝업      : 저장번호 · VLUE 비회원 · 회원(송출 OFF) · VLUE DB 적재번호
+ * ④ 미인증        : 비회원 + 미저장 + VLUE DB 없음
+ *
+ * 회원 가입/탈퇴·유료↔무료·송출 ON/OFF 는 네트워크 확정(facts.conclusive)일 때만
+ * 버킷을 바꾼다. 추측 페인트로 ③↔①② 를 오가지 않는다.
  */
 
 import { resolveIsKnownContactSync } from "../contacts/hybridKnownContact.js";
 import { matchNationalAgency } from "../nationalAgencyDcpClient.js";
-import { peerHasDccOrShowcaseContent } from "../peerShowcaseContent.js";
+import {
+  cardHasDccBody,
+  peerHasDccOrShowcaseContent,
+  peerShowcaseBroadcastOn
+} from "../peerShowcaseContent.js";
 import { readCallHistoryPeerCache } from "../callHistoryPeerCache.js";
 import { readCallHistoryMemberHint } from "../callHistoryMemberIndex.js";
+import { isPaidLetteringTier } from "../letteringMembership.js";
 
 export const CALL_HISTORY_ROUTE = Object.freeze({
-  SAFE: "safe",
-  AUTH: "auth",
+  /** ① DCC+ / ② 일반 — UI 동일(Lettering), variant 로 구분 */
   SHOWCASE: "showcase",
+  /** ③ 안심 */
+  SAFE: "safe",
+  /** ④ 미인증 */
   UNVERIFIED: "unverified",
   AGENCY: "agency",
-  PENDING: "pending"
+  PENDING: "pending",
+  /** @deprecated 규정 ③으로 통합 — 송출 OFF 회원은 안심 */
+  AUTH: "safe"
+});
+
+export const SHOWCASE_VARIANT = Object.freeze({
+  DCC_PLUS: "dcc_plus",
+  NORMAL: "normal"
 });
 
 const UUID_RE =
@@ -42,10 +57,6 @@ function hasUuidUserId(cardOrCall) {
   return UUID_RE.test(String(cardOrCall?.userId || cardOrCall?.ownerUserId || "").trim());
 }
 
-/**
- * VLUE 회원 힌트.
- * index verified:false 는 무시(독성 캐시) — 양수 신호만 신뢰.
- */
 export function isVlueMemberHint(call, cached = null) {
   const phone = phoneOf(call);
   const memberHint = phone ? readCallHistoryMemberHint(phone) : null;
@@ -80,102 +91,156 @@ function packStyle(cached, call, card) {
   );
 }
 
-export function decideCallHistoryRoute(call, cachedPeer = null) {
+function isInVlueDb(card, payload) {
+  if (hasUuidUserId(card)) return true;
+  if (payload?.verified === true) return true;
+  if (
+    payload?.publicDirectorySafe ||
+    card?.dcp?.publicDirectorySafe ||
+    card?.profileKind === "public_directory_safe" ||
+    card?.profileKind === "contact_safe_care"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 관측 사실을 한 객체로 모은다.
+ * @returns {{
+ *   phone: string,
+ *   isMember: boolean,
+ *   isPaid: boolean,
+ *   broadcastOn: boolean,
+ *   hasDcc: boolean,
+ *   hasShowcaseContent: boolean,
+ *   isSaved: boolean,
+ *   inVlueDb: boolean,
+ *   card: object|null,
+ *   style: object|null,
+ *   conclusive: boolean
+ * }}
+ */
+export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = null) {
   const phone = phoneOf(call);
-  const agency = phone ? matchNationalAgency(phone) : null;
+  const cached = cachedPeer || (phone ? readCallHistoryPeerCache(phone) : null);
+  const card = payload?.card || packCard(cached, call);
+  const style = payload
+    ? payload.showcaseStyle || payload.card?.showcaseStyle || null
+    : packStyle(cached, call, card);
+  const known = resolveIsKnownContactSync(phone);
+
+  const fromPayloadMember =
+    payload != null && Boolean(payload.verified) && hasUuidUserId(payload.card);
+  const isMember = fromPayloadMember || isVlueMemberHint(call, cached);
+  const tier =
+    card?.membershipTier || call?.membershipTier || cached?.card?.membershipTier || "free";
+  const isPaid = isPaidLetteringTier(tier);
+  const broadcastOn = peerShowcaseBroadcastOn(style);
+  const hasDcc = cardHasDccBody(card);
+  const hasShowcaseContent = peerHasDccOrShowcaseContent(card, style);
+  const isSaved = isSavedContactHint(call, known);
+  const inVlueDb = isInVlueDb(card, payload);
+  const conclusive = payload != null;
+
+  return {
+    phone,
+    isMember,
+    isPaid,
+    broadcastOn,
+    hasDcc,
+    hasShowcaseContent,
+    isSaved,
+    inVlueDb,
+    card,
+    style,
+    conclusive
+  };
+}
+
+/**
+ * 4분류 결정 — 규정 그대로.
+ * @returns {{ kind: string, variant?: string, card?: object, verified?: boolean, agency?: object }}
+ */
+export function decideBucketFromFacts(facts, agency = null) {
   if (agency) return { kind: CALL_HISTORY_ROUTE.AGENCY, agency };
 
-  const cached = cachedPeer || (phone ? readCallHistoryPeerCache(phone) : null);
-  const known = resolveIsKnownContactSync(phone);
-  const member = isVlueMemberHint(call, cached);
-  const saved = isSavedContactHint(call, known);
-  const card = packCard(cached, call);
-  const style = packStyle(cached, call, card);
-  const hasContent = peerHasDccOrShowcaseContent(card, style);
+  const {
+    isMember,
+    isPaid,
+    broadcastOn,
+    hasDcc,
+    hasShowcaseContent,
+    isSaved,
+    inVlueDb,
+    card
+  } = facts;
 
-  if (member && hasContent) {
-    return { kind: CALL_HISTORY_ROUTE.SHOWCASE, card, verified: true };
+  /* ①② 회원 + 송출 ON + 실콘텐츠 */
+  if (isMember && broadcastOn && hasShowcaseContent) {
+    const variant =
+      isPaid && hasDcc ? SHOWCASE_VARIANT.DCC_PLUS : SHOWCASE_VARIANT.NORMAL;
+    return {
+      kind: CALL_HISTORY_ROUTE.SHOWCASE,
+      variant,
+      card,
+      verified: true
+    };
   }
 
-  if (member) {
-    if (style && typeof style === "object" && style.includeDigitalCard === false) {
-      return { kind: CALL_HISTORY_ROUTE.AUTH, card, verified: true };
-    }
+  /* ③ 안심 — 저장 · 비회원 DB적재 · 회원 송출 OFF · (회원인데 송출/콘텐츠 미확정이면 PENDING) */
+  if (isMember && facts.conclusive && (!broadcastOn || !hasShowcaseContent)) {
+    return { kind: CALL_HISTORY_ROUTE.SAFE, card, verified: true };
+  }
+  if (!isMember && (isSaved || inVlueDb)) {
+    return { kind: CALL_HISTORY_ROUTE.SAFE, card, verified: false };
+  }
+  if (isSaved && !isMember) {
+    return { kind: CALL_HISTORY_ROUTE.SAFE, card, verified: false };
+  }
+
+  /* 회원인데 송출 여부를 아직 모름 → 네트워크 */
+  if (isMember && !facts.conclusive) {
     return { kind: CALL_HISTORY_ROUTE.PENDING };
   }
 
-  /* 저장 비회원 — 즉시 안심. 회원은 위에서 이미 제외.
-     회원 여부가 아직 목록에 없으면 아래 PENDING 으로 by-number 확인 */
-  if (saved) {
-    const hint = phone ? readCallHistoryMemberHint(phone) : null;
-    /* 양수로 회원 확정된 적 없으면 저장번호는 안심.
-       (독성 false 는 isVlueMemberHint 에서 무시됨) */
-    if (hint?.verified === true) {
-      return { kind: CALL_HISTORY_ROUTE.PENDING };
-    }
-    return { kind: CALL_HISTORY_ROUTE.SAFE };
-  }
-
-  if (call?.verified === false) {
-    return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card };
+  /* ④ 미인증 — 비회원 · 미저장 · DB 없음 (확정 시에만) */
+  if (facts.conclusive && !isMember && !isSaved && !inVlueDb) {
+    return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card, verified: false };
   }
 
   return { kind: CALL_HISTORY_ROUTE.PENDING };
 }
 
+export function decideCallHistoryRoute(call, cachedPeer = null) {
+  const phone = phoneOf(call);
+  const agency = phone ? matchNationalAgency(phone) : null;
+  const facts = buildCallHistoryPeerFacts(call, cachedPeer, null);
+  return decideBucketFromFacts(facts, agency);
+}
+
 export function decideCallHistoryRouteFromPayload(call, payload) {
   const phone = phoneOf(call);
   const agency = phone ? matchNationalAgency(phone) : null;
-  if (agency) return { kind: CALL_HISTORY_ROUTE.AGENCY, agency };
-
-  const known = resolveIsKnownContactSync(phone);
-  const saved = isSavedContactHint(call, known);
-  const card = payload?.card || null;
-  const style = payload?.showcaseStyle || card?.showcaseStyle || null;
-  const hasUuid = hasUuidUserId(card);
-  const verified = Boolean(payload?.verified) && hasUuid;
-  const hasContent = peerHasDccOrShowcaseContent(card, style);
-  const publicDir = Boolean(
-    payload?.publicDirectorySafe ||
-      card?.dcp?.publicDirectorySafe ||
-      card?.profileKind === "public_directory_safe" ||
-      card?.profileKind === "contact_safe_care"
-  );
-
-  if (verified && hasContent) {
-    return { kind: CALL_HISTORY_ROUTE.SHOWCASE, card, verified: true };
-  }
-  if (verified && !hasContent) {
-    return { kind: CALL_HISTORY_ROUTE.AUTH, card, verified: true };
-  }
-  if (!verified && (saved || publicDir)) {
-    return { kind: CALL_HISTORY_ROUTE.SAFE };
-  }
-  return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card, verified: false };
+  const facts = buildCallHistoryPeerFacts(call, null, payload || {});
+  return decideBucketFromFacts(facts, agency);
 }
 
 /**
- * SAFE 잠금 중에는 UUID 회원 상향(AUTH/SHOWCASE)만 허용.
- * UNVERIFIED 등으로 안심을 닫지 않음.
+ * 버킷 전이.
+ * - PENDING → 최종 허용
+ * - 동일 버킷 유지
+ * - conclusive(네트워크 확정) 일 때만 ①②③④ 상호 전이 허용
+ *   (가입·탈퇴·송출 ON/OFF·유료↔무료)
  */
-export function mayApplyRoute(lockedKind, nextKind) {
+export function mayApplyRoute(lockedKind, nextKind, opts = {}) {
+  const conclusive = Boolean(opts.conclusive);
   if (!lockedKind || lockedKind === CALL_HISTORY_ROUTE.PENDING) return true;
   if (lockedKind === nextKind) return true;
-  if (lockedKind === CALL_HISTORY_ROUTE.SHOWCASE) return false;
-  if (lockedKind === CALL_HISTORY_ROUTE.UNVERIFIED) return false;
-  if (lockedKind === CALL_HISTORY_ROUTE.AGENCY) return false;
-  if (lockedKind === CALL_HISTORY_ROUTE.SAFE) {
-    return (
-      nextKind === CALL_HISTORY_ROUTE.SHOWCASE || nextKind === CALL_HISTORY_ROUTE.AUTH
-    );
+  if (lockedKind === CALL_HISTORY_ROUTE.AGENCY && nextKind !== CALL_HISTORY_ROUTE.AGENCY) {
+    return false;
   }
-  if (
-    lockedKind === CALL_HISTORY_ROUTE.AUTH &&
-    nextKind === CALL_HISTORY_ROUTE.SHOWCASE
-  ) {
-    return true;
-  }
-  if (lockedKind === CALL_HISTORY_ROUTE.AUTH) return false;
+  if (conclusive) return true;
   return false;
 }
 
@@ -184,7 +249,6 @@ export function resolveHistoryRowMemberState(call) {
   const phone = phoneOf(call);
   const hint = phone ? readCallHistoryMemberHint(phone) : null;
   if (hint?.verified === true) return "member";
-  /* index false 는 CTA 비회원으로 쓰지 않음 — 미확정 숨김 */
   if (call?.verified === true || call?.peerIsVlueMember === true || hasUuidUserId(call)) {
     return "member";
   }
