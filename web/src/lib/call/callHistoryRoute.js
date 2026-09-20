@@ -1,14 +1,12 @@
 /**
  * 통화목록 탭 → 단일 확정 라우트
  *
- * 우선순위:
- * 1) 국가기관 DCP
- * 2) VLUE 회원 + 송출 콘텐츠 → 쇼케이스
- * 3) VLUE 회원 + 송출 OFF → 인증 팝업
- * 4) VLUE 회원(송출 미확정) → PENDING
- * 5) 저장 연락처(비회원) → 안심 (단말 — 이후 hydrate 로 덮지 않음)
- * 6) 명시 비회원 → 미인증
- * 7) 그 외 → PENDING
+ * 1) 국가기관
+ * 2) VLUE 회원 + 송출 → 쇼케이스
+ * 3) VLUE 회원 + 송출 OFF → 인증
+ * 4) VLUE 회원 미확정 송출 → PENDING
+ * 5) 저장 비회원 → 안심
+ * 6) 그 외 → PENDING / 미인증
  */
 
 import { resolveIsKnownContactSync } from "../contacts/hybridKnownContact.js";
@@ -44,23 +42,21 @@ function hasUuidUserId(cardOrCall) {
   return UUID_RE.test(String(cardOrCall?.userId || cardOrCall?.ownerUserId || "").trim());
 }
 
-/** VLUE 회원 — 주소록/이름보다 항상 우선 */
+/**
+ * VLUE 회원 힌트.
+ * index verified:false 는 무시(독성 캐시) — 양수 신호만 신뢰.
+ */
 export function isVlueMemberHint(call, cached = null) {
   const phone = phoneOf(call);
   const memberHint = phone ? readCallHistoryMemberHint(phone) : null;
   if (memberHint?.verified === true) return true;
-  if (memberHint?.verified === false) return false;
-  const pack = cached || (phone ? readCallHistoryPeerCache(phone) : null);
-  if (pack?.verified === true && hasUuidUserId(pack.card || pack)) return true;
   if (call?.verified === true || call?.peerIsVlueMember === true) return true;
   if (hasUuidUserId(call) || hasUuidUserId(call?.cardSnapshot)) return true;
+  const pack = cached || (phone ? readCallHistoryPeerCache(phone) : null);
+  if (pack?.verified === true && hasUuidUserId(pack.card || pack)) return true;
   return false;
 }
 
-/**
- * 저장 연락처 힌트 (비회원 안심).
- * CallLog 표시명·주소록 — 회원 분기가 먼저 처리됨.
- */
 export function isSavedContactHint(call, known = null) {
   const phone = phoneOf(call);
   const knownSync = known || resolveIsKnownContactSync(phone);
@@ -68,15 +64,6 @@ export function isSavedContactHint(call, known = null) {
   if (String(call?.contactName || "").trim()) return true;
   const label = String(call?.name || call?.cachedName || "").trim();
   if (label && !isPhoneLikeLabel(label)) return true;
-  return false;
-}
-
-function isExplicitNonMember(call, cached) {
-  const phone = phoneOf(call);
-  const memberHint = phone ? readCallHistoryMemberHint(phone) : null;
-  if (memberHint?.verified === true || isVlueMemberHint(call, cached)) return false;
-  if (memberHint?.verified === false) return true;
-  if (call?.verified === false) return true;
   return false;
 }
 
@@ -93,9 +80,6 @@ function packStyle(cached, call, card) {
   );
 }
 
-/**
- * @returns {{ kind: string, agency?: object, card?: object, verified?: boolean }}
- */
 export function decideCallHistoryRoute(call, cachedPeer = null) {
   const phone = phoneOf(call);
   const agency = phone ? matchNationalAgency(phone) : null;
@@ -120,21 +104,25 @@ export function decideCallHistoryRoute(call, cachedPeer = null) {
     return { kind: CALL_HISTORY_ROUTE.PENDING };
   }
 
+  /* 저장 비회원 — 즉시 안심. 회원은 위에서 이미 제외.
+     회원 여부가 아직 목록에 없으면 아래 PENDING 으로 by-number 확인 */
   if (saved) {
+    const hint = phone ? readCallHistoryMemberHint(phone) : null;
+    /* 양수로 회원 확정된 적 없으면 저장번호는 안심.
+       (독성 false 는 isVlueMemberHint 에서 무시됨) */
+    if (hint?.verified === true) {
+      return { kind: CALL_HISTORY_ROUTE.PENDING };
+    }
     return { kind: CALL_HISTORY_ROUTE.SAFE };
   }
 
-  if (isExplicitNonMember(call, cached)) {
+  if (call?.verified === false) {
     return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card };
   }
 
   return { kind: CALL_HISTORY_ROUTE.PENDING };
 }
 
-/**
- * 네트워크 페이로드로만 최종 확정 (pending 해소).
- * verified 는 UUID userId 있을 때만 회원으로 인정 — 약한 is_verified 로 안심→인증 교체 금지.
- */
 export function decideCallHistoryRouteFromPayload(call, payload) {
   const phone = phoneOf(call);
   const agency = phone ? matchNationalAgency(phone) : null;
@@ -160,26 +148,27 @@ export function decideCallHistoryRouteFromPayload(call, payload) {
   if (verified && !hasContent) {
     return { kind: CALL_HISTORY_ROUTE.AUTH, card, verified: true };
   }
-
   if (!verified && (saved || publicDir)) {
     return { kind: CALL_HISTORY_ROUTE.SAFE };
   }
-
   return { kind: CALL_HISTORY_ROUTE.UNVERIFIED, card, verified: false };
 }
 
 /**
- * 라우트 잠금.
- * SAFE / SHOWCASE / UNVERIFIED / AGENCY 는 단말 — hydrate 가 안심 팝업을 닫지 않음.
- * AUTH → SHOWCASE 상향만 허용.
+ * SAFE 잠금 중에는 UUID 회원 상향(AUTH/SHOWCASE)만 허용.
+ * UNVERIFIED 등으로 안심을 닫지 않음.
  */
 export function mayApplyRoute(lockedKind, nextKind) {
   if (!lockedKind || lockedKind === CALL_HISTORY_ROUTE.PENDING) return true;
   if (lockedKind === nextKind) return true;
-  if (lockedKind === CALL_HISTORY_ROUTE.SAFE) return false;
   if (lockedKind === CALL_HISTORY_ROUTE.SHOWCASE) return false;
   if (lockedKind === CALL_HISTORY_ROUTE.UNVERIFIED) return false;
   if (lockedKind === CALL_HISTORY_ROUTE.AGENCY) return false;
+  if (lockedKind === CALL_HISTORY_ROUTE.SAFE) {
+    return (
+      nextKind === CALL_HISTORY_ROUTE.SHOWCASE || nextKind === CALL_HISTORY_ROUTE.AUTH
+    );
+  }
   if (
     lockedKind === CALL_HISTORY_ROUTE.AUTH &&
     nextKind === CALL_HISTORY_ROUTE.SHOWCASE
@@ -195,10 +184,9 @@ export function resolveHistoryRowMemberState(call) {
   const phone = phoneOf(call);
   const hint = phone ? readCallHistoryMemberHint(phone) : null;
   if (hint?.verified === true) return "member";
-  if (hint?.verified === false) return "nonmember";
+  /* index false 는 CTA 비회원으로 쓰지 않음 — 미확정 숨김 */
   if (call?.verified === true || call?.peerIsVlueMember === true || hasUuidUserId(call)) {
     return "member";
   }
-  if (call?.verified === false) return "nonmember";
   return "unknown";
 }

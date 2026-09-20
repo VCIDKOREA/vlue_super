@@ -848,6 +848,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           membershipTier: payload?.card?.membershipTier || call?.membershipTier || "free"
         });
       } else if (payload && payload.verified === false && phone) {
+        /* 비회원 기록은 by-number 확정 후에만 — CTA 용. 독성 일괄 false 아님 */
         writeCallHistoryMemberHint(phone, {
           verified: false,
           userId: "",
@@ -945,6 +946,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const phone = call.phoneDisplay || call.phone;
     return resolveCallHistoryShowcasePeer(phone, {
       force: Boolean(opts.force),
+      light: Boolean(opts.light),
       displayName: call.name || call.memberName || "",
       avatarUrl: call.avatarUrl || ""
     }).then((payload) => {
@@ -958,12 +960,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     async (call, gen, opts = {}) => {
       const background = Boolean(opts.background);
       const force = Boolean(opts.forceStyle);
+      const light = Boolean(opts.light);
       const phone = call.phoneDisplay || call.phone;
       try {
         if (!background) setLoading(true);
         const payload = await prefetchCallHistoryPeer(
           phone,
-          () => loadPeerPayload(call, { force }),
+          () => loadPeerPayload(call, { force, light }),
           { force }
         );
         applyPeerPayload(payload, call, gen);
@@ -1079,7 +1082,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     };
 
     if (decision.kind === CALL_HISTORY_ROUTE.SAFE) {
-      /* 안심은 단말 — hydrate 로 팝업을 닫지 않음 */
+      /* 안심 즉시 표시 — UNVERIFIED 로 닫지 않음. UUID 회원만 쇼케이스/인증으로 상향 */
       flushSync(() => {
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setSelected(null);
@@ -1087,6 +1090,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         setPreviewVerified(false);
         setLoading(false);
         openContactSafeForCall(call, resolveIsKnownContactSync(phone));
+      });
+      void hydrateCallFromNetwork(call, gen, {
+        background: true,
+        forceStyle: false,
+        light: true
       });
       return;
     }
@@ -1147,7 +1155,12 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   };
 
   useEffect(() => {
-    const onCloseOverlays = () => closeDetail();
+    const onCloseOverlays = () => {
+      /* 안심만 열린 상태에서는 글로벌 close 로 팝업을 끄지 않음(깜빡임 방지) */
+      if (routeLockRef.current === CALL_HISTORY_ROUTE.SAFE) return;
+      if (routeLockRef.current === CALL_HISTORY_ROUTE.AUTH) return;
+      closeDetail();
+    };
     window.addEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
     return () => window.removeEventListener(CLOSE_SHOWCASE_OVERLAYS_EVENT, onCloseOverlays);
   }, []);

@@ -53,6 +53,7 @@ export async function fetchMemberNamesByNumbers(numbers) {
     const data = await parseJson(res);
     return Array.isArray(data.members) ? data.members : [];
   } catch {
-    return [];
+    /* null = 실패 — 호출부가 miss→비회원 기록하지 않도록 */
+    return null;
   }
 }
