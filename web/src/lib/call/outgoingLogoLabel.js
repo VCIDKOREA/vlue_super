@@ -28,6 +28,18 @@ export function resolveOutgoingLogoLabel(card) {
   if (!card || typeof card !== "object") return OUTGOING_LOGO_TAP_HINT;
 
   const kind = String(card.profileKind || "").trim();
+  /*
+   * 주소록 저장 번호(안심케어 카드)는 matched:false 로 내려온다 — 미등록 판정보다 먼저 저장 이름을 쓴다.
+   * (이전: matched===false 분기가 먼저 걸려 저장된 번호도 「탭하여 정보확인」 으로 표시됨)
+   */
+  if (kind === "contact_safe_care") {
+    const saved =
+      cleanName(card.contactName) ||
+      cleanName(card.displayName) ||
+      cleanName(card.name) ||
+      cleanName(card.dcp?.contactName);
+    return saved || OUTGOING_LOGO_TAP_HINT;
+  }
   /* 조회 대기 · 미등록 확정 → 항상 탭 유도 문구 */
   if (kind === "lookup_pending" || kind === "unverified" || card.matched === false) {
     return OUTGOING_LOGO_TAP_HINT;
