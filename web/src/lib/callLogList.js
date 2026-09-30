@@ -44,6 +44,20 @@ function pickSavedContactName(rawName, phone, phoneKey) {
   return name;
 }
 
+/**
+ * 통화 목록 발/수신/부재중 3분류 (아이콘·색 구분의 단일 기준).
+ * 네이티브 `callType`(outgoing|incoming|missed) 우선 → 없으면 direction/callState/통화시간으로 유도.
+ * @returns {"outgoing"|"incoming"|"missed"}
+ */
+export function resolveCallType(call) {
+  const t = String(call?.callType || "").trim().toLowerCase();
+  if (t === "outgoing" || t === "incoming" || t === "missed") return t;
+  if (call?.direction === "out") return "outgoing";
+  if (String(call?.callState || "") === "missed") return "missed";
+  if (Number.isFinite(Number(call?.durationSec)) && Number(call.durationSec) <= 0) return "missed";
+  return "incoming";
+}
+
 /** 목록 표시용 이름: VLUÉ 회원명 → 저장(주소록)명 */
 export function resolveCallDisplayName(call) {
   const phone = call?.phoneDisplay || call?.phone || "";
@@ -73,6 +87,12 @@ export async function fetchDeviceCallLogEntries(limit = 200) {
         viaNumber: String(row?.viaNumber || "").trim(),
         durationSec: Math.max(0, Number(row?.durationSec) || 0),
         direction: row?.direction === "out" ? "out" : "in",
+        callType: resolveCallType({
+          callType: row?.callType,
+          direction: row?.direction,
+          callState: row?.callState,
+          durationSec: row?.durationSec
+        }),
         dateMs: Number(row?.dateMs) || 0,
         callState: String(row?.callState || "ended"),
         cachedName: String(row?.cachedName || row?.name || "").trim()
@@ -111,6 +131,7 @@ export function groupConsecutiveCallLogEntries(rawEntries) {
       phone: entry.phone,
       phoneDisplay: formatLetteringPhoneDisplay(entry.phone) || entry.phone,
       direction: entry.direction === "out" ? "out" : "in",
+      callType: resolveCallType(entry),
       durationSec: Math.max(0, Number(entry.durationSec) || 0),
       endedAt: entry.dateMs
         ? new Date(entry.dateMs).toISOString()

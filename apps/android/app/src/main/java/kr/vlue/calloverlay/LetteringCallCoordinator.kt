@@ -17,6 +17,7 @@ import kr.vlue.calloverlay.dcp.CallPathVerdict
 import kr.vlue.calloverlay.dcp.ContactSafeCarePayload
 import kr.vlue.calloverlay.dcp.DcpLookupPayload
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
+import kr.vlue.calloverlay.dcp.UnregisteredNumberPopup
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
 import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
@@ -178,6 +179,9 @@ object LetteringCallCoordinator {
                     outgoing = outgoing,
                     dcpRoute = ""
                 )
+                if (!outgoing) {
+                    armIncomingGuarantee(app, overlayNumber, hasMemberSeed, overlayJsonFast, gen)
+                }
             } else {
                 val restrictHint =
                     if (LetteringPermissionHelper.isLikelySamsungCallOverlayRestricted(app)) {
@@ -219,6 +223,11 @@ object LetteringCallCoordinator {
                     upgradeNumberAfterOverlay(app, outgoing, gen, startedAt)
                 }
             } else {
+                /*
+                 * 프리패치는 경로검증을 기다리지 않고 즉시 시작 — 미니버블/빅푸시가 떠 있는 동안
+                 * 백그라운드(IO)에서 메모리 캐시를 채운다. (경로검증 결과는 뒤에서 병합)
+                 */
+                startPrefetch(app, raw, outgoing)
                 scope.launch(Dispatchers.Default) {
                     val dcpVerdict = CallPathSession.consumeOrVerify(app)
                     if (dcpVerdict.isAbnormal) {
@@ -289,6 +298,75 @@ object LetteringCallCoordinator {
             LetteringPrefs.setLastOverlayError(context, "onRinging:${e.message}")
         }
     }
+
+    /** 수신 BigPush 보장 재시도 간격 (ms) — 링잉 첫 수 초 안에 창이 없으면 다시 기동 */
+    private val INCOMING_GUARANTEE_DELAYS_MS = longArrayOf(450L, 1_100L, 2_200L)
+
+    /**
+     * 수신 BigPush 100% 송출 보장 워치독.
+     *
+     * startForegroundService 가 OEM 에서 지연·실패·stale 서비스로 묻히는 경우를 대비해,
+     * 전화가 아직 울리는 동안 오버레이 창이 붙지 않았으면 같은 번호로 서비스를 다시 기동한다.
+     * 통화가 끝났거나(세대 변경) 이미 창이 붙었거나 더 이상 RINGING 이 아니면 즉시 종료.
+     */
+    private fun armIncomingGuarantee(
+        app: Context,
+        number: String,
+        verified: Boolean,
+        cardJson: String?,
+        gen: Long
+    ) {
+        scope.launch {
+            for (waitMs in INCOMING_GUARANTEE_DELAYS_MS) {
+                delay(waitMs)
+                if (callGen.get() != gen || !incomingRingingActive || lastOutgoing) return@launch
+                if (CallOverlayService.isOverlayAttached()) return@launch
+                if (!isPhoneStillRinging(app)) return@launch
+                if (!LetteringPermissionHelper.canDrawOverlays(app)) return@launch
+                val current = lastRingNumber
+                val sameNumber = IncomingNumberResolver.sameCanonicalNumber(current, number)
+                val retryNumber =
+                    when {
+                        IncomingNumberResolver.isUnknown(current) -> number
+                        sameNumber -> number
+                        else -> current
+                    }
+                Log.w(TAG, "incoming guarantee: overlay not attached after ${waitMs}ms — restart")
+                VlueBigPushTrace.lifecycle(
+                    "INCOMING_GUARANTEE_RESTART",
+                    "wait=${waitMs}ms number=${ReleaseDebugGate.maskPhoneForLog(retryNumber)}"
+                )
+                startOverlayService(
+                    app,
+                    retryNumber,
+                    verified = verified && (sameNumber || IncomingNumberResolver.isUnknown(current)),
+                    cardJson = if (sameNumber) cardJson else null,
+                    outgoing = false,
+                    dcpRoute = ""
+                )
+            }
+            /* 마지막까지 실패 — HUN 폴백으로라도 수신 정보를 알린다 */
+            if (callGen.get() == gen &&
+                incomingRingingActive &&
+                !CallOverlayService.isOverlayAttached() &&
+                isPhoneStillRinging(app)
+            ) {
+                LetteringIncomingNotifier.post(app, number, false, forceFallback = true)
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isPhoneStillRinging(app: Context): Boolean =
+        try {
+            val tm = app.getSystemService(android.telephony.TelephonyManager::class.java)
+            /* 상태를 알 수 없으면(권한 없음) 울리는 중으로 간주 — 보장 쪽으로 기운다 */
+            tm == null || tm.callState == android.telephony.TelephonyManager.CALL_STATE_RINGING
+        } catch (_: SecurityException) {
+            true
+        } catch (_: Exception) {
+            true
+        }
 
     /** CallLog 조회는 IO — Overlay 시작을 막지 않는다 */
     private suspend fun upgradeNumberAfterOverlay(
@@ -403,149 +481,126 @@ object LetteringCallCoordinator {
     private fun callLogMinDate(callStartedAt: Long): Long =
         (callStartedAt - 1_500L).coerceAtLeast(0L)
 
+    /**
+     * 번호 조회 — [CallPrefetchCache] 병렬 프리패치 (v2).
+     *
+     * VLUE 회원 조회와 로컬/공공 DB 조회를 코루틴으로 **동시에** 시작하고, 먼저 도착한 결과를 즉시 바인딩한다.
+     * 결과가 없으면 [CallPrefetchCache.FIRST_PAINT_TIMEOUT_MS] 뒤 미등록으로 확정해 조회 대기 고착을 없앤다.
+     * 이미 진행 중이면 재시작하지 않고(dedupe), 경로 검증이 뒤늦게 비정상으로 끝난 경우에만 현재 결과를 재게시한다.
+     */
     private suspend fun enrichWithLookup(app: Context, raw: String, outgoing: Boolean) {
         if (applyWhitelistPathIfMatched(app, raw, outgoing)) return
+        startPrefetch(app, raw, outgoing)
+        if (CallPathSession.lastVerdict?.isAbnormal == true) {
+            CallPrefetchCache.peek(raw)?.let { applyPrefetchEntry(app, raw, outgoing, it) }
+        }
+    }
+
+    /** 통화 시작 즉시 호출 — 미니버블이 떠 있는 동안 백그라운드에서 메모리 캐시를 채운다. */
+    private fun startPrefetch(app: Context, raw: String, outgoing: Boolean) {
         val masked = ReleaseDebugGate.maskPhoneForLog(raw)
         val started = SystemClock.elapsedRealtime()
-        CompanionRuntimeStabilityDiag.noteMemberLookup(
-            phase = "PHONE_RECEIVED",
-            maskedPhone = masked,
-            dataSource = "coordinator"
-        )
         val normalized = CardLookupBridge.normalizeKr(raw)
-        CompanionRuntimeStabilityDiag.noteMemberLookup(
-            phase = "PHONE_NORMALIZED",
-            maskedPhone = masked,
-            normalizedOk = normalized != null,
-            dataSource = "CardLookupBridge.normalizeKr"
-        )
-        CompanionRuntimeStabilityDiag.noteMemberLookup(
-            phase = "LOOKUP_STARTED",
-            maskedPhone = masked,
-            dataSource = "CardLookupRepository"
-        )
-        try {
-            var lookup = CardLookupRepository.lookup(app, raw)
-            /* 네트워크 null(타임아웃) — 느린 재시도. matched:false 는 확정 */
-            if (lookup == null) {
-                delay(180L)
-                lookup = CardLookupRepository.lookupSlow(app, raw)
-            }
-            val elapsed = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L)
-            if (lookup == null) {
+        val job =
+            CallPrefetchCache.prefetch(app, raw) { entry ->
                 CompanionRuntimeStabilityDiag.noteMemberLookup(
-                    phase = "LOOKUP_COMPLETED",
+                    phase = if (entry.tier == CallPrefetchCache.Tier.UNREGISTERED) {
+                        "LOOKUP_COMPLETED"
+                    } else {
+                        "LOOKUP_MATCHED"
+                    },
                     maskedPhone = masked,
-                    lookupElapsedMs = elapsed,
-                    matched = false,
-                    dataSource = "api_timeout",
+                    lookupElapsedMs = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L),
+                    matched = entry.tier != CallPrefetchCache.Tier.UNREGISTERED,
+                    dataSource = "prefetch_${entry.tier.name.lowercase()}",
                     normalizedOk = normalized != null
                 )
-                Log.w(TAG, "lookup timeout for $masked — try contact safe-care then keep pending")
-                LetteringPrefs.setLastOverlayError(app, "lookup_timeout:$masked")
-                if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
-                return
-            }
-            if (!lookup.matched) {
-                CompanionRuntimeStabilityDiag.noteMemberLookup(
-                    phase = "LOOKUP_COMPLETED",
-                    maskedPhone = masked,
-                    lookupElapsedMs = elapsed,
-                    matched = false,
-                    dataSource = "api",
-                    normalizedOk = normalized != null
+                applyPrefetchEntry(app, raw, outgoing, entry)
+            } ?: return
+        if (job.isActive) {
+            CompanionRuntimeStabilityDiag.noteMemberLookup(
+                phase = "LOOKUP_STARTED",
+                maskedPhone = masked,
+                dataSource = "CallPrefetchCache"
+            )
+        }
+    }
+
+    /** 프리패치 결과를 오버레이에 게시 — 티어별 UI 는 서비스/정책이 결정한다. */
+    private suspend fun applyPrefetchEntry(
+        app: Context,
+        raw: String,
+        outgoing: Boolean,
+        entry: CallPrefetchCache.Entry
+    ) {
+        val masked = ReleaseDebugGate.maskPhoneForLog(raw)
+        if (!IncomingNumberResolver.sameCanonicalNumber(lastRingNumber, raw)) {
+            CompanionRuntimeStabilityDiag.noteStaleEvent(
+                "LOOKUP_UPDATE_STALE_NUMBER",
+                "applyPrefetchEntry",
+                detail = "drop=$masked current=${ReleaseDebugGate.maskPhoneForLog(lastRingNumber)}"
+            )
+            return
+        }
+        if (!CompanionRuntimeStabilityDiag.isCallSessionActive() &&
+            CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
+        ) {
+            CompanionRuntimeStabilityDiag.noteStaleEvent(
+                "LOOKUP_UPDATE_AFTER_CALL_END",
+                "applyPrefetchEntry",
+                detail = "tier=${entry.tier.name} but session ended"
+            )
+            return
+        }
+        if (!LetteringPermissionHelper.canDrawOverlays(app)) {
+            /* 오버레이 불가 — HUN 폴백만 (매칭된 경우 이름 표시) */
+            if (entry.tier != CallPrefetchCache.Tier.UNREGISTERED) {
+                LetteringIncomingNotifier.post(
+                    app,
+                    raw,
+                    outgoing,
+                    displayName = entry.result?.displayName?.ifBlank { raw } ?: raw,
+                    forceFallback = true
                 )
-                Log.w(TAG, "lookup unmatched for $masked")
-                LetteringPrefs.setLastOverlayError(app, "lookup_unmatched:$masked")
-                val cachedPositive = CardLookupRepository.peekCached(app, raw)
-                if (cachedPositive != null && cachedPositive.matched) {
-                    val mergedCached = CallPathLookupMerge.merge(
-                        cachedPositive.rawJson,
-                        CallPathSession.lastVerdict,
-                        outgoing
-                    )
-                    if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                        CallOverlayService.updateCallInfo(
-                            app,
-                            raw,
-                            verified = cachedPositive.verified,
-                            cardJson = mergedCached.json,
-                            outgoing = outgoing,
-                            dcpRoute = mergedCached.route
-                        )
-                    }
-                    return
-                }
+            }
+            return
+        }
+        when (entry.tier) {
+            CallPrefetchCache.Tier.UNREGISTERED -> {
+                Log.i(TAG, "unregistered $masked provisional=${entry.provisional}")
+                LetteringPrefs.setLastOverlayError(app, "lookup_unregistered:$masked")
+                /* 주소록 저장 번호는 안심케어 팝업이 우선 */
                 if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
+                val merged = CallPathLookupMerge.merge(
+                    UnregisteredNumberPopup.json(raw),
+                    CallPathSession.lastVerdict,
+                    outgoing
+                )
+                /* 경로 비정상이면 비정상 카드, 아니면 미등록 확정 (lookup_pending 고착 금지) */
+                CallOverlayService.updateCallInfo(
+                    app,
+                    raw,
+                    verified = false,
+                    cardJson = if (merged.route == "abnormal") merged.json else UnregisteredNumberPopup.json(raw),
+                    outgoing = outgoing,
+                    dcpRoute = merged.route
+                )
+                LetteringIncomingNotifier.cancel(app)
+            }
+            CallPrefetchCache.Tier.PUBLIC_DB,
+            CallPrefetchCache.Tier.VLUE_MEMBER -> {
+                val lookup = entry.result ?: return
+                CompanionRuntimeStabilityDiag.noteMemberLookup(
+                    phase = "CARD_DATA_READY",
+                    maskedPhone = masked,
+                    matched = true,
+                    dataSource = "prefetch_${entry.tier.name.lowercase()}"
+                )
                 val merged = CallPathLookupMerge.merge(
                     lookup.rawJson,
                     CallPathSession.lastVerdict,
                     outgoing
                 )
-                /* 경로 비정상 · 일반 unmatched → 미인증 확정 (lookup_pending 고착 금지) */
-                if (LetteringPermissionHelper.canDrawOverlays(app)) {
-                    val cardJson =
-                        if (merged.route == "abnormal") {
-                            merged.json
-                        } else {
-                            unmatchedLookupJson(raw)
-                        }
-                    CallOverlayService.updateCallInfo(
-                        app,
-                        raw,
-                        verified = false,
-                        cardJson = cardJson,
-                        outgoing = outgoing,
-                        dcpRoute = merged.route
-                    )
-                    LetteringIncomingNotifier.cancel(app)
-                }
-                return
-            }
-            CompanionRuntimeStabilityDiag.noteMemberLookup(
-                phase = "LOOKUP_MATCHED",
-                maskedPhone = masked,
-                lookupElapsedMs = elapsed,
-                matched = true,
-                dataSource = "api",
-                normalizedOk = normalized != null
-            )
-            CompanionRuntimeStabilityDiag.noteMemberLookup(
-                phase = "CARD_DATA_READY",
-                maskedPhone = masked,
-                lookupElapsedMs = elapsed,
-                matched = true,
-                dataSource = "api"
-            )
-            if (!IncomingNumberResolver.sameCanonicalNumber(lastRingNumber, raw)) {
-                CompanionRuntimeStabilityDiag.noteStaleEvent(
-                    "LOOKUP_UPDATE_STALE_NUMBER",
-                    "enrichWithLookup",
-                    detail = "drop=${ReleaseDebugGate.maskPhoneForLog(raw)} current=${ReleaseDebugGate.maskPhoneForLog(lastRingNumber)}"
-                )
-                Log.i(
-                    TAG,
-                    "drop stale lookup ${ReleaseDebugGate.maskPhoneForLog(raw)} current=${ReleaseDebugGate.maskPhoneForLog(lastRingNumber)}"
-                )
-                return
-            }
-            if (!CompanionRuntimeStabilityDiag.isCallSessionActive() &&
-                CompanionRuntimeStabilityDiag.shouldIgnorePostEndOverlayStart()
-            ) {
-                CompanionRuntimeStabilityDiag.noteStaleEvent(
-                    "LOOKUP_UPDATE_AFTER_CALL_END",
-                    "enrichWithLookup",
-                    detail = "matched=true but session ended"
-                )
-                return
-            }
-            val label = lookup.displayName.ifBlank { raw }
-            val merged = CallPathLookupMerge.merge(
-                lookup.rawJson,
-                CallPathSession.lastVerdict,
-                outgoing
-            )
-            if (LetteringPermissionHelper.canDrawOverlays(app)) {
                 CallOverlayService.updateCallInfo(
                     app,
                     raw,
@@ -555,39 +610,9 @@ object LetteringCallCoordinator {
                     dcpRoute = merged.route
                 )
                 LetteringIncomingNotifier.cancel(app)
-            } else {
-                LetteringIncomingNotifier.post(
-                    app,
-                    raw,
-                    outgoing,
-                    displayName = label,
-                    forceFallback = true
-                )
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "lookup failed after overlay start", e)
-            LetteringPrefs.setLastOverlayError(app, "lookup_error:${e.message}")
-            CompanionRuntimeStabilityDiag.noteMemberLookup(
-                phase = "LOOKUP_COMPLETED",
-                maskedPhone = masked,
-                lookupElapsedMs = (SystemClock.elapsedRealtime() - started).coerceAtLeast(0L),
-                matched = false,
-                dataSource = "error:${e.javaClass.simpleName}"
-            )
-            if (applyContactSafeCareIfSaved(app, raw, outgoing)) return
-            /* 예외 시에도 unmatched 미인증 페인트 금지 — pending 유지, 웹 조회에 맡김 */
-            Log.w(TAG, "lookup error — keep lookup_pending ($masked)")
         }
     }
-
-    private fun unmatchedLookupJson(raw: String): String =
-        org.json.JSONObject()
-            .put("matched", false)
-            .put("is_verified", false)
-            .put("phoneE164", raw)
-            .put("source", "unmatched")
-            .put("profileKind", "unverified")
-            .toString()
 
     /** 조회 완료 전 — 미인증 앰버 UI 깜빡임 방지 */
     private fun lookupPendingJson(raw: String): String =
@@ -714,6 +739,8 @@ object LetteringCallCoordinator {
     fun onCallEnded(context: Context) {
         try {
             CallPathSession.clear()
+            /* 통화 단위 프리패치 상태(임시 미등록 포함)를 다음 통화로 넘기지 않는다 */
+            CallPrefetchCache.clear()
             val app = context.applicationContext
             VlueBigPushTrace.step(11, "Call End", "source=LetteringCallCoordinator.onCallEnded")
             LetteringPrefs.setLastCallEvent(app, "idle")

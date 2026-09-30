@@ -41,7 +41,12 @@ object CallUiPhasePolicy {
          * 경로 검증 비정상 — FULL_SHOWCASE 금지, 안심 팝업만.
          * 회원 DCC/쇼케이스·미인증 신고 패널보다 우선.
          */
-        val isPathAbnormal: Boolean = false
+        val isPathAbnormal: Boolean = false,
+        /**
+         * 미등록 안심팝업의 「제보하기」/「신고하기」 버튼을 사용자가 눌렀을 때만 true.
+         * 이때만 미인증 번호가 신고 패널(FULL_SHOWCASE)로 열린다.
+         */
+        val reportRequested: Boolean = false
     )
 
     /**
@@ -55,9 +60,15 @@ object CallUiPhasePolicy {
         remoteConnected: Boolean,
         dialingOrConnecting: Boolean,
         hasActiveConnectedCall: Boolean,
-        @Suppress("UNUSED_PARAMETER") trustedPeerConnected: Boolean = false
+        @Suppress("UNUSED_PARAMETER") trustedPeerConnected: Boolean = false,
+        /**
+         * v2 원터치: 사용자가 발신 미니버블을 직접 탭했다. 탭 자체가 unlock 이므로
+         * 다이얼링 중에도 프리패치된 메모리 결과를 즉시 표시한다.
+         */
+        userTapRequested: Boolean = false
     ): Boolean {
         if (!outgoing || remoteConnected) return true
+        if (userTapRequested) return true
         /* 거는 중 — 중앙 팝업·풀쇼케이스 금지 */
         if (dialingOrConnecting) return false
         /* InCall ACTIVE(상대 응답) 만 통과. 오디오 trusted 단독 통과 금지(OEM MODE_IN_CALL 오판). */
@@ -100,7 +111,25 @@ object CallUiPhasePolicy {
         if (input.isAuthMemberOnly) return Phase.CENTER_AUTH_POPUP
         if (input.hasBroadcastShowcaseContent) return Phase.FULL_SHOWCASE
         if (input.canPromoteContactSafeCare) return Phase.CENTER_SAFE_POPUP
-        if (input.isUnverifiedResolved) return Phase.FULL_SHOWCASE
+        if (input.isUnverifiedResolved) {
+            /* v2: 미등록 번호는 항상 2줄 안심팝업. 풀 쇼케이스는 신고 버튼을 누른 경우만. */
+            return if (input.reportRequested) Phase.FULL_SHOWCASE else Phase.CENTER_SAFE_POPUP
+        }
         return Phase.KEEP_BIG_PUSH
     }
+
+    /**
+     * 발신 탭로고(미니버블) **상단** 라벨.
+     * - VLUÉ DB 상호/이름 또는 저장된 연락처 이름/상호 → 그대로
+     * - 미등록·모르는 번호(이름 없음) → 「탭하여 정보확인」
+     *
+     * 로고 하단 「연결중...」 은 삭제됐다 — 연결 상태와 무관하게 동일 규칙.
+     * (웹 twin: `resolveOutgoingLogoLabel`)
+     */
+    fun outgoingBubbleLabel(displayName: String?): String {
+        val name = displayName?.trim().orEmpty()
+        return if (name.isEmpty()) OUTGOING_TAP_INFO_LABEL else name
+    }
+
+    const val OUTGOING_TAP_INFO_LABEL = "탭하여 정보확인"
 }

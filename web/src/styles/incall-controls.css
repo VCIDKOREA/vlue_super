@@ -656,6 +656,40 @@
   color: #8b95a1;
 }
 
+.call-history-row__type {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.call-history-row__type--outgoing {
+  color: #2563eb;
+}
+
+.call-history-row__type--incoming {
+  color: #16a34a;
+}
+
+.call-history-row__type--missed {
+  color: #ef4444;
+}
+
+.dark-mode .call-history-row__type--outgoing,
+[data-theme="dark"] .call-history-row__type--outgoing {
+  color: #60a5fa;
+}
+
+.dark-mode .call-history-row__type--incoming,
+[data-theme="dark"] .call-history-row__type--incoming {
+  color: #4ade80;
+}
+
+.dark-mode .call-history-row__type--missed,
+[data-theme="dark"] .call-history-row__type--missed {
+  color: #f87171;
+}
+
 .call-history-row__when {
   flex-shrink: 0;
   margin-left: 6px;

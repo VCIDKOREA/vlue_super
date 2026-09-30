@@ -50,7 +50,7 @@ class LetteringCallReceiver : BroadcastReceiver() {
                     val hasNumber = !IncomingNumberResolver.isUnknown(number)
                     if (!hasNumber &&
                         VlueInCallController.hasActiveCall() &&
-                        CallOverlayService.isRunning()
+                        CallOverlayService.isOverlayAttached()
                     ) {
                         VlueBigPushTrace.skip(1, "InCall+Overlay already running — PHONE_STATE RINGING skipped")
                         ReleaseDebugGate.d(TAG, "skip RINGING: InCall+Overlay active")

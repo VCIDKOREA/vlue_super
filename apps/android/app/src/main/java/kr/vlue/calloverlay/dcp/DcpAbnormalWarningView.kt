@@ -54,7 +54,9 @@ object DcpAbnormalWarningView {
         val vlueAuthMember: Boolean = false,
         val showShareShowcase: Boolean = false,
         val reasonLine: String = "",
-        val pathVerify: Boolean = false
+        val pathVerify: Boolean = false,
+        /** 미등록 번호 안심팝업 — 2줄 문구 + 제보/신고 버튼 ([UnregisteredNumberPopup]) */
+        val unregistered: Boolean = false
     )
 
     data class Built(
@@ -66,7 +68,10 @@ object DcpAbnormalWarningView {
         context: Context,
         spec: Spec,
         onConfirm: () -> Unit,
-        onShareShowcase: (() -> Unit)? = null
+        onShareShowcase: (() -> Unit)? = null,
+        onReport: (() -> Unit)? = null,
+        /** 미등록 팝업 「제보하기」 — null 이면 [onReport] 로 대체 */
+        onTip: (() -> Unit)? = null
     ): Built {
         val ctx = context
         val card = LinearLayout(ctx).apply {
@@ -124,6 +129,7 @@ object DcpAbnormalWarningView {
                     spec.abnormal && spec.pathVerify ->
                         "비정상 경로로 확인된 전화입니다."
                     spec.abnormal -> NationalAgencyWhitelist.ABNORMAL_WARNING
+                    spec.unregistered -> UnregisteredNumberPopup.BODY
                     spec.vlueAuthMember -> VLUE_AUTH_MEMBER_MESSAGE
                     spec.contactSafeCare -> CONTACT_NORMAL_MESSAGE
                     else -> NORMAL_MESSAGE
@@ -133,8 +139,11 @@ object DcpAbnormalWarningView {
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER
                 setPadding(0, dp(ctx, 10), 0, 0)
-                if (spec.contactSafeCare) {
+                if (spec.contactSafeCare || spec.unregistered) {
                     setLineSpacing(0f, 1.15f)
+                }
+                if (spec.unregistered) {
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 }
             }
         )
@@ -227,21 +236,82 @@ object DcpAbnormalWarningView {
             adView.loadAd(AdRequest.Builder().build())
         }
 
+        /*
+         * 미등록 번호 — 2줄 안내 + [제보하기] [신고하기] [피싱안심SOS] 한 줄 버튼, 닫기는 보조.
+         * (웹뷰 로딩 없이 네이티브로 즉시 표시. 버튼은 사용자 명시 액션일 때만 패널을 연다.)
+         */
+        if (spec.unregistered && onReport != null) {
+            fun actionButton(label: String, colorHex: String, onClick: () -> Unit) =
+                TextView(ctx).apply {
+                    text = label
+                    setTextColor(Color.WHITE)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    maxLines = 1
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor(colorHex))
+                        cornerRadius = dp(ctx, 12).toFloat()
+                    }
+                    setPadding(dp(ctx, 4), dp(ctx, 12), dp(ctx, 4), dp(ctx, 12))
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    tag = ACTION_TAG
+                    setOnClickListener { onClick() }
+                }
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(ctx, 14) }
+            }
+            val gap = dp(ctx, 6)
+            row.addView(
+                actionButton(UnregisteredNumberPopup.TIP_BUTTON, "#2563EB") { (onTip ?: onReport)() }
+            )
+            row.addView(
+                actionButton(UnregisteredNumberPopup.REPORT_BUTTON, "#E11D48") { onReport() }.apply {
+                    (layoutParams as LinearLayout.LayoutParams).marginStart = gap
+                }
+            )
+            row.addView(
+                actionButton(UnregisteredNumberPopup.SOS_BUTTON, "#0F766E") {
+                    openUri(ctx, UnregisteredNumberPopup.SOS_URL)
+                }.apply {
+                    (layoutParams as LinearLayout.LayoutParams).marginStart = gap
+                }
+            )
+            card.addView(row)
+        }
         val confirm = TextView(ctx).apply {
-            text = if (spec.expired) "닫기" else "확인"
+            text = when {
+                spec.unregistered -> UnregisteredNumberPopup.CLOSE_BUTTON
+                spec.expired -> "닫기"
+                else -> "확인"
+            }
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                setColor(Color.parseColor(if (spec.abnormal) "#E11D48" else "#2563EB"))
+                setColor(
+                    Color.parseColor(
+                        when {
+                            spec.unregistered && onReport != null -> "#334155"
+                            spec.abnormal -> "#E11D48"
+                            else -> "#2563EB"
+                        }
+                    )
+                )
                 cornerRadius = dp(ctx, 12).toFloat()
             }
             setPadding(dp(ctx, 12), dp(ctx, 12), dp(ctx, 12), dp(ctx, 12))
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(ctx, 14) }
+            ).apply {
+                topMargin = dp(ctx, if (spec.unregistered && onReport != null) 8 else 14)
+            }
             layoutParams = lp
             tag = ACTION_TAG
             setOnClickListener {

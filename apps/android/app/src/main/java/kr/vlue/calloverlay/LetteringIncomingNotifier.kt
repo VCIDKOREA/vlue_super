@@ -61,7 +61,7 @@ object LetteringIncomingNotifier {
             val title = if (outgoing) "VLUÉ 발신 레터링" else "VLUÉ 수신 빅푸시"
             val body = when {
                 !displayName.isNullOrBlank() -> displayName
-                phone.isBlank() || phone == "unknown" -> "번호 확인 중…"
+                phone.isBlank() || phone == "unknown" -> "수신 전화"
                 else -> phone
             }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Phone, PhoneIncoming, PhoneOutgoing, ShieldCheck } from "lucide-react";
+import { Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, ShieldCheck } from "lucide-react";
 import { CALL_SHOWCASE_HISTORY_CHANGED } from "../lib/callShowcaseHistory.js";
 import {
   applyLocalKnownPeersToCallGroups,
@@ -13,7 +13,8 @@ import {
   formatCallGroupLabel,
   formatCallWhen,
   resolveCallDisplayName,
-  resolveCallHistoryAvatar
+  resolveCallHistoryAvatar,
+  resolveCallType
 } from "../lib/callLogList.js";
 import {
   applySafeCareLocalToCallGroups,
@@ -75,6 +76,7 @@ import {
 } from "../lib/call/callHistoryRoute.js";
 import { formatAgencyTelHref } from "../lib/showcase/showcaseContactActions.js";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
+import UnregisteredSafePopup from "./UnregisteredSafePopup.jsx";
 import AgencyDcpMiniPopup from "./agency/AgencyDcpMiniPopup.jsx";
 import "./friend-showcase-list.css";
 import "../styles/showcase-call-glass.css";
@@ -208,7 +210,9 @@ function peerPayloadFromResolve(payload) {
     showcaseStyle: payload.card?.showcaseStyle || payload.showcaseStyle,
     verified: Boolean(payload.verified),
     phone: payload.phone,
-    tier: payload.card?.membershipTier || "free"
+    tier: payload.card?.membershipTier || "free",
+    /* live 조회 타임아웃 등 — 「쇼케이스 없음」 결론 금지 (callHistoryRoute.conclusive) */
+    incomplete: payload.incomplete === true
   };
 }
 
@@ -257,6 +261,29 @@ function writeCallHistoryLineId(id) {
   }
 }
 
+const CALL_TYPE_META = {
+  outgoing: { Icon: PhoneOutgoing, label: "발신" },
+  incoming: { Icon: PhoneIncoming, label: "수신" },
+  missed: { Icon: PhoneMissed, label: "부재중" }
+};
+
+/** 발신(↗ 파랑) · 수신(↙ 초록) · 부재중(↙ 빨강) — 통화시간 앞 아이콘 */
+function CallTypeMark({ call }) {
+  const type = resolveCallType(call);
+  const { Icon, label } = CALL_TYPE_META[type] || CALL_TYPE_META.incoming;
+  return (
+    <span
+      className={`call-history-row__type call-history-row__type--${type}`}
+      data-call-type={type}
+      role="img"
+      aria-label={label}
+      title={label}
+    >
+      <Icon size={12} strokeWidth={2.6} aria-hidden />
+    </span>
+  );
+}
+
 function CallHistoryAvatar({ call, cacheTick = 0, onBrokenUrl }) {
   let url = "";
   try {
@@ -269,7 +296,7 @@ function CallHistoryAvatar({ call, cacheTick = 0, onBrokenUrl }) {
     setBroken(false);
   }, [url, cacheTick]);
   const label = resolveCallDisplayName(call);
-  const Icon = call.direction === "out" ? PhoneOutgoing : PhoneIncoming;
+  const Icon = resolveCallType(call) === "outgoing" ? PhoneOutgoing : PhoneIncoming;
 
   if (url && !broken) {
     return (
@@ -437,17 +464,11 @@ function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, ch
   );
 }
 
-function CallHistoryLoadingGuide({ syncing = false }) {
-  return (
-    <div className="call-history-loading" role="status" aria-live="polite">
-      <div className="call-history-loading__spinner" aria-hidden />
-      <p className="call-history-loading__title">
-        {syncing ? "최신 쇼케이스를 불러오는 중…" : "쇼케이스를 불러오는 중…"}
-      </p>
-      <p className="call-history-loading__hint">잠시만 기다려 주세요</p>
-    </div>
-  );
-}
+/*
+ * 「쇼케이스를 불러오는 중…」 로딩 스피너 레이어는 삭제됐다.
+ * 탭 즉시: 캐시/스냅샷 쇼케이스 · 안심/인증 팝업 · 미등록 2줄 안심팝업 중 하나를 바로 그리고,
+ * 네트워크 결과는 백그라운드에서 같은 화면에 덮어쓴다.
+ */
 
 export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false }) {
   const [items, setItems] = useState(() =>
@@ -467,6 +488,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const [toast, setToast] = useState("");
   const [sharePick, setSharePick] = useState(null);
   const [authPopup, setAuthPopup] = useState({ open: false, name: "", phone: "", handle: "" });
+  /* 미등록·모르는 번호 — 풀스크린 쇼케이스 대신 2줄 안심팝업 (즉시, 로딩 없음) */
+  const [unregPopup, setUnregPopup] = useState({ open: false, phone: "" });
   const [contactSafePopup, setContactSafePopup] = useState({
     open: false,
     name: "",
@@ -478,6 +501,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   const openGenRef = useRef(0);
   const routeLockRef = useRef(CALL_HISTORY_ROUTE.PENDING);
   const lastOpenAtRef = useRef(0);
+  /** incomplete(live 타임아웃) 회원 재조회 — gen 당 1회 */
+  const retryGenRef = useRef(0);
+  const retryHydrateRef = useRef(null);
   const { unlockAudioGesture, setPlaybackPhase } = useShowcaseBgm();
 
   useEffect(() => {
@@ -576,6 +602,23 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
   }, []);
 
+  const closeUnregPopup = useCallback(() => {
+    setUnregPopup((prev) => (prev.open ? { open: false, phone: "" } : prev));
+  }, []);
+
+  /** 미등록 번호 — 풀스크린 쇼케이스/신고 패널 호출 금지, 2줄 안심팝업만 즉시 표시 */
+  const openUnregisteredPopupForCall = useCallback((call) => {
+    const phone = call?.phoneDisplay || call?.phone || "";
+    setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+    setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
+    setSelected(null);
+    setPreviewCard(null);
+    setPreviewVerified(false);
+    setExpanded(true);
+    setLoading(false);
+    setUnregPopup((prev) => (prev.open && prev.phone === phone ? prev : { open: true, phone }));
+  }, []);
+
   const openContactSafeForCall = useCallback((call, known = null, opts = {}) => {
     const phone = call?.phoneDisplay || call?.phone || "";
     const knownSync = known || resolveIsKnownContactSync(phone);
@@ -585,6 +628,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     const abnormal = Boolean(opts.abnormal);
     const warning = String(opts.warning || "").trim();
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+    setUnregPopup((prev) => (prev.open ? { open: false, phone: "" } : prev));
     setSelected(null);
     setPreviewCard(null);
     setPreviewVerified(false);
@@ -606,6 +650,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
   const openAuthPopupForPeer = useCallback((call, card = null) => {
     setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
+    setUnregPopup((prev) => (prev.open ? { open: false, phone: "" } : prev));
     setSelected(null);
     setPreviewCard(null);
     setPreviewVerified(false);
@@ -901,6 +946,31 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
       routeLockRef.current = next.kind;
 
+      /*
+       * 회원인데 live 조회가 타임아웃(incomplete) — 「쇼케이스 없음」 결론 금지.
+       * 팝업으로 떨어뜨리지 않고 이미 그려진(또는 지금 받은) 회원 쇼케이스를 유지하고 1회 재조회한다.
+       */
+      if (next.kind === CALL_HISTORY_ROUTE.PENDING) {
+        if (payload?.verified === true && payload?.card) {
+          closeUnregPopup();
+          setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+          setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
+          setSelected((prev) => prev || call);
+          setExpanded(true);
+          setPreviewVerified(true);
+          setPreviewCard((prev) => (payload.card && (!prev || prev._optimistic) ? payload.card : prev));
+          setLoading(false);
+          if (retryGenRef.current !== gen) {
+            retryGenRef.current = gen;
+            window.setTimeout(() => {
+              if (gen !== openGenRef.current) return;
+              void retryHydrateRef.current?.(call, gen, { background: true, forceStyle: true });
+            }, 1500);
+          }
+        }
+        return;
+      }
+
       /* ③ 안심 — 회원(송출OFF 등)은 인증 팝업, 비회원 저장만 contact-safe */
       if (next.kind === CALL_HISTORY_ROUTE.SAFE) {
         if (next.verified === true || next.variant === SAFE_VARIANT.ABNORMAL) {
@@ -932,6 +1002,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
           "paid",
           { peerMode: true, style: silentShowcaseStyle() }
         );
+        closeUnregPopup();
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
         setSelected({
@@ -951,6 +1022,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       if (next.kind === CALL_HISTORY_ROUTE.SHOWCASE && (next.card || payload?.card)) {
         const card = next.card || payload.card;
         const tier = card.membershipTier || call.membershipTier || "free";
+        closeUnregPopup();
         setAuthPopup({ open: false, name: "", phone: "", handle: "" });
         setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
         setSelected({
@@ -968,26 +1040,13 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         return;
       }
 
-      /* ④ 미인증 */
-      {
-        const card =
-          next.card ||
-          payload?.card || {
-            name: call.name || "",
-            phone: call.phoneDisplay || call.phone || "",
-            membershipTier: "free",
-            showcaseStyle: silentShowcaseStyle()
-          };
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
-        setSelected(call);
-        setExpanded(true);
-        setPreviewVerified(false);
-        setPreviewCard(card);
-        setLoading(false);
-      }
+      /*
+       * ④ 미인증 — 풀스크린 쇼케이스/신고 패널을 절대 호출하지 않는다.
+       * 네이티브와 동일한 2줄 안심팝업 + [제보하기][신고하기][피싱안심SOS] 만 즉시 표시.
+       */
+      openUnregisteredPopupForCall(call);
     },
-    [openContactSafeForCall, openAuthPopupForPeer]
+    [openContactSafeForCall, openAuthPopupForPeer, openUnregisteredPopupForCall, closeUnregPopup]
   );
 
   const loadPeerPayload = useCallback(async (call, opts = {}) => {
@@ -1024,6 +1083,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     },
     [applyPeerPayload, loadPeerPayload]
   );
+  retryHydrateRef.current = hydrateCallFromNetwork;
 
   const runRowAction = async (call, matrix, shareChannel = null) => {
     const cta = matrix?.cta;
@@ -1090,6 +1150,8 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
 
     const gen = ++openGenRef.current;
     const phone = call.phoneDisplay || call.phone;
+    /* 이전 탭에서 남은 미등록 팝업 정리 — 이번 탭 결과가 다시 필요하면 아래에서 다시 연다 */
+    closeUnregPopup();
 
     try {
       unlockAudioGesture?.();
@@ -1116,18 +1178,23 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       }
     };
 
+    /*
+     * 회원 힌트가 없는 번호 — 로딩 스피너 대신 **즉시** 안심팝업을 띄우고 백그라운드에서 조회한다.
+     *  - 저장 연락처 → 안심케어(정상) 팝업
+     *  - 그 외      → 미등록 2줄 안심팝업 (풀스크린 쇼케이스/신고 패널 금지)
+     * 조회 결과가 회원/쇼케이스면 applyPeerPayload 가 같은 자리에서 교체한다.
+     */
     const paintPending = () => {
+      const known = resolveIsKnownContactSync(phone);
       flushSync(() => {
-        setAuthPopup({ open: false, name: "", phone: "", handle: "" });
-        setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
-        setSelected(call);
-        setExpanded(true);
-        setPreviewCard(null);
-        setPreviewVerified(false);
-        setLoading(true);
+        if (known?.isKnownContact) {
+          openContactSafeForCall(call, known, { abnormal: false, warning: "" });
+        } else {
+          openUnregisteredPopupForCall(call);
+        }
       });
       void hydrateCallFromNetwork(call, gen, {
-        background: false,
+        background: true,
         forceStyle: !readCallHistoryPeerCache(phone)
       });
     };
@@ -1214,6 +1281,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
     setLoading(false);
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
     setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
+    closeUnregPopup();
   };
 
   useEffect(() => {
@@ -1314,8 +1382,9 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
               {toast}
             </p>
           ) : null}
-          {loading || !previewCard ? (
-            <CallHistoryLoadingGuide />
+          {!previewCard ? (
+            /* 스피너 없음 — 카드가 아직 없으면 빈 셸(닫기 버튼만). 정상 경로에선 항상 즉시 카드가 있다. */
+            <div className="flex min-h-0 flex-1" aria-hidden />
           ) : (
             <div className="lettering-showcase-fs lettering-showcase-fs--history-embed relative">
               <div className="lettering-showcase-fs__shell">
@@ -1437,6 +1506,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
                         ) : null}
                       </p>
                       <p className="friend-showcase-list__subtitle call-history-row__sub">
+                        <CallTypeMark call={call} />
                         {formatCallDuration(call.durationSec)}
                       </p>
                     </div>
@@ -1461,6 +1531,16 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
         phone={authPopup.phone}
         handle={authPopup.handle}
         onClose={closeAuthPopup}
+      />
+      <UnregisteredSafePopup
+        open={Boolean(open && unregPopup.open)}
+        phone={unregPopup.phone}
+        onClose={() => {
+          openGenRef.current += 1;
+          routeLockRef.current = CALL_HISTORY_ROUTE.PENDING;
+          closeUnregPopup();
+        }}
+        onToast={showToast}
       />
       <AgencyDcpMiniPopup
         open={Boolean(open && contactSafePopup.open)}

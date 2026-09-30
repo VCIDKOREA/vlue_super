@@ -136,7 +136,7 @@ object BigPushShowcaseBar {
         if (expired) {
             return Model(
                 brandLabel = "VLUÉ",
-                primaryLine = phoneDisp.ifBlank { "번호 확인 중…" },
+                primaryLine = phoneDisp.ifBlank { "수신 전화" },
                 secondaryLine = firstNonBlank(
                     json?.optString("expiredSubtitle"),
                     card?.optString("expiredSubtitle")
@@ -168,10 +168,10 @@ object BigPushShowcaseBar {
             !hideBroadcastName && !displayName.isNullOrBlank() -> displayName
             hideBroadcastName -> "VLUÉ ID"
             !displayName.isNullOrBlank() -> displayName
-            else -> phoneDisp.ifBlank { "번호 확인 중…" }
+            else -> phoneDisp.ifBlank { "수신 전화" }
         }.let { line ->
             if (line == "—" || line == "-" || line == "\u2014") {
-                phoneDisp.ifBlank { "번호 확인 중…" }
+                phoneDisp.ifBlank { "수신 전화" }
             } else line
         }
         val secondary = when {
@@ -184,11 +184,11 @@ object BigPushShowcaseBar {
                 )
                 if (parts.isNotEmpty()) parts.joinToString(" | ")
                 else if (verified) "VLUÉ 인증 · 쇼케이스"
-                else "상대 번호 확인 중…"
+                else "VLUÉ 안심통화"
             }
             phoneDisp.isNotBlank() -> phoneDisp
             verified -> "VLUÉ 인증 · 쇼케이스"
-            else -> "상대 번호 확인 중…"
+            else -> "VLUÉ 안심통화"
         }
         /* jobTitle 은 펼침 쇼케이스 본문에만 사용 — 바에는 넣지 않음 */
         return Model(

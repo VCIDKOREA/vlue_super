@@ -230,7 +230,7 @@ object CardLookupRepository {
             return localSafeFallback ?: result
     }
 
-    private fun buildPublicDirectorySafeJson(rawNumber: String, displayName: String): String {
+    internal fun buildPublicDirectorySafeJson(rawNumber: String, displayName: String): String {
         val e164 = CardLookupBridge.normalizeKr(rawNumber) ?: rawNumber
         return JSONObject()
             .put("matched", true)

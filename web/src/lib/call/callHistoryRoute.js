@@ -158,7 +158,8 @@ export function buildCallHistoryPeerFacts(call, cachedPeer = null, payload = nul
   const warning = String(
     payload?.warning || card?.dcp?.warning || call?.warning || ""
   ).trim();
-  const conclusive = payload != null;
+  /* incomplete(live 조회 타임아웃 등) 는 「없음」 결론 금지 — 회원이면 PENDING 으로 남겨 쇼케이스 유지 */
+  const conclusive = payload != null && payload.incomplete !== true;
 
   return {
     phone,

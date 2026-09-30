@@ -32,7 +32,8 @@
 | Incoming ringing | `BIG_PUSH` only |
 | Outgoing dialing / connecting | `OUTGOING_LOGO` only — **skip peer BigPush / identity fetch UI** |
 | Audio `MODE_IN_CALL` while still dialing | **Ignore** — must not open popup/showcase |
-| Logo / bar tap while outgoing unanswered | **Ignore** (hold logo) — except resolved unverified may open 미인증 report |
+| Logo / bar tap while outgoing unanswered | **Honored (v2 one-touch)** — opens best memory entry from `CallPrefetchCache` instantly (member → showcase / safe popup; otherwise 미등록 안심팝업). Never waits, never shows a spinner. |
+| Outgoing logo label | Text sits **above** the logo (nothing below it; `연결중...` is deleted). VLUÉ DB 상호/이름 → that name · saved contact → saved name/상호 · VLUÉ 미등록/unknown/lookup pending → `탭하여 정보확인`. Connection state no longer changes the text (`CallUiPhasePolicy.outgoingBubbleLabel`, web `resolveOutgoingLogoLabel`). |
 | Card lookup / Safe Care payload arrives while unanswered | Incoming: paint BigPush only. Outgoing: keep logo — **no center popup** |
 
 `remoteConnected` may become true **only** after a real answer path (`enterShowcaseFromAnswer` / InCall `STATE_ACTIVE` after dialing/connecting). Audio `MODE_IN_CALL` alone must **never** open popup/showcase (OEM false positive while still ringing).
@@ -54,19 +55,25 @@ Decision order (first match wins):
 4. Auth-member-only (verified + **explicit** broadcast OFF, or no DCC/showcase content) → `CENTER_AUTH_POPUP`
 5. Verified member with real DCC **or** showcase content, unless `includeDigitalCard:false` → `FULL_SHOWCASE`
    (missing `includeDigitalCard` key must **not** be treated as OFF when a digital card exists)
-6. Resolved unverified (lookup done, `matched:false`, not pending, not safe-care, no device-contact promote) → `FULL_SHOWCASE` (**미인증 신고 패널**)
-7. Else (pending lookup / blank) → `KEEP_BIG_PUSH`
+6. Resolved unverified / 미등록 (lookup done or timed out, `matched:false`, not pending, not safe-care, no device-contact promote) → **`CENTER_SAFE_POPUP` (미등록 안심팝업, v2)**. **FULL_SHOWCASE is forbidden** unless the user explicitly presses the popup's report button (`AnswerInput.reportRequested`).
+   - Line 1: `• 발신경로 정상 (VLUE 미등록 번호)`
+   - Line 2: `• 유선상 금전요구는 주의바랍니다.`
+   - Buttons (one row): `제보하기` → in-overlay 제보 panel (user action only) · `신고하기` → in-overlay 신고 sheet (user action only) · `피싱안심SOS` → external 경찰청 SOS page. Then `닫기` → Mini.
+   - Shown **natively, instantly** from the `CallPrefetchCache` entry — presenting it never expands the overlay window or starts any extra WebView navigation/loading UI. Same rule applies to the in-app call-history list (`CallShowcaseHistorySheet`): tapping an unregistered number opens the web twin of this popup, never the full-screen showcase/report panel.
+7. Else (pending lookup / blank) → `KEEP_BIG_PUSH` until `CallPrefetchCache` binds (hard cap `FIRST_PAINT_TIMEOUT_MS`, 2s) — the cap binds a 미등록 entry, so pending can never persist.
 
 Contact promote: if lookup pending/blank **and** device contact name exists → treat as Safe Care (`CENTER_SAFE_POPUP`).
 
-Pending lookup must retry continuously after answer. After the bounded retry window
-(about 8 seconds), it must resolve to the existing unverified report panel; it must
-never remain permanently in `KEEP_BIG_PUSH`. Path-abnormal sessions remain
-`CENTER_SAFE_POPUP` and are not promoted to unverified.
+**Lookup tiers (v2, `CallPrefetchCache`, ConcurrentHashMap, parallel first-arrival binding):**
+1. VLUE member → `FULL_SHOWCASE` / auth popup (rules 4–5)
+2. Public / local DB (`public_directory_safe`, saved safe-care) → 안심팝업 (rule 3)
+3. Unregistered / timeout → 미등록 안심팝업 (rule 6)
 
-**Public directory:** 학교·우체국·공공기관 등 DB 전화 매칭 → `public_directory_safe` 안심팝업. 미매칭 → 기존 미인증 쇼케이스.
+A lower tier may bind first (first paint) but never overwrites a higher tier; a later higher-tier result upgrades an already-visible 미등록 popup in place.
 
-**BigPush bar tap (after answer):** same decision table. Resolved unverified must open 미인증 fullscreen (not `BIG_PUSH_TAP_KEEP`).
+**Public directory:** 학교·우체국·공공기관 등 DB 전화 매칭 → `public_directory_safe` 안심팝업.
+
+**BigPush bar tap (after answer):** same decision table. Resolved unverified opens the 미등록 안심팝업 (not fullscreen).
 
 ### 3b. Outgoing (manual expand only)
 
@@ -78,6 +85,13 @@ never remain permanently in `KEEP_BIG_PUSH`. Path-abnormal sessions remain
 | Mini tap restore | Showcase / popup again (same as incoming) |
 
 `CallUiPhasePolicy.mayAutoExpandAfterAnswer(outgoing, expandRequestedByUser)` must be false for outgoing until the user taps.
+
+**v2 one-touch:** the tap itself is the unlock. `CallUiPhasePolicy.mayAdvancePastBigPush(..., userTapRequested = true)` passes even while still dialing, and popup gating treats `remoteConnected || outgoingExpandRequestedByUser` as "answered". The tap never sets `remoteConnected` by itself.
+
+**Label / connected signal (outgoing):**
+- Default dialer (InCallService bound): `STATE_ACTIVE` → `notifyConnected` immediately (no 350ms probe wait) → web `outgoing_connected` → label flips.
+- Not default dialer: telephony gives no ACTIVE. After `NON_DIALER_LABEL_FALLBACK_MS` (4s) of OFFHOOK the label (only) flips via `outgoing_connected`; `remoteConnected` stays false.
+- Web must replay a queued `outgoing_connected` when its listener registers (page load race was the stuck-"연결 중" root cause).
 
 ---
 
@@ -93,7 +107,7 @@ never remain permanently in `KEEP_BIG_PUSH`. Path-abnormal sessions remain
 - Safe Care / auth-only: **never** leave a blank dark `FULLSCREEN` Showcase
 - **Path abnormal:** never `FULL_SHOWCASE` — center 안심 팝업 only (even if peer has DCC/showcase)
 - Web host must not `setExpanded(true)` or `notifyVlueAuthMemberReady` for `contact_safe_care`
-- **Hard gate:** `commitFullscreenLayout` / `enterShowcaseLayout` / `restoreShowcase` require `hasBroadcastShowcaseContent` **or** resolved unverified (`isUnverifiedResolved`), and must fail when path is abnormal — otherwise `refuseEmptyFullscreen` → popup or compact BigPush (releases touch blockade)
+- **Hard gate:** `commitFullscreenLayout` / `enterShowcaseLayout` / `restoreShowcase` require `hasBroadcastShowcaseContent` **or** (resolved unverified **and** the user pressed the 미등록 popup report button — `unregisteredReportRequested`), and must fail when path is abnormal — otherwise `refuseEmptyFullscreen` → popup or compact BigPush (releases touch blockade)
 - Web: connected + no expand content → `lettering-overlay-host--bar-only` (transparent host, not `#070b14` full bleed) — **exception:** resolved unverified may expand to 미인증 panel
 - Native unmatched after API confirm: inject `profileKind=unverified` (do not leave `lookup_pending` forever)
 

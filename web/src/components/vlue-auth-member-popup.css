@@ -92,3 +92,70 @@
 .vlue-auth-member-popup__ok:active {
   transform: scale(0.98);
 }
+
+/* 미등록·모르는 번호 안심팝업 (UnregisteredSafePopup) — 2줄 안내 + 제보/신고/SOS */
+.vlue-unregistered-popup__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.vlue-unregistered-popup__row {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.vlue-unregistered-popup__tip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.vlue-unregistered-popup__input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vlue-unregistered-popup__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 4px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.vlue-unregistered-popup__btn:disabled {
+  opacity: 0.6;
+}
+
+.vlue-unregistered-popup__btn--tip {
+  background: #2563eb;
+}
+
+.vlue-unregistered-popup__btn--report {
+  background: #e11d48;
+}
+
+.vlue-unregistered-popup__btn--sos {
+  background: #0f766e;
+}
+
+.vlue-auth-member-popup__ok.vlue-unregistered-popup__close {
+  background: #334155;
+}

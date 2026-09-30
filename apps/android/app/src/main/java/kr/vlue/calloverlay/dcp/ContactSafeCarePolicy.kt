@@ -8,6 +8,26 @@ import kr.vlue.calloverlay.companion.OverlayState
  * (링잉 중 hide+popup 은 지문/키가드와 겹쳐 빅푸시만 사라지고 팝업도 실패하는 UX)
  */
 object ContactSafeCarePolicy {
+    /**
+     * 미등록 번호 안심팝업 — 안심케어와 동일한 표시 게이트(수화/탭 후, BIG_PUSH·SHOWCASE·IDLE).
+     * 별도 함수로 둔 이유: profileKind 문자열 해킹 없이 의도를 드러내고 테스트하기 위함.
+     */
+    fun shouldShowUnregistered(
+        overlayState: OverlayState,
+        popupOnly: Boolean,
+        callAnswered: Boolean
+    ): Boolean {
+        if (!callAnswered) return false
+        /* 미니버블 탭 → 같은 팝업 복원 (popupOnly 는 명시적 복원/표시 요청일 때만 true) */
+        if (popupOnly && overlayState == OverlayState.MINI_CASE) return true
+        return shouldShow(
+            profileKind = ContactSafeCarePayload.PROFILE_KIND,
+            overlayState = overlayState,
+            popupOnly = popupOnly,
+            callAnswered = callAnswered
+        )
+    }
+
     fun shouldShow(
         profileKind: String,
         overlayState: OverlayState,

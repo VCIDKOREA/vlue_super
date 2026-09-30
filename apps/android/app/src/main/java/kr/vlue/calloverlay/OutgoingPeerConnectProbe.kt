@@ -22,11 +22,24 @@ object OutgoingPeerConnectProbe {
     private var probeRunnable: Runnable? = null
     private var startedAtMs = 0L
     private var sawDialingOrConnecting = false
+    private var labelFallbackFired = false
+
+    /** 첫 확인 지연 / 폴링 주기 — 예전 500ms/350ms 는 연결 후 라벨 갱신이 체감상 늦었다 */
+    private const val FIRST_TICK_MS = 150L
+    private const val POLL_MS = 150L
+
+    /**
+     * 기본 전화앱이 아니면(InCallService 미바인딩) 텔레포니가 STATE_ACTIVE 를 주지 않아
+     * 「연결중...」 라벨이 통화 내내 멈춘다. 이 시간이 지나면 **라벨만** 갱신한다.
+     * remoteConnected 는 세우지 않는다 — 팝업/쇼케이스는 사용자 탭(원터치)으로만 열린다.
+     */
+    const val NON_DIALER_LABEL_FALLBACK_MS = 4_000L
 
     fun start(context: Context) {
         stop()
         val app = context.applicationContext
         startedAtMs = android.os.SystemClock.elapsedRealtime()
+        labelFallbackFired = false
         sawDialingOrConnecting = VlueInCallController.isDialingOrConnecting()
         val tick =
             object : Runnable {
@@ -40,10 +53,18 @@ object OutgoingPeerConnectProbe {
                         return
                     }
                     val elapsed = android.os.SystemClock.elapsedRealtime() - startedAtMs
+                    if (!labelFallbackFired &&
+                        !VlueInCallController.isDefaultDialerBound() &&
+                        elapsed >= NON_DIALER_LABEL_FALLBACK_MS
+                    ) {
+                        labelFallbackFired = true
+                        Log.i(TAG, "non-default-dialer label fallback elapsed=${elapsed}ms")
+                        CallOverlayService.notifyOutgoingLabelConnected()
+                    }
                     if (VlueInCallController.isDialingOrConnecting()) {
                         sawDialingOrConnecting = true
                         if (elapsed <= 180_000L) {
-                            mainHandler.postDelayed(this, 350L)
+                            mainHandler.postDelayed(this, POLL_MS)
                         } else {
                             stop()
                         }
@@ -76,11 +97,11 @@ object OutgoingPeerConnectProbe {
                         stop()
                         return
                     }
-                    mainHandler.postDelayed(this, 350L)
+                    mainHandler.postDelayed(this, POLL_MS)
                 }
             }
         probeRunnable = tick
-        mainHandler.postDelayed(tick, 500L)
+        mainHandler.postDelayed(tick, FIRST_TICK_MS)
         Log.i(TAG, "started (InCall ACTIVE only — no audio heuristic)")
     }
 

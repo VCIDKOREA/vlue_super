@@ -26,13 +26,13 @@ import {
 import { peerHasDccOrShowcaseContent, peerShowcaseBroadcastOn } from "../lib/peerShowcaseContent.js";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
-import { VlueBrandMark } from "./VlueBrandLogo.jsx";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
 import LetteringReportSheet from "./LetteringReportSheet.jsx";
 import LetteringCertModal from "./LetteringCertModal.jsx";
 import RenderErrorGuard from "./RenderErrorGuard.jsx";
 import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import OutgoingCallLogo from "./call/OutgoingCallLogo.jsx";
+import { resolveOutgoingLogoLabel } from "../lib/call/outgoingLogoLabel.js";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
@@ -1370,7 +1370,39 @@ function LetteringOverlayHostInner() {
       }
     };
     window.addEventListener("vlue-native-call-state", onNativeCall);
+    /*
+     * 「연결중...」 고착 방지 — 리스너 등록 전에 네이티브가 보낸 outgoing_connected 는
+     * 이벤트로 재전달되지 않으므로 큐(__VLUE_LAST_CALL_STATE__)를 1회 재생한다.
+     * 수신 오버레이에는 적용 금지(발신 방향일 때만).
+     */
+    if (
+      readQueuedNativeCallState() === "outgoing_connected" &&
+      directionRef.current === "outgoing"
+    ) {
+      onNativeCall({ detail: { state: "outgoing_connected" } });
+    }
     return () => window.removeEventListener("vlue-native-call-state", onNativeCall);
+  }, []);
+
+  /* 미등록 안전 팝업 [스팸/피싱 제보 및 신고하기] → 기존 신고 시트 열기 */
+  useEffect(() => {
+    const openReport = () => {
+      try {
+        window.__VLUE_OPEN_REPORT__ = 0;
+      } catch {
+        /* ignore */
+      }
+      setReportOpen(true);
+    };
+    window.addEventListener("vlue-native-open-report", openReport);
+    let pending = false;
+    try {
+      pending = window.__VLUE_OPEN_REPORT__ === 1;
+    } catch {
+      /* ignore */
+    }
+    if (pending) openReport();
+    return () => window.removeEventListener("vlue-native-open-report", openReport);
   }, []);
 
   const membershipTier = card?.membershipTier || "free";
@@ -1683,27 +1715,16 @@ function LetteringOverlayHostInner() {
   }
 
   if (showLoadingChip && !(direction === "outgoing" && outgoingLogoMode)) {
-    /* FULLSCREEN 흰 바탕 점유 금지 — 투명 호스트 + 브랜드 확인 칩만 */
+    /*
+     * v2: 「신원 확인 중」 스피너/칩 제거 — 조회는 백그라운드(프리패치)에서 진행하고
+     * 결과 도착 전에는 투명 호스트만 둔다. (미등록 확정은 네이티브가 2초 내 안전 팝업으로 게시)
+     */
     return (
       <div
         className="lettering-overlay-host lettering-overlay-host--tent lettering-overlay-host--loading"
-        style={{ background: "transparent" }}
-      >
-        <div className="lettering-overlay-verify-chip" role="status" aria-live="polite">
-          <span className="lettering-overlay-verify-chip__mark">
-            <VlueBrandMark size={18} />
-          </span>
-          <span className="lettering-overlay-verify-chip__copy">
-            <span className="lettering-overlay-verify-chip__brand">VLUÉ</span>
-            <span className="lettering-overlay-verify-chip__label">신원 확인 중</span>
-          </span>
-          <span className="lettering-overlay-verify-chip__dots" aria-hidden>
-            <i />
-            <i />
-            <i />
-          </span>
-        </div>
-      </div>
+        style={{ background: "transparent", pointerEvents: "none" }}
+        aria-hidden
+      />
     );
   }
 
@@ -1749,7 +1770,7 @@ function LetteringOverlayHostInner() {
         data-mini="false"
       >
         {/* 로고 모드는 네이티브 expand 성공 후 해제 — 탭 직후 지우면 쇼케이스/팝업이 안 뜸 */}
-        <OutgoingCallLogo connected={onCall} />
+        <OutgoingCallLogo connected={onCall} label={resolveOutgoingLogoLabel(styledCard)} />
         {toast ? (
           <p className="lettering-overlay-toast" role="status">
             {toast}

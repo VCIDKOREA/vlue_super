@@ -64,7 +64,7 @@ class LetteringRingingActivity : Activity() {
         )
         root.addView(
             TextView(this).apply {
-                text = if (phone == "unknown") "번호 확인 중…" else phone
+                text = if (phone == "unknown") "수신 전화" else phone
                 setTextColor(Color.parseColor("#E2E8F0"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
                 typeface = Typeface.DEFAULT_BOLD
@@ -73,7 +73,7 @@ class LetteringRingingActivity : Activity() {
         )
         root.addView(
             TextView(this).apply {
-                text = "쇼케이스 불러오는 중… 뒤로가기로 전화 화면으로 돌아갈 수 있습니다."
+                text = "VLUÉ 안심통화 · 뒤로가기로 전화 화면으로 돌아갈 수 있습니다."
                 setTextColor(Color.parseColor("#94A3B8"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setPadding(0, dp(12), 0, 0)

@@ -198,7 +198,9 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
       phone: phoneDisplay,
       verified: true,
       card,
-      showcaseStyle: snapStyle
+      showcaseStyle: snapStyle,
+      /* profile/live 미조회 예열본 — 「쇼케이스 없음」 결론에 쓰지 않는다 (탭 시 전체 조회로 교체) */
+      incomplete: true
     };
   }
 
@@ -243,10 +245,18 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
   }
 
   const tier = merged.membershipTier || "free";
-  let peerStyle =
-    live && typeof live === "object"
-      ? normalizeReplayStyle(live, merged)
-      : memberReplayStyle(merged);
+  /*
+   * live 조회가 타임아웃/실패(null)인데 by-number 스냅샷에도 송출 ON/OFF 가 명시돼 있지 않으면
+   * 「쇼케이스 없음」을 결론 내릴 수 없다. (이전: memberReplayStyle 이 includeDigitalCard:false 로
+   * 떨어뜨려 전중희·김광덕 같은 회원에게 「공개 설정된 쇼케이스가 없습니다」 팝업이 고착)
+   * incomplete=true 는 호출부가 안심(없음) 팝업 대신 이미 그려진 회원 쇼케이스를 유지하게 한다.
+   */
+  const liveOk = Boolean(live && typeof live === "object");
+  const snapExplicit = typeof merged.showcaseStyle?.includeDigitalCard === "boolean";
+  const incomplete = !liveOk && !snapExplicit;
+  let peerStyle = liveOk
+    ? normalizeReplayStyle(live, merged)
+    : memberReplayStyle(merged);
   if (
     peerShowcaseBroadcastOn(peerStyle) &&
     !(Array.isArray(peerStyle.pages) && peerStyle.pages.some((p) => p && typeof p === "object")) &&
@@ -282,6 +292,7 @@ export async function resolveCallHistoryShowcasePeer(phoneRaw, opts = {}) {
     phone: phoneDisplay,
     verified: true,
     card,
-    showcaseStyle: peerStyle
+    showcaseStyle: peerStyle,
+    incomplete
   };
 }

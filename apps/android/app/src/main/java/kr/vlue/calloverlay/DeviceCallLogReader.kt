@@ -19,6 +19,19 @@ object DeviceCallLogReader {
     private const val DEFAULT_LIMIT = 200
     private const val MAX_LIMIT = 500
 
+    /**
+     * 목록 아이콘용 3분류 — 발신(outgoing ↗) / 수신(incoming ↙) / 부재중(missed ↙ 빨강).
+     * 거절·차단·음성사서함 미수신도 사용자 입장에서는 받지 못한 전화이므로 missed.
+     */
+    internal fun callTypeOf(type: Int): String =
+        when (type) {
+            CallLog.Calls.OUTGOING_TYPE -> "outgoing"
+            CallLog.Calls.MISSED_TYPE,
+            CallLog.Calls.REJECTED_TYPE,
+            CallLog.Calls.BLOCKED_TYPE -> "missed"
+            else -> "incoming"
+        }
+
     fun readAsJson(context: Context, limitRaw: Int = DEFAULT_LIMIT): String {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG)
             != PackageManager.PERMISSION_GRANTED
@@ -83,6 +96,7 @@ object DeviceCallLogReader {
                     CallLog.Calls.MISSED_TYPE -> "in"
                     else -> "in"
                 }
+                val callType = callTypeOf(type)
                 val callState =
                     if (type == CallLog.Calls.MISSED_TYPE || durationSec <= 0) "missed" else "ended"
                 val row = JSONObject()
@@ -92,6 +106,7 @@ object DeviceCallLogReader {
                     .put("durationSec", durationSec)
                     .put("direction", direction)
                     .put("type", type)
+                    .put("callType", callType)
                     .put("dateMs", dateMs)
                     .put("callState", callState)
                 if (cachedName.isNotEmpty()) {

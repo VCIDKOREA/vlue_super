@@ -2,7 +2,8 @@ import { normalizePhoneDigits, toKoreaNationalDigits } from "./letteringPhoneMat
 
 const TTL_MS = 30 * 60 * 1000;
 const MAX = 48;
-const STORAGE_KEY = "vlue_call_history_peer_v4";
+/* v5: incomplete 플래그 도입 — v4 의 예열(light)·타임아웃 팩이 「쇼케이스 없음」 으로 고착되던 캐시를 폐기 */
+const STORAGE_KEY = "vlue_call_history_peer_v5";
 const mem = new Map();
 
 /**
@@ -101,7 +102,8 @@ export function prefetchCallHistoryPeer(phone, loader, opts = {}) {
   const force = Boolean(opts.force);
   if (!force) {
     const cached = readCallHistoryPeerCache(phone);
-    if (cached) return Promise.resolve(cached);
+    /* incomplete(예열·live 타임아웃) 캐시는 결론으로 쓰지 않고 전체 조회로 교체한다 */
+    if (cached && cached.incomplete !== true) return Promise.resolve(cached);
     const existing = inflight.get(k);
     if (existing) return existing;
   } else {

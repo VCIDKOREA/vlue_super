@@ -5130,18 +5130,23 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar
   display: block;
   box-shadow: none !important;
 }
-.outgoing-call-logo__hint {
+/* 로고 상단 텍스트 — 상호/이름 또는 「탭하여 정보확인」 (하단 「연결중...」 삭제) */
+.outgoing-call-logo__top {
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: rgba(226, 232, 240, 0.72);
+  /* 로고 창(~120dp) 안에 들어가도록 */
+  max-width: 116px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #f1f5f9;
   pointer-events: none;
-}
-.outgoing-call-logo[data-connected="0"] .outgoing-call-logo__hint {
-  color: rgba(226, 232, 240, 0.5);
 }

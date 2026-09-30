@@ -60,6 +60,7 @@ import kr.vlue.calloverlay.dcp.VlueAuthMemberPopupPolicy
 import kr.vlue.calloverlay.dcp.DcpAbnormalWarningView
 import kr.vlue.calloverlay.dcp.DcpPopupPolicy
 import kr.vlue.calloverlay.dcp.NationalAgencyWhitelist
+import kr.vlue.calloverlay.dcp.UnregisteredNumberPopup
 import kr.vlue.calloverlay.diagnostics.CompanionBigPushDiag
 import kr.vlue.calloverlay.incall.VlueInCallController
 import kr.vlue.calloverlay.diagnostics.CompanionRuntimeStabilityDiag
@@ -167,6 +168,15 @@ class CallOverlayService : Service() {
      * 수신은 항상 무시(정책이 incoming 을 즉시 허용).
      */
     private var outgoingExpandRequestedByUser: Boolean = false
+    /** 현재 중앙 팝업이 「미등록 번호 안심팝업」인가 — 더 높은 티어 결과가 늦게 오면 제자리 업그레이드 */
+    private var unregisteredPopupShown: Boolean = false
+    /** 현재 수신 링잉 시작(wall ms, -3s 여유). 0 = 미기록 */
+    private var ringingSinceWallMs: Long = 0L
+    /**
+     * 미등록 팝업의 「스팸/피싱 제보 및 신고하기」를 사용자가 눌렀다.
+     * 이때만 미인증 번호가 신고 패널(FULL_SHOWCASE)로 열린다 (계약 §3a rule 6).
+     */
+    private var unregisteredReportRequested: Boolean = false
     /** 발신 중앙 로고 오버레이 창 한 변 (dp) — 전체화면 금지 */
     private val outgoingLogoWindowDp: Int = 120
     /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
@@ -185,6 +195,43 @@ class CallOverlayService : Service() {
     private var dcpPopupOnly = false
     /** Phase 5-C — Memory callback 관찰만 (동작 변경 없음) */
     private var memoryCallbacks: ComponentCallbacks2? = null
+
+    /**
+     * 중앙 팝업 표시 게이트용 「수화됨」.
+     * 발신: 실제 연결(remoteConnected) 또는 사용자가 미니버블을 탭(원터치) — 탭이 unlock.
+     * 수신: remoteConnected 또는 통화 이미 수화.
+     */
+    private fun isCallAnsweredForPopup(): Boolean =
+        if (currentOutgoing) remoteConnected || outgoingExpandRequestedByUser
+        else remoteConnected || isCallAlreadyAnswered()
+
+    /**
+     * 탭/수화 시점에 카드가 비었거나 조회 대기면 메모리 프리패치 결과로 즉시 채운다.
+     * 프리패치에도 없으면 미등록 확정 — 「검색 중」 상태를 사용자에게 절대 보이지 않는다.
+     * 나중에 더 높은 티어가 도착하면 [applyCallInfoUpdate] 가 제자리 업그레이드한다.
+     */
+    private fun adoptPrefetchedCardIfPending(source: String, allowUnregisteredFallback: Boolean) {
+        val json = pendingCardJson
+        if (!json.isNullOrBlank() && !isLookupPendingCard(json)) return
+        val entry = CallPrefetchCache.peek(currentPhone)
+        val adopted =
+            when {
+                entry != null -> entry.rawJson ?: UnregisteredNumberPopup.json(currentPhone)
+                allowUnregisteredFallback -> UnregisteredNumberPopup.json(currentPhone)
+                /* 수신 수화: 프리패치 진행 중 — 기존 재시도 루프가 바인딩을 기다린다 */
+                else -> return
+            }
+        pendingCardJson = adopted
+        pendingVerified = entry?.result?.verified ?: false
+        bindDcpRoute(currentPhone, currentDcpRoute, adopted)
+        webView?.let { wv ->
+            if (!wv.url.isNullOrBlank()) injectCardLookupJson(wv, adopted)
+        }
+        VlueBigPushTrace.lifecycle(
+            "PREFETCH_ADOPT",
+            "source=$source tier=${entry?.tier?.name ?: "UNREGISTERED(none)"}"
+        )
+    }
 
     /** Derived — OverlayState SoT. 저장 flag 아님. */
     private fun isInCallOverlayState(): Boolean =
@@ -968,6 +1015,10 @@ class CallOverlayService : Service() {
 
         currentPhone = phone
         currentOutgoing = outgoing
+        if (asBigPush && System.currentTimeMillis() - ringingSinceWallMs > 45_000L) {
+            /* 새 수신 시작 시각 (워치독 재기동으로 같은 링잉 중 갱신되지 않도록 45s 가드) — — 이후 InCallActivity resume 만 「풀 전화 UI」 증거로 인정 (직전 통화 stale 제외) */
+            ringingSinceWallMs = System.currentTimeMillis() - 3_000L
+        }
         pendingCardJson = cardJson
         pendingVerified = verified
         val forMiniCase =
@@ -1053,7 +1104,8 @@ class CallOverlayService : Service() {
                 remoteConnected = remoteConnected,
                 dialingOrConnecting = VlueInCallController.isDialingOrConnecting(),
                 hasActiveConnectedCall = VlueInCallController.hasConnectedActiveCall(),
-                trustedPeerConnected = trustedPeerConnected
+                trustedPeerConnected = trustedPeerConnected,
+                userTapRequested = currentOutgoing && outgoingExpandRequestedByUser
             )
         ) {
             VlueBigPushTrace.lifecycle(
@@ -1066,8 +1118,19 @@ class CallOverlayService : Service() {
         }
         CompanionRuntimeStabilityDiag.mark("ANSWER_DETECTED", source)
         CompanionRuntimeStabilityDiag.mark("CONTROLLER_ON_ANSWER", source)
-        OutgoingPeerConnectProbe.stop()
-        remoteConnected = true
+        /*
+         * v2 원터치: 다이얼링 중 사용자 탭으로 통과한 경우 remoteConnected 를 세우지 않는다.
+         * (실제 ACTIVE 가 오면 프로브/InCall 경로가 라벨과 함께 확정)
+         */
+        val realConnect =
+            !currentOutgoing ||
+                remoteConnected ||
+                VlueInCallController.hasConnectedActiveCall() ||
+                !VlueInCallController.isDialingOrConnecting()
+        if (realConnect) {
+            OutgoingPeerConnectProbe.stop()
+            remoteConnected = true
+        }
         VlueBigPushTrace.milestone(
             "ANSWER_DETECTED",
             "Answer Detected",
@@ -1103,6 +1166,16 @@ class CallOverlayService : Service() {
             return
         }
 
+        /*
+         * 메모리 프리패치 결과를 즉시 채택 (Zero Latency).
+         * 발신 탭: 프리패치에도 없으면 미등록 확정 — 「검색 중」 없이 바로 안심팝업.
+         * 수신 수화: 프리패치가 아직 진행 중이면 기존 재시도 루프가 바인딩을 기다린다.
+         */
+        adoptPrefetchedCardIfPending(
+            source = source,
+            allowUnregisteredFallback = currentOutgoing && outgoingExpandRequestedByUser
+        )
+
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
         val safeCare = isContactSafeCare(pendingCardJson)
         val authOnly = VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)
@@ -1131,7 +1204,8 @@ class CallOverlayService : Service() {
                     hasBroadcastShowcaseContent = hasBroadcastContent,
                     canPromoteContactSafeCare = canPromote,
                     isUnverifiedResolved = unverifiedResolved,
-                    isPathAbnormal = pathAbnormal
+                    isPathAbnormal = pathAbnormal,
+                    reportRequested = unregisteredReportRequested
                 )
             )
         VlueBigPushTrace.lifecycle(
@@ -1580,8 +1654,12 @@ class CallOverlayService : Service() {
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
         if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)) return false
         if (VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)) return true
-        /* 미인증 신고 패널 — 빈 다크 케이스가 아님 */
-        return VlueAuthMemberPopupPolicy.isUnverifiedResolved(pendingCardJson)
+        /*
+         * 미등록 번호 — 자동 풀 쇼케이스 금지(안심팝업만).
+         * 사용자가 팝업의 「스팸/피싱 제보 및 신고하기」를 누른 경우에만 신고 패널로 펼친다.
+         */
+        return VlueAuthMemberPopupPolicy.isUnverifiedResolved(pendingCardJson) &&
+            unregisteredReportRequested
     }
 
     /**
@@ -1596,7 +1674,8 @@ class CallOverlayService : Service() {
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
         if (isCurrentPathAbnormal(pendingCardJson) ||
             isContactSafeCare(pendingCardJson) ||
-            VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified)
+            VlueAuthMemberPopupPolicy.isAuthMemberOnly(pendingCardJson, verified) ||
+            VlueAuthMemberPopupPolicy.isUnverifiedResolved(pendingCardJson)
         ) {
             presentCenterSafePopup(
                 source = "refuse_empty_$source",
@@ -1864,13 +1943,14 @@ class CallOverlayService : Service() {
                 when {
                     VlueInCallController.hasConnectedActiveCall() -> remoteConnected = true
                     VlueInCallController.isDialingOrConnecting() -> {
+                        /*
+                         * v2 원터치: 아직 연결 전이어도 탭은 유효하다.
+                         * 메모리 프리패치 결과(없으면 미등록)를 즉시 표시하고 remoteConnected 는 세우지 않는다.
+                         */
                         VlueBigPushTrace.lifecycle(
-                            "OUTGOING_LOGO_TAP_HOLD_DIALING",
-                            "still dialing — keep center logo"
+                            "OUTGOING_LOGO_TAP_WHILE_DIALING",
+                            "one-touch — show prefetched result now"
                         )
-                        ensureOutgoingLogoWindowLayout()
-                        notifyWebCallState("outgoing_logo")
-                        return@post
                     }
                     else -> {
                         /* OEM: dialing 종료됐는데 remoteConnected 미반영 */
@@ -1883,6 +1963,48 @@ class CallOverlayService : Service() {
                 "remoteConnected=$remoteConnected → enterShowcaseFromAnswer"
             )
             enterShowcaseFromAnswer(source = "outgoing_logo_tap")
+        }
+    }
+
+    /**
+     * 미등록 안심팝업의 「제보하기」/「신고하기」 — 사용자 명시 액션.
+     * 계약 §3a rule 6: 이때만 미인증 번호가 제보·신고 패널(FULL_SHOWCASE)로 열린다.
+     *
+     * @param openReportSheet true=「신고하기」(신고 시트까지 연다), false=「제보하기」(패널의 한 줄 제보 입력만)
+     */
+    private fun onUnregisteredReportRequested(openReportSheet: Boolean = true) {
+        mainHandler.post {
+            if (dismissing) return@post
+            unregisteredReportRequested = true
+            unregisteredPopupShown = false
+            authPopupOnlyMode = false
+            authPopupConfirmedToMini = false
+            userMinimized = false
+            removeDcpPopupWindow()
+            VlueBigPushTrace.lifecycle(
+                "UNREGISTERED_REPORT_TAP",
+                "phone=${ReleaseDebugGate.maskPhoneForLog(currentPhone)} outgoing=$currentOutgoing"
+            )
+            if (openReportSheet) {
+                webView?.evaluateJavascript("try{window.__VLUE_OPEN_REPORT__=1;}catch(e){}", null)
+            }
+            enterShowcaseFromAnswer(source = "unregistered_report_button")
+            if (!openReportSheet) return@post
+            /*
+             * 웹이 펼쳐진 뒤 기존 신고 시트를 연다.
+             * 웹이 소비하면 __VLUE_OPEN_REPORT__=0 — 재시도 스크립트는 그때 아무것도 하지 않는다.
+             */
+            val openReport =
+                Runnable {
+                    if (dismissing) return@Runnable
+                    webView?.evaluateJavascript(
+                        "try{if(window.__VLUE_OPEN_REPORT__===1){" +
+                            "window.dispatchEvent(new CustomEvent('vlue-native-open-report'));}}catch(e){}",
+                        null
+                    )
+                }
+            mainHandler.postDelayed(openReport, 250L)
+            mainHandler.postDelayed(openReport, 900L)
         }
     }
 
@@ -1915,11 +2037,16 @@ class CallOverlayService : Service() {
         }
         /* 발신 다이얼 중에는 팝업 금지 — 단, 사용자 로고 탭 후 수화 확정이면 허용 */
         if (currentOutgoing && !remoteConnected) {
-            if (outgoingExpandRequestedByUser &&
-                (VlueInCallController.hasConnectedActiveCall() ||
-                    !VlueInCallController.isDialingOrConnecting())
-            ) {
-                remoteConnected = true
+            if (outgoingExpandRequestedByUser) {
+                /*
+                 * v2 원터치: 탭이 unlock. 실제 연결 신호가 있으면 remoteConnected 로 확정하되,
+                 * 아직 다이얼링 중이어도 프리패치된 팝업을 막지 않는다.
+                 */
+                if (VlueInCallController.hasConnectedActiveCall() ||
+                    !VlueInCallController.isDialingOrConnecting()
+                ) {
+                    remoteConnected = true
+                }
             } else {
                 VlueBigPushTrace.lifecycle(
                     "CENTER_SAFE_POPUP_HOLD_DIALING",
@@ -2018,6 +2145,12 @@ class CallOverlayService : Service() {
             )
         if (route == "normal" || route == "abnormal") return true
         if (parsePathVerify(json)) return true
+        /* 미등록 번호 — Mini 탭은 같은 안심팝업으로 복원 (풀 쇼케이스 아님) */
+        if (VlueAuthMemberPopupPolicy.isUnverifiedResolved(json) &&
+            NationalAgencyWhitelist.match(currentPhone) == null
+        ) {
+            return true
+        }
         return false
     }
 
@@ -2130,6 +2263,18 @@ class CallOverlayService : Service() {
                 VlueBigPushTrace.lifecycle(
                     "OVERLAY_CONTEXT",
                     "phase=RINGING keyguard=true ctx=INCOMING_CALL_UI"
+                )
+                return OverlayContext.INCOMING_CALL_UI
+            }
+            /*
+             * 링잉 시작 이후 InCallActivity 가 resume 됐다 = 삼성 **풀 전화 UI**.
+             * VLUÉ 전면·전화앱 task 잔존으로 미니(BELOW=화면 중앙)로 오판하지 않도록 TOP 확정.
+             * 미니 수신 팝업(HUN)은 InCallActivity 를 띄우지 않는다.
+             */
+            if (ForegroundPackageProbe.fullInCallResumedSince(this, ringingSinceWallMs)) {
+                VlueBigPushTrace.lifecycle(
+                    "OVERLAY_CONTEXT",
+                    "phase=RINGING freshInCallResume=true ctx=INCOMING_CALL_UI"
                 )
                 return OverlayContext.INCOMING_CALL_UI
             }
@@ -2352,33 +2497,6 @@ class CallOverlayService : Service() {
         }
     }
 
-    private fun bannerPrimaryText(phone: String, cardJson: String?): String {
-        parseDisplayName(cardJson)?.let { return it }
-        return if (phone.isBlank() || phone == "unknown") "번호 확인 중…" else phone
-    }
-
-    private fun bannerHintText(phone: String, verified: Boolean, cardJson: String?): String {
-        val name = parseDisplayName(cardJson)
-        return when {
-            name != null && phone.isNotBlank() && phone != "unknown" -> phone
-            verified -> "VLUÉ 인증 · 쇼케이스 불러오는 중"
-            phone.isBlank() || phone == "unknown" -> "상대 번호를 확인하는 중…"
-            else -> "쇼케이스 불러오는 중…"
-        }
-    }
-
-    private fun parseDisplayName(cardJson: String?): String? {
-        if (cardJson.isNullOrBlank()) return null
-        return try {
-            val json = org.json.JSONObject(cardJson)
-            json.optString("displayName").ifBlank {
-                json.optJSONObject("card")?.optString("displayName").orEmpty()
-            }.ifBlank { null }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     private fun applyCallInfoUpdate(
         phone: String,
         verified: Boolean,
@@ -2449,6 +2567,30 @@ class CallOverlayService : Service() {
             pendingCardJson = cardJson
             pendingVerified = verified
             bindDcpRoute(phone, dcpRoute, cardJson)
+            /*
+             * 미등록 팝업이 떠 있는 상태에서 더 높은 티어(회원·공공DB·비정상 경로)가 늦게 도착 —
+             * 제자리 업그레이드. 낮은 티어/동일 미등록 재전송은 무시(깜박임 방지).
+             */
+            if (unregisteredPopupShown &&
+                !phoneChanged &&
+                !cardJson.isNullOrBlank() &&
+                !isLookupPendingCard(cardJson) &&
+                (!VlueAuthMemberPopupPolicy.isUnverifiedResolved(cardJson) ||
+                    isCurrentPathAbnormal(cardJson))
+            ) {
+                VlueBigPushTrace.lifecycle(
+                    "UNREGISTERED_POPUP_UPGRADE",
+                    "phone=${ReleaseDebugGate.maskPhoneForLog(phone)} kind=${parseProfileKind(cardJson)}"
+                )
+                removeDcpPopupWindow()
+                authPopupOnlyMode = false
+                webView?.let { wv ->
+                    if (!wv.url.isNullOrBlank()) injectCardLookupJson(wv, cardJson)
+                }
+                enterShowcaseFromAnswer(source = "applyCallInfoUpdate_upgrade_from_unregistered")
+                LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                return@post
+            }
             if (isContactSafeCare(cardJson)) {
                 /* 링잉: 빅푸시 바 유지(회원과 동일 페인트). 팝업만 수화 후. */
                 val banner = nativeBanner
@@ -2474,8 +2616,8 @@ class CallOverlayService : Service() {
                     }
                 }
                 if (isCallAlreadyAnswered() || companion.state == OverlayState.SHOWCASE) {
-                    /* 발신 미연결 — 카드 enrich 로 정상 팝업 금지 */
-                    if (currentOutgoing && !remoteConnected) {
+                    /* 발신 미연결 — 카드 enrich 로 정상 팝업 금지 (단, 사용자 탭 후에는 허용) */
+                    if (currentOutgoing && !remoteConnected && !outgoingExpandRequestedByUser) {
                         VlueBigPushTrace.lifecycle(
                             "CONTACT_SAFE_CARE_HOLD_BIGPUSH",
                             "outgoing unanswered — keep BigPush phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
@@ -2503,7 +2645,7 @@ class CallOverlayService : Service() {
             if (VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified) &&
                 (companion.state == OverlayState.SHOWCASE || isCallAlreadyAnswered())
             ) {
-                if (currentOutgoing && !remoteConnected) {
+                if (currentOutgoing && !remoteConnected && !outgoingExpandRequestedByUser) {
                     VlueBigPushTrace.lifecycle(
                         "AUTH_MEMBER_HOLD_BIGPUSH",
                         "outgoing unanswered — keep BigPush phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
@@ -2692,7 +2834,7 @@ class CallOverlayService : Service() {
                 profileKind = ContactSafeCarePayload.PROFILE_KIND,
                 overlayState = companion.state,
                 popupOnly = dcpPopupOnly || authPopupOnlyMode,
-                callAnswered = if (currentOutgoing) remoteConnected else (remoteConnected || isCallAlreadyAnswered())
+                callAnswered = isCallAnsweredForPopup()
             ) && !dismissing
             if (!show) {
                 removeDcpPopupWindow()
@@ -2740,7 +2882,7 @@ class CallOverlayService : Service() {
             val show = VlueAuthMemberPopupPolicy.shouldShow(
                 overlayState = companion.state,
                 popupOnlyTest = dcpPopupOnly || authPopupOnlyMode,
-                callAnswered = if (currentOutgoing) remoteConnected else (remoteConnected || isCallAlreadyAnswered())
+                callAnswered = isCallAnsweredForPopup()
             ) && !dismissing
             if (!show) {
                 /* ContextWatch 가 BIG_PUSH 로 접어도 이미 표시 중인 인증 팝업은 유지 */
@@ -2760,6 +2902,53 @@ class CallOverlayService : Service() {
             attachDcpPopupWindow(spec)
             return
         }
+        /*
+         * 미등록 번호(조회 완료·타임아웃) — 쇼케이스 없이 2줄 안심팝업 + 제보/신고 버튼.
+         * 경로 비정상·국가기관은 아래 기존 DCP 분기가 우선한다.
+         */
+        if (!isCurrentPathAbnormal(cardJson) &&
+            NationalAgencyWhitelist.match(currentPhone) == null &&
+            VlueAuthMemberPopupPolicy.isUnverifiedResolved(cardJson)
+        ) {
+            if (!authPopupOnlyMode &&
+                (authPopupConfirmedToMini ||
+                    userMinimized ||
+                    companion.state == OverlayState.MINI_CASE)
+            ) {
+                removeDcpPopupWindow()
+                return
+            }
+            /* 신고 패널로 펼친 뒤에는 팝업을 다시 붙이지 않는다 */
+            if (unregisteredReportRequested) {
+                removeDcpPopupWindow()
+                return
+            }
+            val show = ContactSafeCarePolicy.shouldShowUnregistered(
+                overlayState = companion.state,
+                popupOnly = dcpPopupOnly || authPopupOnlyMode,
+                callAnswered = isCallAnsweredForPopup()
+            ) && !dismissing
+            if (!show) {
+                if (dcpPopupView?.isAttachedToWindow == true) return
+                removeDcpPopupWindow()
+                return
+            }
+            val hadPopupBefore = dcpPopupView?.isAttachedToWindow == true
+            attachDcpPopupWindow(
+                DcpAbnormalWarningView.Spec(
+                    abnormal = false,
+                    agencyName = "",
+                    shortNumber = parseDcpPhone(cardJson).ifBlank { currentPhone },
+                    officialWebsite = "",
+                    fromMock = dcpPopupOnly,
+                    unregistered = true
+                )
+            )
+            /* dcpPopupView 는 addView 성공 뒤에만 세팅된다 — isAttachedToWindow 는 첫 트래버설 전 false */
+            unregisteredPopupShown =
+                dcpPopupView != null && (!hadPopupBefore || unregisteredPopupShown)
+            return
+        }
         val route = NationalAgencyWhitelist.routeForCall(currentPhone, dcpRoute, parseDcpRoute(cardJson))
         val pathVerify = parsePathVerify(cardJson) ||
             (route == "abnormal" && NationalAgencyWhitelist.match(currentPhone) == null)
@@ -2768,9 +2957,7 @@ class CallOverlayService : Service() {
             overlayState = companion.state,
             popupOnlyTest = dcpPopupOnly || authPopupOnlyMode,
             pathVerifyAbnormal = pathVerify,
-            callAnswered =
-                if (currentOutgoing) remoteConnected
-                else (remoteConnected || isCallAlreadyAnswered())
+            callAnswered = isCallAnsweredForPopup()
         ) && !dismissing
         if (!show) {
             removeDcpPopupWindow()
@@ -2849,6 +3036,9 @@ class CallOverlayService : Service() {
                 } else if (spec.contactSafeCare) {
                     /* 정상 팝업 확인 → MiniCase (인증회원과 동일 UX) */
                     enterMiniCaseAfterAuthPopupConfirm()
+                } else if (spec.unregistered && !spec.fromMock && !dcpPopupOnly) {
+                    /* 미등록 팝업 닫기(X) → 미니버블 복귀. 미니 탭 시 같은 팝업 재표시 */
+                    enterMiniCaseAfterAuthPopupConfirm()
                 } else if (spec.fromMock || dcpPopupOnly) {
                     authPopupOnlyMode = false
                     dcpPopupOnly = false
@@ -2868,6 +3058,16 @@ class CallOverlayService : Service() {
                         ownerPhone = LetteringPrefs.getMemberPhone(this)
                     )
                 }
+            } else {
+                null
+            },
+            onReport = if (spec.unregistered) {
+                { onUnregisteredReportRequested(openReportSheet = true) }
+            } else {
+                null
+            },
+            onTip = if (spec.unregistered) {
+                { onUnregisteredReportRequested(openReportSheet = false) }
             } else {
                 null
             }
@@ -2899,6 +3099,7 @@ class CallOverlayService : Service() {
     }
 
     private fun removeDcpPopupWindow() {
+        unregisteredPopupShown = false
         val view = dcpPopupView ?: return
         try {
             dcpPopupDestroyAds?.invoke()
@@ -3249,12 +3450,18 @@ class CallOverlayService : Service() {
     /** BigPush 최소 Y — 상태바+여백 (알림바 가림 방지) */
     private fun topBigPushOffsetY(): Int = statusBarHeightPx() + dp(8)
 
-    /** 삼성 미니 수신 팝업 바로 아래 (사진 3 "여기") */
+    /** 삼성 미니 수신 팝업 바로 아래 (사진 3 "원기") — 미니 팝업 전용 */
     private fun compactIncomingBelowY(): Int =
         statusBarHeightPx() +
             dp(CompactIncomingMetrics.CARD_HEIGHT_DP) +
             dp(CompactIncomingMetrics.GAP_DP)
 
+    /**
+     * BigPush 창 Y.
+     * - BELOW_COMPACT_INCOMING: 삼성 **미니** 수신 팝업 바로 아래 (의도된 중앙 배치)
+     * - 그 외(TOP, 전체 전화 UI 포함): 화면 상단 (Gravity.TOP|START, 상태바+8dp)
+     * 전체 전화 UI 오판(미니로 잘못 분류)은 [detectOverlayContext] 에서 잡는다.
+     */
     private fun compactBarY(pos: OverlayPosition, barH: Int, screenH: Int): Int =
         when (pos) {
             OverlayPosition.BOTTOM -> (screenH - barH - dp(8)).coerceAtLeast(0)
@@ -3324,6 +3531,8 @@ class CallOverlayService : Service() {
             return
         }
         authPopupOnlyMode = false
+        /* 신고 패널에서 닫으면(X) 미니로 — 이후 미니 탭은 미등록 안심팝업을 다시 띄운다 */
+        unregisteredReportRequested = false
         companion.onMinimize(
             if (keypadOpen) OverlayContext.KEYPAD else OverlayContext.MINIMIZED
         )
@@ -4238,6 +4447,8 @@ class CallOverlayService : Service() {
         companion.onCallEnd()
         remoteConnected = false
         outgoingExpandRequestedByUser = false
+        unregisteredPopupShown = false
+        unregisteredReportRequested = false
         lastLoadedOutgoing = null
         answerUiResumeAttempt = 0
         userMinimized = false
@@ -4450,6 +4661,7 @@ class CallOverlayService : Service() {
         val lastResumed = ForegroundPackageProbe.lastResumedPackage(this)
         val confirmedFullInCall =
             isDeviceKeyguardLocked() ||
+                ForegroundPackageProbe.fullInCallResumedSince(this, ringingSinceWallMs) ||
                 OverlayContextDetector.isLikelyFullInCallUiPackage(tasksPkg) ||
                 (OverlayContextDetector.isLikelyFullInCallUiPackage(lastResumed) &&
                     !OverlayContextDetector.isLikelyLauncherPackage(tasksPkg) &&
@@ -4879,9 +5091,35 @@ class CallOverlayService : Service() {
 
         fun isRunning(): Boolean = activeInstance != null
 
+        /**
+         * 서비스가 살아 있을 뿐 아니라 오버레이 창이 실제로 WindowManager 에 붙어 있는지.
+         * (서비스만 남고 창이 없는 stale 상태에서 RINGING 을 skip 해 BigPush 가 안 뜨는 것 방지)
+         */
+        fun isOverlayAttached(): Boolean {
+            val svc = activeInstance ?: return false
+            if (svc.dismissing) return false
+            return svc.rootContainer?.isAttachedToWindow == true
+        }
+
         fun isRemoteConnectedPublic(): Boolean = activeInstance?.remoteConnected == true
 
         fun isOutgoingPublic(): Boolean = activeInstance?.currentOutgoing == true
+
+        /**
+         * 기본 전화앱이 아니라 STATE_ACTIVE 를 받을 수 없을 때 — 발신 미니버블 **라벨만**
+         * 「연결중...」→「상호명/안심통화」로 갱신한다. remoteConnected 는 세우지 않는다.
+         */
+        fun notifyOutgoingLabelConnected() {
+            val svc = activeInstance ?: return
+            svc.mainHandler.post {
+                if (svc.dismissing || !svc.currentOutgoing) return@post
+                if (svc.companion.state != OverlayState.BIG_PUSH || svc.outgoingExpandRequestedByUser) {
+                    return@post
+                }
+                svc.notifyWebCallState("outgoing_logo")
+                svc.notifyWebCallState("outgoing_connected")
+            }
+        }
 
         /** 통화 종료 시 강제 제거 — IDLE 검사와 무관하게 창을 없앤다 */
         fun dismissNow(context: android.content.Context? = null) {

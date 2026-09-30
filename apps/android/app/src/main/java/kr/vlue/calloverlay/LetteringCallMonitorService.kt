@@ -45,7 +45,8 @@ class LetteringCallMonitorService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (callback == null) registerCallCallback()
+        /* 콜백이 없으면(권한 뒤늦게 허용·프로세스 재생성) 매 start 마다 재등록 */
+        if (callback == null && legacyListener == null) registerCallCallback()
         return START_STICKY
     }
 
@@ -53,6 +54,16 @@ class LetteringCallMonitorService : Service() {
         running = false
         unregisterCallCallback()
         super.onDestroy()
+    }
+
+    /**
+     * 최근 앱에서 스와이프 제거 시 일부 OEM 이 FGS 를 함께 죽인다 — 통화 감지가 끊기면
+     * 수신 BigPush 가 나오지 않으므로 즉시 재기동한다.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.w(TAG, "onTaskRemoved — re-arm monitor")
+        syncWithPrefs(this)
     }
 
     private fun registerCallCallback() {
@@ -128,10 +139,14 @@ class LetteringCallMonitorService : Service() {
                     "LetteringCallMonitorService received",
                     "state=RINGING prev=$lastState number=null(TelephonyCallback has no number)"
                 )
-                if (CallOverlayService.isRunning()) {
+                if (CallOverlayService.isOverlayAttached()) {
                     /* PHONE_STATE 가 070 등 실번호를 이미 넣었으면 unknown 으로 덮지 않음 */
-                    Log.i(TAG, "RINGING — overlay running, skip unknown onRinging")
+                    Log.i(TAG, "RINGING — overlay attached, skip unknown onRinging")
                 } else {
+                    /*
+                     * 서비스만 살아 있고 창이 없는 stale 상태(isRunning=true)도 여기로 온다.
+                     * 반드시 BigPush 를 다시 기동한다 — 수신 100% 송출 보장.
+                     */
                     LetteringCallCoordinator.onRinging(this, null, outgoing = false)
                 }
             }

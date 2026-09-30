@@ -221,6 +221,33 @@ object ForegroundPackageProbe {
         }
     }
 
+    /**
+     * [sinceWallMs] 이후 **전체 InCallActivity** 가 ACTIVITY_RESUMED 되었는가.
+     * 미니 수신 팝업(HUN)은 InCallActivity 를 띄우지 않으므로, 이 신호가 있으면 풀 전화 UI 확정이다.
+     * (VLUÉ 전면/전화앱 task 잔존 때문에 미니로 오판해 빅푸시가 화면 중앙에 남는 것을 막는다.)
+     * 사용정보 접근 권한이 없으면 false (기존 분류 유지).
+     */
+    fun fullInCallResumedSince(context: Context, sinceWallMs: Long): Boolean {
+        if (sinceWallMs <= 0L) return false
+        return try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return false
+            val end = System.currentTimeMillis()
+            val events = usm.queryEvents(sinceWallMs, end) ?: return false
+            val ev = UsageEvents.Event()
+            while (events.hasNextEvent()) {
+                events.getNextEvent(ev)
+                if (ev.eventType != UsageEvents.Event.ACTIVITY_RESUMED &&
+                    ev.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND
+                ) continue
+                if (OverlayContextDetector.isLikelyFullInCallUiPackage(ev.packageName)) return true
+            }
+            false
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     fun processImportanceHints(context: Context): ProcessImportanceHints {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
             return ProcessImportanceHints(null, emptyList())

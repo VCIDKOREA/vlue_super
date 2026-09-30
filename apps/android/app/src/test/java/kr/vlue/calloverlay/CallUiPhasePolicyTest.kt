@@ -260,9 +260,9 @@ class CallUiPhasePolicyTest {
     }
 
     @Test
-    fun afterAnswer_unverifiedResolved_isFullShowcase() {
+    fun afterAnswer_unverifiedResolved_isUnregisteredSafePopup_notFullscreen() {
         assertEquals(
-            CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+            CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
             CallUiPhasePolicy.decideAfterAnswer(
                 CallUiPhasePolicy.AnswerInput(
                     alreadyMiniOrAuthConfirmed = false,
@@ -274,6 +274,77 @@ class CallUiPhasePolicyTest {
                 )
             )
         )
+    }
+
+    @Test
+    fun afterAnswer_unverifiedResolved_reportButton_opensReportPanel() {
+        assertEquals(
+            CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = false,
+                    hasBroadcastShowcaseContent = false,
+                    canPromoteContactSafeCare = false,
+                    isUnverifiedResolved = true,
+                    reportRequested = true
+                )
+            )
+        )
+    }
+
+    @Test
+    fun afterAnswer_pathAbnormal_beatsReportRequest() {
+        assertEquals(
+            CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = false,
+                    hasBroadcastShowcaseContent = false,
+                    canPromoteContactSafeCare = false,
+                    isUnverifiedResolved = true,
+                    isPathAbnormal = true,
+                    reportRequested = true
+                )
+            )
+        )
+    }
+
+    @Test
+    fun outgoing_userTap_advancesEvenWhileDialing() {
+        assertTrue(
+            CallUiPhasePolicy.mayAdvancePastBigPush(
+                outgoing = true,
+                remoteConnected = false,
+                dialingOrConnecting = true,
+                hasActiveConnectedCall = false,
+                userTapRequested = true
+            )
+        )
+    }
+
+    @Test
+    fun outgoing_withoutTap_stillBlockedWhileDialing() {
+        assertFalse(
+            CallUiPhasePolicy.mayAdvancePastBigPush(
+                outgoing = true,
+                remoteConnected = false,
+                dialingOrConnecting = true,
+                hasActiveConnectedCall = false,
+                userTapRequested = false
+            )
+        )
+    }
+
+    @Test
+    fun outgoingBubbleLabel_nameOrTapHint_neverConnecting() {
+        assertEquals("홍길동상사", CallUiPhasePolicy.outgoingBubbleLabel(" 홍길동상사 "))
+        assertEquals("탭하여 정보확인", CallUiPhasePolicy.outgoingBubbleLabel(null))
+        assertEquals("탭하여 정보확인", CallUiPhasePolicy.outgoingBubbleLabel("   "))
+        assertEquals("탭하여 정보확인", CallUiPhasePolicy.OUTGOING_TAP_INFO_LABEL)
     }
 
     @Test
