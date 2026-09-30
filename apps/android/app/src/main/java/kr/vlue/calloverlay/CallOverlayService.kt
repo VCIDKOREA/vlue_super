@@ -85,6 +85,10 @@ class CallOverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var rootContainer: FrameLayout? = null
     private var nativeBanner: LinearLayout? = null
+    /** 오버레이 웹 문서 로드 실패(404/5xx/네트워크) 시 네이티브 폴백 뷰 (BigPush 바 / 발신 로고) */
+    private var overlayFallbackView: android.view.View? = null
+    private var overlayLoadFailed: Boolean = false
+    private var overlayLoadFailCount: Int = 0
     private var webView: WebView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var dismissing = false
@@ -779,10 +783,40 @@ class CallOverlayService : Service() {
         }
         wv.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                /* 새 문서 로드 시작 — 실패 플래그 리셋 (실패면 곧 onReceived*Error 가 다시 세운다) */
+                overlayLoadFailed = false
                 injectLetteringFlag(view)
             }
 
+            /* 서버(Railway) 404/5xx — "Not Found" 본문이 투명 오버레이에 그려져 아무것도 안 보이던 문제 */
+            override fun onReceivedHttpError(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?,
+                errorResponse: android.webkit.WebResourceResponse?
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                val code = errorResponse?.statusCode ?: 0
+                if (request?.isForMainFrame == true && code >= 400) {
+                    onOverlayWebLoadFailed("http_$code")
+                }
+            }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?,
+                error: android.webkit.WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame == true) {
+                    onOverlayWebLoadFailed("err_${error?.errorCode ?: 0}")
+                }
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
+                if (!overlayLoadFailed) {
+                    overlayLoadFailCount = 0
+                    hideOverlayNativeFallback()
+                }
                 CompanionPerfTracker.noteWebViewReady()
                 injectLetteringFlag(view)
                 if (dismissing || companion.state == OverlayState.IDLE ||
@@ -1500,6 +1534,13 @@ class CallOverlayService : Service() {
      * Window 추가 금지.
      */
     private fun syncOverlayChromeForState(source: String) {
+        /* 네이티브 로드-실패 폴백은 링잉/발신 BigPush 단계에서만 */
+        if (companion.state != OverlayState.BIG_PUSH ||
+            authPopupOnlyMode ||
+            dcpPopupView?.isAttachedToWindow == true
+        ) {
+            hideOverlayNativeFallback()
+        }
         when (companion.state) {
             OverlayState.BIG_PUSH -> {
                 /*
@@ -3325,6 +3366,177 @@ class CallOverlayService : Service() {
     /**
      * 번호가 바뀌면 `_n` 로 문서를 새로 연다. 해시만 바꾸면 이전 incoming(070)이 CEO 카드와 섞인다.
      */
+    /**
+     * 오버레이 웹 문서 로드 실패 — 폴백을 즉시 띄우고 백오프로 재시도한다.
+     * (www.vlue.kr 이 배포/재시작 중 Railway 404 "Application not found" 를 돌려주면
+     *  투명 WebView 에 404 본문만 남아 BigPush·발신 탭로고가 안 보였다.)
+     */
+    private fun onOverlayWebLoadFailed(reason: String) {
+        if (dismissing) return
+        overlayLoadFailed = true
+        VlueBigPushTrace.lifecycle(
+            "OVERLAY_WEB_LOAD_FAILED",
+            "reason=$reason retry=$overlayLoadFailCount outgoing=$currentOutgoing state=${companion.state.name}"
+        )
+        showOverlayNativeFallback()
+        if (overlayLoadFailCount >= OVERLAY_WEB_RETRY_MAX) return
+        val delayMs = (700L * (overlayLoadFailCount + 1)).coerceAtMost(3_000L)
+        overlayLoadFailCount++
+        mainHandler.postDelayed({
+            if (dismissing || !overlayLoadFailed) return@postDelayed
+            webView?.reload()
+        }, delayMs)
+    }
+
+    private fun hideOverlayNativeFallback() {
+        val v = overlayFallbackView ?: return
+        overlayFallbackView = null
+        try {
+            (v.parent as? android.view.ViewGroup)?.removeView(v)
+        } catch (_: Exception) {
+        }
+    }
+
+    /** 발신 로고 라벨 — 웹 resolveOutgoingLogoLabel 과 동일 규칙 (카드 JSON 기준) */
+    private fun outgoingFallbackLabel(): String {
+        val json = pendingCardJson
+        if (json.isNullOrBlank()) return CallUiPhasePolicy.outgoingBubbleLabel(null)
+        return try {
+            val o = org.json.JSONObject(json)
+            val kind = o.optString("profileKind")
+            fun clean(s: String?): String {
+                val t = s?.trim().orEmpty()
+                if (t.isEmpty() || t == "null") return ""
+                return if (t.all { it.isDigit() || it in " -()+." }) "" else t
+            }
+            val name =
+                if (kind == "contact_safe_care") {
+                    clean(o.optString("contactName")).ifBlank { clean(o.optString("displayName")) }
+                } else if (kind == "lookup_pending" || kind == "unverified" ||
+                    (o.has("matched") && !o.optBoolean("matched", true))
+                ) {
+                    ""
+                } else {
+                    clean(o.optString("organization"))
+                        .ifBlank { clean(o.optString("companyName")) }
+                        .ifBlank { clean(o.optString("displayName")) }
+                        .ifBlank { clean(o.optString("name")) }
+                }
+            CallUiPhasePolicy.outgoingBubbleLabel(name.ifBlank { null })
+        } catch (_: Exception) {
+            CallUiPhasePolicy.outgoingBubbleLabel(null)
+        }
+    }
+
+    private fun showOverlayNativeFallback() {
+        if (overlayFallbackView != null) return
+        val root = rootContainer ?: return
+        if (companion.state != OverlayState.BIG_PUSH) return
+        val view: android.view.View
+        val lp: FrameLayout.LayoutParams
+        if (currentOutgoing) {
+            if (outgoingExpandRequestedByUser) return
+            /* 발신 탭로고 — 원형 VLUÉ 마크 + 위쪽 라벨 (웹 OutgoingCallLogo 와 같은 구성) */
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setOnClickListener { onOutgoingLogoTapFromWeb() }
+            }
+            col.addView(
+                TextView(this).apply {
+                    text = outgoingFallbackLabel()
+                    setTextColor(Color.WHITE)
+                    textSize = 12f
+                    typeface = Typeface.DEFAULT_BOLD
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    gravity = Gravity.CENTER
+                    setPadding(dp(10), dp(4), dp(10), dp(4))
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(Color.parseColor("#CC0B101B"))
+                    }
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(8) }
+            )
+            col.addView(
+                TextView(this).apply {
+                    text = "VLUÉ"
+                    setTextColor(Color.WHITE)
+                    textSize = 15f
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(Color.parseColor("#1D4ED8"))
+                        setStroke(dp(2), Color.parseColor("#66FFFFFF"))
+                    }
+                },
+                LinearLayout.LayoutParams(dp(64), dp(64))
+            )
+            view = col
+            lp = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            )
+        } else {
+            /* 수신 BigPush — 네이티브 바 (이름/번호). 웹이 살아나면 자동 제거 */
+            val model = BigPushShowcaseBar.parseModel(currentPhone, pendingVerified, pendingCardJson)
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), dp(10), dp(14), dp(12))
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = dp(18).toFloat()
+                    setColor(Color.parseColor("#E60B101B"))
+                    setStroke(dp(1), Color.parseColor("#5522D3EE"))
+                }
+            }
+            col.addView(
+                TextView(this).apply {
+                    text = model.brandLabel
+                    setTextColor(Color.parseColor("#22D3EE"))
+                    textSize = 11f
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+            )
+            col.addView(
+                TextView(this).apply {
+                    text = model.primaryLine
+                    setTextColor(Color.WHITE)
+                    textSize = 17f
+                    typeface = Typeface.DEFAULT_BOLD
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+            )
+            col.addView(
+                TextView(this).apply {
+                    text = model.secondaryLine
+                    setTextColor(Color.parseColor("#CBD5E1"))
+                    textSize = 13f
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+            )
+            view = col
+            lp = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP
+            ).apply {
+                marginStart = dp(10)
+                marginEnd = dp(10)
+            }
+        }
+        overlayFallbackView = view
+        root.addView(view, lp)
+        view.bringToFront()
+    }
+
     private fun loadOverlayDocument(
         wv: WebView,
         phone: String,
@@ -5090,6 +5302,9 @@ class CallOverlayService : Service() {
         private var activeInstance: CallOverlayService? = null
 
         fun isRunning(): Boolean = activeInstance != null
+
+        /** 오버레이 웹 문서 로드 실패 시 백오프 재시도 최대 횟수 */
+        private const val OVERLAY_WEB_RETRY_MAX = 8
 
         /**
          * 서비스가 살아 있을 뿐 아니라 오버레이 창이 실제로 WindowManager 에 붙어 있는지.

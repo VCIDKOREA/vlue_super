@@ -300,7 +300,11 @@ object LetteringCallCoordinator {
     }
 
     /** 수신 BigPush 보장 재시도 간격 (ms) — 링잉 첫 수 초 안에 창이 없으면 다시 기동 */
-    private val INCOMING_GUARANTEE_DELAYS_MS = longArrayOf(450L, 1_100L, 2_200L)
+    /*
+     * 서비스 기동(onCreate→showOverlay→addView)만 실기기에서 ~1.1s 걸린다.
+     * 450ms 에 검사하면 정상 기동 중인 창을 「미부착」으로 오판해 서비스를 중복 재기동(WebView 재생성·깜빡임)한다.
+     */
+    private val INCOMING_GUARANTEE_DELAYS_MS = longArrayOf(1_800L, 1_500L, 2_500L)
 
     /**
      * 수신 BigPush 100% 송출 보장 워치독.
