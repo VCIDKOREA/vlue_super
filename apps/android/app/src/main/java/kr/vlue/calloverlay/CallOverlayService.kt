@@ -278,6 +278,7 @@ class CallOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        OverlayAssetServer.init(this)
         CompanionRuntimeStabilityDiag.mark("SERVICE_ON_CREATE", "CallOverlayService.onCreate")
         CompanionRecoveryTracker.recordServiceLifecycle("ON_CREATE")
         VlueBigPushTrace.bind(this)
@@ -782,6 +783,14 @@ class CallOverlayService : Service() {
             }
         }
         wv.webViewClient = object : WebViewClient() {
+            /* 오버레이 번들(/vlue-overlay/ 하위) 은 APK assets 에서 즉시 — 서버 404/오프라인 무관 */
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?
+            ): android.webkit.WebResourceResponse? =
+                OverlayAssetServer.intercept(this@CallOverlayService, request)
+                    ?: super.shouldInterceptRequest(view, request)
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 /* 새 문서 로드 시작 — 실패 플래그 리셋 (실패면 곧 onReceived*Error 가 다시 세운다) */
                 overlayLoadFailed = false

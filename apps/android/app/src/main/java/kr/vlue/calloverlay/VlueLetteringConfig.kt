@@ -48,8 +48,10 @@ object VlueLetteringConfig {
         val nav = if (navigationNonce > 0L) "&_n=$navigationNonce" else ""
         val mini =
             if (miniCase) "&mini=1&phase=connected" else ""
-        return appUrl(
+        val hash =
             "lettering-overlay?incoming=$enc&platform=android&direction=$dir&verified=$ver&native=1&forceLettering=1&_ov=$bust$dcp$nav$mini"
-        )
+        /* APK 내장 번들 우선 — 서버 404/오프라인이어도 UI 즉시 렌더 (없을 때만 원격 /app) */
+        if (OverlayAssetServer.useBundle()) return OverlayAssetServer.bundledUrl(hash)
+        return appUrl(hash)
     }
 }

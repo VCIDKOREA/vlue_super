@@ -124,6 +124,16 @@ A lower tier may bind first (first paint) but never overwrites a higher tier; a 
 
 Do not add parallel “open showcase” / “open popup” helpers that skip this table.
 
+### 5a. Overlay bundle (server-independent)
+
+- The overlay WebView does **not** depend on `https://www.vlue.kr/app`. `VlueLetteringConfig.overlayUrl` points to
+  `https://<web>/vlue-overlay/overlay.html#lettering-overlay?...`; `OverlayAssetServer` (WebViewClient
+  `shouldInterceptRequest`) serves it from `assets/vlue-overlay/` — origin is kept so localStorage / API CORS match the main app.
+- Server outage (404/5xx/offline) cannot blank the overlay; the server only supplies async JSON (lookup / showcase data).
+- If `assets/vlue-overlay/overlay.html` is missing from the APK, the URL falls back to remote `/app` (legacy path).
+- **After ANY change under `web/src` that affects the overlay** (`LetteringOverlayHost`, `OutgoingCallLogo`, styles, lib/*):
+  run `npm run build:overlay --workspace @vlue/web` and commit `apps/android/app/src/main/assets/vlue-overlay/`, then rebuild the APK.
+
 ---
 
 ## 6. Regression checklist (manual)
