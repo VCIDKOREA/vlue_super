@@ -35,7 +35,7 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: cors });
 }
 
-function clipSummary(text: string, max = 220) {
+function clipSummary(text: string, max = 400) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
   return [...clean].slice(0, max).join("");
 }
@@ -165,6 +165,59 @@ async function followRedirect(start: string): Promise<FollowResult> {
   }
 }
 
+function optOutDigits(text: string): string | null {
+  const labeled = text.match(/(?:무료\s*)?수신\s*거부\s*[:：]?\s*(0\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4})/);
+  const raw = labeled?.[1] || text.match(/\b080[-\s]?\d{3,4}[-\s]?\d{4}\b/)?.[0] || "";
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 8 ? digits : null;
+}
+
+function formatKrPhone(digits: string) {
+  if (digits.startsWith("080") && digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.startsWith("080") && digits.length === 11) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return digits;
+}
+
+function linkFact(urls: string[], tracked: string[], finalUrl: string | null) {
+  const shown = urls[0] || "";
+  const shortHost = shown ? hostOf(shown) : "";
+  const missed = tracked.some((row) => row.includes("접속 불가"));
+  if (missed && shown) {
+    return `링크 ${shown} 는 응답이 없어 도착 주소를 확인하지 못했습니다.`;
+  }
+  if (finalUrl) {
+    const finalHost = hostOf(finalUrl);
+    if (shown && finalUrl.replace(/\/$/, "") !== shown.replace(/\/$/, "") && finalHost && finalHost !== shortHost) {
+      return `링크 ${shortHost || shown} 는 ${finalHost} 로 이어집니다.`;
+    }
+    return `링크 주소는 ${finalHost || finalUrl} 입니다.`;
+  }
+  return "";
+}
+
+function optOutFact(digits: string | null) {
+  if (!digits) return "";
+  const phone = formatKrPhone(digits);
+  if (digits.startsWith("080")) {
+    return `수신거부 ${phone} 는 광고 수신거부 번호라 상담·결제 전화가 아닙니다.`;
+  }
+  return `수신거부 ${phone} 는 본문에 적힌 거부 번호입니다. 금전 안내는 그 번호로 하지 마세요.`;
+}
+
+function briefSummary(verdict: string, messageText: string, urls: string[], tracked: string[], finalUrl: string | null) {
+  const lines = [verdict, linkFact(urls, tracked, finalUrl), optOutFact(optOutDigits(messageText))]
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  return lines.join("\n");
+}
+
 function fallback(status: AnalysisStatus, summary: string, unshortenedUrl: string | null): SmsAnalysis {
   return {
     status,
@@ -226,7 +279,7 @@ function parseModelJson(raw: string, unshortenedUrl: string | null): SmsAnalysis
       status,
       dangerScore: score,
       unshortenedUrl: safeUrl,
-      summary: clipSummary(parsed.summary || "분석 요약을 만들지 못했습니다", status === "SAFE" ? 80 : 220),
+      summary: clipSummary(parsed.summary || "분석 요약을 만들지 못했습니다", 400),
       actionGuide: String(parsed.actionGuide || "").trim().slice(0, 180) ||
         (status === "SAFE" ? "일반 안내로 보입니다." : "링크를 열지 마세요.")
     };
@@ -288,7 +341,7 @@ serve(async (req) => {
       "② 해외 도박/스팸: WEGO88, 카지노, 대박캐시백, 리베이트처럼 불법 도박 유도 문구나 그런 주소가 있으면 status=DANGER. summary는 🚨 [스미싱 차단] 해외 불법 도박 사이트 유도 링크(주소)가 포함되어 있습니다. 형태.",
       "③ 정상 인증/안내: 카카오, 통신사, 은행의 인증번호이거나 공식 주소만 있으면 status=SAFE. summary는 🟢 [안전]으로 시작. 링크가 없는 본문만으로 DANGER를 내리지 말 것.",
       "URL 추적 결과가 'URL 접속 불가/응답 없음'이어도 분석을 포기하지 말고 본문으로 판정하라.",
-      "status는 SAFE, SUSPICIOUS, DANGER. dangerScore는 0부터 100. summary와 actionGuide는 한글만.",
+      "summary는 한글 2~3줄만. 1줄은 판정과 주의(금전·개인정보에는 응하지 말고 직접 확인). 2줄은 링크가 어디로 이어지는지, 응답이 없으면 그 사실을. 3줄은 수신거부 번호가 있으면 광고 수신거부 번호인지. status는 SAFE, SUSPICIOUS, DANGER. dangerScore는 0부터 100.",
       `발신번호: ${sender || "알 수 없음"}`,
       `원본 문자: ${messageText}`,
       `추적된 URL: ${tracked.length ? tracked.join(" | ") : "없음"}`,
@@ -298,7 +351,7 @@ serve(async (req) => {
     let parsed: SmsAnalysis | null = null;
     try {
       const gemini = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -324,6 +377,18 @@ serve(async (req) => {
 
     if (!parsed) {
       if (local) return json(local);
+      const ordinary = fallback(
+        "SAFE",
+        briefSummary(
+          "🟢 [안전] 광고·안내 문자입니다. 금전 요구나 개인정보에는 응하지 마시고, 필요하면 업체를 직접 확인하세요.",
+          messageText,
+          urls,
+          tracked,
+          unshortenedUrl
+        ),
+        unshortenedUrl
+      );
+      if (!gamblingHint(messageText) && !impersonationHint(messageText)) return json(ordinary);
       return json({ ok: false, retry: true, error: "분석을 완료하지 못했습니다. 다시 시도해 주세요." }, 200);
     }
 
@@ -338,6 +403,11 @@ serve(async (req) => {
       parsed.summary = local.summary;
     }
     if (!parsed.unshortenedUrl) parsed.unshortenedUrl = unshortenedUrl;
+    const facts = [linkFact(urls, tracked, parsed.unshortenedUrl), optOutFact(optOutDigits(messageText))]
+      .filter((line) => line && !parsed.summary.includes(line.slice(0, 12)));
+    if (facts.length) {
+      parsed.summary = clipSummary(`${parsed.summary}\n${facts.join("\n")}`, 400);
+    }
     return json(parsed);
   } catch {
     return json({ ok: false, retry: true, error: "분석을 완료하지 못했습니다. 다시 시도해 주세요." }, 200);

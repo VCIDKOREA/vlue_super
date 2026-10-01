@@ -41,6 +41,7 @@ object DeviceSmsReader {
         if (threads.isEmpty()) {
             readSmsScanThreads(context, names, readMarks, threads)
         }
+        fillSnippetsFromSmsBodies(context, threads)
         val arr = JSONArray()
         threads.values.forEach { arr.put(it) }
         return JSONObject().put("ok", true).put("permission", true).put("threads", arr).toString()
@@ -154,7 +155,7 @@ object DeviceSmsReader {
                     .put("threadId", threadId)
                     .put("address", address)
                     .put("name", names[phoneKey(address)].orEmpty())
-                    .put("snippet", if (snippetCol >= 0) it.getString(snippetCol).orEmpty() else "")
+                    .put("snippet", repairSmsText(snippetText(it, snippetCol)))
                     .put("dateMs", dateMs)
                     .put("unread", unread)
             }
@@ -251,7 +252,7 @@ object DeviceSmsReader {
                     JSONObject()
                         .put("id", if (idCol >= 0) "s${cursor.getLong(idCol)}" else "s$count")
                         .put("address", rowAddress)
-                        .put("body", if (bodyCol >= 0) cursor.getString(bodyCol).orEmpty() else "")
+                        .put("body", repairSmsText(if (bodyCol >= 0) cursor.getString(bodyCol).orEmpty() else ""))
                         .put("dateMs", if (dateCol >= 0) cursor.getLong(dateCol) else 0L)
                         .put("incoming", type != Telephony.Sms.MESSAGE_TYPE_SENT)
                 )
@@ -355,6 +356,57 @@ object DeviceSmsReader {
             if (index >= 0) return index
         }
         return -1
+    }
+
+    /** 대화방 snippet 컬럼은 UTF-8이 Latin-1로 읽혀 목록만 깨진다. 최신 SMS 본문으로 다시 채운다. */
+    private fun fillSnippetsFromSmsBodies(context: Context, threads: LinkedHashMap<String, JSONObject>) {
+        if (threads.isEmpty()) return
+        val pending = threads.keys.filter { it.startsWith("t:") }.toMutableSet()
+        if (pending.isEmpty()) return
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(Telephony.Sms.THREAD_ID, Telephony.Sms.BODY),
+            null,
+            null,
+            "${Telephony.Sms.DATE} DESC"
+        )?.use { cursor ->
+            val threadCol = cursor.getColumnIndex(Telephony.Sms.THREAD_ID)
+            val bodyCol = cursor.getColumnIndex(Telephony.Sms.BODY)
+            var scanned = 0
+            while (cursor.moveToNext() && pending.isNotEmpty() && scanned < FALLBACK_SCAN_LIMIT) {
+                scanned += 1
+                val threadId = if (threadCol >= 0) cursor.getLong(threadCol) else continue
+                val key = "t:$threadId"
+                if (key !in pending) continue
+                val body = repairSmsText(if (bodyCol >= 0) cursor.getString(bodyCol).orEmpty() else "")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                if (body.isEmpty()) continue
+                threads[key]?.put("snippet", body.take(140))
+                pending.remove(key)
+            }
+        }
+    }
+
+    private fun snippetText(cursor: android.database.Cursor, snippetCol: Int): String {
+        if (snippetCol < 0) return ""
+        return try {
+            val blob = cursor.getBlob(snippetCol)
+            if (blob != null && blob.isNotEmpty()) String(blob, Charsets.UTF_8) else cursor.getString(snippetCol).orEmpty()
+        } catch (_: Exception) {
+            cursor.getString(snippetCol).orEmpty()
+        }
+    }
+
+    private fun repairSmsText(raw: String): String {
+        if (raw.isBlank() || raw.any { it in '\uAC00'..'\uD7A3' }) return raw
+        if (raw.none { it.code in 0x80..0xFF }) return raw
+        return try {
+            val fixed = String(raw.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+            if (fixed.contains('\uFFFD') || fixed == raw) raw else fixed
+        } catch (_: Exception) {
+            raw
+        }
     }
 
     private fun normalizeEpoch(raw: Long): Long {

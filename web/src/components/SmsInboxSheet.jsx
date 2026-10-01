@@ -255,7 +255,7 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
                 ) : null}
                 {result ? (
                   <div className={`relative z-[1] mt-2 rounded-xl px-2.5 py-2 text-[12px] leading-relaxed ${blocked ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>
-                    <p className="font-bold">{result.summary || (blocked ? "🚨 [스미싱 차단] 위험한 링크가 포함되어 있어 터치를 차단했습니다." : "🟢 안전 / 정상 메시지")}</p>
+                    <p className="whitespace-pre-line font-bold">{result.summary || (blocked ? "🚨 [스미싱 차단] 위험한 링크가 포함되어 있어 터치를 차단했습니다." : "🟢 안전 / 정상 메시지")}</p>
                     {blocked && result.unshortenedUrl ? <p className="mt-1 break-all">최종 URL: {result.unshortenedUrl}</p> : null}
                   </div>
                 ) : null}
