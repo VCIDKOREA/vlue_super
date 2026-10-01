@@ -11,6 +11,9 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
 import { ShowcaseBgmProvider } from "./context/ShowcaseBgmContext.jsx";
+/* Tailwind base/utilities — 메인 앱은 마케팅 셸(site/bolt)이 이 CSS 를 끌어온다.
+ * 빠지면 .flex-col/.min-h-0/.px-3 등 유틸이 사라져 BigPush 바가 커진다. styles.css 보다 먼저. */
+import "./site/bolt/index.css";
 import "./styles.css";
 import "./styles/vlue-wide-shell.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";

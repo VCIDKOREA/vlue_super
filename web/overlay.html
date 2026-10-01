@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>VLUE Overlay</title>
+    <!-- 폰트는 비차단(swap) — 오프라인이면 시스템 폰트, UI 렌더는 폰트와 무관 -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      crossorigin
+      media="print"
+      onload="this.media='all'"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+    />
     <style>
       /* 번들 로드 전 첫 프레임부터 투명 — 흰 깜빡임 금지 */
       html,
