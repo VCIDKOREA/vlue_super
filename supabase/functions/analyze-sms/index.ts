@@ -16,6 +16,11 @@ type Body = {
   address?: string;
 };
 
+type FollowResult = {
+  finalUrl: string | null;
+  note: string;
+};
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -23,12 +28,14 @@ const cors = {
 };
 
 const URL_RE = /https?:\/\/[^\s<>"'`]+/gi;
+const URL_FOLLOW_MS = 2500;
+const FILE_EXT = new Set(["jpg", "jpeg", "png", "gif", "webp", "pdf", "txt", "zip", "mp4", "doc", "docx", "html", "htm"]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: cors });
 }
 
-function clipSummary(text: string, max = 180) {
+function clipSummary(text: string, max = 220) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
   return [...clean].slice(0, max).join("");
 }
@@ -71,15 +78,23 @@ function isPrivateAddress(host: string) {
   return false;
 }
 
-const DOMAIN_RE = /\b((?:[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?\.)+(?:com|net|kr|io|me|co|xyz|info|biz|org|cc|tv|app|link|ly|gl))\b/gi;
+const DOMAIN_RE = /\b((?:[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?\.)+[a-z]{2,24})\b/gi;
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
 
 function extractBareDomains(text: string, urls: string[]) {
-  const hosts = new Set(urls.map((url) => {
-    try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
-  }));
+  const hosts = new Set(urls.map(hostOf).filter(Boolean));
   const out: string[] = [];
   for (const match of text.match(DOMAIN_RE) || []) {
     const host = match.toLowerCase();
+    const tld = host.split(".").pop() || "";
+    if (FILE_EXT.has(tld)) continue;
     if (hosts.has(host) || hosts.has(host.replace(/^www\./, ""))) continue;
     if (!out.includes(host)) out.push(host);
     if (out.length >= 3) break;
@@ -87,12 +102,29 @@ function extractBareDomains(text: string, urls: string[]) {
   return out;
 }
 
+function isOfficialHost(host: string) {
+  const h = host.toLowerCase().replace(/^www\./, "");
+  return h.endsWith(".go.kr") ||
+    h.endsWith(".or.kr") ||
+    h.endsWith(".korea.kr") ||
+    h === "go.kr" ||
+    h === "epost.kr" ||
+    h.endsWith(".epost.kr") ||
+    h.endsWith(".gov") ||
+    h.endsWith(".bank") ||
+    h.endsWith(".kftc.or.kr");
+}
+
 function isAuthMessage(text: string) {
   return /인증번호|인증코드|본인확인|verification code|일회용/i.test(text) && /\d{4,8}/.test(text);
 }
 
+function impersonationHint(text: string) {
+  return /우체국|경찰청|경찰|국민건강|건강보험|택배|배송조회|청첩장|과태료|법원|국세청|검찰|관세청|모바일\s*청첩/i.test(text);
+}
+
 function gamblingHint(text: string) {
-  return /도박|카지노|슬롯|바카라|리베이트|토토|배팅|환전/i.test(text);
+  return /도박|카지노|슬롯|바카라|리베이트|토토|배팅|환전|대박캐시백|wego\s*88|wego88/i.test(text);
 }
 
 function extractUrls(text: string) {
@@ -107,45 +139,73 @@ function extractUrls(text: string) {
   return out;
 }
 
-/** 단축 URL의 최종 목적지. HEAD 실패 시에만 GET으로 다시 따라가고, 본문은 받지 않는다. */
-async function followRedirect(start: string): Promise<string | null> {
-  if (!parsePublicHttpUrl(start)) return null;
-  const finalFrom = async (method: "HEAD" | "GET") => {
-    const res = await fetch(start, {
-      method,
-      redirect: "follow",
-      signal: AbortSignal.timeout(8000)
-    });
-    if (method === "GET") {
-      await res.body?.cancel().catch(() => undefined);
-    }
-    const finalUrl = res.url || start;
-    return parsePublicHttpUrl(finalUrl) ? finalUrl : null;
-  };
-  try {
-    const head = await finalFrom("HEAD");
-    if (head) return head;
-  } catch {
-    /* HEAD 미지원 단축 URL */
+/** 단축 URL 최종 주소. 실패·타임아웃이어도 예외를 던지지 않는다. */
+async function followRedirect(start: string): Promise<FollowResult> {
+  if (!parsePublicHttpUrl(start)) {
+    return { finalUrl: null, note: "URL 접속 불가/응답 없음" };
   }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), URL_FOLLOW_MS);
   try {
-    return await finalFrom("GET");
+    const res = await fetch(start, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal
+    });
+    await res.body?.cancel().catch(() => undefined);
+    const finalUrl = res.url || start;
+    if (!parsePublicHttpUrl(finalUrl)) {
+      return { finalUrl: null, note: "URL 접속 불가/응답 없음" };
+    }
+    return { finalUrl, note: "" };
   } catch {
-    return null;
+    return { finalUrl: null, note: "URL 접속 불가/응답 없음" };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 function fallback(status: AnalysisStatus, summary: string, unshortenedUrl: string | null): SmsAnalysis {
   return {
     status,
-    dangerScore: status === "DANGER" ? 90 : status === "SUSPICIOUS" ? 55 : 5,
+    dangerScore: status === "DANGER" ? 92 : status === "SUSPICIOUS" ? 55 : 5,
     unshortenedUrl,
     summary: clipSummary(summary),
     actionGuide:
       status === "SAFE"
-        ? "링크는 열어 보셔도 됩니다. 결제를 유도하면 중단하세요."
-        : "링크를 누르지 마세요. 모르는 번호의 설치·송금·개인정보 요구는 거절하세요."
+        ? "일반 안내로 보입니다. 결제를 요구하면 중단하세요."
+        : "링크를 누르지 마세요. 기관 안내는 공식 주소에서만 확인하세요."
   };
+}
+
+function localVerdict(text: string, hosts: string[]): SmsAnalysis | null {
+  const suspiciousHost = hosts.find((host) => host && !isOfficialHost(host)) || "";
+  const officialOnly = hosts.length > 0 && hosts.every(isOfficialHost);
+  if (isAuthMessage(text) && !suspiciousHost) {
+    return fallback("SAFE", "🟢 [안전] 정상 인증 메시지입니다.", null);
+  }
+  if (!suspiciousHost && hosts.length === 0) {
+    return fallback(
+      "SAFE",
+      isAuthMessage(text) ? "🟢 [안전] 정상 인증 메시지입니다." : "🟢 [안전] 링크가 없는 일반 문자입니다.",
+      null
+    );
+  }
+  if (impersonationHint(text) && suspiciousHost && !officialOnly) {
+    return fallback(
+      "DANGER",
+      `🚨 [기관 사칭 스미싱] 우체국·택배·공공기관 안내를 사칭한 주소(${suspiciousHost})입니다. 공식 기관 도메인과 달라 터치를 차단했습니다.`,
+      `https://${suspiciousHost}`
+    );
+  }
+  if (gamblingHint(text) && suspiciousHost) {
+    return fallback(
+      "DANGER",
+      `🚨 [스미싱 차단] 해외 불법 도박 사이트 유도 링크(${suspiciousHost})가 포함되어 있습니다.`,
+      `https://${suspiciousHost}`
+    );
+  }
+  return null;
 }
 
 function parseModelJson(raw: string, unshortenedUrl: string | null): SmsAnalysis | null {
@@ -166,7 +226,7 @@ function parseModelJson(raw: string, unshortenedUrl: string | null): SmsAnalysis
       status,
       dangerScore: score,
       unshortenedUrl: safeUrl,
-      summary: clipSummary(parsed.summary || "분석 요약을 만들지 못했습니다", status === "SAFE" ? 80 : 180),
+      summary: clipSummary(parsed.summary || "분석 요약을 만들지 못했습니다", status === "SAFE" ? 80 : 220),
       actionGuide: String(parsed.actionGuide || "").trim().slice(0, 180) ||
         (status === "SAFE" ? "일반 안내로 보입니다." : "링크를 열지 마세요.")
     };
@@ -187,82 +247,97 @@ serve(async (req) => {
 
     const urls = extractUrls(messageText);
     const bareDomains = extractBareDomains(messageText, urls);
-    if (urls.length === 0 && bareDomains.length === 0) {
-      const auth = isAuthMessage(messageText);
-      return json(fallback(
-        "SAFE",
-        auth ? "🟢 안전 / 정상 인증 메시지" : "🟢 안전 / 링크가 없는 일반 문자",
-        null
-      ));
-    }
-    let unshortenedUrl: string | null = null;
+    const hosts = [
+      ...bareDomains,
+      ...urls.map(hostOf)
+    ].filter((host, index, all) => host && all.indexOf(host) === index);
+
     const tracked: string[] = [];
+    let unshortenedUrl: string | null = null;
     for (const url of urls) {
-      const finalUrl = await followRedirect(url);
-      const value = finalUrl || url;
-      tracked.push(`${url} -> ${value}`);
-      if (!unshortenedUrl && finalUrl && finalUrl !== url) unshortenedUrl = finalUrl;
-      if (!unshortenedUrl) unshortenedUrl = value;
+      const followed = await followRedirect(url);
+      if (followed.finalUrl) {
+        tracked.push(`${url} -> ${followed.finalUrl}`);
+        const host = hostOf(followed.finalUrl);
+        if (host && !hosts.includes(host)) hosts.push(host);
+        if (!unshortenedUrl) unshortenedUrl = followed.finalUrl;
+      } else {
+        tracked.push(`${url} -> URL 접속 불가/응답 없음`);
+        if (!unshortenedUrl) unshortenedUrl = url;
+      }
+    }
+    for (const host of bareDomains) {
+      if (!unshortenedUrl) unshortenedUrl = `https://${host}`;
     }
 
-    const leadHost = bareDomains[0] || (unshortenedUrl ? new URL(unshortenedUrl).hostname.replace(/^www\./, "") : "");
-    if (leadHost && gamblingHint(messageText)) {
-      return json(fallback(
-        "DANGER",
-        `🚨 [스미싱 차단] 해외 도박/불법 사이트 유도 링크(${leadHost})가 포함되어 있어 터치를 차단했습니다.`,
-        unshortenedUrl || `https://${leadHost}`
-      ));
+    const local = localVerdict(messageText, hosts);
+    if (local && local.status === "SAFE" && urls.length === 0 && bareDomains.length === 0) {
+      return json(local);
     }
 
     const apiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
     if (!apiKey) {
+      if (local) return json(local);
       return json({ ok: false, retry: true, error: "분석을 마치려면 잠시 후 다시 시도해 주세요." }, 200);
     }
 
     const prompt = [
-      "너는 대한민국 통신 보안 분석관이다.",
-      "카카오·통신사·은행 인증번호처럼 링크가 없는 본인확인 문자는 SAFE로 판정하라.",
-      "단축 링크의 실제 목적지가 피싱, 악성 앱 다운로드, 불법 도박 도메인이면 DANGER로 판정하라.",
-      "위험이면 summary를 한글로 쓰고, 영문 상태 태그만 적지 마라.",
-      "summary 예: 🚨 [스미싱 차단] 해외 도박/불법 사이트 유도 링크(도메인)가 포함되어 있어 터치를 차단했습니다.",
-      "응답은 JSON 객체만 반환하라. status는 SAFE, SUSPICIOUS, DANGER. dangerScore는 0부터 100.",
+      "너는 대한민국 스미싱 정밀 분석관이다. 문자 본문과 URL 추적 결과만 보고 JSON만 반환하라.",
+      "판정 규칙:",
+      "① 기관/택배 사칭: 우체국, 경찰청, 국민건강보험, 택배 배송, 모바일 청첩장, 과태료 안내를 말하면서 공식 도메인(go.kr, epost.go.kr, or.kr, korea.kr)이 아닌 불분명한 주소가 있으면 status=DANGER. summary는 한글로 🚨 [기관 사칭 스미싱]으로 시작하고, 사칭한 기관과 차단한 주소를 적을 것.",
+      "② 해외 도박/스팸: WEGO88, 카지노, 대박캐시백, 리베이트처럼 불법 도박 유도 문구나 그런 주소가 있으면 status=DANGER. summary는 🚨 [스미싱 차단] 해외 불법 도박 사이트 유도 링크(주소)가 포함되어 있습니다. 형태.",
+      "③ 정상 인증/안내: 카카오, 통신사, 은행의 인증번호이거나 공식 주소만 있으면 status=SAFE. summary는 🟢 [안전]으로 시작. 링크가 없는 본문만으로 DANGER를 내리지 말 것.",
+      "URL 추적 결과가 'URL 접속 불가/응답 없음'이어도 분석을 포기하지 말고 본문으로 판정하라.",
+      "status는 SAFE, SUSPICIOUS, DANGER. dangerScore는 0부터 100. summary와 actionGuide는 한글만.",
       `발신번호: ${sender || "알 수 없음"}`,
       `원본 문자: ${messageText}`,
       `추적된 URL: ${tracked.length ? tracked.join(" | ") : "없음"}`,
-      `본문 도메인: ${bareDomains.join(", ") || "없음"}`
+      `본문 도메인: ${hosts.join(", ") || "없음"}`
     ].join("\n");
 
-    const gemini = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(20000),
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 300,
-            responseMimeType: "application/json"
-          }
-        })
-      }
-    );
-    const data = await gemini.json().catch(() => ({})) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-    const parsed = parseModelJson(raw, unshortenedUrl);
+    let parsed: SmsAnalysis | null = null;
+    try {
+      const gemini = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(20000),
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 400,
+              responseMimeType: "application/json"
+            }
+          })
+        }
+      );
+      const data = await gemini.json().catch(() => ({})) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+      parsed = parseModelJson(raw, unshortenedUrl);
+    } catch {
+      parsed = null;
+    }
+
     if (!parsed) {
+      if (local) return json(local);
       return json({ ok: false, retry: true, error: "분석을 완료하지 못했습니다. 다시 시도해 주세요." }, 200);
     }
-    if ((parsed.status === "DANGER" || parsed.status === "SUSPICIOUS") && leadHost) {
-      parsed.summary = `🚨 [스미싱 차단] 해외 도박/불법 사이트 유도 링크(${leadHost})가 포함되어 있어 터치를 차단했습니다.`;
-      parsed.unshortenedUrl = parsed.unshortenedUrl || unshortenedUrl || `https://${leadHost}`;
+
+    if (local?.status === "DANGER" && parsed.status === "SAFE") {
+      parsed.status = "DANGER";
+      parsed.dangerScore = Math.max(parsed.dangerScore, local.dangerScore);
+      parsed.summary = local.summary;
+      parsed.unshortenedUrl = parsed.unshortenedUrl || local.unshortenedUrl;
+    } else if (local?.status === "SAFE" && isAuthMessage(messageText) && hosts.every(isOfficialHost)) {
+      parsed.status = "SAFE";
+      parsed.dangerScore = Math.min(parsed.dangerScore, 10);
+      parsed.summary = local.summary;
     }
-    if (parsed.status === "SAFE" && isAuthMessage(messageText)) {
-      parsed.summary = "🟢 안전 / 정상 인증 메시지";
-    }
+    if (!parsed.unshortenedUrl) parsed.unshortenedUrl = unshortenedUrl;
     return json(parsed);
   } catch {
     return json({ ok: false, retry: true, error: "분석을 완료하지 못했습니다. 다시 시도해 주세요." }, 200);

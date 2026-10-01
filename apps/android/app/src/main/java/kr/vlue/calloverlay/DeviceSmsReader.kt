@@ -3,17 +3,22 @@ package kr.vlue.calloverlay
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.ContactsContract
 import android.provider.Telephony
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** 앱 문자함 — content://sms 를 최신순으로 읽고 발신자별 대화방으로 묶는다. */
+/** 앱 문자함 — 삼성 메시지와 같이 대화방 전체를 읽는다. SMS와 MMS를 함께 포함한다. */
 object DeviceSmsReader {
-    private const val SCAN_LIMIT = 400
-    private const val THREAD_LIMIT = 80
-    private const val MESSAGE_LIMIT = 200
+    private const val THREAD_LIMIT = 400
+    private const val MESSAGE_LIMIT = 1000
+    private const val FALLBACK_SCAN_LIMIT = 5000
+    private val CONVERSATIONS_URI: Uri = Uri.parse("content://mms-sms/conversations?simple=true")
+    private val CANONICAL_URI: Uri = Uri.parse("content://mms-sms/canonical-addresses")
+    private val MMS_URI: Uri = Uri.parse("content://mms")
+    private val MMS_PART_URI: Uri = Uri.parse("content://mms/part")
     private const val PREFS = "vlue_sms_read_marks"
 
     fun hasPermission(context: Context): Boolean =
@@ -30,56 +35,11 @@ object DeviceSmsReader {
         }
         val names = contactNames(context)
         val readMarks = readMarks(context)
+        val canonical = canonicalAddresses(context)
         val threads = LinkedHashMap<String, JSONObject>()
-        val resolver = context.contentResolver
-        resolver.query(
-            Telephony.Sms.CONTENT_URI,
-            arrayOf(
-                Telephony.Sms._ID,
-                Telephony.Sms.THREAD_ID,
-                Telephony.Sms.ADDRESS,
-                Telephony.Sms.BODY,
-                Telephony.Sms.DATE,
-                Telephony.Sms.READ,
-                Telephony.Sms.TYPE
-            ),
-            null,
-            null,
-            "${Telephony.Sms.DATE} DESC"
-        )?.use { cursor ->
-            val threadCol = cursor.getColumnIndex(Telephony.Sms.THREAD_ID)
-            val addressCol = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
-            val bodyCol = cursor.getColumnIndex(Telephony.Sms.BODY)
-            val dateCol = cursor.getColumnIndex(Telephony.Sms.DATE)
-            val readCol = cursor.getColumnIndex(Telephony.Sms.READ)
-            val typeCol = cursor.getColumnIndex(Telephony.Sms.TYPE)
-            var scanned = 0
-            while (cursor.moveToNext() && scanned < SCAN_LIMIT) {
-                scanned += 1
-                val address = if (addressCol >= 0) cursor.getString(addressCol).orEmpty() else ""
-                val threadId = if (threadCol >= 0) cursor.getLong(threadCol) else -1L
-                val key = if (threadId > 0L) "t:$threadId" else "a:${phoneKey(address)}"
-                val existing = threads[key]
-                val dateMs = if (dateCol >= 0) cursor.getLong(dateCol) else 0L
-                val markedUntil = readMarks[key] ?: 0L
-                val unread = dateMs > markedUntil &&
-                    readCol >= 0 && cursor.getInt(readCol) == 0 &&
-                    (typeCol < 0 || cursor.getInt(typeCol) != Telephony.Sms.MESSAGE_TYPE_SENT)
-                if (existing == null) {
-                    if (threads.size >= THREAD_LIMIT) continue
-                    val display = names[phoneKey(address)].orEmpty()
-                    threads[key] = JSONObject()
-                        .put("id", key)
-                        .put("threadId", threadId)
-                        .put("address", address)
-                        .put("name", display)
-                        .put("snippet", if (bodyCol >= 0) cursor.getString(bodyCol).orEmpty() else "")
-                        .put("dateMs", if (dateCol >= 0) cursor.getLong(dateCol) else 0L)
-                        .put("unread", if (unread) 1 else 0)
-                } else if (unread) {
-                    existing.put("unread", existing.optInt("unread") + 1)
-                }
-            }
+        readConversationThreads(context, names, readMarks, canonical, threads)
+        if (threads.isEmpty()) {
+            readSmsScanThreads(context, names, readMarks, threads)
         }
         val arr = JSONArray()
         threads.values.forEach { arr.put(it) }
@@ -102,41 +62,13 @@ object DeviceSmsReader {
             args = null
         }
         val rows = ArrayList<JSONObject>()
-        context.contentResolver.query(
-            Telephony.Sms.CONTENT_URI,
-            arrayOf(
-                Telephony.Sms._ID,
-                Telephony.Sms.ADDRESS,
-                Telephony.Sms.BODY,
-                Telephony.Sms.DATE,
-                Telephony.Sms.TYPE,
-                Telephony.Sms.THREAD_ID
-            ),
-            selection,
-            args,
-            "${Telephony.Sms.DATE} DESC"
-        )?.use { cursor ->
-            val idCol = cursor.getColumnIndex(Telephony.Sms._ID)
-            val addressCol = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
-            val bodyCol = cursor.getColumnIndex(Telephony.Sms.BODY)
-            val dateCol = cursor.getColumnIndex(Telephony.Sms.DATE)
-            val typeCol = cursor.getColumnIndex(Telephony.Sms.TYPE)
-            val wantKey = phoneKey(address)
-            var count = 0
-            while (cursor.moveToNext() && count < MESSAGE_LIMIT) {
-                val rowAddress = if (addressCol >= 0) cursor.getString(addressCol).orEmpty() else ""
-                if (threadId == null && phoneKey(rowAddress) != wantKey) continue
-                count += 1
-                val type = if (typeCol >= 0) cursor.getInt(typeCol) else Telephony.Sms.MESSAGE_TYPE_INBOX
-                rows.add(
-                    JSONObject()
-                        .put("id", if (idCol >= 0) cursor.getLong(idCol) else count)
-                        .put("address", rowAddress)
-                        .put("body", if (bodyCol >= 0) cursor.getString(bodyCol).orEmpty() else "")
-                        .put("dateMs", if (dateCol >= 0) cursor.getLong(dateCol) else 0L)
-                        .put("incoming", type != Telephony.Sms.MESSAGE_TYPE_SENT)
-                )
-            }
+        appendSmsRows(context, selection, args, address, rows)
+        if (threadId != null && threadId > 0L) appendMmsRows(context, threadId, rows)
+        rows.sortByDescending { it.optLong("dateMs") }
+        if (rows.size > MESSAGE_LIMIT) {
+            val kept = rows.take(MESSAGE_LIMIT)
+            rows.clear()
+            rows.addAll(kept)
         }
         for (i in rows.size - 1 downTo 0) messages.put(rows[i])
         return JSONObject().put("ok", true).put("permission", true).put("messages", messages).toString()
@@ -180,6 +112,254 @@ object DeviceSmsReader {
             out[key] = millis
         }
         return out
+    }
+
+    private fun readConversationThreads(
+        context: Context,
+        names: Map<String, String>,
+        readMarks: Map<String, Long>,
+        canonical: Map<Long, String>,
+        threads: LinkedHashMap<String, JSONObject>
+    ) {
+        val cursor = try {
+            context.contentResolver.query(CONVERSATIONS_URI, null, null, null, "date DESC")
+        } catch (_: Exception) {
+            null
+        } ?: return
+        cursor.use {
+            val idCol = firstColumn(it, "_id", "thread_id")
+            val dateCol = it.getColumnIndex("date")
+            val snippetCol = firstColumn(it, "snippet", "body")
+            val readCol = it.getColumnIndex("read")
+            val unreadCountCol = firstColumn(it, "unread_count", "unread")
+            val recipientCol = firstColumn(it, "recipient_ids", "address")
+            while (it.moveToNext() && threads.size < THREAD_LIMIT) {
+                val threadId = if (idCol >= 0) it.getLong(idCol) else -1L
+                if (threadId <= 0L) continue
+                val address = addressForRecipients(
+                    if (recipientCol >= 0) it.getString(recipientCol).orEmpty() else "",
+                    canonical
+                )
+                val key = "t:$threadId"
+                val dateMs = normalizeEpoch(if (dateCol >= 0) it.getLong(dateCol) else 0L)
+                val markedUntil = readMarks[key] ?: 0L
+                val unread = when {
+                    dateMs <= markedUntil -> 0
+                    unreadCountCol >= 0 -> it.getInt(unreadCountCol).coerceAtLeast(0)
+                    readCol >= 0 && it.getInt(readCol) == 0 -> 1
+                    else -> 0
+                }
+                threads[key] = JSONObject()
+                    .put("id", key)
+                    .put("threadId", threadId)
+                    .put("address", address)
+                    .put("name", names[phoneKey(address)].orEmpty())
+                    .put("snippet", if (snippetCol >= 0) it.getString(snippetCol).orEmpty() else "")
+                    .put("dateMs", dateMs)
+                    .put("unread", unread)
+            }
+        }
+    }
+
+    private fun readSmsScanThreads(
+        context: Context,
+        names: Map<String, String>,
+        readMarks: Map<String, Long>,
+        threads: LinkedHashMap<String, JSONObject>
+    ) {
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(
+                Telephony.Sms.THREAD_ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.BODY,
+                Telephony.Sms.DATE,
+                Telephony.Sms.READ,
+                Telephony.Sms.TYPE
+            ),
+            null,
+            null,
+            "${Telephony.Sms.DATE} DESC"
+        )?.use { cursor ->
+            val threadCol = cursor.getColumnIndex(Telephony.Sms.THREAD_ID)
+            val addressCol = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
+            val bodyCol = cursor.getColumnIndex(Telephony.Sms.BODY)
+            val dateCol = cursor.getColumnIndex(Telephony.Sms.DATE)
+            val readCol = cursor.getColumnIndex(Telephony.Sms.READ)
+            val typeCol = cursor.getColumnIndex(Telephony.Sms.TYPE)
+            var scanned = 0
+            while (cursor.moveToNext() && scanned < FALLBACK_SCAN_LIMIT && threads.size < THREAD_LIMIT) {
+                scanned += 1
+                val address = if (addressCol >= 0) cursor.getString(addressCol).orEmpty() else ""
+                val threadId = if (threadCol >= 0) cursor.getLong(threadCol) else -1L
+                val key = if (threadId > 0L) "t:$threadId" else "a:${phoneKey(address)}"
+                val dateMs = if (dateCol >= 0) cursor.getLong(dateCol) else 0L
+                val markedUntil = readMarks[key] ?: 0L
+                val unread = dateMs > markedUntil &&
+                    readCol >= 0 && cursor.getInt(readCol) == 0 &&
+                    (typeCol < 0 || cursor.getInt(typeCol) != Telephony.Sms.MESSAGE_TYPE_SENT)
+                val existing = threads[key]
+                if (existing == null) {
+                    threads[key] = JSONObject()
+                        .put("id", key)
+                        .put("threadId", threadId)
+                        .put("address", address)
+                        .put("name", names[phoneKey(address)].orEmpty())
+                        .put("snippet", if (bodyCol >= 0) cursor.getString(bodyCol).orEmpty() else "")
+                        .put("dateMs", dateMs)
+                        .put("unread", if (unread) 1 else 0)
+                } else if (unread) {
+                    existing.put("unread", existing.optInt("unread") + 1)
+                }
+            }
+        }
+    }
+
+    private fun appendSmsRows(
+        context: Context,
+        selection: String?,
+        args: Array<String>?,
+        address: String,
+        rows: ArrayList<JSONObject>
+    ) {
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(
+                Telephony.Sms._ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.BODY,
+                Telephony.Sms.DATE,
+                Telephony.Sms.TYPE
+            ),
+            selection,
+            args,
+            "${Telephony.Sms.DATE} DESC"
+        )?.use { cursor ->
+            val idCol = cursor.getColumnIndex(Telephony.Sms._ID)
+            val addressCol = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
+            val bodyCol = cursor.getColumnIndex(Telephony.Sms.BODY)
+            val dateCol = cursor.getColumnIndex(Telephony.Sms.DATE)
+            val typeCol = cursor.getColumnIndex(Telephony.Sms.TYPE)
+            val wantKey = phoneKey(address)
+            var count = 0
+            while (cursor.moveToNext() && count < MESSAGE_LIMIT) {
+                val rowAddress = if (addressCol >= 0) cursor.getString(addressCol).orEmpty() else ""
+                if (selection == null && phoneKey(rowAddress) != wantKey) continue
+                count += 1
+                val type = if (typeCol >= 0) cursor.getInt(typeCol) else Telephony.Sms.MESSAGE_TYPE_INBOX
+                rows.add(
+                    JSONObject()
+                        .put("id", if (idCol >= 0) "s${cursor.getLong(idCol)}" else "s$count")
+                        .put("address", rowAddress)
+                        .put("body", if (bodyCol >= 0) cursor.getString(bodyCol).orEmpty() else "")
+                        .put("dateMs", if (dateCol >= 0) cursor.getLong(dateCol) else 0L)
+                        .put("incoming", type != Telephony.Sms.MESSAGE_TYPE_SENT)
+                )
+            }
+        }
+    }
+
+    private fun appendMmsRows(context: Context, threadId: Long, rows: ArrayList<JSONObject>) {
+        val cursor = try {
+            context.contentResolver.query(
+                MMS_URI,
+                arrayOf("_id", "date", "msg_box", "sub", "thread_id"),
+                "thread_id=?",
+                arrayOf(threadId.toString()),
+                "date DESC"
+            )
+        } catch (_: Exception) {
+            null
+        } ?: return
+        cursor.use {
+            val idCol = it.getColumnIndex("_id")
+            val dateCol = it.getColumnIndex("date")
+            val boxCol = it.getColumnIndex("msg_box")
+            val subCol = it.getColumnIndex("sub")
+            var count = 0
+            while (it.moveToNext() && count < MESSAGE_LIMIT) {
+                val id = if (idCol >= 0) it.getLong(idCol) else continue
+                count += 1
+                val body = mmsText(context, id).ifBlank {
+                    if (subCol >= 0) it.getString(subCol).orEmpty() else ""
+                }.ifBlank { "(사진/첨부 메시지)" }
+                val box = if (boxCol >= 0) it.getInt(boxCol) else 1
+                rows.add(
+                    JSONObject()
+                        .put("id", "m$id")
+                        .put("address", "")
+                        .put("body", body)
+                        .put("dateMs", normalizeEpoch(if (dateCol >= 0) it.getLong(dateCol) else 0L))
+                        .put("incoming", box != 2)
+                )
+            }
+        }
+    }
+
+    private fun mmsText(context: Context, mmsId: Long): String {
+        val cursor = try {
+            context.contentResolver.query(
+                MMS_PART_URI,
+                arrayOf("ct", "text"),
+                "mid=?",
+                arrayOf(mmsId.toString()),
+                null
+            )
+        } catch (_: Exception) {
+            null
+        } ?: return ""
+        val lines = ArrayList<String>()
+        cursor.use {
+            val ctCol = it.getColumnIndex("ct")
+            val textCol = it.getColumnIndex("text")
+            while (it.moveToNext()) {
+                val mime = if (ctCol >= 0) it.getString(ctCol).orEmpty() else ""
+                if (mime.startsWith("text/") && textCol >= 0) {
+                    val text = it.getString(textCol).orEmpty().trim()
+                    if (text.isNotEmpty()) lines.add(text)
+                }
+            }
+        }
+        return lines.joinToString("\n")
+    }
+
+    private fun canonicalAddresses(context: Context): Map<Long, String> {
+        val out = HashMap<Long, String>()
+        val cursor = try {
+            context.contentResolver.query(CANONICAL_URI, arrayOf("_id", "address"), null, null, null)
+        } catch (_: Exception) {
+            null
+        } ?: return out
+        cursor.use {
+            val idCol = it.getColumnIndex("_id")
+            val addressCol = it.getColumnIndex("address")
+            while (it.moveToNext()) {
+                val id = if (idCol >= 0) it.getLong(idCol) else continue
+                val address = if (addressCol >= 0) it.getString(addressCol).orEmpty() else ""
+                if (address.isNotBlank()) out[id] = address
+            }
+        }
+        return out
+    }
+
+    private fun addressForRecipients(raw: String, canonical: Map<Long, String>): String {
+        val ids = raw.split(' ', ',').mapNotNull { it.trim().toLongOrNull() }
+        val resolved = ids.mapNotNull { canonical[it] }.filter { it.isNotBlank() }
+        if (resolved.isNotEmpty()) return resolved.joinToString(", ")
+        return raw.trim()
+    }
+
+    private fun firstColumn(cursor: android.database.Cursor, vararg names: String): Int {
+        for (name in names) {
+            val index = cursor.getColumnIndex(name)
+            if (index >= 0) return index
+        }
+        return -1
+    }
+
+    private fun normalizeEpoch(raw: Long): Long {
+        if (raw <= 0L) return 0L
+        return if (raw < 10_000_000_000L) raw * 1000L else raw
     }
 
     private fun phoneKey(raw: String): String {

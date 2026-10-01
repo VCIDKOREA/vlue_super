@@ -222,7 +222,6 @@ class CallOverlayService : Service() {
             when {
                 entry != null -> entry.rawJson ?: UnregisteredNumberPopup.json(currentPhone)
                 allowUnregisteredFallback -> UnregisteredNumberPopup.json(currentPhone)
-                /* 수신 수화: 프리패치 진행 중 — 기존 재시도 루프가 바인딩을 기다린다 */
                 else -> return
             }
         pendingCardJson = adopted
@@ -1211,12 +1210,13 @@ class CallOverlayService : Service() {
 
         /*
          * 메모리 프리패치 결과를 즉시 채택 (Zero Latency).
-         * 발신 탭: 프리패치에도 없으면 미등록 확정 — 「검색 중」 없이 바로 안심팝업.
-         * 수신 수화: 프리패치가 아직 진행 중이면 기존 재시도 루프가 바인딩을 기다린다.
+         * 수신 수화·발신 탭: 프리패치가 없으면 미등록 확정으로 안심팝업을 바로 연다.
+         * 조회를 기다리며 BigPush 에 남기면 수화 후에도 팝업/쇼케이스가 안 뜬다.
+         * 더 높은 티어가 늦게 오면 applyCallInfoUpdate 가 제자리 업그레이드한다.
          */
         adoptPrefetchedCardIfPending(
             source = source,
-            allowUnregisteredFallback = currentOutgoing && outgoingExpandRequestedByUser
+            allowUnregisteredFallback = !currentOutgoing || outgoingExpandRequestedByUser
         )
 
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
