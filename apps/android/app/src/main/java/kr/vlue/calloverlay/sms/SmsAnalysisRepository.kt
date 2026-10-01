@@ -114,7 +114,7 @@ class SmsAnalysisRepository(private val context: Context) {
             status = status,
             dangerScore = parsed.dangerScore.coerceIn(0, 100),
             unshortenedUrl = parsed.unshortenedUrl?.trim()?.ifBlank { null },
-            summary = parsed.summary?.trim().orEmpty().take(40),
+            summary = parsed.summary?.trim().orEmpty().take(180),
             actionGuide = parsed.actionGuide?.trim().orEmpty()
         )
     }

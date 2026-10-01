@@ -6,6 +6,7 @@ import {
   analyzeSmsMessage,
   fetchSmsMessages,
   fetchSmsThreads,
+  markSmsThreadRead,
   requestSmsReadPermission,
   waitSmsPermission,
   watchSmsAnalyzeAd
@@ -62,7 +63,7 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
   const [messages, setMessages] = useState([]);
   const [analysis, setAnalysis] = useState({});
   const [busyId, setBusyId] = useState(null);
-  const [notice, setNotice] = useState("");
+  const [failures, setFailures] = useState({});
 
   const muted = isDarkMode ? "text-slate-400" : "text-slate-500";
   const strong = isDarkMode ? "text-slate-100" : "text-slate-900";
@@ -93,10 +94,16 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
   }, [open, loadThreads]);
 
   const openThread = (thread) => {
+    markSmsThreadRead(thread.id, thread.address, thread.dateMs);
+    setThreads((prev) => prev.map((row) => (row.id === thread.id ? { ...row, unread: 0 } : row)));
     const data = fetchSmsMessages(thread.id, thread.address);
     setMessages(data.messages);
     setSelected(thread);
-    setNotice("");
+  };
+
+  const backToList = () => {
+    setSelected(null);
+    loadThreads();
   };
 
   const askPermission = async () => {
@@ -113,13 +120,13 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
     const key = String(message.id);
     if (busyId) return;
     setBusyId(key);
-    setNotice("");
+    setFailures((prev) => ({ ...prev, [key]: "" }));
     try {
       if (!paid) await watchSmsAnalyzeAd();
       const result = await analyzeSmsMessage(message.address || selected?.address || "", message.body || "");
       setAnalysis((prev) => ({ ...prev, [key]: result }));
     } catch (error) {
-      setNotice(error?.message || "분석에 실패했습니다.");
+      setFailures((prev) => ({ ...prev, [key]: error?.message || "분석을 완료하지 못했습니다. 다시 시도해 주세요." }));
     } finally {
       setBusyId(null);
     }
@@ -186,8 +193,11 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
 
   const detail = selected ? (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={`flex items-center gap-2 border-b px-3 py-2 ${isDarkMode ? "border-white/10" : "border-slate-200"}`}>
-        <button type="button" onClick={() => setSelected(null)} className={`px-2 text-[18px] ${strong}`} aria-label="목록">
+      <div
+        className={`vlue-top-safe flex items-center gap-2 border-b px-3 pb-2 ${isDarkMode ? "border-white/10" : "border-slate-200"}`}
+        style={{ paddingTop: "max(8px, var(--vlue-safe-top, env(safe-area-inset-top, 0px)))" }}
+      >
+        <button type="button" onClick={backToList} className={`px-2 text-[18px] ${strong}`} aria-label="목록">
           ←
         </button>
         <p className={`min-w-0 flex-1 truncate text-[16px] font-black ${strong}`}>{threadTitle(selected)}</p>
@@ -202,9 +212,9 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
           return (
             <div key={key} className={`flex ${incoming ? "justify-start" : "justify-end"}`}>
               <div
-                className="max-w-[88%] rounded-2xl px-3 py-2"
+                className={`relative max-w-[88%] overflow-hidden rounded-2xl px-3 py-2 ${busyId === key ? "sms-scan" : ""}`}
                 style={{
-                  background: blocked ? "#1FF44336" : safe ? "#1F4CAF50" : isDarkMode ? "#243041" : "#F1F5F9",
+                  background: blocked ? "rgba(244, 67, 54, 0.12)" : safe ? "rgba(76, 175, 80, 0.12)" : isDarkMode ? "#243041" : "#F1F5F9",
                   border: blocked ? "1px solid #F44336" : safe ? "1px solid #4CAF50" : "1px solid transparent"
                 }}
                 onClick={() => {
@@ -241,20 +251,33 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
                   </button>
                 </div>
                 {busyId === key ? (
-                  <p className={`mt-1 text-[11px] ${muted}`}>AI가 실제 URL 추적 및 정밀 분석 중...</p>
+                  <p className="relative z-[1] mt-1 text-[11px] font-bold text-blue-700">Gemini AI 정밀 스캔 중...</p>
                 ) : null}
                 {result ? (
-                  <div className={`mt-2 rounded-xl px-2.5 py-2 text-[11px] ${blocked ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>
-                    <p className="font-black">{blocked ? "🔒 위험: 스미싱 링크 터치 차단됨" : "🟢 안전한 메시지"} · {result.status}</p>
-                    {result.summary ? <p className="mt-1">{result.summary}</p> : null}
-                    {result.unshortenedUrl ? <p className="mt-1 break-all">최종 URL: {result.unshortenedUrl}</p> : null}
+                  <div className={`relative z-[1] mt-2 rounded-xl px-2.5 py-2 text-[12px] leading-relaxed ${blocked ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>
+                    <p className="font-bold">{result.summary || (blocked ? "🚨 [스미싱 차단] 위험한 링크가 포함되어 있어 터치를 차단했습니다." : "🟢 안전 / 정상 메시지")}</p>
+                    {blocked && result.unshortenedUrl ? <p className="mt-1 break-all">최종 URL: {result.unshortenedUrl}</p> : null}
+                  </div>
+                ) : null}
+                {!result && failures[key] ? (
+                  <div className="relative z-[1] mt-2 rounded-xl bg-amber-50 px-2.5 py-2 text-[12px] text-amber-900">
+                    <p>{failures[key]}</p>
+                    <button
+                      type="button"
+                      className="mt-1 font-bold text-blue-700"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void analyze(message);
+                      }}
+                    >
+                      다시 분석
+                    </button>
                   </div>
                 ) : null}
               </div>
             </div>
           );
         })}
-        {notice ? <p className="text-center text-[12px] font-semibold text-amber-600">{notice}</p> : null}
       </div>
     </div>
   ) : null;

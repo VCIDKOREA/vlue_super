@@ -14,6 +14,7 @@ object DeviceSmsReader {
     private const val SCAN_LIMIT = 400
     private const val THREAD_LIMIT = 80
     private const val MESSAGE_LIMIT = 200
+    private const val PREFS = "vlue_sms_read_marks"
 
     fun hasPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) ==
@@ -28,6 +29,7 @@ object DeviceSmsReader {
                 .toString()
         }
         val names = contactNames(context)
+        val readMarks = readMarks(context)
         val threads = LinkedHashMap<String, JSONObject>()
         val resolver = context.contentResolver
         resolver.query(
@@ -58,7 +60,10 @@ object DeviceSmsReader {
                 val threadId = if (threadCol >= 0) cursor.getLong(threadCol) else -1L
                 val key = if (threadId > 0L) "t:$threadId" else "a:${phoneKey(address)}"
                 val existing = threads[key]
-                val unread = readCol >= 0 && cursor.getInt(readCol) == 0 &&
+                val dateMs = if (dateCol >= 0) cursor.getLong(dateCol) else 0L
+                val markedUntil = readMarks[key] ?: 0L
+                val unread = dateMs > markedUntil &&
+                    readCol >= 0 && cursor.getInt(readCol) == 0 &&
                     (typeCol < 0 || cursor.getInt(typeCol) != Telephony.Sms.MESSAGE_TYPE_SENT)
                 if (existing == null) {
                     if (threads.size >= THREAD_LIMIT) continue
@@ -135,6 +140,46 @@ object DeviceSmsReader {
         }
         for (i in rows.size - 1 downTo 0) messages.put(rows[i])
         return JSONObject().put("ok", true).put("permission", true).put("messages", messages).toString()
+    }
+
+    /** 대화방 진입 시 읽음. 기본 문자 앱이 아니면 DB 쓰기가 거절되므로 앱 표시 시각도 같이 남긴다. */
+    fun markThreadRead(context: Context, threadKey: String, address: String, seenUntilMs: Long): String {
+        if (!hasPermission(context)) {
+            return JSONObject().put("ok", false).put("permission", false).toString()
+        }
+        val threadId = threadKey.removePrefix("t:").toLongOrNull()?.takeIf { threadKey.startsWith("t:") }
+        var updated = 0
+        try {
+            val values = android.content.ContentValues().apply { put(Telephony.Sms.READ, 1) }
+            updated = if (threadId != null && threadId > 0L) {
+                context.contentResolver.update(
+                    Telephony.Sms.CONTENT_URI,
+                    values,
+                    "${Telephony.Sms.THREAD_ID}=? AND ${Telephony.Sms.READ}=0",
+                    arrayOf(threadId.toString())
+                )
+            } else {
+                0
+            }
+        } catch (_: SecurityException) {
+            updated = 0
+        }
+        val until = seenUntilMs.coerceAtLeast(System.currentTimeMillis())
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(threadKey.ifBlank { "a:${phoneKey(address)}" }, until)
+            .apply()
+        return JSONObject().put("ok", true).put("updated", updated).put("seenUntilMs", until).toString()
+    }
+
+    private fun readMarks(context: Context): Map<String, Long> {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val out = HashMap<String, Long>()
+        for ((key, value) in prefs.all) {
+            val millis = (value as? Long) ?: (value as? Int)?.toLong() ?: continue
+            out[key] = millis
+        }
+        return out
     }
 
     private fun phoneKey(raw: String): String {

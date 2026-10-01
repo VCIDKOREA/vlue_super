@@ -88,6 +88,22 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   padding-top: var(--vlue-safe-top);
 }
 
+.sms-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(37, 99, 235, 0.28) 50%, transparent 80%);
+  transform: translateX(-120%);
+  animation: sms-scan-light 1.15s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes sms-scan-light {
+  to {
+    transform: translateX(120%);
+  }
+}
+
 .vlue-scroll-pad-bottom-nav {
   padding-bottom: calc(var(--vlue-bottom-nav-offset) + 28px);
   overflow-anchor: none;

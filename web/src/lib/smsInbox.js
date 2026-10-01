@@ -39,6 +39,11 @@ export function requestSmsReadPermission() {
   bridge()?.requestSmsReadPermission?.();
 }
 
+export function markSmsThreadRead(threadId, address, dateMs) {
+  const raw = bridge()?.markSmsThreadRead?.(String(threadId || ""), String(address || ""), String(dateMs || 0));
+  return parseJson(raw, { ok: false });
+}
+
 function waitEvent(name, requestId, timeoutMs) {
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => {

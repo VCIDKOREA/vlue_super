@@ -952,6 +952,10 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 requestSmsReadPermission:function(){
                   try{if(window.Android&&window.Android.requestSmsReadPermission)window.Android.requestSmsReadPermission();}catch(e){}
                 },
+                markSmsThreadRead:function(threadId,address,dateMs){
+                  try{return window.Android&&window.Android.markSmsThreadRead?window.Android.markSmsThreadRead(String(threadId||''),String(address||''),String(dateMs||'0')):'{"ok":false}';}
+                  catch(e){return '{"ok":false}';}
+                },
                 analyzeSms:function(requestId,sender,messageText){
                   try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
                   catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
@@ -1387,6 +1391,15 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun getDeviceSmsMessagesJson(threadId: String?, address: String?): String =
             DeviceSmsReader.readMessagesJson(activity, threadId.orEmpty(), address.orEmpty())
+
+        @android.webkit.JavascriptInterface
+        fun markSmsThreadRead(threadId: String?, address: String?, dateMs: String?): String =
+            DeviceSmsReader.markThreadRead(
+                activity,
+                threadId.orEmpty(),
+                address.orEmpty(),
+                dateMs?.toLongOrNull() ?: 0L
+            )
 
         @android.webkit.JavascriptInterface
         fun requestSmsReadPermission() {
