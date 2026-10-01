@@ -75,6 +75,8 @@ export const v1AppShell = {
   friendShowcaseFeed: true,
   /** 하단 바 — 통화 목록 시트 */
   callShowcaseHistoryNav: true,
+  /** 하단 바 — 기기 문자함 */
+  smsInbox: true,
   showcaseStyleSettings: true,
   /** V1 — 배너 소셜 오버레이 (좋아요·댓글·공유·더보기·로고·상태/한줄) */
   showcaseSocialOverlay: true,

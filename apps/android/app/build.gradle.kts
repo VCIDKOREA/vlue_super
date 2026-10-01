@@ -18,6 +18,8 @@ fun gradleProp(key: String, fallback: String): String {
         val mapped = when (key) {
             "VLUE_API_BASE_URL" -> props.getProperty("vlue.api.base.url")
             "VLUE_WEB_BASE_URL" -> props.getProperty("vlue.web.base.url")
+            "VLUE_SUPABASE_URL" -> props.getProperty("vlue.supabase.url")
+            "VLUE_SUPABASE_ANON_KEY" -> props.getProperty("vlue.supabase.anon.key")
             "ADMOB_APP_ID" -> props.getProperty("admob.app.id")
             "ADMOB_REWARDED_15_ID" -> props.getProperty("admob.rewarded.15.id")
             "ADMOB_REWARDED_30_ID" -> props.getProperty("admob.rewarded.30.id")
@@ -33,6 +35,8 @@ fun gradleProp(key: String, fallback: String): String {
 
 val vlueApiBase = gradleProp("VLUE_API_BASE_URL", "https://api.vlue.kr")
 val vlueWebBase = gradleProp("VLUE_WEB_BASE_URL", "https://www.vlue.kr")
+val vlueSupabaseUrl = gradleProp("VLUE_SUPABASE_URL", "")
+val vlueSupabaseAnon = gradleProp("VLUE_SUPABASE_ANON_KEY", "")
 /* Google 공식 테스트 ID. 출시 전 local.properties/Gradle secret으로 실 ID를 반드시 주입한다. */
 val admobAppId = gradleProp("ADMOB_APP_ID", "ca-app-pub-3940256099942544~3347511713")
 val admobRewarded15Id = gradleProp("ADMOB_REWARDED_15_ID", "ca-app-pub-3940256099942544/5224354917")
@@ -65,6 +69,8 @@ android {
         versionName = "1.0.20"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
+        buildConfigField("String", "SUPABASE_URL", "\"$vlueSupabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$vlueSupabaseAnon\"")
         buildConfigField("String", "ADMOB_REWARDED_15_ID", "\"$admobRewarded15Id\"")
         buildConfigField("String", "ADMOB_REWARDED_30_ID", "\"$admobRewarded30Id\"")
         buildConfigField("String", "ADMOB_NATIVE_ID", "\"$admobNativeId\"")
@@ -120,6 +126,8 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.webkit:webkit:1.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+    implementation("androidx.recyclerview:recyclerview:1.1.0")
+    implementation("com.google.code.gson:gson:2.10")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.google.android.gms:play-services-ads:23.6.0")
 

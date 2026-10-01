@@ -941,6 +941,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     return '[]';
                   }catch(e){return '[]';}
                 },
+                getDeviceSmsThreadsJson:function(){
+                  try{return window.Android&&window.Android.getDeviceSmsThreadsJson?window.Android.getDeviceSmsThreadsJson():'{"ok":false,"threads":[]}';}
+                  catch(e){return '{"ok":false,"threads":[]}';}
+                },
+                getDeviceSmsMessagesJson:function(threadId,address){
+                  try{return window.Android&&window.Android.getDeviceSmsMessagesJson?window.Android.getDeviceSmsMessagesJson(String(threadId||''),String(address||'')):'{"ok":false,"messages":[]}';}
+                  catch(e){return '{"ok":false,"messages":[]}';}
+                },
+                requestSmsReadPermission:function(){
+                  try{if(window.Android&&window.Android.requestSmsReadPermission)window.Android.requestSmsReadPermission();}catch(e){}
+                },
+                analyzeSms:function(requestId,sender,messageText){
+                  try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
+                  catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
+                },
                 saveSafeCareCache:function(phone,name){
                   try{
                     if(window.Android&&window.Android.saveSafeCareCache){
@@ -1095,6 +1110,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_SMS) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+            dispatchWebCustomEvent(
+                "vlue-sms-permission",
+                JSONObject().put("granted", granted).toString()
+            )
+            return
+        }
         if (requestCode == REQ_PHONE) {
             if (LetteringPermissionHelper.hasCallDetectPermissions(this)) {
                 LetteringPrefs.setLetteringEnabled(this, true)
@@ -1349,6 +1372,72 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                     ownerPhone = LetteringPrefs.getMemberPhone(activity)
                 )
             }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openSmsList() {
+            activity.runOnUiThread {
+                kr.vlue.calloverlay.sms.SmsListActivity.start(activity)
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun getDeviceSmsThreadsJson(): String = DeviceSmsReader.readThreadsJson(activity)
+
+        @android.webkit.JavascriptInterface
+        fun getDeviceSmsMessagesJson(threadId: String?, address: String?): String =
+            DeviceSmsReader.readMessagesJson(activity, threadId.orEmpty(), address.orEmpty())
+
+        @android.webkit.JavascriptInterface
+        fun requestSmsReadPermission() {
+            activity.runOnUiThread {
+                androidx.core.app.ActivityCompat.requestPermissions(
+                    activity,
+                    arrayOf(android.Manifest.permission.READ_SMS),
+                    REQ_SMS
+                )
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun analyzeSms(requestId: String?, sender: String?, messageText: String?): String {
+            val id = requestId?.trim().orEmpty().ifBlank { System.currentTimeMillis().toString() }
+            val body = messageText.orEmpty()
+            if (body.isBlank()) return """{"ok":false,"error":"empty"}"""
+            Thread {
+                val detail = try {
+                    val result = kotlinx.coroutines.runBlocking {
+                        kr.vlue.calloverlay.sms.SmsAnalysisRepository(activity).analyze(
+                            kr.vlue.calloverlay.sms.SmsInboxMessage(
+                                id = 0L,
+                                address = sender.orEmpty(),
+                                body = body,
+                                dateMs = 0L,
+                                incoming = true
+                            )
+                        )
+                    }
+                    org.json.JSONObject()
+                        .put("ok", true)
+                        .put("requestId", id)
+                        .put("status", result.status)
+                        .put("dangerScore", result.dangerScore)
+                        .put("unshortenedUrl", result.unshortenedUrl ?: JSONObject.NULL)
+                        .put("summary", result.summary)
+                        .put("actionGuide", result.actionGuide)
+                        .toString()
+                } catch (e: Exception) {
+                    org.json.JSONObject()
+                        .put("ok", false)
+                        .put("requestId", id)
+                        .put("error", e.message ?: "analyze_failed")
+                        .toString()
+                }
+                activity.runOnUiThread {
+                    activity.dispatchWebCustomEvent("vlue-sms-analysis", detail)
+                }
+            }.start()
+            return org.json.JSONObject().put("ok", true).put("requestId", id).toString()
         }
 
         /** 앱「통화 목록」— 시스템 CallLog 최근 건 */
@@ -1654,6 +1743,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         const val EXTRA_OPEN_APP_SETTINGS = "open_app_settings"
         const val EXTRA_OPEN_CERT = "open_cert"
         private const val REQ_PHONE = 4102
+        private const val REQ_SMS = 4104
         private const val REQ_FAMILY = 4103
         private const val TAG = "VlueMainActivity"
     }

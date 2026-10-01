@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
@@ -134,6 +135,11 @@
                 <data android:scheme="vlue" android:host="lettering" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".sms.SmsListActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor" />
 
         <!-- 수신 빅푸시 폴백 (오버레이가 전화 UI 아래일 때) -->
         <activity

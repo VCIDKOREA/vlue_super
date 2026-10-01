@@ -36,6 +36,7 @@ import AdMobShowcaseOverlay from "./components/ads/AdMobShowcaseOverlay.jsx";
 import HashtagSearchPopup from "./components/showcase/HashtagSearchPopup.jsx";
 import UserCaseArchiveView from "./components/mycase/UserCaseArchiveView.jsx";
 import CallShowcaseHistorySheet from "./components/CallShowcaseHistorySheet.jsx";
+import SmsInboxSheet from "./components/SmsInboxSheet.jsx";
 import { getLocalVlueUserId } from "./lib/showcase/resolveShowcaseOwnerUserId.js";
 import { dispatchCloseShowcaseOverlays } from "./lib/showcase/closeShowcaseOverlays.js";
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
@@ -563,6 +564,7 @@ function App() {
   const [walletDefaultTab, setWalletDefaultTab] = useState("received");
   const [appNotificationOpen, setAppNotificationOpen] = useState(false);
   const [callShowcaseSheetOpen, setCallShowcaseSheetOpen] = useState(false);
+  const [smsInboxOpen, setSmsInboxOpen] = useState(false);
   const [showcaseStyleSheetOpen, setShowcaseStyleSheetOpen] = useState(false);
   const [officeRemoteOpen, setOfficeRemoteOpen] = useState(false);
   const [appMode, setAppMode] = useState(() => readAppMode());
@@ -5539,6 +5541,12 @@ function App() {
         onClose={() => setCallShowcaseSheetOpen(false)}
         isDarkMode={isDarkMode}
       />
+      <SmsInboxSheet
+        open={v1AppShell.smsInbox && smsInboxOpen}
+        onClose={() => setSmsInboxOpen(false)}
+        isDarkMode={isDarkMode}
+        membershipTier={membershipTier}
+      />
       <OfficeRemoteModal
         open={v1AppShell.printerRemote && officeRemoteOpen}
         onClose={() => setOfficeRemoteOpen(false)}
@@ -5840,6 +5848,7 @@ function App() {
                 requireApp(() => {
                   setAppNotificationOpen(false);
                   setShowcaseStyleSheetOpen(false);
+                  setSmsInboxOpen(false);
                   setCallShowcaseSheetOpen(true);
                 });
               }}
@@ -5869,12 +5878,45 @@ function App() {
             </button>
             ) : null}
 
+            {v1AppShell.smsInbox ? (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHeaderEyeNavBlink();
+                requireApp(() => {
+                  setAppNotificationOpen(false);
+                  setShowcaseStyleSheetOpen(false);
+                  setCallShowcaseSheetOpen(false);
+                  setSmsInboxOpen(true);
+                });
+              }}
+              className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
+              aria-label="문자함"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="21"
+                height="21"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={smsInboxOpen ? "text-blue-500" : "text-gray-400"}
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+            ) : null}
+
             <button
               type="button"
               onClick={() => {
                 triggerHeaderEyeNavBlink();
                 setAppNotificationOpen(false);
                 setCallShowcaseSheetOpen(false);
+                setSmsInboxOpen(false);
                 setShowcaseStyleSheetOpen(false);
                 if (isBrowseGuest) {
                   requireAuth(() => navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null }));
