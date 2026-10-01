@@ -3540,3 +3540,84 @@ model PublicDirectoryEntry {
   @@index([sourceKind, region], map: "public_directory_entries_kind_region_idx")
   @@map("public_directory_entries")
 }
+
+/// 지도 하단 직접 스폰서 띠배너. 없으면 AdMob으로 떨어진다.
+model MapSponsorBanner {
+  id        String    @id @default(uuid()) @db.Uuid
+  title     String    @db.VarChar(80)
+  body      String    @default("") @db.VarChar(160)
+  imageUrl  String    @default("") @map("image_url") @db.VarChar(1024)
+  linkUrl   String    @default("") @map("link_url") @db.VarChar(1024)
+  active    Boolean   @default(true)
+  startsAt  DateTime? @map("starts_at") @db.Timestamptz(6)
+  endsAt    DateTime? @map("ends_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([active, startsAt, endsAt])
+  @@map("map_sponsor_banners")
+}
+
+/// 가족위치확인 — 마지막 GPS. 끊기면 이 좌표에 흑백으로 남긴다.
+model LocationPresence {
+  userId       String   @id @map("user_id") @db.Uuid
+  displayName  String   @default("") @map("display_name") @db.VarChar(80)
+  lat          Float
+  lng          Float
+  addressLabel String   @default("") @map("address_label") @db.VarChar(240)
+  batteryPct   Int?     @map("battery_pct")
+  online       Boolean  @default(true)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("location_presence")
+}
+
+model VmapRoom {
+  id         String   @id @default(uuid()) @db.Uuid
+  hostUserId String   @map("host_user_id") @db.Uuid
+  title      String   @default("약속") @db.VarChar(80)
+  placeLabel String   @default("") @map("place_label") @db.VarChar(160)
+  placeLat   Float    @map("place_lat")
+  placeLng   Float    @map("place_lng")
+  placeReady    Boolean   @default(false) @map("place_ready")
+  active        Boolean   @default(true)
+  closingAt     DateTime? @map("closing_at") @db.Timestamptz(6)
+  closingReason String    @default("") @map("closing_reason") @db.VarChar(16)
+  logBody       String    @default("") @map("log_body") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([hostUserId, active])
+  @@map("vmap_rooms")
+}
+
+model VmapMember {
+  id          String   @id @default(uuid()) @db.Uuid
+  roomId      String   @map("room_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  displayName String   @default("") @map("display_name") @db.VarChar(80)
+  departed    Boolean  @default(false)
+  arrived     Boolean  @default(false)
+  lat         Float?
+  lng         Float?
+  batteryPct  Int?     @map("battery_pct")
+  online      Boolean  @default(true)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@map("vmap_members")
+}
+
+model VmapMessage {
+  id          String   @id @default(uuid()) @db.Uuid
+  roomId      String   @map("room_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  displayName String   @default("") @map("display_name") @db.VarChar(80)
+  kind        String   @default("text") @db.VarChar(16)
+  body        String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([roomId, createdAt])
+  @@map("vmap_messages")
+}

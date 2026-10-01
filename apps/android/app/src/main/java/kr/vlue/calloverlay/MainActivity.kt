@@ -956,6 +956,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                   try{return window.Android&&window.Android.markSmsThreadRead?window.Android.markSmsThreadRead(String(threadId||''),String(address||''),String(dateMs||'0')):'{"ok":false}';}
                   catch(e){return '{"ok":false}';}
                 },
+                startVmapSession:function(){
+                  try{if(window.Android&&window.Android.startVmapSession)window.Android.startVmapSession();}catch(e){}
+                },
+                stopVmapSession:function(){
+                  try{if(window.Android&&window.Android.stopVmapSession)window.Android.stopVmapSession();}catch(e){}
+                },
                 analyzeSms:function(requestId,sender,messageText){
                   try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
                   catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
@@ -1412,6 +1418,23 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             }
         }
 
+        /** V-Map이 미니맵으로 내려가도 프로세스를 유지. Exit Room에서 중지. */
+        @android.webkit.JavascriptInterface
+        fun startVmapSession() {
+            activity.runOnUiThread {
+                try {
+                    FamilyCareForegroundService.start(activity)
+                } catch (_: Exception) {
+                    /* OEM이 백그라운드 시작을 막는 경우 지도 화면은 유지 */
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun stopVmapSession() {
+            activity.runOnUiThread { FamilyCareForegroundService.stop(activity) }
+        }
+
         @android.webkit.JavascriptInterface
         fun analyzeSms(requestId: String?, sender: String?, messageText: String?): String {
             val id = requestId?.trim().orEmpty().ifBlank { System.currentTimeMillis().toString() }
@@ -1438,6 +1461,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                         .put("unshortenedUrl", result.unshortenedUrl ?: JSONObject.NULL)
                         .put("summary", result.summary)
                         .put("actionGuide", result.actionGuide)
+                        .put("senderBadge", result.senderBadge)
+                        .put("senderBand", result.senderBand)
+                        .put("senderReason", result.senderReason)
                         .toString()
                 } catch (e: Exception) {
                     org.json.JSONObject()

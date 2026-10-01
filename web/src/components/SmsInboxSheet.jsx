@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import AppFullScreenView from "./AppFullScreenView.jsx";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
+import { postLetteringReport } from "../lib/letteringApi.js";
 import {
   analyzeSmsMessage,
   fetchSmsMessages,
+  fetchSmsSenderContext,
   fetchSmsThreads,
   markSmsThreadRead,
+  mergeSmsAnalysis,
   requestSmsReadPermission,
   waitSmsPermission,
   watchSmsAnalyzeAd
@@ -31,6 +34,35 @@ function formatBubbleTime(dateMs) {
   const ms = Number(dateMs) || 0;
   if (!ms) return "";
   return new Date(ms).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+}
+
+function riskBadge(status) {
+  if (status === "DANGER") return { mark: "🚨", label: "피싱 위험 번호", tone: "danger" };
+  if (status === "SUSPICIOUS") return { mark: "⚠️", label: "의심 번호", tone: "suspect" };
+  return { mark: "🟢", label: "안전", tone: "safe" };
+}
+
+function lookupLine(lookups, band) {
+  if (!lookups && !band) return "";
+  const piece = (title, row) => {
+    if (!row || row.status === "unavailable") return `${title} 조회 불가`;
+    if (row.status === "matched" && row.name) return `${title} ${row.name}`;
+    return `${title} 불일치`;
+  };
+  const reports = lookups?.reports;
+  const reportText = reports?.phishing
+    ? `신고 ${reports.phishing}건`
+    : reports?.total
+      ? `제보 ${reports.total}건`
+      : "신고 없음";
+  return [
+    band,
+    reportText,
+    piece("공공DB", lookups?.directory),
+    piece("카카오", lookups?.kakao),
+    piece("네이버", lookups?.naver),
+    piece("공공데이터", lookups?.publicData)
+  ].filter(Boolean).join(" · ");
 }
 
 function threadTitle(thread) {
@@ -63,6 +95,8 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
   const [messages, setMessages] = useState([]);
   const [analysis, setAnalysis] = useState({});
   const [busyId, setBusyId] = useState(null);
+  const [reportBusyId, setReportBusyId] = useState(null);
+  const [reported, setReported] = useState({});
   const [failures, setFailures] = useState({});
 
   const muted = isDarkMode ? "text-slate-400" : "text-slate-500";
@@ -123,12 +157,38 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
     setFailures((prev) => ({ ...prev, [key]: "" }));
     try {
       if (!paid) await watchSmsAnalyzeAd();
-      const result = await analyzeSmsMessage(message.address || selected?.address || "", message.body || "");
-      setAnalysis((prev) => ({ ...prev, [key]: result }));
+      const sender = message.address || selected?.address || "";
+      const body = message.body || "";
+      const [result, context] = await Promise.all([
+        analyzeSmsMessage(sender, body),
+        fetchSmsSenderContext(sender, body)
+      ]);
+      setAnalysis((prev) => ({ ...prev, [key]: mergeSmsAnalysis(result, context) }));
     } catch (error) {
       setFailures((prev) => ({ ...prev, [key]: error?.message || "분석을 완료하지 못했습니다. 다시 시도해 주세요." }));
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const blockAndReport = async (message, result) => {
+    const key = String(message.id);
+    const phone = message.address || selected?.address || "";
+    if (!phone || reportBusyId) return;
+    setReportBusyId(key);
+    try {
+      const posted = await postLetteringReport({
+        phone,
+        reasonId: result?.status === "DANGER" ? "smishing_malware" : "fraud",
+        detail: result?.summary || result?.senderReason || "문자 스캔 신고",
+        verified: true
+      });
+      if (!posted?.ok) throw new Error(posted?.error || "차단·신고를 저장하지 못했습니다.");
+      setReported((prev) => ({ ...prev, [key]: true }));
+    } catch (error) {
+      setFailures((prev) => ({ ...prev, [key]: error?.message || "차단·신고를 저장하지 못했습니다." }));
+    } finally {
+      setReportBusyId(null);
     }
   };
 
@@ -206,7 +266,8 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
         {messages.map((message) => {
           const key = String(message.id);
           const result = analysis[key];
-          const blocked = result?.status === "DANGER" || result?.status === "SUSPICIOUS";
+          const danger = result?.status === "DANGER";
+          const suspect = result?.status === "SUSPICIOUS";
           const safe = result?.status === "SAFE";
           const incoming = message.incoming !== false;
           return (
@@ -214,11 +275,11 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
               <div
                 className={`relative max-w-[88%] overflow-hidden rounded-2xl px-3 py-2 ${busyId === key ? "sms-scan" : ""}`}
                 style={{
-                  background: blocked ? "rgba(244, 67, 54, 0.12)" : safe ? "rgba(76, 175, 80, 0.12)" : isDarkMode ? "#243041" : "#F1F5F9",
-                  border: blocked ? "1px solid #F44336" : safe ? "1px solid #4CAF50" : "1px solid transparent"
+                  background: danger ? "rgba(244, 67, 54, 0.12)" : suspect ? "rgba(245, 158, 11, 0.16)" : safe ? "rgba(76, 175, 80, 0.12)" : isDarkMode ? "#243041" : "#F1F5F9",
+                  border: danger ? "1px solid #F44336" : suspect ? "1px solid #D97706" : safe ? "1px solid #4CAF50" : "1px solid transparent"
                 }}
                 onClick={() => {
-                  if (blocked) {
+                  if (danger) {
                     window.alert("🚨 AI 분석 결과 스미싱 위험 문자로 판정되어 링크 접근이 차단되었습니다.");
                   }
                 }}
@@ -251,12 +312,32 @@ export default function SmsInboxSheet({ open, onClose, isDarkMode = false, membe
                   </button>
                 </div>
                 {busyId === key ? (
-                  <p className="relative z-[1] mt-1 text-[11px] font-bold text-blue-700">Gemini AI 정밀 스캔 중...</p>
+                  <p className="relative z-[1] mt-1 text-[11px] font-bold text-blue-700">발신번호 대조와 Gemini 분석 중...</p>
                 ) : null}
                 {result ? (
-                  <div className={`relative z-[1] mt-2 rounded-xl px-2.5 py-2 text-[12px] leading-relaxed ${blocked ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>
-                    <p className="whitespace-pre-line font-bold">{result.summary || (blocked ? "🚨 [스미싱 차단] 위험한 링크가 포함되어 있어 터치를 차단했습니다." : "🟢 안전 / 정상 메시지")}</p>
-                    {blocked && result.unshortenedUrl ? <p className="mt-1 break-all">최종 URL: {result.unshortenedUrl}</p> : null}
+                  <div className={`relative z-[1] mt-2 rounded-xl px-2.5 py-2 text-[12px] leading-relaxed ${danger ? "bg-red-50 text-red-800" : suspect ? "bg-amber-50 text-amber-950" : "bg-emerald-50 text-emerald-800"}`}>
+                    <p className="font-black">
+                      {riskBadge(result.status).mark} {riskBadge(result.status).label}
+                    </p>
+                    {result.senderBand || result.senderLookups ? (
+                      <p className="mt-1 text-[11px] leading-snug opacity-80">{lookupLine(result.senderLookups, result.senderBand)}</p>
+                    ) : null}
+                    <p className="mt-1 whitespace-pre-line font-bold">
+                      {result.summary || result.senderReason || (danger ? "🚨 [스미싱 차단] 위험한 링크가 포함되어 있어 터치를 차단했습니다." : "🟢 안전 / 정상 메시지")}
+                    </p>
+                    {danger && result.unshortenedUrl ? <p className="mt-1 break-all">최종 URL: {result.unshortenedUrl}</p> : null}
+                    <button
+                      type="button"
+                      disabled={reportBusyId === key || reported[key]}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void blockAndReport(message, result);
+                      }}
+                      className="mt-2 rounded-full bg-slate-900 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
+                    >
+                      {reported[key] ? "차단·신고 완료" : reportBusyId === key ? "저장 중..." : "차단 및 신고"}
+                    </button>
+                    {failures[key] ? <p className="mt-1 font-semibold">{failures[key]}</p> : null}
                   </div>
                 ) : null}
                 {!result && failures[key] ? (

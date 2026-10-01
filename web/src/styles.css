@@ -88,6 +88,17 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   padding-top: var(--vlue-safe-top);
 }
 
+.vmap-live-line {
+  animation: vmap-live-line 7.5s ease forwards;
+}
+
+@keyframes vmap-live-line {
+  0% { opacity: 0; transform: translateY(14px); }
+  10% { opacity: 1; transform: translateY(0); }
+  72% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
 .sms-scan::after {
   content: "";
   position: absolute;

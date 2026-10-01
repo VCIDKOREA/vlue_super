@@ -1226,20 +1226,30 @@ function ProfilePanel({
           <div className="mt-6 px-1">
             <button
               type="button"
-              onClick={refreshActiveRegion}
-              disabled={activeRegionBusy}
-              className="flex w-full items-center gap-3 rounded-[28px] border-2 border-gray-50 bg-white p-5 shadow-sm transition-all active:scale-[0.98] disabled:opacity-70"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }));
+              }}
+              className={`flex w-full items-center gap-3 rounded-[28px] border p-4 text-left shadow-sm transition active:scale-[0.98] ${
+                isDarkMode
+                  ? "border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 text-white"
+                  : "border-sky-100 bg-gradient-to-r from-white to-sky-50 text-slate-900"
+              }`}
             >
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-red-50">
-                <span className="text-lg">📍</span>
-              </div>
-              <div className="flex min-w-0 flex-col text-left">
-                <p className="mb-0.5 text-[11px] font-bold uppercase tracking-tight text-gray-400">Active Region</p>
-                <p className="truncate whitespace-nowrap text-[clamp(13px,3.8vw,15px)] font-black tracking-tight text-gray-900">
+              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[20px] shadow-sm ${isDarkMode ? "bg-white/10" : "bg-white"}`}>
+                📍
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={`block text-[10px] font-black uppercase tracking-[0.16em] ${isDarkMode ? "text-sky-200" : "text-sky-600"}`}>
+                  위치 · 가족 · V-Map
+                </span>
+                <span className="mt-0.5 block truncate text-[15px] font-black tracking-tight">
                   {activeRegionBusy ? "위치 확인 중…" : activeRegionLabel}
-                </p>
-              </div>
-              <div className="ml-auto text-gray-300">›</div>
+                </span>
+              </span>
+              <span className={`ml-auto text-[18px] ${isDarkMode ? "text-white/40" : "text-slate-300"}`}>›</span>
+            </button>
+            <button type="button" onClick={refreshActiveRegion} className={`mt-1 px-2 text-[11px] font-bold ${isDarkMode ? "text-slate-400" : "text-slate-400"}`}>
+              현재 위치 다시 읽기
             </button>
           </div>
 

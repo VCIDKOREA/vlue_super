@@ -3,6 +3,7 @@ import PricingManagerPanel from "./PricingManagerPanel.jsx";
 import AdminMetricsPanel from "./AdminMetricsPanel.jsx";
 import AdminDiagnosticsPanel from "./AdminDiagnosticsPanel.jsx";
 import AdminAgencyDcpPanel from "./AdminAgencyDcpPanel.jsx";
+import AdminMapSponsorPanel from "./AdminMapSponsorPanel.jsx";
 import { ADMIN_DIAGNOSTICS_UI_ENABLED } from "../../lib/adminDiagnosticsFlags.js";
 import {
   createAdminNotice,
@@ -62,6 +63,7 @@ const TABS = [
   { id: "users", label: "회원 관리" },
   { id: "overdue", label: "미납 회선" },
   { id: "posts", label: "게시물 관리" },
+  { id: "mapSponsors", label: "지도 스폰서" },
   { id: "onboarding", label: "가입 승인" }
 ];
 
@@ -1926,6 +1928,7 @@ export default function AdminConsoleDesk({ user, onLogout }) {
         {tab === "users" ? <UsersTab onToast={showToast} /> : null}
         {tab === "overdue" ? <OverdueLinesTab onToast={showToast} /> : null}
         {tab === "posts" ? <PostsTab onToast={showToast} /> : null}
+        {tab === "mapSponsors" ? <AdminMapSponsorPanel /> : null}
         {tab === "onboarding" ? <OnboardingTab onToast={showToast} /> : null}
       </main>
 

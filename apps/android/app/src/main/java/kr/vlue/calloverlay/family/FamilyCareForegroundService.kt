@@ -87,5 +87,9 @@ class FamilyCareForegroundService : Service() {
                 context.startService(i)
             }
         }
+
+        fun stop(context: Context) {
+            context.stopService(Intent(context, FamilyCareForegroundService::class.java))
+        }
     }
 }

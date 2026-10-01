@@ -42,6 +42,7 @@ import {
   applyReportThresholdForPhone,
   assertReporterCanFile
 } from "../services/dcc/dccModerationService.js";
+import { buildSmsSenderContext } from "../services/sms/smsSenderContext.js";
 
 export const letteringRoutes = new Hono();
 
@@ -125,6 +126,21 @@ function buildTipSummary(rows: Array<{ cardSnapshot: unknown; detail: string | n
   };
 }
 
+
+/** 문자 스캔 — 발신번호 유형·신고 DB·공공 디렉터리·카카오·네이버·공공데이터 대조 */
+letteringRoutes.post("/sms-sender-context", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const phone = String(body.phone ?? body.sender ?? body.number ?? "").trim();
+  const messageText = String(body.messageText ?? body.text ?? "").trim();
+  if (!phone && !messageText) return c.json({ ok: false, error: "phone_required" }, 400);
+  try {
+    const context = await buildSmsSenderContext(phone, messageText);
+    return c.json(context, 200);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "sender_context_failed";
+    return c.json({ ok: false, error: message }, 200);
+  }
+});
 
 /** 번호별 신고·제보 이력 (웹 상세·오버레이 미리보기 — 공개 조회) */
 letteringRoutes.get("/reports/by-phone", async (c) => {

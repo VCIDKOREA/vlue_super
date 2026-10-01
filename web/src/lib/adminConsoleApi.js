@@ -480,6 +480,37 @@ export async function patchAdminAgency(id, body) {
   return parseJson(res);
 }
 
+export async function fetchAdminMapSponsors() {
+  const res = await fetch(apiUrl("/api/admin/console/map-sponsors"), { headers: adminHeaders() });
+  return parseJson(res);
+}
+
+export async function createAdminMapSponsor(body) {
+  const res = await fetch(apiUrl("/api/admin/console/map-sponsors"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}
+
+export async function patchAdminMapSponsor(id, body) {
+  const res = await fetch(apiUrl(`/api/admin/console/map-sponsors/${id}`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return parseJson(res);
+}
+
+export async function deleteAdminMapSponsor(id) {
+  const res = await fetch(apiUrl(`/api/admin/console/map-sponsors/${id}`), {
+    method: "DELETE",
+    headers: adminHeaders()
+  });
+  return parseJson(res);
+}
+
 export async function createAdminAgencyLogoUploadUrl(id, body) {
   const res = await fetch(apiUrl(`/api/admin/console/agencies/${encodeURIComponent(id)}/logo-upload-url`), {
     method: "POST",

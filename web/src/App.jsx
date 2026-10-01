@@ -42,6 +42,7 @@ import { dispatchCloseShowcaseOverlays } from "./lib/showcase/closeShowcaseOverl
 import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
+import LocationPlatform from "./components/location/LocationPlatform.jsx";
 import VlueBrandWordmark from "./components/VlueBrandWordmark.jsx";
 import V1PaidPackageGateModal from "./components/V1PaidPackageGateModal.jsx";
 import {
@@ -6277,6 +6278,7 @@ function App() {
         </div>
       ) : null}
 
+      <LocationPlatform />
       <ProfilePanel
         open={profileOpen}
         initialView={profileInitialView}

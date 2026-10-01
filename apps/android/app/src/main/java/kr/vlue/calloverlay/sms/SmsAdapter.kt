@@ -92,8 +92,19 @@ class SmsAdapter(
                     badge.visibility = View.GONE
                 }
             }
-            val detail = row.error ?: row.result?.summary
-            if (detail.isNullOrBlank()) {
+            val analyzed = row.result
+            val headline = when (analyzed?.senderBadge) {
+                "phishing" -> "🚨 피싱 위험 번호"
+                "suspect" -> "⚠️ 의심 번호"
+                "safe" -> "🟢 안전"
+                else -> ""
+            }
+            val detail = listOf(row.error, headline, analyzed?.senderBand, analyzed?.senderReason, analyzed?.summary)
+                .map { it?.trim().orEmpty() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .joinToString("\n")
+            if (detail.isBlank()) {
                 summary.visibility = View.GONE
             } else {
                 summary.visibility = View.VISIBLE

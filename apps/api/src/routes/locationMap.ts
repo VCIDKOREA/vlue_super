@@ -1,0 +1,531 @@
+import { Hono } from "hono";
+import { prisma } from "../db/client.js";
+import { fetchKakaoCarDirections } from "../integrations/kakao/kakaoMobilityDirections.js";
+import { searchKakaoLocalList } from "../integrations/kakao/kakaoLocalSearch.js";
+import { requireUserHeader } from "../middleware/cardGate.js";
+import { AUTO_ARRIVE_METERS, isVmapDropout, vmapRoomReadyToClose } from "../services/location/vmapArrival.js";
+
+const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
+
+export const locationMapRoutes = new Hono();
+
+function num(value: unknown, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function clip(value: unknown, max: number) {
+  return String(value || "").trim().slice(0, max);
+}
+
+function paramId(c: { req: { param: (name: string) => string | undefined } }) {
+  return String(c.req.param("id") || "");
+}
+
+async function me(c: { get: (key: "vlueUserId") => string | undefined }) {
+  return c.get("vlueUserId") || "";
+}
+
+function activeSponsorWhere(now: Date) {
+  return {
+    active: true,
+    AND: [
+      { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+      { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }
+    ]
+  };
+}
+
+function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const rad = Math.PI / 180;
+  const dLat = (bLat - aLat) * rad;
+  const dLng = (bLng - aLng) * rad;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(aLat * rad) * Math.cos(bLat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function seoulDateLabel(date = new Date()) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  }).format(date);
+}
+
+function roomRecord(room: { closingReason: string; logBody: string }) {
+  return {
+    title: "V-Map",
+    body: room.logBody,
+    reason: room.closingReason || "host",
+    farewell: room.closingReason === "arrived" ? FAREWELL : ""
+  };
+}
+
+const arrivalTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleArrivalClose(roomId: string) {
+  if (arrivalTimers.has(roomId)) return;
+  const timer = setTimeout(() => {
+    arrivalTimers.delete(roomId);
+    closeVmapRoom(roomId, "arrived").catch(() => {});
+  }, 5000);
+  arrivalTimers.set(roomId, timer);
+}
+async function maybeBeginArrival(roomId: string) {
+  const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
+  if (!room?.placeReady || room.closingAt) return room;
+  const moving = await prisma.vmapMember.findMany({ where: { roomId, departed: true } });
+  if (!vmapRoomReadyToClose(moving)) return room;
+  const claimed = await prisma.vmapRoom.updateMany({
+    where: { id: roomId, active: true, closingAt: null },
+    data: { closingAt: new Date(), closingReason: "arrived" }
+  });
+  if (claimed.count !== 1) return prisma.vmapRoom.findUnique({ where: { id: roomId } });
+  scheduleArrivalClose(roomId);
+  return prisma.vmapRoom.findUnique({ where: { id: roomId } });
+}
+
+/** 방 종료 기록을 참가자 알림함에 남기고 멤버·대화는 지운다. */
+async function closeVmapRoom(roomId: string, reason: "arrived" | "host") {
+  const room = await prisma.vmapRoom.findUnique({ where: { id: roomId } });
+  if (!room) return null;
+  if (!room.active && room.logBody) return roomRecord(room);
+  const members = await prisma.vmapMember.findMany({ where: { roomId } });
+  const host = await prisma.user.findUnique({
+    where: { id: room.hostUserId },
+    select: { legalName: true, publicHandle: true }
+  });
+  const creator = String(host?.legalName || host?.publicHandle || "생성자").replace(/^@+/, "").trim() || "생성자";
+  const participants = members.map((member) => member.displayName || "참여자");
+  const destination = room.placeLabel || "목적지";
+  const date = seoulDateLabel();
+  const body = room.logBody || `${date}\n생성자 ${creator}\n참가 ${participants.join(", ") || creator}\n목적지 ${destination}`;
+  const payload = JSON.stringify({ kind: "vmap_record", date, creator, participants, destination });
+  const claimed = await prisma.$queryRaw<Array<{ claimed: number }>>`
+    WITH claim AS (
+      UPDATE vmap_rooms
+      SET active = false,
+          log_body = ${body},
+          closing_reason = ${reason},
+          updated_at = now()
+      WHERE id = CAST(${roomId} AS uuid) AND active = true
+      RETURNING id, host_user_id
+    ),
+    roster AS (
+      SELECT m.user_id, c.host_user_id
+      FROM vmap_members m
+      JOIN claim c ON m.room_id = c.id
+    ),
+    inserted AS (
+      INSERT INTO owner_notifications (
+        id, owner_user_id, actor_user_id, title, body, status, pin_key, payload_json, created_at
+      )
+      SELECT gen_random_uuid(),
+             roster.user_id,
+             roster.host_user_id,
+             'V-Map',
+             ${body},
+             'unread'::"NotificationStatus",
+             'vmap:' || CAST(${roomId} AS text),
+             CAST(${payload} AS jsonb),
+             now()
+      FROM roster
+      ON CONFLICT (owner_user_id, pin_key) DO NOTHING
+      RETURNING id
+    ),
+    gone_members AS (
+      DELETE FROM vmap_members
+      WHERE room_id IN (SELECT id FROM claim)
+        AND (SELECT COUNT(*) FROM inserted) >= 0
+      RETURNING id
+    ),
+    gone_messages AS (
+      DELETE FROM vmap_messages
+      WHERE room_id IN (SELECT id FROM claim)
+        AND (SELECT COUNT(*) FROM gone_members) >= 0
+      RETURNING id
+    )
+    SELECT COUNT(*)::int AS claimed FROM claim
+  `;
+  if (Number(claimed[0]?.claimed || 0) < 1) {
+    const again = await prisma.vmapRoom.findUnique({ where: { id: roomId } });
+    return again ? roomRecord(again) : null;
+  }
+  return { title: "V-Map", body, reason, farewell: reason === "arrived" ? FAREWELL : "" };
+}
+
+/** 자동차 길찾기. 좌표는 경도,위도. */
+locationMapRoutes.get("/guide", requireUserHeader, async (c) => {
+  const fromLat = num(c.req.query("fromLat"), NaN);
+  const fromLng = num(c.req.query("fromLng"), NaN);
+  const toLat = num(c.req.query("toLat"), NaN);
+  const toLng = num(c.req.query("toLng"), NaN);
+  if (![fromLat, fromLng, toLat, toLng].every(Number.isFinite)) {
+    return c.json({ ok: false, error: "좌표가 없습니다." }, 400);
+  }
+  try {
+    const guided = await fetchKakaoCarDirections(fromLng, fromLat, toLng, toLat);
+    if (!guided.ok) return c.json({ ok: false, error: guided.error }, 200);
+    return c.json(guided);
+  } catch {
+    return c.json({ ok: false, error: "길안내 서버에 연결하지 못했습니다." }, 200);
+  }
+});
+
+/** 지도 하단 스폰서. 없으면 앱이 AdMob으로 대체한다. */
+locationMapRoutes.get("/sponsor", async (c) => {
+  try {
+    const row = await prisma.mapSponsorBanner.findFirst({
+      where: activeSponsorWhere(new Date()),
+      orderBy: { updatedAt: "desc" }
+    });
+    if (!row) return c.json({ ok: true, banner: null });
+    return c.json({
+      ok: true,
+      banner: {
+        id: row.id,
+        title: row.title,
+        body: row.body,
+        imageUrl: row.imageUrl,
+        linkUrl: row.linkUrl
+      }
+    });
+  } catch {
+    return c.json({ ok: true, banner: null });
+  }
+});
+
+locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const body = await c.req.json().catch(() => ({}));
+  const lat = num(body.lat, NaN);
+  const lng = num(body.lng, NaN);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return c.json({ error: "좌표가 없습니다." }, 400);
+  const row = await prisma.locationPresence.upsert({
+    where: { userId },
+    create: {
+      userId,
+      displayName: clip(body.displayName, 80),
+      lat,
+      lng,
+      addressLabel: clip(body.addressLabel, 240),
+      batteryPct: body.batteryPct == null ? null : Math.max(0, Math.min(100, Math.round(num(body.batteryPct)))),
+      online: body.online !== false
+    },
+    update: {
+      displayName: clip(body.displayName, 80),
+      lat,
+      lng,
+      addressLabel: clip(body.addressLabel, 240),
+      batteryPct: body.batteryPct == null ? null : Math.max(0, Math.min(100, Math.round(num(body.batteryPct)))),
+      online: body.online !== false
+    }
+  });
+  return c.json({ ok: true, presence: row });
+});
+
+locationMapRoutes.get("/family", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const links = await prisma.familyProtectionLink.findMany({
+    where: {
+      status: "active",
+      OR: [{ guardianUserId: userId }, { wardUserId: userId }]
+    },
+    select: {
+      guardianUserId: true,
+      wardUserId: true,
+      familyRelation: true,
+      guardianUser: { select: { id: true, legalName: true, publicHandle: true } },
+      wardUser: { select: { id: true, legalName: true, publicHandle: true } }
+    }
+  });
+  const ids = new Set<string>([userId]);
+  const names = new Map<string, string>();
+  for (const link of links) {
+    for (const person of [link.guardianUser, link.wardUser]) {
+      ids.add(person.id);
+      names.set(person.id, person.legalName || person.publicHandle || "가족");
+    }
+  }
+  const rows = await prisma.locationPresence.findMany({ where: { userId: { in: [...ids] } } });
+  const byId = new Map(rows.map((row) => [row.userId, row]));
+  const members = [...ids].map((id) => {
+    const row = byId.get(id);
+    const stale = !row || Date.now() - row.updatedAt.getTime() > 3 * 60 * 1000;
+    const dead = !row || row.online === false || row.batteryPct === 0 || stale;
+    return {
+      userId: id,
+      self: id === userId,
+      displayName: row?.displayName || names.get(id) || (id === userId ? "나" : "가족"),
+      lat: row?.lat ?? null,
+      lng: row?.lng ?? null,
+      addressLabel: row?.addressLabel || "",
+      batteryPct: row?.batteryPct ?? null,
+      online: Boolean(row) && !dead,
+      grayscale: dead,
+      updatedAt: row?.updatedAt?.toISOString() || null
+    };
+  });
+  return c.json({ ok: true, members });
+});
+
+locationMapRoutes.post("/vmap", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const body = await c.req.json().catch(() => ({}));
+  const placeLat = num(body.placeLat, NaN);
+  const placeLng = num(body.placeLng, NaN);
+  if (!Number.isFinite(placeLat) || !Number.isFinite(placeLng)) return c.json({ error: "약속 장소가 없습니다." }, 400);
+  const room = await prisma.vmapRoom.create({
+    data: {
+      hostUserId: userId,
+      title: clip(body.title, 80) || "약속",
+      placeLabel: "",
+      placeLat,
+      placeLng,
+      placeReady: false
+    }
+  });
+  await prisma.vmapMember.create({
+    data: { roomId: room.id, userId, displayName: clip(body.displayName, 80) || "나", departed: false }
+  });
+  return c.json({ ok: true, room });
+});
+
+locationMapRoutes.get("/place-search", requireUserHeader, async (c) => {
+  const query = clip(c.req.query("q"), 80);
+  if (query.length < 2) return c.json({ ok: true, places: [] });
+  const list = await searchKakaoLocalList(query, 6).catch(() => []);
+  return c.json({
+    ok: true,
+    places: list
+      .filter((item) => item.latitude != null && item.longitude != null)
+      .map((item) => ({
+        label: item.place_name,
+        address: item.road_address || item.address,
+        lat: item.latitude,
+        lng: item.longitude
+      }))
+  });
+});
+
+locationMapRoutes.patch("/vmap/:id/place", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
+  if (!room) return c.json({ error: "약속을 찾을 수 없습니다." }, 404);
+  if (room.hostUserId !== userId) return c.json({ error: "도착지는 방장만 정할 수 있습니다." }, 403);
+  const body = await c.req.json().catch(() => ({}));
+  const placeLat = num(body.placeLat, NaN);
+  const placeLng = num(body.placeLng, NaN);
+  if (!Number.isFinite(placeLat) || !Number.isFinite(placeLng)) return c.json({ error: "핀 위치가 없습니다." }, 400);
+  const updated = await prisma.vmapRoom.update({
+    where: { id: roomId },
+    data: {
+      placeLat,
+      placeLng,
+      placeLabel: clip(body.placeLabel, 160) || "도착지",
+      placeReady: true
+    }
+  });
+  return c.json({ ok: true, room: updated });
+});
+
+locationMapRoutes.post("/vmap/:id/join", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
+  if (!room) return c.json({ error: "약속을 찾을 수 없습니다." }, 404);
+  const body = await c.req.json().catch(() => ({}));
+  await prisma.vmapMember.upsert({
+    where: { roomId_userId: { roomId, userId } },
+    create: { roomId, userId, displayName: clip(body.displayName, 80) || "참여자", departed: false },
+    update: { displayName: clip(body.displayName, 80) || "참여자" }
+  });
+  return c.json({ ok: true, room });
+});
+
+locationMapRoutes.post("/vmap/:id/depart", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const body = await c.req.json().catch(() => ({}));
+  const lat = num(body.lat, NaN);
+  const lng = num(body.lng, NaN);
+  const member = await prisma.vmapMember.update({
+    where: { roomId_userId: { roomId, userId } },
+    data: {
+      departed: true,
+      online: body.online !== false,
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      batteryPct: body.batteryPct == null ? undefined : Math.round(num(body.batteryPct))
+    }
+  });
+  const room = await maybeBeginArrival(roomId);
+  return c.json({ ok: true, member, closingAt: room?.closingAt?.toISOString() || null });
+});
+
+locationMapRoutes.post("/vmap/:id/arrive", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const current = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+  if (!current?.departed) return c.json({ error: "출발한 뒤에 도착할 수 있습니다." }, 400);
+  const member = await prisma.vmapMember.update({
+    where: { roomId_userId: { roomId, userId } },
+    data: { arrived: true, online: true }
+  });
+  const room = await maybeBeginArrival(roomId);
+  return c.json({ ok: true, member, closingAt: room?.closingAt?.toISOString() || null });
+});
+
+locationMapRoutes.post("/vmap/:id/presence", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const current = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+  if (!current?.departed) return c.json({ ok: true, hidden: true });
+  const body = await c.req.json().catch(() => ({}));
+  const lat = num(body.lat, NaN);
+  const lng = num(body.lng, NaN);
+  const nextLat = Number.isFinite(lat) ? lat : current.lat;
+  const nextLng = Number.isFinite(lng) ? lng : current.lng;
+  let arrived = current.arrived;
+  if (!arrived && nextLat != null && nextLng != null) {
+    const place = await prisma.vmapRoom.findFirst({
+      where: { id: roomId, active: true, placeReady: true },
+      select: { placeLat: true, placeLng: true }
+    });
+    if (place && haversineMeters(nextLat, nextLng, place.placeLat, place.placeLng) <= AUTO_ARRIVE_METERS) {
+      arrived = true;
+    }
+  }
+  const member = await prisma.vmapMember.update({
+    where: { roomId_userId: { roomId, userId } },
+    data: {
+      arrived,
+      online: body.online !== false,
+      lat: nextLat,
+      lng: nextLng,
+      batteryPct: body.batteryPct == null ? current.batteryPct : Math.round(num(body.batteryPct))
+    }
+  });
+  const room = await maybeBeginArrival(roomId);
+  return c.json({ ok: true, member, closingAt: room?.closingAt?.toISOString() || null });
+});
+
+locationMapRoutes.get("/vmap/:id", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  let room = await prisma.vmapRoom.findUnique({ where: { id: roomId } });
+  if (!room) return c.json({ error: "종료된 약속입니다." }, 404);
+  if (!room.active) {
+    return c.json({ ok: true, dissolved: true, ...roomRecord(room) });
+  }
+  if (room.closingAt && Date.now() - room.closingAt.getTime() >= 5000) {
+    const record = (await closeVmapRoom(roomId, "arrived")) || {
+      title: "V-Map",
+      body: "",
+      reason: "arrived" as const,
+      farewell: FAREWELL
+    };
+    return c.json({ ok: true, dissolved: true, ...record });
+  }
+  if (!room.closingAt) room = (await maybeBeginArrival(roomId)) || room;
+  const mine = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+  if (!mine) return c.json({ error: "방에 참여하지 않았습니다." }, 403);
+  const members = await prisma.vmapMember.findMany({ where: { roomId } });
+  return c.json({
+    ok: true,
+    room,
+    members: members.map((member) => ({
+      ...member,
+      lat: member.departed ? member.lat : null,
+      lng: member.departed ? member.lng : null,
+      arrived: member.arrived,
+      dropout: isVmapDropout(member),
+      batteryPct: null,
+      addressLabel: ""
+    }))
+  });
+});
+
+locationMapRoutes.post("/vmap/:id/messages", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const mine = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+  if (!mine) return c.json({ error: "방에 참여하지 않았습니다." }, 403);
+  const body = await c.req.json().catch(() => ({}));
+  const kind = body.kind === "voice" ? "voice" : "text";
+  const text = String(body.body || "");
+  if (!text.trim()) return c.json({ error: "내용이 없습니다." }, 400);
+  if (text.length > 180_000) return c.json({ error: "음성 메시지가 너무 깁니다." }, 413);
+  const message = await prisma.vmapMessage.create({
+    data: {
+      roomId,
+      userId,
+      displayName: mine.displayName || "참여자",
+      kind,
+      body: text
+    }
+  });
+  await prisma.vmapMessage.deleteMany({
+    where: {
+      roomId,
+      createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    }
+  });
+  return c.json({ ok: true, message: { ...message, createdAt: message.createdAt.toISOString() } });
+});
+
+locationMapRoutes.get("/vmap/:id/messages", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const mine = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+  if (!mine) return c.json({ error: "방에 참여하지 않았습니다." }, 403);
+  const after = String(c.req.query("after") || "");
+  const rows = await prisma.vmapMessage.findMany({
+    where: { roomId, ...(after ? { createdAt: { gt: new Date(after) } } : {}) },
+    orderBy: { createdAt: "asc" },
+    take: 40
+  });
+  return c.json({
+    ok: true,
+    messages: rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
+  });
+});
+
+locationMapRoutes.post("/vmap/:id/exit", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const room = await prisma.vmapRoom.findUnique({ where: { id: roomId } });
+  if (!room) return c.json({ ok: true, closed: false });
+  if (room.hostUserId === userId) {
+    const pending = arrivalTimers.get(roomId);
+    if (pending) {
+      clearTimeout(pending);
+      arrivalTimers.delete(roomId);
+    }
+    const record = await closeVmapRoom(roomId, room.closingReason === "arrived" ? "arrived" : "host");
+    return c.json({ ok: true, closed: true, record });
+  }
+  await prisma.vmapMember.deleteMany({ where: { roomId, userId } });
+  return c.json({ ok: true, closed: false });
+});
+
+locationMapRoutes.post("/vmap/:id/finish", requireUserHeader, async (c) => {
+  const roomId = paramId(c);
+  const room = await prisma.vmapRoom.findUnique({ where: { id: roomId } });
+  if (!room) return c.json({ ok: true, dissolved: true });
+  if (!room.active) return c.json({ ok: true, dissolved: true, ...roomRecord(room) });
+  if (!room.closingAt || Date.now() - room.closingAt.getTime() < 5000) {
+    return c.json({ ok: true, waiting: true, closingAt: room.closingAt?.toISOString() || null });
+  }
+  const record = (await closeVmapRoom(roomId, "arrived")) || {
+    title: "V-Map",
+    body: "",
+    reason: "arrived" as const,
+    farewell: FAREWELL
+  };
+  return c.json({ ok: true, dissolved: true, ...record });
+});

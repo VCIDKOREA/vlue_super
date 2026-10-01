@@ -8,6 +8,28 @@ type SmsAnalysis = {
   unshortenedUrl: string | null;
   summary: string;
   actionGuide: string;
+  senderBadge?: string;
+  senderBand?: string;
+  senderReason?: string;
+};
+
+type SenderContext = {
+  ok?: boolean;
+  band?: string;
+  bandLabel?: string;
+  badge?: string;
+  escalate?: AnalysisStatus;
+  dangerFloor?: number;
+  reason?: string;
+  impersonation?: boolean;
+  smishingUrl?: boolean;
+  lookups?: {
+    reports?: { total?: number; phishing?: number; reasons?: string[] };
+    directory?: { status?: string; name?: string };
+    kakao?: { status?: string; name?: string };
+    naver?: { status?: string; name?: string };
+    publicData?: { status?: string; name?: string };
+  };
 };
 
 type Body = {
@@ -210,6 +232,85 @@ function optOutFact(digits: string | null) {
   return `수신거부 ${phone} 는 본문에 적힌 거부 번호입니다. 금전 안내는 그 번호로 하지 마세요.`;
 }
 
+function localSenderBand(raw: string) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  const trimmed = String(raw || "").trim();
+  if (/^(00[1235678]|00700)/.test(digits) || (trimmed.startsWith("+") && !trimmed.startsWith("+82"))) {
+    const known = ["001", "002", "003", "005", "006", "007", "008"].find((item) => digits.startsWith(item));
+    return { band: "international", label: known ? `국제전화 ${known} 대역` : "국외발신 대역" };
+  }
+  if (digits.startsWith("070")) return { band: "internet", label: "070 인터넷전화" };
+  if (digits.startsWith("050")) return { band: "virtual", label: "050 안심·가상번호" };
+  if (/^01[016789]/.test(digits)) return { band: "mobile", label: "일반 010 이동전화" };
+  return { band: "other", label: digits ? "일반 발신번호" : "발신번호 없음" };
+}
+
+async function loadSenderContext(sender: string, messageText: string): Promise<SenderContext | null> {
+  const base = (Deno.env.get("VLUE_API_BASE") || "https://api.vlue.kr").replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/api/lettering/sms-sender-context`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(4500),
+      body: JSON.stringify({ phone: sender, messageText: messageText.slice(0, 1500) })
+    });
+    const data = await res.json().catch(() => null) as SenderContext | null;
+    if (!res.ok || !data?.ok) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function contextFacts(ctx: SenderContext | null, sender: string) {
+  const local = localSenderBand(sender);
+  if (!ctx) return `발신 유형: ${local.label}`;
+  const hit = (name: string, row?: { status?: string; name?: string }) => {
+    if (!row || row.status === "unavailable") return `${name} 조회 불가`;
+    if (row.status === "matched" && row.name) return `${name} 일치: ${row.name}`;
+    return `${name} 번호 불일치`;
+  };
+  const reports = ctx.lookups?.reports;
+  const reportLine = reports?.phishing
+    ? `VLUÉ 스미싱·사기 신고 ${reports.phishing}건`
+    : reports?.total
+      ? `VLUÉ 신고 ${reports.total}건`
+      : "VLUÉ 신고 이력 없음";
+  return [
+    `발신 유형: ${ctx.bandLabel || local.label}`,
+    reportLine,
+    hit("공공 디렉터리", ctx.lookups?.directory),
+    hit("카카오", ctx.lookups?.kakao),
+    hit("네이버", ctx.lookups?.naver),
+    hit("공공데이터 상가", ctx.lookups?.publicData),
+    ctx.reason ? `대조 메모: ${ctx.reason}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function applySenderContext(parsed: SmsAnalysis, ctx: SenderContext | null, sender: string): SmsAnalysis {
+  const local = localSenderBand(sender);
+  const impersonation = Boolean(ctx?.impersonation);
+  const personal = impersonation && (local.band === "mobile" || local.band === "international" || ctx?.band === "mobile" || ctx?.band === "international");
+  const floor = personal ? 98 : Math.max(0, Number(ctx?.dangerFloor) || 0);
+  const elevate = personal ? "DANGER" : ctx?.escalate;
+  if (elevate === "DANGER" && parsed.status !== "DANGER") {
+    parsed.status = "DANGER";
+    parsed.dangerScore = Math.max(parsed.dangerScore, floor || 90);
+  } else if (elevate === "SUSPICIOUS" && parsed.status === "SAFE") {
+    parsed.status = "SUSPICIOUS";
+    parsed.dangerScore = Math.max(parsed.dangerScore, floor || 58);
+  } else if (floor > parsed.dangerScore && elevate && elevate !== "SAFE") {
+    parsed.dangerScore = floor;
+  }
+  if (ctx?.reason && !parsed.summary.includes(ctx.reason.slice(0, 16))) {
+    parsed.summary = clipSummary(`${parsed.summary}\n${ctx.reason}`, 400);
+  }
+  parsed.senderBadge = ctx?.badge || (parsed.status === "DANGER" ? "phishing" : parsed.status === "SUSPICIOUS" ? "suspect" : "safe");
+  parsed.senderBand = ctx?.bandLabel || local.label;
+  parsed.senderReason = ctx?.reason || "";
+  return parsed;
+}
+
 function briefSummary(verdict: string, messageText: string, urls: string[], tracked: string[], finalUrl: string | null) {
   const lines = [verdict, linkFact(urls, tracked, finalUrl), optOutFact(optOutDigits(messageText))]
     .map((line) => line.trim())
@@ -323,26 +424,38 @@ serve(async (req) => {
       if (!unshortenedUrl) unshortenedUrl = `https://${host}`;
     }
 
+    const senderContext = await loadSenderContext(sender, messageText);
     const local = localVerdict(messageText, hosts);
-    if (local && local.status === "SAFE" && urls.length === 0 && bareDomains.length === 0) {
-      return json(local);
+    const senderEscalates = senderContext?.escalate === "DANGER" || senderContext?.escalate === "SUSPICIOUS";
+    if (local && local.status === "SAFE" && urls.length === 0 && bareDomains.length === 0 && !senderEscalates) {
+      return json(applySenderContext(local, senderContext, sender));
     }
 
     const apiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
     if (!apiKey) {
-      if (local) return json(local);
+      if (local) return json(applySenderContext(local, senderContext, sender));
+      if (senderContext?.escalate === "DANGER" || senderContext?.escalate === "SUSPICIOUS") {
+        return json(applySenderContext(
+          fallback(senderContext.escalate, senderContext.reason || "발신번호 대조에서 위험 징후가 있습니다.", unshortenedUrl),
+          senderContext,
+          sender
+        ));
+      }
       return json({ ok: false, retry: true, error: "분석을 마치려면 잠시 후 다시 시도해 주세요." }, 200);
     }
 
     const prompt = [
-      "너는 대한민국 스미싱 정밀 분석관이다. 문자 본문과 URL 추적 결과만 보고 JSON만 반환하라.",
+      "너는 대한민국 스미싱 정밀 분석관이다. 문자 본문, URL 추적, 발신번호 대조 결과를 함께 보고 JSON만 반환하라.",
       "판정 규칙:",
       "① 기관/택배 사칭: 우체국, 경찰청, 국민건강보험, 택배 배송, 모바일 청첩장, 과태료 안내를 말하면서 공식 도메인(go.kr, epost.go.kr, or.kr, korea.kr)이 아닌 불분명한 주소가 있으면 status=DANGER. summary는 한글로 🚨 [기관 사칭 스미싱]으로 시작하고, 사칭한 기관과 차단한 주소를 적을 것.",
       "② 해외 도박/스팸: WEGO88, 카지노, 대박캐시백, 리베이트처럼 불법 도박 유도 문구나 그런 주소가 있으면 status=DANGER. summary는 🚨 [스미싱 차단] 해외 불법 도박 사이트 유도 링크(주소)가 포함되어 있습니다. 형태.",
-      "③ 정상 인증/안내: 카카오, 통신사, 은행의 인증번호이거나 공식 주소만 있으면 status=SAFE. summary는 🟢 [안전]으로 시작. 링크가 없는 본문만으로 DANGER를 내리지 말 것.",
-      "URL 추적 결과가 'URL 접속 불가/응답 없음'이어도 분석을 포기하지 말고 본문으로 판정하라.",
+      "③ 정상 인증/안내: 카카오, 통신사, 은행의 인증번호이거나 공식 주소만 있으면 status=SAFE. summary는 🟢 [안전]으로 시작. 링크가 없는 본문만으로 DANGER를 내리지 말 것. 단, 아래 발신번호 대조가 위험이면 이 예외를 적용하지 말 것.",
+      "④ 기관·택배·금융 사칭 문자가 010 개인번호나 001·002·006 등 국제전화, 070·050 인터넷전화로 오면 status=DANGER, dangerScore는 98 이상. summary에 그 발신 유형을 적을 것.",
+      "⑤ VLUÉ 신고 이력이 있거나 스미싱 URL이 있으면 경고다. 신고가 사기·스미싱이거나 URL과 사칭이 같이 있으면 status=DANGER. summary에 신고 이력과 URL 사실을 한 문장으로 적을 것. KISA 신고라고 쓰지 말고 VLUÉ 신고라고만 적을 것.",
+      "URL 추적 결과가 'URL 접속 불가/응답 없음'이어도 분석을 포기하지 말고 본문과 발신번호 대조로 판정하라.",
       "summary는 한글 2~3줄만. 1줄은 판정과 주의(금전·개인정보에는 응하지 말고 직접 확인). 2줄은 링크가 어디로 이어지는지, 응답이 없으면 그 사실을. 3줄은 수신거부 번호가 있으면 광고 수신거부 번호인지. status는 SAFE, SUSPICIOUS, DANGER. dangerScore는 0부터 100.",
       `발신번호: ${sender || "알 수 없음"}`,
+      contextFacts(senderContext, sender),
       `원본 문자: ${messageText}`,
       `추적된 URL: ${tracked.length ? tracked.join(" | ") : "없음"}`,
       `본문 도메인: ${hosts.join(", ") || "없음"}`
@@ -376,7 +489,7 @@ serve(async (req) => {
     }
 
     if (!parsed) {
-      if (local) return json(local);
+      if (local) return json(applySenderContext(local, senderContext, sender));
       const ordinary = fallback(
         "SAFE",
         briefSummary(
@@ -388,7 +501,14 @@ serve(async (req) => {
         ),
         unshortenedUrl
       );
-      if (!gamblingHint(messageText) && !impersonationHint(messageText)) return json(ordinary);
+      if (!gamblingHint(messageText) && !impersonationHint(messageText) && !senderEscalates) return json(applySenderContext(ordinary, senderContext, sender));
+      if (senderContext?.reason) {
+        return json(applySenderContext(
+          fallback(senderContext.escalate === "SAFE" ? "SUSPICIOUS" : (senderContext.escalate || "SUSPICIOUS"), senderContext.reason, unshortenedUrl),
+          senderContext,
+          sender
+        ));
+      }
       return json({ ok: false, retry: true, error: "분석을 완료하지 못했습니다. 다시 시도해 주세요." }, 200);
     }
 
@@ -403,6 +523,7 @@ serve(async (req) => {
       parsed.summary = local.summary;
     }
     if (!parsed.unshortenedUrl) parsed.unshortenedUrl = unshortenedUrl;
+    applySenderContext(parsed, senderContext, sender);
     const facts = [linkFact(urls, tracked, parsed.unshortenedUrl), optOutFact(optOutDigits(messageText))]
       .filter((line) => line && !parsed.summary.includes(line.slice(0, 12)));
     if (facts.length) {

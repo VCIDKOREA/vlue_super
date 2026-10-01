@@ -16,7 +16,10 @@ data class SmsAnalysisResult(
     val dangerScore: Int,
     val unshortenedUrl: String?,
     val summary: String,
-    val actionGuide: String
+    val actionGuide: String,
+    val senderBadge: String = "",
+    val senderBand: String = "",
+    val senderReason: String = ""
 )
 
 data class SmsInboxMessage(
@@ -115,7 +118,10 @@ class SmsAnalysisRepository(private val context: Context) {
             dangerScore = parsed.dangerScore.coerceIn(0, 100),
             unshortenedUrl = parsed.unshortenedUrl?.trim()?.ifBlank { null },
             summary = parsed.summary?.trim().orEmpty().take(400),
-            actionGuide = parsed.actionGuide?.trim().orEmpty()
+            actionGuide = parsed.actionGuide?.trim().orEmpty(),
+            senderBadge = parsed.senderBadge?.trim().orEmpty(),
+            senderBand = parsed.senderBand?.trim().orEmpty(),
+            senderReason = parsed.senderReason?.trim().orEmpty()
         )
     }
 }
@@ -126,5 +132,8 @@ private data class SmsAnalysisDto(
     val unshortenedUrl: String? = null,
     val summary: String? = null,
     val actionGuide: String? = null,
+    val senderBadge: String? = null,
+    val senderBand: String? = null,
+    val senderReason: String? = null,
     @SerializedName("error") val error: String? = null
 )

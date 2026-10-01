@@ -1,3 +1,4 @@
+import { apiUrl } from "./apiBase.js";
 import { getLocalVlueUserId } from "./showcase/resolveShowcaseOwnerUserId.js";
 
 function bridge() {
@@ -99,6 +100,70 @@ export async function analyzeSmsMessage(sender, messageText) {
     dangerScore: Number(detail.dangerScore) || 0,
     unshortenedUrl: detail.unshortenedUrl || null,
     summary: String(detail.summary || ""),
-    actionGuide: String(detail.actionGuide || "")
+    actionGuide: String(detail.actionGuide || ""),
+    senderBadge: String(detail.senderBadge || ""),
+    senderBand: String(detail.senderBand || ""),
+    senderReason: String(detail.senderReason || "")
+  };
+}
+
+const STATUS_RANK = { SAFE: 0, SUSPICIOUS: 1, DANGER: 2 };
+
+function statusFromBadge(badge) {
+  if (badge === "phishing") return "DANGER";
+  if (badge === "suspect") return "SUSPICIOUS";
+  return "SAFE";
+}
+
+function badgeFromStatus(status) {
+  if (status === "DANGER") return "phishing";
+  if (status === "SUSPICIOUS") return "suspect";
+  return "safe";
+}
+
+/** 문자 본문 분석과 별도로, 발신번호를 VLUE DB·카카오·네이버·공공데이터와 대조한다. */
+export async function fetchSmsSenderContext(phone, messageText) {
+  try {
+    const res = await fetch(apiUrl("/api/lettering/sms-sender-context"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone: String(phone || "").slice(0, 40),
+        messageText: String(messageText || "").slice(0, 2000)
+      })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function mergeSmsAnalysis(analysis, context) {
+  const base = analysis || {
+    status: "SAFE",
+    dangerScore: 0,
+    unshortenedUrl: null,
+    summary: "",
+    actionGuide: ""
+  };
+  if (!context?.ok && !base.senderReason) return base;
+  const contextStatus = context?.ok ? statusFromBadge(context.badge) : "SAFE";
+  const geminiStatus = STATUS_RANK[base.status] >= 0 ? base.status : "SAFE";
+  const status = (STATUS_RANK[contextStatus] || 0) > (STATUS_RANK[geminiStatus] || 0) ? contextStatus : geminiStatus;
+  const reason = String(context?.reason || base.senderReason || "").trim();
+  const summary = reason && !String(base.summary || "").includes(reason.slice(0, 16))
+    ? [base.summary, reason].filter(Boolean).join("\n")
+    : String(base.summary || reason);
+  return {
+    ...base,
+    status,
+    dangerScore: Math.max(Number(base.dangerScore) || 0, Number(context?.dangerFloor) || 0),
+    summary,
+    senderBadge: status === geminiStatus && base.senderBadge ? base.senderBadge : badgeFromStatus(status),
+    senderBand: context?.bandLabel || base.senderBand || "",
+    senderReason: reason,
+    senderLookups: context?.lookups || null
   };
 }

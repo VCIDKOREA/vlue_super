@@ -700,6 +700,51 @@ authed.post("/agencies/:id/logo-upload-url", async (c) => {
   }
 });
 
+authed.get("/map-sponsors", async (c) => {
+  const rows = await prisma.mapSponsorBanner.findMany({ orderBy: { updatedAt: "desc" }, take: 50 });
+  return c.json({ ok: true, banners: rows });
+});
+
+authed.post("/map-sponsors", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const title = String(body.title || "").trim();
+  if (!title) return c.json({ error: "제목이 필요합니다." }, 400);
+  const row = await prisma.mapSponsorBanner.create({
+    data: {
+      title: title.slice(0, 80),
+      body: String(body.body || "").slice(0, 160),
+      imageUrl: String(body.imageUrl || "").slice(0, 1024),
+      linkUrl: String(body.linkUrl || "").slice(0, 1024),
+      active: body.active !== false,
+      startsAt: body.startsAt ? new Date(body.startsAt) : null,
+      endsAt: body.endsAt ? new Date(body.endsAt) : null
+    }
+  });
+  return c.json({ ok: true, banner: row });
+});
+
+authed.patch("/map-sponsors/:id", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const row = await prisma.mapSponsorBanner.update({
+    where: { id: c.req.param("id") },
+    data: {
+      ...(body.title != null ? { title: String(body.title).slice(0, 80) } : {}),
+      ...(body.body != null ? { body: String(body.body).slice(0, 160) } : {}),
+      ...(body.imageUrl != null ? { imageUrl: String(body.imageUrl).slice(0, 1024) } : {}),
+      ...(body.linkUrl != null ? { linkUrl: String(body.linkUrl).slice(0, 1024) } : {}),
+      ...(body.active != null ? { active: Boolean(body.active) } : {}),
+      ...(body.startsAt !== undefined ? { startsAt: body.startsAt ? new Date(body.startsAt) : null } : {}),
+      ...(body.endsAt !== undefined ? { endsAt: body.endsAt ? new Date(body.endsAt) : null } : {})
+    }
+  });
+  return c.json({ ok: true, banner: row });
+});
+
+authed.delete("/map-sponsors/:id", async (c) => {
+  await prisma.mapSponsorBanner.delete({ where: { id: c.req.param("id") } });
+  return c.json({ ok: true });
+});
+
 authed.route("/pricing-config", adminPricingConfigRoutes);
 authed.route("/enterprise-dcc", enterpriseDccAdminRoutes);
 authed.route("/group-account", groupAccountAdminRoutes);
