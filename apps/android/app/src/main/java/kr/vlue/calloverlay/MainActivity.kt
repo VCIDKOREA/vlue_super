@@ -890,7 +890,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                   remoteAppScan:true,
                   missedCallDetection:true,
                   phoneState:true,
-                  bankNotificationParsing:true,
+                  bankNotificationParsing:false,
                   dangerousAppScan:true,
                   posOcr:true,
                   familyStateShare:true

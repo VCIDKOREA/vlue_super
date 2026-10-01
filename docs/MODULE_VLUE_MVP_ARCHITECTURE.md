@@ -127,10 +127,7 @@ VlueFamilyBridge.dispatchBatteryState(snap.percent, snap.isCharging)
 - `VlueLocalStore` — 장부·상태 로컬 저장
 
 ### NotificationListenerService
-- `FamilyBankNotificationListener` — 은행 앱 푸시 감지
-- `FamilyBankNotificationParser` — 계좌 마스킹·입출금 파싱
-- `onBankNotification` → 서버 `syncFamilySecurityState`
-- 설정: 가족 대시보드 **은행 입출금 알림 연동** 버튼
+- 은행 입출금 알림(알림 파싱)은 제공하지 않음. `FamilyBankNotificationListener`는 등록되지 않는다.
 
 ## POS RBAC — OWNER / STAFF (사장님 중심 Vault)
 
@@ -181,7 +178,7 @@ VlueFamilyBridge.dispatchBatteryState(snap.percent, snap.isCharging)
 | 구분 | Android | iPhone |
 |------|---------|--------|
 | OCR 빌지 스캔 | 가능 (강력) ML Kit | 가능 (강력) Vision |
-| 실시간 입출금 알림 | 가능 (알림 파싱) | 불가능 (보안 차단) |
+| 실시간 입출금 알림 | 제공하지 않음 | 제공하지 않음 |
 | 실시간 악성 앱 탐지 | 가능 (시스템 권한) | 불가능 (샌드박스) |
 | 가족 보안/상태 공유 | 가능 (배터리 등) | 제한적 (백그라운드) |
 

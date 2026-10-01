@@ -382,7 +382,7 @@
 |------|------|
 | 기능명 | 가족보호 |
 | 사용자 문제 | 가족 위험 통화·앱·링크를 보호자가 알기 어렵다 |
-| 기능 설명 | 유료 1:3 등록·설정·알림 API. Android 네이티브 스캐너·브릿지·통화/배터리 등. 오픈뱅킹 자동은 미구현 |
+| 기능 설명 | 유료 1:3 등록·설정·알림 API. Android 네이티브 스캐너·브릿지·통화/배터리 등. 계좌·입출금 알림은 제외 |
 | 실제 구현 파일/모듈 | `FamilyProtectionPage.tsx`, `FamilyProtectionRegister.jsx`, `apps/api/.../familyProtection.ts`, Android `family/*`, iOS `VlueFamilyBridge.swift` |
 | 현재 구현 상태 | `[부분 구현]` |
 | V1/V2 구분 | **V1** (`familyProtection: true`) |

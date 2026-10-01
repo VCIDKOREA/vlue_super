@@ -217,10 +217,9 @@ export function useFamilyProtection() {
           alertElderLongCallMinutes: Number(elderLongCallMinutes),
           alertElderRemoteAppEnabled: elderRemoteAppEnabled,
           alertElderGovCallEnabled: elderGovCallEnabled,
-          alertChildBankEnabled: childBankEnabled,
-          alertChildBankAllTx: childBankAllTx,
-          alertChildBankThresholdKrw: Number(childBankThresholdKrw),
-          alertChildUnknownPayeeEnabled: childUnknownPayeeEnabled
+          alertChildBankEnabled: false,
+          alertChildBankAllTx: false,
+          alertChildUnknownPayeeEnabled: false
         });
         await load();
         return "알림 설정이 저장되었습니다.";

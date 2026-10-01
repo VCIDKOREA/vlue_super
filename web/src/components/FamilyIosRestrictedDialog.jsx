@@ -45,7 +45,7 @@ export default function FamilyIosRestrictedDialog() {
         ) : null}
         {detail?.guardianIosWard ? (
           <p className="mt-2 text-[11px] text-slate-500">
-            등록된 자녀 기기가 iPhone({detail?.wardNames || "자녀"})입니다. 입출금 알림·악성앱 탐지 등은 Android에서만 동작합니다.
+            등록된 자녀 기기가 iPhone({detail?.wardNames || "자녀"})입니다. 악성앱 탐지 등은 Android에서만 동작합니다. 입출금 알림은 제공하지 않습니다.
           </p>
         ) : null}
         <button

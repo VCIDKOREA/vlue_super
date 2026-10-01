@@ -40,10 +40,19 @@ export const USAGE_GUIDE = {
     "① 유료 회원: 가족 보호 N/4명 — VLUE 아이디·전화번호로 초대 (부모·자녀·가족)",
     "② 가족 수락 후 보호 시작 — 부모·자녀 설정을 각각 켜기 (가족 분류는 알림만)",
     "③ 부모: 미접속·부재중·비회원·모르는 번호 장통화·원격앱·정부기관 통화 알림",
-    "④ 자녀: 유해·도박·VPN 사이트 + 계좌 동의 후 입출금 알림",
+    "④ 자녀: 유해·도박·VPN 사이트 (계좌·입출금 알림은 제공하지 않음)",
     "⑤ 네이티브 앱에서 통화·설치앱 연동 시 실시간 감지 (docs/FAMILY_PROTECTION.md)"
   ]
 };
+
+function stripBankAlertSettings<T>(settings: T): T {
+  return {
+    ...(settings as object),
+    alertChildBankEnabled: false,
+    alertChildBankAllTx: false,
+    alertChildUnknownPayeeEnabled: false
+  } as T;
+}
 
 function hoursAgo(h: number) {
   return new Date(Date.now() - h * 60 * 60 * 1000);
@@ -288,10 +297,10 @@ function mergeAlertConfig(
     longCallMinutes: settings.alertElderLongCallMinutes,
     remoteAppEnabled: settings.alertElderRemoteAppEnabled,
     govCallEnabled: settings.alertElderGovCallEnabled,
-    childBankEnabled: settings.alertChildBankEnabled,
-    childBankAllTx: settings.alertChildBankAllTx,
+    childBankEnabled: false,
+    childBankAllTx: false,
     childBankThresholdKrw: settings.alertChildBankThresholdKrw,
-    childUnknownPayeeEnabled: settings.alertChildUnknownPayeeEnabled
+    childUnknownPayeeEnabled: false
   };
 }
 
@@ -1068,16 +1077,12 @@ export async function updateProtectionSettings(
       ...(input.alertElderGovCallEnabled !== undefined
         ? { alertElderGovCallEnabled: Boolean(input.alertElderGovCallEnabled) }
         : {}),
-      ...(input.alertChildBankEnabled !== undefined
-        ? { alertChildBankEnabled: Boolean(input.alertChildBankEnabled) }
-        : {}),
-      ...(input.alertChildBankAllTx !== undefined ? { alertChildBankAllTx: Boolean(input.alertChildBankAllTx) } : {}),
+      alertChildBankEnabled: false,
+      ...(input.alertChildBankAllTx !== undefined ? { alertChildBankAllTx: false } : {}),
       ...(input.alertChildBankThresholdKrw !== undefined
         ? { alertChildBankThresholdKrw: bankThreshold }
         : {}),
-      ...(input.alertChildUnknownPayeeEnabled !== undefined
-        ? { alertChildUnknownPayeeEnabled: Boolean(input.alertChildUnknownPayeeEnabled) }
-        : {})
+      alertChildUnknownPayeeEnabled: false
     },
     create: {
       userId,
@@ -1090,10 +1095,10 @@ export async function updateProtectionSettings(
       alertElderLongCallMinutes: longMin,
       alertElderRemoteAppEnabled: input.alertElderRemoteAppEnabled ?? true,
       alertElderGovCallEnabled: input.alertElderGovCallEnabled ?? true,
-      alertChildBankEnabled: input.alertChildBankEnabled ?? true,
-      alertChildBankAllTx: input.alertChildBankAllTx ?? false,
+      alertChildBankEnabled: false,
+      alertChildBankAllTx: false,
       alertChildBankThresholdKrw: bankThreshold,
-      alertChildUnknownPayeeEnabled: input.alertChildUnknownPayeeEnabled ?? true
+      alertChildUnknownPayeeEnabled: false
     }
   });
 
@@ -1120,7 +1125,7 @@ export async function listFamilyProtection(userId: string) {
       inviteBlockCode: memberSlots?.blockCode ?? null,
       uiMode: "guide_only" as const,
       memberSlots,
-      settings,
+      settings: stripBankAlertSettings(settings),
       asGuardian: [],
       asWard: [],
       alerts: [],
@@ -1229,7 +1234,7 @@ async function listFamilyProtectionCore(userId: string) {
     inviteBlockCode: memberSlots.blockCode ?? null,
     uiMode: resolveFamilyProtectionUiMode(userId, paid.ok && memberSlots.canInvite, asGuardian, asWard),
     memberSlots,
-    settings,
+    settings: stripBankAlertSettings(settings),
     asGuardian,
     asWard,
     alerts,
@@ -1239,7 +1244,7 @@ async function listFamilyProtectionCore(userId: string) {
     familyPlanBeneficiary,
     bankConsents,
     implementationNote:
-      "1단계: VLUE 앱 이벤트(통화·사이트·동의). 2단계: Android/iOS 네이티브(CallLog·설치앱). 3단계: 오픈뱅킹 입출금 자동연동.",
+      "1단계: VLUE 앱 이벤트(통화·사이트). 2단계: Android/iOS 네이티브(CallLog·설치앱). 계좌·입출금 알림은 제공하지 않음.",
     degraded: false
   };
 }

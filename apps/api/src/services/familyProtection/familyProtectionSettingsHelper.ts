@@ -35,10 +35,10 @@ export function defaultFamilySettings(userId: string): FamilyProtectionSettingsR
     alertElderLongCallMinutes: DEFAULT_LONG_CALL_MINUTES,
     alertElderRemoteAppEnabled: true,
     alertElderGovCallEnabled: true,
-    alertChildBankEnabled: true,
+    alertChildBankEnabled: false,
     alertChildBankAllTx: false,
     alertChildBankThresholdKrw: DEFAULT_BANK_THRESHOLD_KRW,
-    alertChildUnknownPayeeEnabled: true
+    alertChildUnknownPayeeEnabled: false
   };
 }
 
@@ -89,10 +89,10 @@ export function mergeLinkAlertConfig(
     longCallMinutes: settings.alertElderLongCallMinutes,
     remoteAppEnabled: settings.alertElderRemoteAppEnabled,
     govCallEnabled: settings.alertElderGovCallEnabled,
-    childBankEnabled: settings.alertChildBankEnabled,
-    childBankAllTx: settings.alertChildBankAllTx,
+    childBankEnabled: false,
+    childBankAllTx: false,
     childBankThresholdKrw: settings.alertChildBankThresholdKrw,
-    childUnknownPayeeEnabled: settings.alertChildUnknownPayeeEnabled
+    childUnknownPayeeEnabled: false
   };
 }
 

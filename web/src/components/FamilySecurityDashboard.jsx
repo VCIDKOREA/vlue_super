@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell } from "lucide-react";
 import {
   fetchFamilyCrossSecurityDashboard,
   fetchFamilySecurityState
 } from "../lib/familyCrossSecurityApi.js";
 import { fetchPosLedgerDashboard, fetchPosLedgerRole, invitePosStaff } from "../lib/vlueOfficeApi.js";
 import FamilyThreatAlertCard from "./FamilyThreatAlertCard.jsx";
-import { openNotificationAccessSettings } from "../lib/posBillNativeOcr.js";
 import PosStaffManagementConsole from "./office/PosStaffManagementConsole.jsx";
 import { OPEN_POS_DASHBOARD_KEY } from "../lib/posDashboardConstants.js";
 import FamilyPlatformMatrixPanel from "./FamilyPlatformMatrixPanel.jsx";
-import { isIosShell, requestIosRestrictedNotice } from "../lib/familyPlatformCapabilities.js";
-
 function krw(n) {
   return `${Math.max(0, Math.floor(Number(n) || 0)).toLocaleString("ko-KR")}원`;
 }
@@ -164,31 +160,6 @@ export default function FamilySecurityDashboard({ isDarkMode = false, onToast })
       ) : null}
 
       {isOwner ? <PosStaffManagementConsole isDarkMode={isDarkMode} onToast={onToast} /> : null}
-
-      <div className="mt-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (isIosShell()) {
-              requestIosRestrictedNotice("bankNotification");
-              return;
-            }
-            const ok = openNotificationAccessSettings();
-            if (!ok) onToast?.("Android 앱에서 알림 접근 권한을 설정해 주세요.");
-          }}
-          className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3.5 text-[13px] font-black shadow-md active:scale-[0.98] ${
-            isDarkMode
-              ? "bg-blue-500 text-white shadow-blue-900/40"
-              : "bg-blue-600 text-white shadow-blue-600/30"
-          }`}
-        >
-          <Bell className="h-4 w-4 shrink-0" aria-hidden />
-          은행 입출금 알림 연동 (알림 접근 권한)
-        </button>
-        <p className={`mt-1.5 text-center text-[9px] font-semibold ${sub}`}>
-          탭하면 기기 알림 접근 설정으로 이동합니다
-        </p>
-      </div>
 
       {openIncidents.length > 0 ? (
         <div className="mt-3 space-y-2">

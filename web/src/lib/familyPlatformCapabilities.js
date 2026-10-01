@@ -16,12 +16,6 @@ export const FAMILY_PLATFORM_MATRIX = {
     ios: "strong",
     note: "ML Kit(Android) · Vision(iOS)"
   },
-  bankNotification: {
-    label: "실시간 입출금 알림",
-    android: true,
-    ios: false,
-    note: "Android NotificationListener · iOS 샌드박스 차단"
-  },
   dangerousAppScan: {
     label: "실시간 악성 앱 탐지",
     android: true,

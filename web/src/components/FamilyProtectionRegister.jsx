@@ -368,29 +368,11 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             <div className={`rounded-xl border p-2.5 ${settingsBox}`}>
               <p className={`text-[11px] font-bold ${strong}`}>자녀 보호</p>
               <p className={`mt-0.5 text-[10px] leading-relaxed ${sub}`}>
-                도박·유해·VPN·딥웹 사이트, 계좌 입출금(자녀 동의 후). 학폭 갈취·불법 입금 탐지용
+                도박·유해·VPN·딥웹 사이트. 계좌·입출금 알림은 제공하지 않습니다.
               </p>
               <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
                 <span>유해·도박·VPN 사이트</span>
                 <input type="checkbox" checked={fp.childSiteEnabled} onChange={(e) => fp.setChildSiteEnabled(e.target.checked)} />
-              </label>
-              <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
-                <span>계좌 입출금 알림</span>
-                <input type="checkbox" checked={fp.childBankEnabled} onChange={(e) => fp.setChildBankEnabled(e.target.checked)} />
-              </label>
-              <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
-                <span>모든 입출금 알림</span>
-                <input type="checkbox" checked={fp.childBankAllTx} onChange={(e) => fp.setChildBankAllTx(e.target.checked)} />
-              </label>
-              {!fp.childBankAllTx ? (
-                <label className={`mt-1 block text-[10px] ${sub}`}>
-                  금액 기준 (원 이상)
-                  <input type="number" min={1000} step={1000} value={fp.childBankThresholdKrw} onChange={(e) => fp.setChildBankThresholdKrw(e.target.value)} className={`mt-0.5 w-full rounded-lg border px-2 py-1.5 text-[12px] ${inputCls}`} />
-                </label>
-              ) : null}
-              <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
-                <span>미등록 상대 입·출금</span>
-                <input type="checkbox" checked={fp.childUnknownPayeeEnabled} onChange={(e) => fp.setChildUnknownPayeeEnabled(e.target.checked)} />
               </label>
             </div>
 
@@ -601,22 +583,6 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             <p className={`mt-3 text-center text-[11px] ${sub}`}>불러오는 중…</p>
           ) : (
             <>
-              {fp.bankConsentsWard?.length > 0 && (
-                <div className="mt-3">
-                  <p className={`text-[11px] font-bold ${strong}`}>계좌 모니터링 동의 요청</p>
-                  {fp.bankConsentsWard.map((c) => (
-                    <div key={c.id} className={`mt-1.5 rounded-xl border px-2.5 py-2 ${isDarkMode ? "border-amber-500/30 bg-amber-500/10" : "border-amber-200 bg-amber-50"}`}>
-                      <p className={`text-[11px] font-semibold ${strong}`}>{c.accountLabel || "자녀 계좌"} 입출금 알림</p>
-                      <p className={`mt-0.5 text-[10px] ${sub}`}>보호자가 요청했습니다. 동의 시 입출금 내역이 전달됩니다.</p>
-                      <div className="mt-2 flex gap-2">
-                        <button type="button" disabled={fp.busy} onClick={async () => { try { toast(await fp.respondBankConsent(c.linkId, true)); } catch (e) { toast(e?.message); } }} className="flex-1 rounded-lg bg-emerald-600 py-1.5 text-[10px] font-bold text-white">동의</button>
-                        <button type="button" disabled={fp.busy} onClick={async () => { try { toast(await fp.respondBankConsent(c.linkId, false)); } catch (e) { toast(e?.message); } }} className="flex-1 rounded-lg border border-gray-200 py-1.5 text-[10px] font-bold text-gray-600">거절</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {fp.asWard.length > 0 && (
                 <div className="mt-3">
                   <p className={`text-[11px] font-bold ${strong}`}>받은 가족 보호 요청</p>
@@ -703,22 +669,6 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1">
-                        {link.status === "active" && link.familyRelation === "child" ? (
-                          <button
-                            type="button"
-                            disabled={fp.busy}
-                            onClick={async () => {
-                              try {
-                                toast(await fp.requestBankConsentForLink(link.id, "자녀 계좌"));
-                              } catch (e) {
-                                toast(e?.message || "요청 실패");
-                              }
-                            }}
-                            className="rounded-lg bg-violet-600 px-2 py-1 text-[9px] font-bold text-white"
-                          >
-                            계좌 동의 요청
-                          </button>
-                        ) : null}
                         <button
                           type="button"
                           disabled={fp.busy}

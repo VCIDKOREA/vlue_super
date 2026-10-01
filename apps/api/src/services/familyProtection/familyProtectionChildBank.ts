@@ -67,6 +67,11 @@ export async function requestChildBankConsent(
   linkId: string,
   input: { accountLabel?: string; bankCode?: string; accountMasked?: string; knownPayees?: string[] }
 ) {
+  void guardianUserId;
+  void linkId;
+  void input;
+  return { error: "계좌·입출금 알림은 제공하지 않습니다." };
+
   const link = await familyProtectionDb.familyProtectionLink.findFirst({
     where: { id: linkId, guardianUserId, status: "active", wardRole: "child" }
   });
@@ -148,6 +153,11 @@ export async function respondChildBankConsent(
   linkId: string,
   accept: boolean
 ) {
+  void wardUserId;
+  void linkId;
+  void accept;
+  return { error: "계좌·입출금 알림은 제공하지 않습니다." };
+
   const consent = await familyProtectionDb.familyBankConsent.findFirst({
     where: { linkId, wardUserId, status: "pending" }
   });
@@ -191,6 +201,15 @@ export async function recordChildBankTransaction(
   wardUserId: string,
   input: ChildBankTransaction | Omit<ChildBankTransaction, "wardUserId">
 ) {
+  void input;
+  return {
+    ok: true,
+    notified: 0,
+    isAccountAgreed: false,
+    reason: "feature_disabled",
+    message: "계좌·입출금 알림은 제공하지 않습니다."
+  };
+
   const links = await getGuardianChildLinks(wardUserId);
   if (!links.length) {
     return { ok: true, notified: 0, isAccountAgreed: false, reason: "no_child_link" };

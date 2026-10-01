@@ -480,8 +480,6 @@ object CompanionSecurityAudit {
             android:foregroundServiceType="specialUse|dataSync" />
         <service android:name=".incall.VlueInCallService" android:exported="true"
             android:permission="android.permission.BIND_INCALL_SERVICE" />
-        <service android:name=".family.bank.FamilyBankNotificationListener" android:exported="true"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
         <receiver android:name=".LetteringCallReceiver" android:exported="true">
             <intent-filter><action android:name="android.intent.action.PHONE_STATE" /></intent-filter>
         </receiver>
