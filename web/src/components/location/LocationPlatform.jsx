@@ -451,22 +451,22 @@ export default function LocationPlatform() {
       const lat = coords?.latitude;
       const lng = coords?.longitude;
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-      let addressLabel = "";
+      /* 주소/배터리 조회가 느려도 프로필 마커는 즉시 올리기 */
+      const next = { lat, lng, addressLabel: "", batteryPct: null, online, displayName: name };
+      setSelf(next);
       try {
         const region = await reverseGeocodeLatLng(lat, lng);
-        addressLabel = region.displayName || region.label;
+        next.addressLabel = region.displayName || region.label || "";
       } catch {
-        addressLabel = "";
+        next.addressLabel = "";
       }
-      let batteryPct = null;
       try {
         const battery = await readBattery();
-        if (battery && Number.isFinite(battery.level)) batteryPct = Math.round(battery.level * 100);
+        if (battery && Number.isFinite(battery.level)) next.batteryPct = Math.round(battery.level * 100);
       } catch {
-        batteryPct = null;
+        next.batteryPct = null;
       }
-      const next = { lat, lng, addressLabel, batteryPct, online, displayName: name };
-      setSelf(next);
+      setSelf({ ...next });
       const liveRoom = roomRef.current;
       const selfRow = membersRef.current.find((member) => member.userId === getLocalVlueUserId());
       const navigating =
@@ -757,7 +757,14 @@ export default function LocationPlatform() {
   }, [visible]);
 
   useEffect(() => {
-    if (!mapReady || !self?.lat || viewRef.current.naverPlaced) return;
+    if (!session.open) {
+      viewRef.current.naverPlaced = false;
+      setMapReady(false);
+    }
+  }, [session.open]);
+
+  useEffect(() => {
+    if (!mapReady || !Number.isFinite(self?.lat) || !Number.isFinite(self?.lng) || viewRef.current.naverPlaced) return;
     viewRef.current.naverPlaced = true;
     mapSurfaceRef.current?.panTo?.(self.lat, self.lng, 16);
   }, [mapReady, self?.lat, self?.lng]);

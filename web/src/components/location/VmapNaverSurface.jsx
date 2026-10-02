@@ -6,19 +6,67 @@ import { estimateEtaMinutes, haversineMeters } from "../../lib/sunTheme.js";
 
 const ACCENT = "#00D2FF";
 
+const MARKER_W = 148;
+const MARKER_H = 78;
+
 function personHtml(name, status, photoUrl, live) {
   const initial = String(name || "?").trim().slice(0, 1) || "?";
   const label = [name, status].filter(Boolean).join(" · ");
   const ring = live ? ACCENT : "#94a3b8";
   const face = photoUrl
-    ? `<img src="${photoUrl.replace(/"/g, "")}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:999px" />`
-    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#083044;color:#fff;font-weight:700;font-size:16px;border-radius:999px">${initial}</div>`;
-  return `<div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-6px)">
-    <div style="width:48px;height:48px;border-radius:999px;padding:3px;background:${ring};box-shadow:0 0 0 2px #fff,0 8px 20px rgba(0,210,255,0.35)">
+    ? `<img src="${String(photoUrl).replace(/"/g, "")}" alt="" draggable="false" style="width:42px;height:42px;object-fit:cover;border-radius:999px;display:block" />`
+    : `<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:#083044;color:#fff;font-weight:700;font-size:16px;border-radius:999px">${initial}</div>`;
+  return `<div style="width:${MARKER_W}px;height:${MARKER_H}px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;pointer-events:auto">
+    <div style="width:48px;height:48px;border-radius:999px;padding:3px;background:${ring};box-shadow:0 0 0 2px #fff,0 8px 20px rgba(0,210,255,0.35);box-sizing:border-box">
       <div style="width:100%;height:100%;border-radius:999px;overflow:hidden;background:#fff">${face}</div>
     </div>
-    <div style="margin-top:4px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.88);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${label}</div>
+    <div style="margin-top:3px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.92);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${label}</div>
   </div>`;
+}
+
+function toLatLngNum(value) {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** API 행에 lat=null 본인이 있어도 로컬 GPS로 덮어써 프로필이 보이게 한다 */
+function buildVisiblePeople({ members, self, mode, departed, mineId, selfPhoto }) {
+  const byId = new Map();
+  for (const member of members || []) {
+    const id = String(member.userId || "").trim();
+    if (!id) continue;
+    byId.set(id, { ...member, userId: id });
+  }
+
+  const selfLat = toLatLngNum(self?.lat);
+  const selfLng = toLatLngNum(self?.lng);
+  if (selfLat != null && selfLng != null) {
+    const id = String(mineId || "").trim() || "__local_self__";
+    const prev = byId.get(id) || {};
+    byId.set(id, {
+      ...prev,
+      userId: id,
+      self: true,
+      displayName: self.displayName || prev.displayName || "나",
+      photoUrl: selfPhoto || prev.photoUrl || "",
+      lat: selfLat,
+      lng: selfLng,
+      online: self.online !== false,
+      grayscale: false,
+      departed: mode === "vmap" ? Boolean(departed || prev.departed) : prev.departed
+    });
+  }
+
+  return [...byId.values()].filter((member) => {
+    const lat = toLatLngNum(member.lat);
+    const lng = toLatLngNum(member.lng);
+    if (lat == null || lng == null) return false;
+    member.lat = lat;
+    member.lng = lng;
+    if (mode === "family") return true;
+    if (member.self || (mineId && member.userId === mineId)) return true;
+    return Boolean(member.departed);
+  });
 }
 
 function pinHtml(ready) {
@@ -236,22 +284,16 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
 
     const mineId = getLocalVlueUserId();
     const selfPhoto = readProfilePhotoAvatar();
-    const plotted = [...members];
-    if (self?.lat != null && mode === "family" && !plotted.some((m) => m.self || m.userId === mineId)) {
-      plotted.push({ ...self, userId: mineId, displayName: self.displayName || "나", photoUrl: selfPhoto, online: self.online });
-    }
-    if (self?.lat != null && mode === "vmap" && departed && !plotted.some((m) => m.userId === mineId && m.lat != null)) {
-      plotted.push({ ...self, userId: mineId, displayName: self.displayName || "나", photoUrl: selfPhoto, departed: true, online: true });
-    }
-
-    const visiblePeople = plotted.filter((m) => m.lat != null && m.lng != null && (mode === "family" || m.departed));
+    const visiblePeople = buildVisiblePeople({ members, self, mode, departed, mineId, selfPhoto });
     const keep = new Set();
+    const iconSize = new naver.Size(MARKER_W, MARKER_H);
+    const iconAnchor = new naver.Point(MARKER_W / 2, 54);
 
     visiblePeople.forEach((member) => {
       const id = String(member.userId || member.displayName);
       keep.add(id);
       const dead = mode === "family" && (member.grayscale || member.online === false || member.batteryPct === 0);
-      const mine = member.self || member.userId === mineId;
+      const mine = Boolean(member.self) || (mineId && member.userId === mineId);
       const status =
         mode === "vmap" && member.departed && room
           ? member.arrived
@@ -267,10 +309,11 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         const marker = new naver.Marker({
           position: nextPos,
           map,
+          title: member.displayName || "멤버",
           icon: {
             content: html,
-            size: new naver.Size(48, 72),
-            anchor: new naver.Point(24, 54)
+            size: iconSize,
+            anchor: iconAnchor
           },
           zIndex: mine ? 120 : 100
         });
@@ -279,7 +322,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         overlaysRef.current.people.set(id, entry);
       } else {
         if (entry.html !== html) {
-          entry.marker.setIcon({ content: html, size: new naver.Size(48, 72), anchor: new naver.Point(24, 54) });
+          entry.marker.setIcon({ content: html, size: iconSize, anchor: iconAnchor });
           entry.html = html;
         }
         if (entry.lat !== member.lat || entry.lng !== member.lng) {
