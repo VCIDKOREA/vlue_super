@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import DigitalCardEditorView from "./DigitalCardEditorView.jsx";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
 import LetteringSettingsSection from "./LetteringSettingsSection.jsx";
@@ -1506,46 +1507,51 @@ function ProfilePanel({
           </p>
         </div>
       ) : null}
-      {locationMenuOpen ? (
-        <div
-          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 px-4 pb-[max(20px,env(safe-area-inset-bottom))]"
-          onClick={() => setLocationMenuOpen(false)}
-        >
-          <div
-            className={`w-full max-w-sm rounded-[28px] p-4 shadow-2xl ${isDarkMode ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <p className="px-1 pb-3 text-center text-[16px] font-black">위치를 선택하세요</p>
-            <button
-              type="button"
-              className="mb-2 block w-full rounded-2xl bg-emerald-500 px-4 py-4 text-[16px] font-black text-white"
-              onClick={() => {
-                setLocationMenuOpen(false);
-                window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }));
-              }}
-            >
-              가족 위치확인
-            </button>
-            <button
-              type="button"
-              className="mb-2 block w-full rounded-2xl bg-blue-600 px-4 py-4 text-[16px] font-black text-white"
-              onClick={() => {
-                setLocationMenuOpen(false);
-                window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "vmap" } }));
-              }}
-            >
-              V-MAP 개설
-            </button>
-            <button
-              type="button"
-              className={`block w-full rounded-2xl px-4 py-3 text-[14px] font-bold ${isDarkMode ? "bg-white/10" : "bg-slate-100"}`}
+      {locationMenuOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[640] flex items-end justify-center bg-black/50 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pointer-events-auto"
               onClick={() => setLocationMenuOpen(false)}
             >
-              닫기
-            </button>
-          </div>
-        </div>
-      ) : null}
+              <div
+                className={`pointer-events-auto mb-[calc(56px+env(safe-area-inset-bottom,0px))] w-full max-w-sm rounded-[28px] p-4 shadow-2xl ${isDarkMode ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <p className="px-1 pb-3 text-center text-[16px] font-black">위치를 선택하세요</p>
+                <button
+                  type="button"
+                  className="mb-2 block w-full rounded-2xl bg-emerald-500 px-4 py-4 text-[16px] font-black text-white"
+                  onClick={() => {
+                    setLocationMenuOpen(false);
+                    onClose?.();
+                    window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }));
+                  }}
+                >
+                  가족 위치확인
+                </button>
+                <button
+                  type="button"
+                  className="mb-2 block w-full rounded-2xl bg-blue-600 px-4 py-4 text-[16px] font-black text-white"
+                  onClick={() => {
+                    setLocationMenuOpen(false);
+                    onClose?.();
+                    window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "vmap" } }));
+                  }}
+                >
+                  V-MAP 개설
+                </button>
+                <button
+                  type="button"
+                  className={`block w-full rounded-2xl px-4 py-3 text-[14px] font-bold ${isDarkMode ? "bg-white/10" : "bg-slate-100"}`}
+                  onClick={() => setLocationMenuOpen(false)}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
       <MembershipUpgradeModal
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
