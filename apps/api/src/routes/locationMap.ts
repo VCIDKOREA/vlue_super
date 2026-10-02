@@ -26,6 +26,22 @@ async function me(c: { get: (key: "vlueUserId") => string | undefined }) {
   return c.get("vlueUserId") || "";
 }
 
+/** 지도 마커용. data URL 은 응답이 커지므로 http 사진만 붙인다. */
+async function profilePhotos(userIds: string[]) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  const map = new Map<string, string>();
+  if (!ids.length) return map;
+  const cards = await prisma.digitalCard.findMany({
+    where: { userId: { in: ids } },
+    select: { userId: true, photoUrl: true }
+  });
+  for (const card of cards) {
+    const url = String(card.photoUrl || "").trim();
+    if (url.startsWith("http://") || url.startsWith("https://")) map.set(card.userId, url);
+  }
+  return map;
+}
+
 function activeSponsorWhere(now: Date) {
   return {
     active: true,
@@ -250,6 +266,7 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
       names.set(person.id, person.legalName || person.publicHandle || "가족");
     }
   }
+  const photos = await profilePhotos([...ids]);
   const rows = await prisma.locationPresence.findMany({ where: { userId: { in: [...ids] } } });
   const byId = new Map(rows.map((row) => [row.userId, row]));
   const members = [...ids].map((id) => {
@@ -266,6 +283,7 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
       batteryPct: row?.batteryPct ?? null,
       online: Boolean(row) && !dead,
       grayscale: dead,
+      photoUrl: photos.get(id) || "",
       updatedAt: row?.updatedAt?.toISOString() || null
     };
   });
@@ -435,6 +453,7 @@ locationMapRoutes.get("/vmap/:id", requireUserHeader, async (c) => {
   const mine = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
   if (!mine) return c.json({ error: "방에 참여하지 않았습니다." }, 403);
   const members = await prisma.vmapMember.findMany({ where: { roomId } });
+  const photos = await profilePhotos(members.map((member) => member.userId));
   return c.json({
     ok: true,
     room,
@@ -444,6 +463,7 @@ locationMapRoutes.get("/vmap/:id", requireUserHeader, async (c) => {
       lng: member.departed ? member.lng : null,
       arrived: member.arrived,
       dropout: isVmapDropout(member),
+      photoUrl: photos.get(member.userId) || "",
       batteryPct: null,
       addressLabel: ""
     }))

@@ -1514,37 +1514,43 @@ function ProfilePanel({
               onClick={() => setLocationMenuOpen(false)}
             >
               <div
-                className={`pointer-events-auto mb-[calc(56px+env(safe-area-inset-bottom,0px))] w-full max-w-sm rounded-[28px] p-4 shadow-2xl ${isDarkMode ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
+                className={`pointer-events-auto mb-3 w-full max-w-sm rounded-[28px] px-3 pb-3 pt-2 shadow-2xl ${isDarkMode ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
                 onClick={(event) => event.stopPropagation()}
               >
-                <p className="px-1 pb-3 text-center text-[16px] font-black">위치를 선택하세요</p>
+                <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${isDarkMode ? "bg-white/20" : "bg-slate-200"}`} />
+                <p className="px-2 text-[17px] font-black">위치</p>
+                <p className={`px-2 pb-3 pt-1 text-[12px] ${isDarkMode ? "text-white/55" : "text-slate-500"}`}>가족 안심과 약속을 각각 엽니다.</p>
                 <button
                   type="button"
-                  className="mb-2 block w-full rounded-2xl bg-emerald-500 px-4 py-4 text-[16px] font-black text-white"
+                  className={`mb-2 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ${isDarkMode ? "bg-white/10" : "bg-slate-50"}`}
                   onClick={() => {
                     setLocationMenuOpen(false);
                     onClose?.();
                     window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }));
                   }}
                 >
-                  가족 위치확인
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[16px] font-black text-white">가</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-black">가족 위치확인</span>
+                    <span className={`block text-[12px] ${isDarkMode ? "text-white/55" : "text-slate-500"}`}>지금 접속한 사람만 컬러로 표시</span>
+                  </span>
                 </button>
                 <button
                   type="button"
-                  className="mb-2 block w-full rounded-2xl bg-blue-600 px-4 py-4 text-[16px] font-black text-white"
+                  className={`mb-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ${isDarkMode ? "bg-white/10" : "bg-slate-50"}`}
                   onClick={() => {
                     setLocationMenuOpen(false);
                     onClose?.();
                     window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "vmap" } }));
                   }}
                 >
-                  V-MAP 개설
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[13px] font-black text-white">V</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-black">V-MAP 개설</span>
+                    <span className={`block text-[12px] ${isDarkMode ? "text-white/55" : "text-slate-500"}`}>도착 핀과 길안내가 있는 약속</span>
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  className={`block w-full rounded-2xl px-4 py-3 text-[14px] font-bold ${isDarkMode ? "bg-white/10" : "bg-slate-100"}`}
-                  onClick={() => setLocationMenuOpen(false)}
-                >
+                <button type="button" className={`mt-1 w-full py-2 text-[13px] font-bold ${isDarkMode ? "text-white/50" : "text-slate-400"}`} onClick={() => setLocationMenuOpen(false)}>
                   닫기
                 </button>
               </div>

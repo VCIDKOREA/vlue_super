@@ -33,6 +33,7 @@ import {
   subscribeLocationSession
 } from "../../lib/locationSession.js";
 import { getProfileHeaderName } from "../../lib/memberCardStorage.js";
+import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters, resolveMapTheme } from "../../lib/sunTheme.js";
 import { formatGuideDistance, nextGuideCue } from "../../lib/vmapGuide.js";
 import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
@@ -53,12 +54,12 @@ function zoomForMeters(meters) {
   return 12;
 }
 
-function tileUrl(theme, z, x, y) {
-  const base =
-    theme === "dark"
-      ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile"
-      : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile";
-  return `${base}/${z}/${y}/${x}`;
+/** 컬러 도로 지도. Esri 도로 타일은 구미 일대 14줌부터 빈 칸이라 OpenStreetMap 을 쓴다. */
+function tileUrl(z, x, y) {
+  const wrap = 2 ** z;
+  const xx = ((x % wrap) + wrap) % wrap;
+  const yy = Math.max(0, Math.min(wrap - 1, y));
+  return `https://tile.openstreetmap.org/${z}/${xx}/${yy}.png`;
 }
 
 function worldX(lng, z) {
@@ -103,12 +104,80 @@ function blobToDataUrl(blob) {
   });
 }
 
-function StatusPill({ online }) {
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-black shadow ${online ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"}`}>
-      {online ? "🟢 안심 상태" : "⚠️ 기기 위치 해제됨"}
-    </span>
-  );
+function roundImage(cache, url) {
+  const src = String(url || "").trim();
+  if (!src) return null;
+  let image = cache.get(src);
+  if (!image) {
+    image = new Image();
+    image.src = src;
+    cache.set(src, image);
+  }
+  return image.complete && image.naturalWidth ? image : null;
+}
+
+function drawPerson(ctx, x, y, image, name, live) {
+  const radius = 22;
+  ctx.save();
+  ctx.shadowColor = "rgba(15, 23, 42, 0.35)";
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.clip();
+  if (image) {
+    ctx.drawImage(image, x - radius, y - radius, radius * 2, radius * 2);
+  } else {
+    ctx.fillStyle = live ? "#2563eb" : "#94a3b8";
+    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(name || "?").trim().slice(0, 1) || "?", x, y + 1);
+  }
+  ctx.restore();
+  if (!live) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(15, 23, 42, 0.28)";
+    ctx.fill();
+    ctx.restore();
+  }
+  const label = String(name || "").trim();
+  if (!label) return;
+  ctx.font = "700 11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const width = Math.ceil(ctx.measureText(label).width) + 14;
+  const boxY = y + radius + 8;
+  ctx.fillStyle = "rgba(15, 23, 42, 0.82)";
+  ctx.beginPath();
+  ctx.roundRect(x - width / 2, boxY, width, 18, 9);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(label, x, boxY + 9);
+}
+
+function drawPlacePin(ctx, x, y, ready) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = ready ? "#2563eb" : "#f59e0b";
+  ctx.beginPath();
+  ctx.arc(0, -16, 11, Math.PI * 0.15, Math.PI * 0.85, true);
+  ctx.lineTo(0, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(0, -16, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 export default function LocationPlatform() {
@@ -400,20 +469,23 @@ export default function LocationPlatform() {
     const ctx = canvas.getContext("2d");
     let frame = 0;
     const cache = new Map();
+    const faces = new Map();
     const paint = () => {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, Math.floor(rect.width));
       const height = Math.max(1, Math.floor(rect.height));
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
       }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const view = viewRef.current;
       const zoom = view.zoom;
       const centerX = worldX(view.lng, zoom) * TILE;
       const centerY = worldY(view.lat, zoom) * TILE;
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = theme === "dark" ? "#0f141c" : "#e8eef4";
+      ctx.fillStyle = "#dbe4ee";
       ctx.fillRect(0, 0, width, height);
       const left = Math.floor((centerX - width / 2) / TILE);
       const top = Math.floor((centerY - height / 2) / TILE);
@@ -421,11 +493,11 @@ export default function LocationPlatform() {
       const bottom = Math.ceil((centerY + height / 2) / TILE);
       for (let tx = left; tx <= right; tx += 1) {
         for (let ty = top; ty <= bottom; ty += 1) {
-          const key = `${theme}/${zoom}/${tx}/${ty}`;
+          const key = `${zoom}/${tx}/${ty}`;
           let image = cache.get(key);
           if (!image) {
             image = new Image();
-            image.src = tileUrl(theme, zoom, tx, ty);
+            image.src = tileUrl(zoom, tx, ty);
             cache.set(key, image);
           }
           const dx = tx * TILE - (centerX - width / 2);
@@ -443,14 +515,7 @@ export default function LocationPlatform() {
         const pinSource = hostView && draftPin ? draftPin : room.placeReady ? room : null;
         if (pinSource?.lat != null) {
           const pin = project(pinSource.lat, pinSource.lng);
-          ctx.fillStyle = room.placeReady ? "#2563eb" : "#f59e0b";
-          ctx.beginPath();
-          ctx.moveTo(pin.x, pin.y - 18);
-          ctx.lineTo(pin.x + 8, pin.y);
-          ctx.lineTo(pin.x, pin.y + 4);
-          ctx.lineTo(pin.x - 8, pin.y);
-          ctx.closePath();
-          ctx.fill();
+          drawPlacePin(ctx, pin.x, pin.y, Boolean(room.placeReady));
         }
         if (room.placeReady) {
           const mineId = getLocalVlueUserId();
@@ -473,34 +538,27 @@ export default function LocationPlatform() {
         }
       }
       const plotted = [...members];
+      const selfPhoto = readProfilePhotoAvatar();
       if (self?.lat != null && session.mode === "family" && !plotted.some((member) => member.self || member.userId === getLocalVlueUserId())) {
-        plotted.push({ ...self, userId: getLocalVlueUserId(), displayName: self.displayName || "나", grayscale: self.online === false, online: self.online });
+        plotted.push({ ...self, userId: getLocalVlueUserId(), displayName: self.displayName || "나", photoUrl: selfPhoto, grayscale: self.online === false, online: self.online });
       }
       if (self?.lat != null && session.mode === "vmap" && session.departed && !plotted.some((member) => member.userId === getLocalVlueUserId() && member.lat != null)) {
-        plotted.push({ ...self, userId: getLocalVlueUserId(), displayName: self.displayName || "나", departed: true, online: true });
+        plotted.push({ ...self, userId: getLocalVlueUserId(), displayName: self.displayName || "나", photoUrl: selfPhoto, departed: true, online: true });
       }
       plotted.filter((member) => member.lat != null && member.lng != null && (session.mode === "family" || member.departed)).forEach((member) => {
         const point = project(member.lat, member.lng);
         const dead = session.mode === "family" && (member.grayscale || member.online === false || member.batteryPct === 0);
-        ctx.save();
-        if (dead) ctx.filter = "grayscale(1)";
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 16, 0, Math.PI * 2);
-        ctx.strokeStyle = dead ? "#6b7280" : "#f97316";
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.fillStyle = dead ? "#9ca3af" : "#fb7185";
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 11, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        ctx.fillStyle = theme === "dark" ? "#f8fafc" : "#111827";
-        ctx.font = "700 11px sans-serif";
-        ctx.fillText(member.displayName || "멤버", point.x + 18, point.y - 8);
-        if (session.mode === "vmap" && member.departed && room) {
-          const label = member.arrived ? "도착" : member.dropout ? "미도착 이탈" : `${estimateEtaMinutes(haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng))}분`;
-          ctx.fillText(label, point.x + 18, point.y + 8);
-        }
+        const mine = member.self || member.userId === getLocalVlueUserId();
+        const face = roundImage(faces, mine && selfPhoto ? selfPhoto : member.photoUrl);
+        const status =
+          session.mode === "vmap" && member.departed && room
+            ? member.arrived
+              ? "도착"
+              : member.dropout
+                ? "이탈"
+                : `${estimateEtaMinutes(haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng))}분`
+            : "";
+        drawPerson(ctx, point.x, point.y, face, [member.displayName || "멤버", status].filter(Boolean).join(" · "), !dead);
       });
     };
     const loop = () => {
@@ -688,43 +746,9 @@ export default function LocationPlatform() {
   const liveComments = messages.filter((row) => liveNow - new Date(row.createdAt).getTime() < 7600).slice(-5);
   const people = members.length ? members : self?.lat ? [{ ...self, userId: getLocalVlueUserId(), self: true, displayName: self.displayName || "나", grayscale: !locationOn }] : [];
 
+  const sheet = theme === "dark" ? "bg-[#121826] text-white" : "bg-white text-slate-900";
   return (
     <section className={`fixed inset-0 z-[530] flex flex-col ${theme === "dark" ? "bg-[#0f141c] text-white" : "bg-[#f4f7fb] text-slate-900"}`}>
-      <header className="relative z-10 flex items-center gap-2 px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))]">
-        <button type="button" onClick={dismissLocation} className="flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-lg text-white" aria-label="닫기">
-          ×
-        </button>
-        <div className="flex min-w-0 flex-1 justify-center">
-          {session.mode === "family" ? (
-            <StatusPill online={locationOn} />
-          ) : (
-            <span className="inline-flex rounded-full bg-black/70 px-3 py-1 text-[11px] font-black text-white">V-Map 약속</span>
-          )}
-        </div>
-        <button type="button" onClick={() => setSettingsOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white" aria-label="설정">
-          ⚙
-        </button>
-        {settingsOpen ? (
-          <div className={`absolute right-3 top-14 w-56 rounded-2xl p-2 shadow-xl ${theme === "dark" ? "bg-slate-900" : "bg-white"}`}>
-            <p className="px-2 py-1 text-[11px] font-bold opacity-60">지도 테마</p>
-            {["auto", "light", "dark"].map((item) => (
-              <button key={item} type="button" className="block w-full rounded-xl px-2 py-2 text-left text-[13px] font-bold" onClick={() => setMapThemePreference(item)}>
-                {item === "auto" ? "자동 (일출/일몰)" : item === "light" ? "항상 라이트" : "항상 다크"}
-                {session.theme === item ? " ✓" : ""}
-              </button>
-            ))}
-            <button type="button" className="mt-1 block w-full rounded-xl px-2 py-2 text-left text-[13px] font-bold" onClick={() => { setMembersOpen(true); setSettingsOpen(false); }}>
-              멤버 목록
-            </button>
-            {session.mode === "vmap" ? (
-              <button type="button" className="block w-full rounded-xl px-2 py-2 text-left text-[13px] font-black text-rose-500" onClick={() => void leaveForGood()}>
-                {isHost ? "방 삭제" : "나가기"}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </header>
-
       <div className="relative min-h-0 flex-1">
         <canvas
           ref={canvasRef}
@@ -734,27 +758,20 @@ export default function LocationPlatform() {
           onPointerUp={onPointerUp}
           onPointerLeave={() => { dragRef.current = null; pinDragRef.current = false; }}
         />
-        <p className="pointer-events-none absolute bottom-2 left-2 text-[9px] opacity-70">© Esri, OpenStreetMap</p>
-        {session.mode === "family" ? (
-          <div className="absolute left-3 top-3 flex gap-2">
-            <button type="button" className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-black text-slate-900 shadow" onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>
-              V-Map
-            </button>
+        <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pt-[max(12px,env(safe-area-inset-top))]">
+          <button type="button" onClick={dismissLocation} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/80 text-lg text-white shadow" aria-label="닫기">×</button>
+          <div className="flex min-w-0 flex-1 rounded-full bg-black/80 p-1 text-white shadow">
+            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-black ${session.mode === "family" ? "bg-white text-slate-900" : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); setMembers([]); patchLocationSession({ mode: "family" }); }}>가족</button>
+            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-black ${session.mode === "vmap" ? "bg-white text-slate-900" : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>V-Map</button>
           </div>
-        ) : (
-          <div className="absolute left-3 top-3 flex gap-2">
-            <button type="button" className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-black text-slate-900 shadow" onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); setMembers([]); patchLocationSession({ mode: "family" }); }}>
-              가족위치
-            </button>
-            {!session.roomId ? (
-              <button type="button" className="rounded-full bg-blue-600 px-3 py-1 text-[12px] font-black text-white shadow" onClick={() => void makeRoom()}>
-                방 만들기
-              </button>
-            ) : null}
-          </div>
-        )}
+          {session.mode === "vmap" && !session.roomId ? (
+            <button type="button" className="shrink-0 rounded-full bg-blue-600 px-3 py-2 text-[12px] font-black text-white shadow" onClick={() => void makeRoom()}>방 만들기</button>
+          ) : null}
+          <button type="button" onClick={() => { setMembersOpen(false); setSettingsOpen((open) => !open); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/80 text-white shadow" aria-label="화면 설정">☼</button>
+        </div>
+        <p className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold text-slate-700/80">© OpenStreetMap</p>
         {session.mode === "vmap" && guideOn && cue ? (
-          <div className="absolute left-1/2 top-14 z-10 -translate-x-1/2 rounded-full bg-orange-500 px-4 py-2 text-[13px] font-black text-white shadow">
+          <div className="absolute left-1/2 bottom-24 z-10 -translate-x-1/2 rounded-full bg-orange-500 px-4 py-2 text-[13px] font-black text-white shadow">
             {formatGuideDistance(cue.distanceM)} 앞 {cue.instruction}
           </div>
         ) : null}
@@ -796,7 +813,7 @@ export default function LocationPlatform() {
           </article>
         ) : null}
         {session.mode === "vmap" && isHost && session.roomId ? (
-          <div className="absolute inset-x-3 top-14 z-10 space-y-2">
+          <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-10 space-y-2 rounded-3xl p-3 shadow-lg ${sheet}`}>
             <form
               className="flex gap-2"
               onSubmit={(event) => {
@@ -848,8 +865,8 @@ export default function LocationPlatform() {
               >
                 {room?.placeReady ? "핀 수정 저장" : "도착 핀 꽂기"}
               </button>
-              <span className="rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-bold text-white">
-                {room?.placeReady ? room.placeLabel || "도착지" : "핀을 옮기거나 검색하세요"}
+              <span className={`min-w-0 flex-1 truncate rounded-full px-3 py-1.5 text-[11px] font-bold ${theme === "dark" ? "bg-white/10" : "bg-slate-100"}`}>
+                {room?.placeReady ? room.placeLabel || "도착지" : "지도를 끌거나 검색으로 핀을 놓으세요"}
               </span>
             </div>
           </div>
@@ -958,6 +975,39 @@ export default function LocationPlatform() {
         )}
       </div>
 
+      {settingsOpen ? (
+        <div className="absolute inset-0 z-30 bg-black/40" onClick={() => setSettingsOpen(false)}>
+          <div className={`absolute inset-x-0 bottom-0 rounded-t-[28px] px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 shadow-2xl ${sheet}`} onClick={(event) => event.stopPropagation()}>
+            <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${theme === "dark" ? "bg-white/20" : "bg-slate-200"}`} />
+            <p className="text-[16px] font-black">화면</p>
+            <p className={`mt-1 text-[12px] ${theme === "dark" ? "text-white/60" : "text-slate-500"}`}>지도는 컬러 도로지도로 두고, 버튼과 패널만 밝기를 바꿉니다.</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                ["auto", "시간"],
+                ["light", "라이트"],
+                ["dark", "다크"]
+              ].map(([item, label]) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={`rounded-2xl px-2 py-3 text-[13px] font-black ${session.theme === item ? "bg-blue-600 text-white" : theme === "dark" ? "bg-white/10" : "bg-slate-100"}`}
+                  onClick={() => setMapThemePreference(item)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button type="button" className={`mt-3 block w-full rounded-2xl px-3 py-3 text-left text-[14px] font-black ${theme === "dark" ? "bg-white/10" : "bg-slate-100"}`} onClick={() => { setMembersOpen(true); setSettingsOpen(false); }}>
+              함께 있는 사람
+            </button>
+            {session.mode === "vmap" && session.roomId ? (
+              <button type="button" className="mt-2 block w-full rounded-2xl bg-rose-500 px-3 py-3 text-[14px] font-black text-white" onClick={() => void leaveForGood()}>
+                {isHost ? "방 삭제" : "나가기"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {membersOpen ? (
         <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setMembersOpen(false)}>
           <div className={`absolute inset-x-0 bottom-0 rounded-t-3xl p-4 ${theme === "dark" ? "bg-slate-900" : "bg-white"}`} onClick={(event) => event.stopPropagation()}>
