@@ -29,6 +29,17 @@ export function formatGuideDistance(meters) {
   return `${Math.max(0, Math.round(value))}m`;
 }
 
+/** 카카오내비식 방향 HUD용 짧은 화살표 기호 */
+export function maneuverGlyph(instruction) {
+  const text = String(instruction || "");
+  if (/U턴|유턴/i.test(text)) return "↩";
+  if (/급우|우회전|오른쪽/.test(text)) return "↗";
+  if (/급좌|좌회전|왼쪽/.test(text)) return "↖";
+  if (/도착/.test(text)) return "◎";
+  if (/로터리|합류/.test(text)) return "⟳";
+  return "↑";
+}
+
 export function nextGuideCue(steps) {
   const rows = Array.isArray(steps) ? steps : [];
   const upcoming = rows.find((step) => step.instruction !== "안내를 시작합니다" && step.instruction !== "목적지 도착" && step.distanceM > 15);

@@ -122,3 +122,12 @@ export function setNativeVmapSession(active) {
     /* ignore */
   }
 }
+
+export function setMapKeepScreenOn(active) {
+  const bridge = typeof window === "undefined" ? null : window.Android || window.VlueLettering;
+  try {
+    bridge?.setMapKeepScreenOn?.(Boolean(active));
+  } catch {
+    /* ignore */
+  }
+}

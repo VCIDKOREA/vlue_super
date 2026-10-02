@@ -20,6 +20,7 @@ import {
   publishPresence,
   publishVmapPresence,
   setNativeVmapSession,
+  setMapKeepScreenOn,
   subscribeVmapPing
 } from "../../lib/locationApi.js";
 import {
@@ -35,14 +36,28 @@ import {
 import { getProfileHeaderName } from "../../lib/memberCardStorage.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters, resolveMapTheme } from "../../lib/sunTheme.js";
-import { formatGuideDistance, nextGuideCue } from "../../lib/vmapGuide.js";
+import { formatGuideDistance, maneuverGlyph, nextGuideCue } from "../../lib/vmapGuide.js";
 import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 
 const TILE = 256;
 const ACCENT = "#00D2FF";
 const AD_BANNER_PX = 56;
+/** 수동 도착 완료는 이 거리 안에 들어와야 한다. */
+const MANUAL_ARRIVE_METERS = 180;
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
+
+function hideLocationAds() {
+  try {
+    window.dispatchEvent(new Event("vlue-hide-all-ads"));
+    const bridge = window.VlueLettering || window.Android;
+    bridge?.hideBannerAd?.("location_map");
+    bridge?.hideBannerAd?.("bottom");
+    bridge?.hideBannerAd?.("ribbon");
+  } catch {
+    /* ignore */
+  }
+}
 
 function zoomForMeters(meters) {
   const value = Number(meters);
@@ -271,6 +286,8 @@ export default function LocationPlatform() {
   const [arriveState, setArriveState] = useState("idle");
   const [sending, setSending] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(true);
+  const [playingVoiceId, setPlayingVoiceId] = useState("");
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
@@ -297,6 +314,8 @@ export default function LocationPlatform() {
   const sendLock = useRef(false);
   const arriveLock = useRef(false);
   const lastTapRef = useRef(0);
+  const wakeLockRef = useRef(null);
+  const voiceAudioRef = useRef(null);
 
   useEffect(() => subscribeLocationSession(setSession), []);
   roomRef.current = room;
@@ -732,8 +751,51 @@ export default function LocationPlatform() {
   }, []);
 
   useEffect(() => {
+    if (!session.open) return undefined;
+    let cancelled = false;
+    const claim = async () => {
+      try {
+        if (!navigator.wakeLock?.request) return;
+        const lock = await navigator.wakeLock.request("screen");
+        if (cancelled) {
+          lock.release().catch(() => {});
+          return;
+        }
+        wakeLockRef.current = lock;
+        lock.addEventListener("release", () => {
+          if (wakeLockRef.current === lock) wakeLockRef.current = null;
+        });
+      } catch {
+        /* 권한·절전 모드에서는 실패할 수 있다 */
+      }
+    };
+    claim();
+    setMapKeepScreenOn(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") claim();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      wakeLockRef.current?.release?.().catch(() => {});
+      wakeLockRef.current = null;
+      setMapKeepScreenOn(false);
+    };
+  }, [session.open]);
+
+  useEffect(() => {
+    if (settingsOpen || membersOpen || keyboardInset > 80) hideLocationAds();
+  }, [settingsOpen, membersOpen, keyboardInset]);
+
+  useEffect(() => {
+    if (room?.placeReady && !pinDirtyRef.current) setSearchOpen(false);
+  }, [room?.placeReady, room?.placeLat, room?.placeLng]);
+
+  useEffect(() => {
     arriveLock.current = false;
     setArriveState("idle");
+    setSearchOpen(true);
   }, [session.roomId]);
 
   const markGesture = () => {
@@ -883,12 +945,44 @@ export default function LocationPlatform() {
   };
 
   const leaveForGood = async () => {
-    if (session.roomId) await exitVmapApi(session.roomId).catch(() => {});
+    hideLocationAds();
+    setSettingsOpen(false);
+    setMembersOpen(false);
+    const roomId = session.roomId;
+    const host = Boolean(roomRef.current?.hostUserId) && roomRef.current.hostUserId === getLocalVlueUserId();
+    pushNotice(host ? "방을 삭제하는 중…" : "나가는 중…");
+    try {
+      if (roomId) await exitVmapApi(roomId);
+    } catch (error) {
+      pushNotice(error.message || "방을 나가지 못했습니다.");
+      return;
+    }
     syncOwnerInboxFromServer().catch(() => {});
     setNativeVmapSession(false);
     setRoom(null);
     setMessages([]);
     exitVmapRoom();
+  };
+
+  const playVoice = (row) => {
+    if (!row?.body) return;
+    try {
+      voiceAudioRef.current?.pause?.();
+    } catch {
+      /* ignore */
+    }
+    const audio = new Audio(row.body);
+    voiceAudioRef.current = audio;
+    setPlayingVoiceId(row.id);
+    audio.onended = () => setPlayingVoiceId((id) => (id === row.id ? "" : id));
+    audio.onerror = () => {
+      setPlayingVoiceId((id) => (id === row.id ? "" : id));
+      pushNotice("음성을 재생하지 못했습니다.");
+    };
+    audio.play().catch(() => {
+      setPlayingVoiceId("");
+      pushNotice("음성을 재생하지 못했습니다.");
+    });
   };
 
   const startVoice = async (event) => {
@@ -980,6 +1074,17 @@ export default function LocationPlatform() {
     if (!session.roomId || arriveState === "pending" || arriveLock.current) return;
     const mine = membersRef.current.find((member) => member.userId === getLocalVlueUserId());
     if (mine?.arrived) return;
+    const place = roomRef.current;
+    const here = self?.lat != null ? self : mine;
+    if (!place?.placeReady || here?.lat == null || here?.lng == null) {
+      pushNotice("현재 위치를 확인한 뒤에 도착 완료를 눌러 주세요.");
+      return;
+    }
+    const meters = haversineMeters(here.lat, here.lng, place.placeLat, place.placeLng);
+    if (meters > MANUAL_ARRIVE_METERS) {
+      pushNotice(`아직 도착지에서 약 ${Math.round(meters)}m 떨어져 있습니다. ${MANUAL_ARRIVE_METERS}m 안에 들어오면 도착 완료를 누를 수 있습니다.`);
+      return;
+    }
     arriveLock.current = true;
     setArriveState("pending");
     try {
@@ -1030,7 +1135,12 @@ export default function LocationPlatform() {
     ? "rounded-full border border-white/12 bg-white/10 px-3.5 py-2 text-[12px] font-semibold tracking-tight text-white"
     : "rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-semibold tracking-tight text-slate-800";
   const arrivedNow = selfArrived || arriveState === "done";
-  const sheetPad = "pb-[max(20px,calc(12px+env(safe-area-inset-bottom)))]";
+  const metersToPlace =
+    self?.lat != null && room?.placeReady
+      ? haversineMeters(self.lat, self.lng, room.placeLat, room.placeLng)
+      : null;
+  const nearArrive = metersToPlace != null && metersToPlace <= MANUAL_ARRIVE_METERS;
+  const sheetLift = `calc(${AD_BANNER_PX + 12}px + env(safe-area-inset-bottom, 0px))`;
   return (
     <section
       className={`fixed inset-x-0 top-0 z-[530] flex flex-col overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
@@ -1054,95 +1164,128 @@ export default function LocationPlatform() {
           {session.mode === "vmap" && !session.roomId ? (
             <button type="button" className={`shrink-0 ${accentBtn}`} onClick={() => void makeRoom()}>방 만들기</button>
           ) : null}
-          <button type="button" onClick={() => { setMembersOpen(false); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
+          <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
-        <div className={`absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
-          <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
-          <div className={dark ? "h-px bg-white/10" : "h-px bg-black/10"} />
-          <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
-        </div>
-        <p className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold text-slate-700/80">© OpenStreetMap</p>
         {session.mode === "vmap" && guideOn && cue ? (
-          <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#04121a]/88 px-4 py-2 text-[13px] font-semibold tracking-tight text-white shadow-lg backdrop-blur-xl">
-            <span className="mr-1 text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</span>
-            앞 {cue.instruction}
+          <div className="absolute right-3 top-[calc(64px+env(safe-area-inset-top))] z-30 flex w-[9.5rem] flex-col overflow-hidden rounded-[22px] border border-[#00D2FF]/35 bg-[#04121a]/92 text-white shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+            <div className="flex items-center justify-center bg-[#00D2FF] px-2 py-3 text-[34px] font-black leading-none text-[#04121a]">
+              {maneuverGlyph(cue.instruction)}
+            </div>
+            <div className="px-3 py-2.5 text-center">
+              <p className="text-[18px] font-black tracking-tight text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</p>
+              <p className="mt-0.5 text-[12px] font-semibold leading-snug text-white/90">{cue.instruction}</p>
+            </div>
           </div>
         ) : null}
+        {!keyboardInset ? (
+          <div className={`absolute bottom-3 right-3 z-20 flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
+            <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
+            <div className={dark ? "h-px bg-white/10" : "h-px bg-black/10"} />
+            <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
+          </div>
+        ) : null}
+        <p className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold text-slate-700/80">© OpenStreetMap</p>
         {farewell ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 px-8 text-center">
             <p className="text-[18px] font-black leading-snug text-white">{farewell}</p>
           </div>
         ) : null}
         {session.mode === "vmap" && isHost && session.roomId ? (
-          <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-10 space-y-2 rounded-[28px] p-3 ${glass}`}>
-            <form
-              className="flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                searchVmapPlaces(placeQuery).then((data) => setPlaceHits(data.places || [])).catch((error) => pushNotice(error.message));
-              }}
-            >
-              <input value={placeQuery} onChange={(event) => setPlaceQuery(event.target.value)} placeholder="주소·장소 검색" className="min-w-0 flex-1 rounded-full border bg-white/90 px-3 py-2 text-[13px] text-slate-900" />
-              <button type="submit" className={accentBtn}>검색</button>
-            </form>
-            {placeHits.length ? (
-              <ul className="max-h-36 overflow-y-auto rounded-2xl bg-white/95 text-slate-900 shadow">
-                {placeHits.map((place) => (
-                  <li key={`${place.lat}-${place.lng}`}>
-                    <button
-                      type="button"
-                      className="block w-full px-3 py-2 text-left text-[12px]"
-                      onClick={() => {
-                        pinDirtyRef.current = true;
-                        setDraftPin({ lat: place.lat, lng: place.lng, label: place.label, ready: false });
-                        viewRef.current = { ...viewRef.current, lat: place.lat, lng: place.lng, placed: true };
-                        setPlaceHits([]);
-                      }}
-                    >
-                      <b>{place.label}</b>
-                      <span className="block opacity-70">{place.address}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={accentBtn}
-                onClick={() => {
-                  if (!draftPin) return;
-                  pinDirtyRef.current = false;
-                  updateVmapPlace(session.roomId, {
-                    placeLat: draftPin.lat,
-                    placeLng: draftPin.lng,
-                    placeLabel: draftPin.label || placeQuery || "도착지"
-                  }).then((data) => {
-                    setRoom(data.room);
-                    setRoutes({});
-                    pushNotice("도착 핀을 저장했습니다.");
-                  }).catch((error) => pushNotice(error.message));
+          searchOpen ? (
+            <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-10 space-y-2 rounded-[28px] p-3 ${glass}`}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[12px] font-semibold tracking-tight opacity-70">도착지 검색</p>
+                <button type="button" className={quietBtn} onClick={() => { setSearchOpen(false); setPlaceHits([]); }}>접기</button>
+              </div>
+              <form
+                className="flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  searchVmapPlaces(placeQuery).then((data) => setPlaceHits(data.places || [])).catch((error) => pushNotice(error.message));
                 }}
               >
-                {room?.placeReady ? "핀 수정 저장" : "도착 핀 꽂기"}
-              </button>
-              <span className={`min-w-0 flex-1 truncate rounded-full px-3 py-1.5 text-[11px] font-bold ${theme === "dark" ? "bg-white/10" : "bg-slate-100"}`}>
-                {room?.placeReady ? room.placeLabel || "도착지" : "지도를 끌거나 검색으로 핀을 놓으세요"}
-              </span>
+                <input value={placeQuery} onChange={(event) => setPlaceQuery(event.target.value)} placeholder="주소·장소 검색" className="min-w-0 flex-1 rounded-full border bg-white/90 px-3 py-2 text-[13px] text-slate-900" />
+                <button type="submit" className={accentBtn}>검색</button>
+              </form>
+              {placeHits.length ? (
+                <ul className="max-h-36 overflow-y-auto rounded-2xl bg-white/95 text-slate-900 shadow">
+                  {placeHits.map((place) => (
+                    <li key={`${place.lat}-${place.lng}`}>
+                      <button
+                        type="button"
+                        className="block w-full px-3 py-2 text-left text-[12px]"
+                        onClick={() => {
+                          pinDirtyRef.current = true;
+                          setDraftPin({ lat: place.lat, lng: place.lng, label: place.label, ready: false });
+                          viewRef.current = { ...viewRef.current, lat: place.lat, lng: place.lng, placed: true };
+                          setPlaceHits([]);
+                        }}
+                      >
+                        <b>{place.label}</b>
+                        <span className="block opacity-70">{place.address}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={accentBtn}
+                  onClick={() => {
+                    if (!draftPin) return;
+                    pinDirtyRef.current = false;
+                    updateVmapPlace(session.roomId, {
+                      placeLat: draftPin.lat,
+                      placeLng: draftPin.lng,
+                      placeLabel: draftPin.label || placeQuery || "도착지"
+                    }).then((data) => {
+                      setRoom(data.room);
+                      setRoutes({});
+                      setSearchOpen(false);
+                      pushNotice("도착 핀을 저장했습니다.");
+                    }).catch((error) => pushNotice(error.message));
+                  }}
+                >
+                  {room?.placeReady ? "핀 수정 저장" : "도착 핀 꽂기"}
+                </button>
+                <span className={`min-w-0 flex-1 truncate rounded-full px-3 py-1.5 text-[11px] font-bold ${theme === "dark" ? "bg-white/10" : "bg-slate-100"}`}>
+                  {room?.placeReady ? room.placeLabel || "도착지" : "지도를 끌거나 검색으로 핀을 놓으세요"}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <button
+              type="button"
+              className={`absolute left-3 top-[calc(68px+env(safe-area-inset-top))] z-10 max-w-[70%] truncate rounded-full px-3 py-2 text-[12px] font-semibold ${glass}`}
+              onClick={() => setSearchOpen(true)}
+            >
+              ✎ {room?.placeLabel || "도착지 수정"}
+            </button>
+          )
         ) : null}
         {liveComments.length ? (
           <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex max-h-[7.5rem] flex-col justify-end gap-1 overflow-hidden">
             {liveComments.map((row) => (
-              <p
+              <div
                 key={row.id}
-                className="w-fit max-w-[88%] rounded-2xl border border-white/10 bg-[#0c1220]/55 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-md"
+                className="pointer-events-auto flex w-fit max-w-[88%] items-center gap-2 rounded-2xl border border-white/10 bg-[#0c1220]/55 px-2.5 py-1.5 text-[13px] font-medium text-white backdrop-blur-md"
                 style={{ opacity: liveOpacity(row.createdAt, liveNow) }}
               >
-                <span className="mr-1 font-semibold text-[#00D2FF]">{row.displayName}</span>
-                {row.kind === "voice" ? "음성" : row.body}
-              </p>
+                <span className="font-semibold text-[#00D2FF]">{row.displayName}</span>
+                {row.kind === "voice" ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full bg-[#00D2FF]/20 px-2 py-0.5 text-[12px] font-semibold text-[#00D2FF]"
+                    onClick={() => playVoice(row)}
+                    aria-label="음성 다시 듣기"
+                  >
+                    {playingVoiceId === row.id ? "❚❚" : "▶"} 음성
+                  </button>
+                ) : (
+                  <span>{row.body}</span>
+                )}
+              </div>
             ))}
           </div>
         ) : null}
@@ -1198,7 +1341,7 @@ export default function LocationPlatform() {
                     </button>
                     <button
                       type="button"
-                      className={accentBtn}
+                      className={nearArrive ? accentBtn : quietBtn}
                       disabled={arriveState === "pending"}
                       onClick={(event) => {
                         event.preventDefault();
@@ -1206,7 +1349,13 @@ export default function LocationPlatform() {
                         void completeArrival();
                       }}
                     >
-                      {arriveState === "pending" ? "처리 중…" : "도착 완료"}
+                      {arriveState === "pending"
+                        ? "처리 중…"
+                        : nearArrive
+                          ? "도착 완료"
+                          : metersToPlace == null
+                            ? "도착 완료"
+                            : `도착까지 ${Math.round(metersToPlace)}m`}
                     </button>
                   </>
                 )
@@ -1271,7 +1420,9 @@ export default function LocationPlatform() {
       </div>
 
       <div className="shrink-0 px-3 pt-2" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
-        {sponsor ? (
+        {settingsOpen || membersOpen || keyboardInset > 80 ? (
+          <div style={{ height: AD_BANNER_PX }} aria-hidden />
+        ) : sponsor ? (
           <a href={sponsor.linkUrl || undefined} target="_blank" rel="noreferrer" className="flex items-center gap-3 overflow-hidden rounded-xl bg-amber-50 px-3 text-slate-900" style={{ height: AD_BANNER_PX }}>
             {sponsor.imageUrl ? <img src={sponsor.imageUrl} alt="" className="h-9 w-16 rounded object-cover" /> : null}
             <span className="min-w-0">
@@ -1280,15 +1431,19 @@ export default function LocationPlatform() {
             </span>
           </a>
         ) : sponsorReady ? (
-          <AdMobBannerSlot slotId="location_map" heightPx={AD_BANNER_PX} preferredSize="BANNER" enabled={!settingsOpen && !membersOpen && !keyboardInset} />
+          <AdMobBannerSlot slotId="location_map" heightPx={AD_BANNER_PX} preferredSize="BANNER" enabled />
         ) : (
           <div style={{ height: AD_BANNER_PX }} />
         )}
       </div>
 
       {settingsOpen ? (
-        <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-sm" onClick={() => setSettingsOpen(false)}>
-          <div className={`absolute inset-x-0 bottom-0 rounded-t-[28px] px-4 pt-3 shadow-2xl ${sheetPad} ${dark ? "bg-[#0c1220]/95 text-white" : "bg-white/95 text-slate-900"}`} onClick={(event) => event.stopPropagation()}>
+        <div className="absolute inset-0 z-[90] bg-black/55 backdrop-blur-sm" onClick={() => setSettingsOpen(false)}>
+          <div
+            className={`absolute inset-x-0 rounded-t-[28px] px-4 pt-3 shadow-2xl ${dark ? "bg-[#0c1220] text-white" : "bg-white text-slate-900"}`}
+            style={{ bottom: sheetLift, paddingBottom: 20 }}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${dark ? "bg-white/20" : "bg-slate-200"}`} />
             <p className="text-[16px] font-semibold tracking-tight">화면</p>
             <p className={`mt-1 text-[12px] ${dark ? "text-white/60" : "text-slate-500"}`}>지도는 컬러 도로지도로 두고, 버튼과 패널만 밝기를 바꿉니다.</p>
@@ -1308,11 +1463,19 @@ export default function LocationPlatform() {
                 </button>
               ))}
             </div>
-            <button type="button" className={`mt-3 block w-full rounded-2xl px-3 py-3 text-left text-[14px] font-semibold ${dark ? "bg-white/10" : "bg-slate-100"}`} onClick={() => { setMembersOpen(true); setSettingsOpen(false); }}>
+            <button type="button" className={`mt-3 block w-full rounded-2xl px-3 py-3 text-left text-[14px] font-semibold ${dark ? "bg-white/10" : "bg-slate-100"}`} onClick={() => { setMembersOpen(true); setSettingsOpen(false); hideLocationAds(); }}>
               함께 있는 사람
             </button>
             {session.mode === "vmap" && session.roomId ? (
-              <button type="button" className="mt-2 block w-full rounded-2xl bg-rose-500 px-3 py-3 text-[14px] font-semibold text-white" onClick={() => void leaveForGood()}>
+              <button
+                type="button"
+                className="mt-2 block w-full rounded-2xl bg-rose-500 px-3 py-3 text-[14px] font-semibold text-white"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void leaveForGood();
+                }}
+              >
                 {isHost ? "방 삭제" : "나가기"}
               </button>
             ) : null}
@@ -1320,8 +1483,12 @@ export default function LocationPlatform() {
         </div>
       ) : null}
       {membersOpen ? (
-        <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-sm" onClick={() => setMembersOpen(false)}>
-          <div className={`absolute inset-x-0 bottom-0 rounded-t-[28px] p-4 ${sheetPad} ${dark ? "bg-[#0c1220]/95 text-white" : "bg-white/95 text-slate-900"}`} onClick={(event) => event.stopPropagation()}>
+        <div className="absolute inset-0 z-[90] bg-black/55 backdrop-blur-sm" onClick={() => setMembersOpen(false)}>
+          <div
+            className={`absolute inset-x-0 rounded-t-[28px] p-4 ${dark ? "bg-[#0c1220] text-white" : "bg-white text-slate-900"}`}
+            style={{ bottom: sheetLift, paddingBottom: 20 }}
+            onClick={(event) => event.stopPropagation()}
+          >
             <p className="text-[15px] font-semibold tracking-tight">함께 있는 사람</p>
             <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
               {people.map((member) => (

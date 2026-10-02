@@ -988,6 +988,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 stopVmapSession:function(){
                   try{if(window.Android&&window.Android.stopVmapSession)window.Android.stopVmapSession();}catch(e){}
                 },
+                setMapKeepScreenOn:function(active){
+                  try{if(window.Android&&window.Android.setMapKeepScreenOn)window.Android.setMapKeepScreenOn(!!active);}catch(e){}
+                },
                 analyzeSms:function(requestId,sender,messageText){
                   try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
                   catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
@@ -1444,10 +1447,28 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             }
         }
 
+        @android.webkit.JavascriptInterface
+        fun setMapKeepScreenOn(active: Boolean) {
+            activity.runOnUiThread {
+                try {
+                    if (active) {
+                        activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+
         /** V-Map이 미니맵으로 내려가도 프로세스를 유지. Exit Room에서 중지. */
         @android.webkit.JavascriptInterface
         fun startVmapSession() {
             activity.runOnUiThread {
+                try {
+                    activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } catch (_: Exception) {
+                }
                 try {
                     FamilyCareForegroundService.start(activity)
                 } catch (_: Exception) {
@@ -1458,7 +1479,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
         @android.webkit.JavascriptInterface
         fun stopVmapSession() {
-            activity.runOnUiThread { FamilyCareForegroundService.stop(activity) }
+            activity.runOnUiThread {
+                try {
+                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } catch (_: Exception) {
+                }
+                FamilyCareForegroundService.stop(activity)
+            }
         }
 
         @android.webkit.JavascriptInterface
