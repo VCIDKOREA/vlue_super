@@ -1830,17 +1830,24 @@ function LetteringOverlayHostInner() {
                */
               userChoseMiniRef.current = false;
               restoreHoldUntilRef.current = Date.now() + 4500;
+              /*
+               * 네이티브가 창을 키운 뒤에만 펼친다.
+               * 먼저 setExpanded 하면 120dp 로고·미니 높이 안에 쇼케이스가 잘려 멈춘다.
+               * restore_showcase 가 창 확장 후에 setExpanded(true) 를 한다.
+               */
+              const nativeRestore =
+                window.VlueLettering?.restoreShowcaseOverlay ||
+                window.Android?.restoreShowcaseOverlay;
+              if (typeof nativeRestore === "function") {
+                try {
+                  nativeRestore();
+                } catch {
+                  /* ignore */
+                }
+                return;
+              }
               setExpanded(true);
               setForceShowcaseBar(false);
-              try {
-                if (typeof window.VlueLettering?.restoreShowcaseOverlay === "function") {
-                  window.VlueLettering.restoreShowcaseOverlay();
-                } else {
-                  window.Android?.restoreShowcaseOverlay?.();
-                }
-              } catch {
-                /* ignore */
-              }
               return;
             }
             /* restore hold 중 접힘(고스트 클릭·스퓨리어스 minimize) 무시 */

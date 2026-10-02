@@ -69,7 +69,9 @@ app.use(
       "X-VLUE-Client",
       "X-VLUE-Platform",
       "X-Admin-Device-Id",
-      "Last-Event-ID"
+      "Last-Event-ID",
+      "If-None-Match",
+      "If-Modified-Since"
     ]
   })
 );

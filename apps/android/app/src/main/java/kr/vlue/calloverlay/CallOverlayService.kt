@@ -1342,7 +1342,8 @@ class CallOverlayService : Service() {
                         "OUTGOING_LOGO_TAP_KEEP_LOGO",
                         "phase=${phase.name} source=$source — no peer big_push_bar"
                     )
-                    ensureOutgoingLogoWindowLayout()
+                    outgoingExpandRequestedByUser = false
+                    ensureOutgoingLogoWindowLayout(force = true)
                     notifyWebCallState("outgoing_logo")
                     if (remoteConnected) notifyWebCallState("outgoing_connected")
                     restartOutgoingPeerProbeIfNeeded()
@@ -1427,19 +1428,21 @@ class CallOverlayService : Service() {
         /* Answer 후 ContextWatch 가 OTHER_APP 으로 오판해 빅푸시로 되돌리지 않도록 충분히 유지 */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         /* 네이티브 창 성장을 먼저 시작해 작은 바 안에서 풀 UI가 잘리는 첫 프레임을 없앤다. */
-        if (rootContainer?.isAttachedToWindow == true) {
-            enterShowcaseLayout(source = source)
-        } else {
-            /* 첫 부착만 — 전환용 remove/add 아님. 단일 TYPE_APPLICATION_OVERLAY */
-            attachOverlayWindow(
-                phone = currentPhone.ifBlank { "unknown" },
-                verified = false,
-                outgoing = currentOutgoing,
-                cardJson = pendingCardJson,
-                asBigPush = false
-            )
-            enterShowcaseLayout(source = source)
-        }
+        val showcaseOpen =
+            if (rootContainer?.isAttachedToWindow == true) {
+                enterShowcaseLayout(source = source)
+            } else {
+                /* 첫 부착만 — 전환용 remove/add 아님. 단일 TYPE_APPLICATION_OVERLAY */
+                attachOverlayWindow(
+                    phone = currentPhone.ifBlank { "unknown" },
+                    verified = false,
+                    outgoing = currentOutgoing,
+                    cardJson = pendingCardJson,
+                    asBigPush = false
+                )
+                enterShowcaseLayout(source = source)
+            }
+        if (!showcaseOpen) return
         notifyWebExpandShowcase()
         /* 탭/자동 동일 — restore_showcase 없으면 웹이 바 상태로 남는 경우가 있음 */
         notifyWebCallState("restore_showcase")
@@ -1628,11 +1631,12 @@ class CallOverlayService : Service() {
         )
     }
 
-    /** Controller position FULLSCREEN을 단일 Window에 updateViewLayout으로 반영 */
-    private fun enterShowcaseLayout(source: String) {
+    /** Controller position FULLSCREEN을 단일 Window에 updateViewLayout으로 반영.
+     *  @return 전체화면이 반영됐으면 true. false 면 웹에 restore 를 보내지 않는다. */
+    private fun enterShowcaseLayout(source: String): Boolean {
         if (!mayCommitFullscreenShowcase()) {
             refuseEmptyFullscreen("enterLayout_$source")
-            return
+            return false
         }
         if (companion.state != OverlayState.SHOWCASE) {
             companion.onAnswer(OverlayContext.IN_CALL)
@@ -1641,6 +1645,7 @@ class CallOverlayService : Service() {
         }
         publishCompanion(OverlayTriggerEvent.INTERNAL)
         applyLayoutFromController(source = source)
+        return companion.position == OverlayPosition.FULLSCREEN
     }
 
     private fun cancelFullscreenExpandAnimator() {
@@ -1721,6 +1726,12 @@ class CallOverlayService : Service() {
             "source=$source state=${companion.state.name} — contract KEEP_BIG_PUSH/popup"
         )
         cancelFullscreenExpandAnimator()
+        /* 웹이 창보다 먼저 풀 쇼케이스를 그리면 120dp·미니 안에 잘린 먹통이 남는다. 접어서 되돌린다. */
+        webView?.evaluateJavascript(
+            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                "window.VlueLettering.setExpanded(false);}catch(e){}",
+            null
+        )
         val verified = pendingVerified || parseIsVerified(pendingCardJson)
         if (isCurrentPathAbnormal(pendingCardJson) ||
             isContactSafeCare(pendingCardJson) ||
@@ -2152,8 +2163,9 @@ class CallOverlayService : Service() {
             )
             if (companion.state == OverlayState.BIG_PUSH) {
                 if (currentOutgoing && outgoingExpandRequestedByUser) {
-                    /* 상단 peer 바로 떨어지지 않게 중앙 로고 유지 */
-                    ensureOutgoingLogoWindowLayout()
+                    /* 탭은 했으나 팝업이 안 붙음 — 로고 창으로 되돌린다. 120dp 안에 미니를 두면 정사각형으로 잘린다. */
+                    outgoingExpandRequestedByUser = false
+                    ensureOutgoingLogoWindowLayout(force = true)
                     notifyWebCallState("outgoing_logo")
                     if (remoteConnected) notifyWebCallState("outgoing_connected")
                 } else {
@@ -2173,7 +2185,15 @@ class CallOverlayService : Service() {
                 "popupOnly=$authPopupOnlyMode attached=${dcpPopupView?.isAttachedToWindow == true}"
         )
         if (webView != null) {
-            notifyWebCallState("connected")
+            /*
+             * connected 는 웹이 풀 쇼케이스를 setExpanded(true) 한다.
+             * 팝업 뒤에 120dp·미니 창에 그려지면 잘린 정사각형으로 남는다.
+             */
+            webView?.evaluateJavascript(
+                "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                    "window.VlueLettering.setExpanded(false);}catch(e){}",
+                null
+            )
         }
     }
 
@@ -3861,18 +3881,20 @@ class CallOverlayService : Service() {
         webView?.visibility = android.view.View.VISIBLE
         rootContainer?.setBackgroundColor(Color.parseColor("#0B101B"))
         /* Mini 창을 먼저 성장시킨 뒤 웹 콘텐츠를 펼쳐 잘린 풀 UI 노출을 방지한다. */
-        if (rootContainer?.isAttachedToWindow == true) {
-            enterShowcaseLayout(source = source)
-        } else {
-            attachOverlayWindow(
-                phone = currentPhone.ifBlank { "unknown" },
-                verified = pendingVerified || parseIsVerified(pendingCardJson),
-                outgoing = currentOutgoing,
-                cardJson = pendingCardJson,
-                asBigPush = false
-            )
-            enterShowcaseLayout(source = source)
-        }
+        val showcaseOpen =
+            if (rootContainer?.isAttachedToWindow == true) {
+                enterShowcaseLayout(source = source)
+            } else {
+                attachOverlayWindow(
+                    phone = currentPhone.ifBlank { "unknown" },
+                    verified = pendingVerified || parseIsVerified(pendingCardJson),
+                    outgoing = currentOutgoing,
+                    cardJson = pendingCardJson,
+                    asBigPush = false
+                )
+                enterShowcaseLayout(source = source)
+            }
+        if (!showcaseOpen) return
         notifyWebExpandShowcase()
         notifyWebCallState("restore_showcase")
         syncOverlayChromeForState(source = source)
@@ -4000,11 +4022,14 @@ class CallOverlayService : Service() {
             OverlayPosition.BOTTOM,
             OverlayPosition.BELOW_COMPACT_INCOMING -> {
                 if (currentOutgoing &&
-                    (!outgoingExpandRequestedByUser ||
-                        (companion.state == OverlayState.BIG_PUSH && !authPopupOnlyMode))
+                    !outgoingExpandRequestedByUser &&
+                    companion.state == OverlayState.BIG_PUSH &&
+                    !authPopupOnlyMode
                 ) {
                     ensureOutgoingLogoWindowLayout()
                     notifyCompactCallChrome()
+                } else if (currentOutgoing && outgoingExpandRequestedByUser) {
+                    /* 탭 이후 ContextWatch 가 BIG_PUSH 로 접어도 120dp 로고 창으로 되돌리지 않는다. */
                 } else {
                     applyCompactRingingWindow()
                 }
@@ -4552,26 +4577,23 @@ class CallOverlayService : Service() {
 
     /** 수신 BigPush 바 / 발신 중앙 로고 — compact chrome 동기 */
     private fun notifyCompactCallChrome() {
-        if (currentOutgoing &&
-            (!outgoingExpandRequestedByUser ||
-                (companion.state == OverlayState.BIG_PUSH && !authPopupOnlyMode))
-        ) {
-            /*
-             * 로고 탭 직후 expandRequested=true 여도 팝업 부착 전에는
-             * peer big_push_bar 로 바꾸면 상단 이상 텍스트가 뜬다 — 로고 유지.
-             */
+        if (currentOutgoing && !outgoingExpandRequestedByUser) {
             notifyWebCallState("outgoing_logo")
             if (remoteConnected) {
                 notifyWebCallState("outgoing_connected")
             }
-        } else {
+        } else if (!currentOutgoing) {
             notifyWebCallState("big_push_bar")
         }
     }
 
-    /** 발신 로고 단계 — 중앙 작은 창만 (전체화면이면 종료 버튼 터치 불가) */
-    private fun ensureOutgoingLogoWindowLayout() {
-        if (!currentOutgoing || outgoingExpandRequestedByUser) return
+    /**
+     * 발신 로고 단계 — 중앙 작은 창만 (전체화면이면 종료 버튼 터치 불가).
+     * 사용자가 로고를 탭한 뒤에는 이 창을 다시 씌우지 않는다. force 는 로고로 되돌릴 때만.
+     */
+    private fun ensureOutgoingLogoWindowLayout(force: Boolean = false) {
+        if (!currentOutgoing) return
+        if (outgoingExpandRequestedByUser && !force) return
         if (companion.state != OverlayState.BIG_PUSH) return
         val params = layoutParams ?: return
         val root = rootContainer ?: return

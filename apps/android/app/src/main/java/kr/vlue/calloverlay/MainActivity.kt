@@ -16,6 +16,7 @@ import android.view.View
 import android.view.WindowManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -150,6 +151,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         bannerAdManager = VlueBannerAdManager(this, mainRoot, webView)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        /* 지도·쇼케이스 웹 배포가 버전코드와 무관하게 바로 보이게 — 디스크 캐시의 옛 index 금지 */
+        webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
         webView.settings.allowFileAccess = true
         webView.settings.allowContentAccess = true
         webView.settings.mediaPlaybackRequiresUserGesture = false
@@ -400,11 +403,17 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private fun clearWebCacheIfVersionBumped() {
         val prefs = getSharedPreferences("vlue_web_shell", MODE_PRIVATE)
         val last = prefs.getInt("web_cache_version", -1)
+        val lastRev = prefs.getInt("web_content_rev", 0)
         val current = BuildConfig.VERSION_CODE
-        if (last == current) return
+        /* 2 = Esri 도로 타일. 같은 versionCode 재설치에서도 옛 Carto HTML 을 버린다. */
+        val contentRev = 2
+        if (last == current && lastRev == contentRev) return
         webView.clearCache(true)
-        prefs.edit().putInt("web_cache_version", current).apply()
-        Log.i(TAG, "webview cache cleared for version $current (was $last)")
+        prefs.edit()
+            .putInt("web_cache_version", current)
+            .putInt("web_content_rev", contentRev)
+            .apply()
+        Log.i(TAG, "webview cache cleared for version $current rev $contentRev (was $last/$lastRev)")
     }
 
     private fun applyNotificationWakeFlags(intent: Intent?) {
