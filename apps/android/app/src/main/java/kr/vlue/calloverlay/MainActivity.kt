@@ -991,6 +991,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 setMapKeepScreenOn:function(active){
                   try{if(window.Android&&window.Android.setMapKeepScreenOn)window.Android.setMapKeepScreenOn(!!active);}catch(e){}
                 },
+                vibrateTap:function(ms){
+                  try{if(window.Android&&window.Android.vibrateTap)window.Android.vibrateTap(Number(ms)||14);}catch(e){}
+                },
                 analyzeSms:function(requestId,sender,messageText){
                   try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
                   catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
@@ -1455,6 +1458,35 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                         activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     } else {
                         activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun vibrateTap(ms: Int) {
+            val duration = ms.coerceIn(1, 80).toLong()
+            activity.runOnUiThread {
+                try {
+                    val vibrator = if (android.os.Build.VERSION.SDK_INT >= 31) {
+                        val mgr = activity.getSystemService(android.os.VibratorManager::class.java)
+                        mgr?.defaultVibrator
+                    } else {
+                        @Suppress("DEPRECATION")
+                        activity.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                    }
+                    if (vibrator == null || !vibrator.hasVibrator()) return@runOnUiThread
+                    if (android.os.Build.VERSION.SDK_INT >= 26) {
+                        vibrator.vibrate(
+                            android.os.VibrationEffect.createOneShot(
+                                duration,
+                                android.os.VibrationEffect.DEFAULT_AMPLITUDE
+                            )
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(duration)
                     }
                 } catch (_: Exception) {
                 }

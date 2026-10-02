@@ -37,6 +37,7 @@ import { getProfileHeaderName } from "../../lib/memberCardStorage.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters, resolveMapTheme } from "../../lib/sunTheme.js";
 import { formatGuideDistance, maneuverGlyph, nextGuideCue } from "../../lib/vmapGuide.js";
+import { bindMapTapFeedback, mapTapFeedback } from "../../lib/mapTapFeedback.js";
 import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 
@@ -45,7 +46,28 @@ const ACCENT = "#00D2FF";
 const AD_BANNER_PX = 56;
 /** 수동 도착 완료는 이 거리 안에 들어와야 한다. */
 const MANUAL_ARRIVE_METERS = 180;
+const MINI_KEY = "vlue_vmap_mini_pos_v1";
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
+
+function readMiniPos() {
+  try {
+    const raw = sessionStorage.getItem(MINI_KEY);
+    if (!raw) return null;
+    const pos = JSON.parse(raw);
+    if (!Number.isFinite(pos?.x) || !Number.isFinite(pos?.y)) return null;
+    return { x: pos.x, y: pos.y };
+  } catch {
+    return null;
+  }
+}
+
+function writeMiniPos(pos) {
+  try {
+    sessionStorage.setItem(MINI_KEY, JSON.stringify(pos));
+  } catch {
+    /* ignore */
+  }
+}
 
 function hideLocationAds() {
   try {
@@ -288,6 +310,7 @@ export default function LocationPlatform() {
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [searchOpen, setSearchOpen] = useState(true);
   const [playingVoiceId, setPlayingVoiceId] = useState("");
+  const [miniPos, setMiniPos] = useState(() => readMiniPos() || { x: null, y: null });
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
@@ -316,6 +339,7 @@ export default function LocationPlatform() {
   const lastTapRef = useRef(0);
   const wakeLockRef = useRef(null);
   const voiceAudioRef = useRef(null);
+  const miniDragRef = useRef(null);
 
   useEffect(() => subscribeLocationSession(setSession), []);
   roomRef.current = room;
@@ -1104,16 +1128,87 @@ export default function LocationPlatform() {
   if (!visible) return null;
 
   if (session.minimized && !session.open) {
+    const miniW = 148;
+    const miniH = 168;
+    const left = Number.isFinite(miniPos.x) ? miniPos.x : Math.max(12, (typeof window !== "undefined" ? window.innerWidth : 360) - miniW - 12);
+    const top = Number.isFinite(miniPos.y) ? miniPos.y : 72;
+    const onMiniDown = (event) => {
+      event.preventDefault();
+      mapTapFeedback("light");
+      miniDragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: left,
+        originY: top,
+        moved: false
+      };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    };
+    const onMiniMove = (event) => {
+      const drag = miniDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      if (Math.hypot(dx, dy) > 6) drag.moved = true;
+      if (!drag.moved) return;
+      const maxX = Math.max(8, window.innerWidth - miniW - 8);
+      const maxY = Math.max(8, window.innerHeight - miniH - 8);
+      const next = {
+        x: Math.min(maxX, Math.max(8, drag.originX + dx)),
+        y: Math.min(maxY, Math.max(8, drag.originY + dy))
+      };
+      setMiniPos(next);
+    };
+    const onMiniUp = (event) => {
+      const drag = miniDragRef.current;
+      miniDragRef.current = null;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.moved) {
+        const maxX = Math.max(8, window.innerWidth - miniW - 8);
+        const maxY = Math.max(8, window.innerHeight - miniH - 8);
+        const dx = event.clientX - drag.startX;
+        const dy = event.clientY - drag.startY;
+        const next = {
+          x: Math.min(maxX, Math.max(8, drag.originX + dx)),
+          y: Math.min(maxY, Math.max(8, drag.originY + dy))
+        };
+        setMiniPos(next);
+        writeMiniPos(next);
+        return;
+      }
+      mapTapFeedback("heavy");
+      restoreLocation();
+    };
     return (
-      <button
-        type="button"
-        onClick={restoreLocation}
-        className="fixed right-3 top-16 z-[520] h-24 w-32 overflow-hidden rounded-2xl border border-white/40 shadow-xl"
-        aria-label="V-Map 열기"
+      <div
+        role="button"
+        tabIndex={0}
+        data-map-tap
+        aria-label="V-Map 미니맵 — 끌어 이동, 탭하면 확대"
+        className="fixed z-[520] overflow-hidden rounded-[22px] border-2 border-[#00D2FF] bg-[#04121a] shadow-[0_12px_36px_rgba(0,0,0,0.45),0_0_0_1px_rgba(0,210,255,0.35)]"
+        style={{ left, top, width: miniW, height: miniH, touchAction: "none" }}
+        onPointerDown={onMiniDown}
+        onPointerMove={onMiniMove}
+        onPointerUp={onMiniUp}
+        onPointerCancel={() => { miniDragRef.current = null; }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            mapTapFeedback("heavy");
+            restoreLocation();
+          }
+        }}
       >
-        <canvas ref={canvasRef} className="h-full w-full" />
-        <span className="absolute bottom-1 left-1 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">V-Map</span>
-      </button>
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-[#04121a]/95 to-transparent px-2 pb-4 pt-1.5">
+          <span className="rounded-full bg-[#00D2FF] px-2 py-0.5 text-[10px] font-black tracking-tight text-[#04121a]">V-Map</span>
+          <span className="text-[10px] font-semibold text-white/75">탭=확대</span>
+        </div>
+        <canvas ref={canvasRef} className="h-full w-full touch-none" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-[#04121a]/90 to-transparent px-2 pb-1.5 pt-5">
+          <span className="block text-center text-[10px] font-medium text-white/70">끌어서 이동</span>
+        </div>
+      </div>
     );
   }
 
@@ -1145,6 +1240,7 @@ export default function LocationPlatform() {
     <section
       className={`fixed inset-x-0 top-0 z-[530] flex flex-col overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
       style={{ bottom: keyboardInset }}
+      onPointerDownCapture={bindMapTapFeedback}
     >
       <div className="relative min-h-0 flex-1">
         <canvas
