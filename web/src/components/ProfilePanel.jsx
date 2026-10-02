@@ -189,6 +189,7 @@ function ProfilePanel({
     () => readCachedActiveRegion()?.label || "위치 확인 중…"
   );
   const [activeRegionBusy, setActiveRegionBusy] = useState(false);
+  const [locationMenuOpen, setLocationMenuOpen] = useState(false);
   const { access: dccAccess } = useDccFeatureAccess();
   const dccBlocked = isDccSettingsDisabled(dccAccess);
 
@@ -1226,27 +1227,20 @@ function ProfilePanel({
           <div className="mt-6 px-1">
             <button
               type="button"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }));
-              }}
-              className={`flex w-full items-center gap-3 rounded-[28px] border p-4 text-left shadow-sm transition active:scale-[0.98] ${
-                isDarkMode
-                  ? "border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 text-white"
-                  : "border-sky-100 bg-gradient-to-r from-white to-sky-50 text-slate-900"
-              }`}
+              onClick={() => setLocationMenuOpen(true)}
+              className="flex w-full items-center gap-3 rounded-[28px] bg-blue-600 p-4 text-left text-white shadow-lg shadow-blue-600/30 transition active:scale-[0.98]"
             >
-              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[20px] shadow-sm ${isDarkMode ? "bg-white/10" : "bg-white"}`}>
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-[26px] shadow-sm">
                 📍
               </span>
               <span className="min-w-0 flex-1">
-                <span className={`block text-[10px] font-black uppercase tracking-[0.16em] ${isDarkMode ? "text-sky-200" : "text-sky-600"}`}>
-                  위치 · 가족 · V-Map
-                </span>
-                <span className="mt-0.5 block truncate text-[15px] font-black tracking-tight">
+                <span className="block text-[18px] font-black tracking-tight">위치</span>
+                <span className="mt-0.5 block text-[12px] font-bold text-blue-100">가족 위치확인 · V-MAP</span>
+                <span className="mt-0.5 block truncate text-[12px] font-bold text-white/90">
                   {activeRegionBusy ? "위치 확인 중…" : activeRegionLabel}
                 </span>
               </span>
-              <span className={`ml-auto text-[18px] ${isDarkMode ? "text-white/40" : "text-slate-300"}`}>›</span>
+              <span className="ml-auto text-[22px] text-white">›</span>
             </button>
             <button type="button" onClick={refreshActiveRegion} className={`mt-1 px-2 text-[11px] font-bold ${isDarkMode ? "text-slate-400" : "text-slate-400"}`}>
               현재 위치 다시 읽기
@@ -1510,6 +1504,46 @@ function ProfilePanel({
           <p className="rounded-full bg-blue-600 px-4 py-2 text-center text-[11px] font-bold text-white shadow-lg">
             {partnerInquiryNotice}
           </p>
+        </div>
+      ) : null}
+      {locationMenuOpen ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 px-4 pb-[max(20px,env(safe-area-inset-bottom))]"
+          onClick={() => setLocationMenuOpen(false)}
+        >
+          <div
+            className={`w-full max-w-sm rounded-[28px] p-4 shadow-2xl ${isDarkMode ? "bg-slate-900 text-white" : "bg-white text-slate-900"}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="px-1 pb-3 text-center text-[16px] font-black">위치를 선택하세요</p>
+            <button
+              type="button"
+              className="mb-2 block w-full rounded-2xl bg-emerald-500 px-4 py-4 text-[16px] font-black text-white"
+              onClick={() => {
+                setLocationMenuOpen(false);
+                window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }));
+              }}
+            >
+              가족 위치확인
+            </button>
+            <button
+              type="button"
+              className="mb-2 block w-full rounded-2xl bg-blue-600 px-4 py-4 text-[16px] font-black text-white"
+              onClick={() => {
+                setLocationMenuOpen(false);
+                window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "vmap" } }));
+              }}
+            >
+              V-MAP 개설
+            </button>
+            <button
+              type="button"
+              className={`block w-full rounded-2xl px-4 py-3 text-[14px] font-bold ${isDarkMode ? "bg-white/10" : "bg-slate-100"}`}
+              onClick={() => setLocationMenuOpen(false)}
+            >
+              닫기
+            </button>
+          </div>
         </div>
       ) : null}
       <MembershipUpgradeModal

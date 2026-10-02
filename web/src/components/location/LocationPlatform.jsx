@@ -54,10 +54,11 @@ function zoomForMeters(meters) {
 }
 
 function tileUrl(theme, z, x, y) {
-  // TODO(maps): VITE_KAKAO_MAP_APP_KEY / VITE_GOOGLE_MAPS_JS_KEY 가 준비되면
-  // 이 타일 소스를 카카오 지도 SDK 또는 Google Maps JS 스타일로 바꾼다.
-  const root = theme === "dark" ? "https://basemaps.cartocdn.com/dark_all" : "https://basemaps.cartocdn.com/light_all";
-  return `${root}/${z}/${x}/${y}.png`;
+  const base =
+    theme === "dark"
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile"
+      : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile";
+  return `${base}/${z}/${y}/${x}`;
 }
 
 function worldX(lng, z) {
@@ -424,7 +425,6 @@ export default function LocationPlatform() {
           let image = cache.get(key);
           if (!image) {
             image = new Image();
-            image.crossOrigin = "anonymous";
             image.src = tileUrl(theme, zoom, tx, ty);
             cache.set(key, image);
           }
@@ -734,7 +734,7 @@ export default function LocationPlatform() {
           onPointerUp={onPointerUp}
           onPointerLeave={() => { dragRef.current = null; pinDragRef.current = false; }}
         />
-        <p className="pointer-events-none absolute bottom-2 left-2 text-[9px] opacity-70">© OpenStreetMap © CARTO</p>
+        <p className="pointer-events-none absolute bottom-2 left-2 text-[9px] opacity-70">© Esri, OpenStreetMap</p>
         {session.mode === "family" ? (
           <div className="absolute left-3 top-3 flex gap-2">
             <button type="button" className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-black text-slate-900 shadow" onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>
