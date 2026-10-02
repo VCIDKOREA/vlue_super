@@ -192,6 +192,16 @@ locationMapRoutes.get("/guide", requireUserHeader, async (c) => {
   }
 });
 
+/** 웹/앱 지도 SDK용 — Client ID만 공개 (Secret 금지). */
+locationMapRoutes.get("/map-config", async (c) => {
+  const clientId = String(process.env.NAVER_MAP_CLIENT_ID || "").trim();
+  return c.json({
+    ok: true,
+    provider: clientId ? "naver" : "none",
+    clientId: clientId || null
+  });
+});
+
 /** 지도 하단 스폰서. 없으면 앱이 AdMob으로 대체한다. */
 locationMapRoutes.get("/sponsor", async (c) => {
   try {

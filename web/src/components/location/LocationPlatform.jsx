@@ -42,6 +42,7 @@ import { formatGuideDistance, maneuverGlyph, nextGuideCue } from "../../lib/vmap
 import { bindMapTapFeedback, mapTapFeedback } from "../../lib/mapTapFeedback.js";
 import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
+import VmapNaverSurface from "./VmapNaverSurface.jsx";
 
 const TILE = 256;
 const ACCENT = "#00D2FF";
@@ -328,9 +329,12 @@ export default function LocationPlatform() {
   const [routeMode, setRouteMode] = useState("recommend");
   const [routePickerOpen, setRoutePickerOpen] = useState(false);
   const [nativeMini, setNativeMini] = useState(false);
+  const [mapError, setMapError] = useState("");
+  const [mapReady, setMapReady] = useState(false);
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
+  const mapSurfaceRef = useRef(null);
   const roomRef = useRef(null);
   const membersRef = useRef([]);
   const sessionRef = useRef(session);
@@ -482,8 +486,14 @@ export default function LocationPlatform() {
           lng,
           zoom: userZoomedRef.current ? null : zoomForMeters(haversineMeters(lat, lng, liveRoom.placeLat, liveRoom.placeLng))
         };
+        if (!userZoomedRef.current) {
+          mapSurfaceRef.current?.panTo?.(lat, lng, followRef.current.zoom || 16);
+        }
       } else {
         followRef.current = null;
+        if (viewRef.current.placed && mapReady) {
+          /* 첫 위치만 네이버 지도 중심으로 — 이후는 사용자/길안내가 담당 */
+        }
       }
       if (session.mode === "family") {
         publishPresence(next).then(refreshFamily).catch(() => {});
@@ -742,62 +752,23 @@ export default function LocationPlatform() {
   };
 
   useEffect(() => {
-    if (!visible) return undefined;
-    let frame = 0;
-    let alive = true;
-    const loop = () => {
-      if (!alive) return;
-      paintRef.current();
-      frame = requestAnimationFrame(loop);
-    };
-    frame = requestAnimationFrame(loop);
-    return () => {
-      alive = false;
-      cancelAnimationFrame(frame);
-    };
+    /* 네이버 SDK 지도 사용 — 캔버스 페인트 루프는 끈다 */
+    return undefined;
   }, [visible]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !visible) return undefined;
-    const onWheel = (event) => {
-      event.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const raw = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
-      const step = Math.max(-1.25, Math.min(1.25, -raw / 260));
-      if (!step) return;
-      userZoomedRef.current = true;
-      gestureAtRef.current = performance.now();
-      viewRef.current = zoomAt(viewRef.current, viewRef.current.zoom + step, event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height);
-    };
-    canvas.addEventListener("wheel", onWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", onWheel);
-  }, [visible, session.open, session.minimized]);
+    if (!mapReady || !self?.lat || viewRef.current.naverPlaced) return;
+    viewRef.current.naverPlaced = true;
+    mapSurfaceRef.current?.panTo?.(self.lat, self.lng, 16);
+  }, [mapReady, self?.lat, self?.lng]);
 
   useEffect(() => {
     const target = session.flyTo;
     if (!target?.lat) return undefined;
-    flyingRef.current = true;
-    const start = { ...viewRef.current };
-    const begun = performance.now();
-    let frame = 0;
-    const step = (now) => {
-      const t = Math.min(1, (now - begun) / 700);
-      const ease = 1 - (1 - t) ** 3;
-      viewRef.current = {
-        ...viewRef.current,
-        lat: start.lat + (target.lat - start.lat) * ease,
-        lng: start.lng + (target.lng - start.lng) * ease,
-        placed: true
-      };
-      if (t < 1) frame = requestAnimationFrame(step);
-      else flyingRef.current = false;
-    };
-    frame = requestAnimationFrame(step);
-    return () => {
-      flyingRef.current = false;
-      cancelAnimationFrame(frame);
-    };
+    userZoomedRef.current = true;
+    markGesture();
+    mapSurfaceRef.current?.panTo?.(target.lat, target.lng);
+    return undefined;
   }, [session.flyTo]);
 
   useEffect(() => {
@@ -915,13 +886,9 @@ export default function LocationPlatform() {
   };
 
   const nudgeZoom = (dir) => {
-    const canvas = canvasRef.current;
-    const rect = canvas?.getBoundingClientRect();
-    const width = rect?.width || 320;
-    const height = rect?.height || 480;
     userZoomedRef.current = true;
     markGesture();
-    viewRef.current = zoomAt(viewRef.current, viewRef.current.zoom + dir, width / 2, height / 2, width, height);
+    mapSurfaceRef.current?.zoomBy?.(dir);
   };
 
   const onPointerDown = (event) => {
@@ -1330,7 +1297,19 @@ export default function LocationPlatform() {
           <span className="rounded-full bg-[#00D2FF] px-2 py-0.5 text-[10px] font-black tracking-tight text-[#04121a]">V-Map</span>
           <span className="text-[10px] font-semibold text-white/75">탭=확대</span>
         </div>
-        <canvas ref={canvasRef} className="h-full w-full touch-none" />
+        <div className="pointer-events-none absolute inset-0">
+          <VmapNaverSurface
+            active
+            members={members}
+            self={self}
+            room={room}
+            draftPin={draftPin}
+            routes={routes}
+            mode={session.mode}
+            departed={session.departed}
+            guideFollow={false}
+          />
+        </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-[#04121a]/90 to-transparent px-2 pb-1.5 pt-5">
           <span className="block text-center text-[10px] font-medium text-white/70">끌어서 이동</span>
         </div>
@@ -1369,14 +1348,50 @@ export default function LocationPlatform() {
       onPointerDownCapture={bindMapTapFeedback}
     >
       <div className="relative min-h-0 flex-1">
-        <canvas
-          ref={canvasRef}
-          className="h-full w-full touch-none"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
+        <VmapNaverSurface
+          ref={mapSurfaceRef}
+          active={session.open}
+          members={members}
+          self={self}
+          room={room}
+          draftPin={draftPin}
+          routes={routes}
+          mode={session.mode}
+          departed={session.departed}
+          guideFollow={guideOn && session.mode === "vmap" && session.departed && !selfArrived}
+          flyTo={session.flyTo}
+          pinEditable={Boolean(room?.hostUserId === getLocalVlueUserId())}
+          onSelectMember={(member) => {
+            setSelected(member || null);
+            if (member?.lat != null) {
+              userZoomedRef.current = true;
+              markGesture();
+              patchLocationSession({ flyTo: { lat: member.lat, lng: member.lng, at: Date.now() } });
+            }
+          }}
+          onDraftPinChange={(next) => {
+            pinDirtyRef.current = true;
+            setDraftPin((prev) => ({ ...(prev || {}), ...next, ready: false }));
+          }}
+          onUserGesture={() => {
+            userZoomedRef.current = true;
+            markGesture();
+          }}
+          onReady={() => {
+            setMapReady(true);
+            setMapError("");
+          }}
+          onError={(error) => {
+            setMapReady(false);
+            setMapError(error?.message || "네이버 지도를 불러오지 못했습니다.");
+            pushNotice(error?.message || "네이버 지도를 불러오지 못했습니다.");
+          }}
         />
+        {mapError ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#eef2f5] px-6 text-center">
+            <p className="text-[14px] font-semibold text-slate-700">{mapError}</p>
+          </div>
+        ) : null}
         <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pt-[max(12px,env(safe-area-inset-top))]">
           <button type="button" onClick={dismissLocation} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="닫기">×</button>
           <div className={`flex min-w-0 flex-1 rounded-full p-1 backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-700"}`}>
@@ -1411,7 +1426,7 @@ export default function LocationPlatform() {
             <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
           </div>
         ) : null}
-        <p className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold text-slate-600/70">© CARTO · OSM</p>
+        <p className="pointer-events-none absolute bottom-3 left-3 z-10 text-[10px] font-semibold text-slate-600/80">© NAVER Map</p>
         {farewell ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 px-8 text-center">
             <p className="text-[18px] font-black leading-snug text-white">{farewell}</p>
@@ -1445,6 +1460,7 @@ export default function LocationPlatform() {
                           pinDirtyRef.current = true;
                           setDraftPin({ lat: place.lat, lng: place.lng, label: place.label, ready: false });
                           viewRef.current = { ...viewRef.current, lat: place.lat, lng: place.lng, placed: true };
+                          mapSurfaceRef.current?.panTo?.(place.lat, place.lng, 17);
                           setPlaceHits([]);
                         }}
                       >
