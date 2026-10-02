@@ -42,6 +42,7 @@ import { formatGuideDistance, maneuverGlyph, nextGuideCue } from "../../lib/vmap
 import { bindMapTapFeedback, mapTapFeedback } from "../../lib/mapTapFeedback.js";
 import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
+import { readLastGeo, writeLastGeo } from "../../lib/lastGeoCache.js";
 import VmapNaverSurface from "./VmapNaverSurface.jsx";
 
 const TILE = 256;
@@ -301,7 +302,18 @@ export default function LocationPlatform() {
   const [session, setSession] = useState(getLocationSession);
   const [members, setMembers] = useState([]);
   const [room, setRoom] = useState(null);
-  const [self, setSelf] = useState(null);
+  const [self, setSelf] = useState(() => {
+    const cached = readLastGeo();
+    if (!cached) return null;
+    return {
+      lat: cached.lat,
+      lng: cached.lng,
+      addressLabel: "",
+      batteryPct: null,
+      online: true,
+      displayName: getProfileHeaderName() || "나"
+    };
+  });
   const [sponsor, setSponsor] = useState(null);
   const [sponsorReady, setSponsorReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -447,10 +459,26 @@ export default function LocationPlatform() {
     if (!tracking) return undefined;
     let watchId = 0;
     const name = getProfileHeaderName() || "나";
+    /* 지도 열자마자 마지막 GPS로 본인 마커를 먼저 올린다 */
+    const cached = readLastGeo();
+    if (cached) {
+      setSelf((prev) => {
+        if (prev?.lat != null && prev?.lng != null) return prev;
+        return {
+          lat: cached.lat,
+          lng: cached.lng,
+          addressLabel: prev?.addressLabel || "",
+          batteryPct: prev?.batteryPct ?? null,
+          online: true,
+          displayName: name
+        };
+      });
+    }
     const send = async (coords, online) => {
       const lat = coords?.latitude;
       const lng = coords?.longitude;
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      writeLastGeo(lat, lng);
       /* 주소/배터리 조회가 느려도 프로필 마커는 즉시 올리기 */
       const next = { lat, lng, addressLabel: "", batteryPct: null, online, displayName: name };
       setSelf(next);
@@ -516,6 +544,11 @@ export default function LocationPlatform() {
       setSelf((prev) => ({ ...(prev || {}), online: false }));
       return undefined;
     }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => void send(pos.coords, true),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 12000 }
+    );
     watchId = navigator.geolocation.watchPosition(
       (pos) => void send(pos.coords, true),
       () => setSelf((prev) => (prev ? { ...prev, online: false } : { online: false, lat: null, lng: null })),

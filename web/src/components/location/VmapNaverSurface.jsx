@@ -16,7 +16,8 @@ function personHtml(name, status, photoUrl, live) {
   const face = photoUrl
     ? `<img src="${String(photoUrl).replace(/"/g, "")}" alt="" draggable="false" style="width:42px;height:42px;object-fit:cover;border-radius:999px;display:block" />`
     : `<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:#083044;color:#fff;font-weight:700;font-size:16px;border-radius:999px">${initial}</div>`;
-  return `<div style="width:${MARKER_W}px;height:${MARKER_H}px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;pointer-events:auto">
+  /* Naver HtmlIcon은 root에 position:absolute + size 고정이 있어야 안정적으로 보인다 */
+  return `<div style="position:absolute;left:0;top:0;width:${MARKER_W}px;height:${MARKER_H}px;margin:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;pointer-events:auto;-webkit-user-select:none;user-select:none">
     <div style="width:48px;height:48px;border-radius:999px;padding:3px;background:${ring};box-shadow:0 0 0 2px #fff,0 8px 20px rgba(0,210,255,0.35);box-sizing:border-box">
       <div style="width:100%;height:100%;border-radius:999px;overflow:hidden;background:#fff">${face}</div>
     </div>
@@ -144,6 +145,8 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
   const onGestureRef = useRef(onUserGesture);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+  const selfRef = useRef(self);
+  const centeredSelfRef = useRef(false);
   const [mapEpoch, setMapEpoch] = useState(0);
 
   guideFollowRef.current = guideFollow;
@@ -153,6 +156,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
   onGestureRef.current = onUserGesture;
   onReadyRef.current = onReady;
   onErrorRef.current = onError;
+  selfRef.current = self;
 
   useImperativeHandle(ref, () => ({
     zoomBy(delta) {
@@ -183,6 +187,8 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     let zoomListener = null;
     let dragEndListener = null;
     let idleTimer = 0;
+    let resizeObserver = null;
+    centeredSelfRef.current = false;
 
     (async () => {
       try {
@@ -191,10 +197,17 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         const naverMaps = await loadNaverMaps(clientId);
         if (cancelled || !hostRef.current) return;
         mapsApiRef.current = naverMaps;
-        const center = new naverMaps.LatLng(36.119, 128.344);
+        const seed = selfRef.current;
+        const seedLat = toLatLngNum(seed?.lat);
+        const seedLng = toLatLngNum(seed?.lng);
+        const center =
+          seedLat != null && seedLng != null
+            ? new naverMaps.LatLng(seedLat, seedLng)
+            : new naverMaps.LatLng(36.119, 128.344);
+        if (seedLat != null && seedLng != null) centeredSelfRef.current = true;
         const map = new naverMaps.Map(hostRef.current, {
           center,
-          zoom: 15,
+          zoom: seedLat != null ? 16 : 15,
           minZoom: 5,
           maxZoom: 21,
           zoomControl: false,
@@ -213,6 +226,41 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         dragListener = naverMaps.Event.addListener(map, "dragstart", markGesture);
         zoomListener = naverMaps.Event.addListener(map, "zoom_changed", markGesture);
         dragEndListener = naverMaps.Event.addListener(map, "dragend", markGesture);
+
+        const relayout = () => {
+          const live = mapRef.current;
+          const host = hostRef.current;
+          if (!live || !host) return;
+          try {
+            if (typeof live.autoResize === "function") live.autoResize();
+            else if (typeof live.setSize === "function") {
+              live.setSize(new naverMaps.Size(host.clientWidth, host.clientHeight));
+            }
+          } catch {
+            /* ignore */
+          }
+          overlaysRef.current.people.forEach((entry) => {
+            try {
+              entry.marker.setMap(live);
+            } catch {
+              /* ignore */
+            }
+          });
+          if (overlaysRef.current.pin?.marker) {
+            try {
+              overlaysRef.current.pin.marker.setMap(live);
+            } catch {
+              /* ignore */
+            }
+          }
+        };
+        relayout();
+        window.setTimeout(relayout, 80);
+        window.setTimeout(relayout, 320);
+        if (typeof ResizeObserver !== "undefined") {
+          resizeObserver = new ResizeObserver(() => relayout());
+          resizeObserver.observe(hostRef.current);
+        }
 
         idleTimer = window.setInterval(() => {
           const target = followTargetRef.current;
@@ -252,6 +300,11 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     return () => {
       cancelled = true;
       window.clearInterval(idleTimer);
+      try {
+        resizeObserver?.disconnect?.();
+      } catch {
+        /* ignore */
+      }
       const naver = mapsApiRef.current;
       if (naver && dragListener) naver.Event.removeListener(dragListener);
       if (naver && zoomListener) naver.Event.removeListener(zoomListener);
@@ -268,6 +321,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         /* ignore */
       }
       mapRef.current = null;
+      centeredSelfRef.current = false;
     };
   }, [active]);
 
@@ -426,6 +480,14 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     });
 
     if (!guideFollow) followTargetRef.current = null;
+
+    const selfLat = toLatLngNum(self?.lat);
+    const selfLng = toLatLngNum(self?.lng);
+    if (!centeredSelfRef.current && selfLat != null && selfLng != null && !guideFollow) {
+      centeredSelfRef.current = true;
+      map.setCenter(new naver.LatLng(selfLat, selfLng));
+      if (map.getZoom() < 14) map.setZoom(16);
+    }
   }, [active, mapEpoch, members, self, room, draftPin, routes, mode, departed, guideFollow, pinEditable]);
 
   return <div ref={hostRef} className="h-full w-full bg-[#eef2f5]" />;
