@@ -76,12 +76,13 @@ export function fetchVmapMessages(roomId, after) {
   return vlueAuthFetch(apiUrl(`/api/location/vmap/${roomId}/messages${q}`), { headers: vlueAuthHeaders() }).then(read);
 }
 
-export function fetchVmapGuide({ fromLat, fromLng, toLat, toLng }) {
+export function fetchVmapGuide({ fromLat, fromLng, toLat, toLng, mode }) {
   const q = new URLSearchParams({
     fromLat: String(fromLat),
     fromLng: String(fromLng),
     toLat: String(toLat),
-    toLng: String(toLng)
+    toLng: String(toLng),
+    mode: String(mode || "recommend")
   });
   return vlueAuthFetch(apiUrl(`/api/location/guide?${q}`), { headers: vlueAuthHeaders() }).then(read);
 }
@@ -127,6 +128,39 @@ export function setMapKeepScreenOn(active) {
   const bridge = typeof window === "undefined" ? null : window.Android || window.VlueLettering;
   try {
     bridge?.setMapKeepScreenOn?.(Boolean(active));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 다른 앱 위에 뜨는 V-Map 미니 오버레이. 지원하면 true. */
+export function setNativeVmapMiniOverlay(active, payload = {}) {
+  const bridge = typeof window === "undefined" ? null : window.Android || window.VlueLettering;
+  try {
+    if (active) {
+      if (typeof bridge?.showVmapMiniOverlay !== "function") return false;
+      const raw = bridge.showVmapMiniOverlay(JSON.stringify(payload || {}));
+      if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw);
+          return Boolean(parsed?.ok);
+        } catch {
+          return raw === "ok" || raw === "true";
+        }
+      }
+      return Boolean(raw);
+    }
+    bridge?.hideVmapMiniOverlay?.();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function updateNativeVmapMiniOverlay(payload = {}) {
+  const bridge = typeof window === "undefined" ? null : window.Android || window.VlueLettering;
+  try {
+    bridge?.updateVmapMiniOverlay?.(JSON.stringify(payload || {}));
   } catch {
     /* ignore */
   }

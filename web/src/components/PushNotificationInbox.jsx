@@ -57,14 +57,18 @@ export default function PushNotificationInbox({ onUnreadChange, onOpenFamilyProt
   const deleteOne = async (n, e) => {
     e?.stopPropagation?.();
     if (!n?.id || busyId) return;
+    if (!window.confirm("해당 메세지를 삭제하시겠습니까?")) return;
     setBusyId(n.id);
+    removePushNotification(n.id);
+    if (detail?.id === n.id) setDetail(null);
+    refresh();
     try {
       if (n.serverId) await deleteOwnerInboxItem(n.serverId);
-      removePushNotification(n.id);
-      if (detail?.id === n.id) setDetail(null);
-      refresh();
+    } catch {
+      /* 서버 실패해도 로컬에서는 이미 지움 — 동기화 시 tombstone이 막음 */
     } finally {
       setBusyId("");
+      refresh();
     }
   };
 

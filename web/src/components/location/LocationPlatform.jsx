@@ -21,6 +21,8 @@ import {
   publishVmapPresence,
   setNativeVmapSession,
   setMapKeepScreenOn,
+  setNativeVmapMiniOverlay,
+  updateNativeVmapMiniOverlay,
   subscribeVmapPing
 } from "../../lib/locationApi.js";
 import {
@@ -93,12 +95,13 @@ function zoomForMeters(meters) {
   return 12;
 }
 
-/** 컬러 도로 지도. Esri 도로 타일은 구미 일대 14줌부터 빈 칸이라 OpenStreetMap 을 쓴다. */
+/** 배민/네이버처럼 연회색 파스텔 — Carto Positron */
 function tileUrl(z, x, y) {
   const wrap = 2 ** z;
   const xx = ((x % wrap) + wrap) % wrap;
   const yy = Math.max(0, Math.min(wrap - 1, y));
-  return `https://tile.openstreetmap.org/${z}/${xx}/${yy}.png`;
+  const host = ["a", "b", "c", "d"][(xx + yy) % 4];
+  return `https://${host}.basemaps.cartocdn.com/light_all/${z}/${xx}/${yy}.png`;
 }
 
 function worldX(lng, z) {
@@ -217,10 +220,17 @@ function drawPerson(ctx, x, y, image, name, live) {
   ctx.shadowColor = "rgba(15, 23, 42, 0.35)";
   ctx.shadowBlur = 8;
   ctx.beginPath();
-  ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
-  ctx.fillStyle = live ? ACCENT : "rgba(255,255,255,0.72)";
+  ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+  ctx.fillStyle = live ? ACCENT : "rgba(255,255,255,0.85)";
+  ctx.shadowColor = live ? "rgba(0, 210, 255, 0.55)" : "rgba(15, 23, 42, 0.25)";
+  ctx.shadowBlur = live ? 14 : 6;
   ctx.fill();
   ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.clip();
@@ -251,10 +261,13 @@ function drawPerson(ctx, x, y, image, name, live) {
   ctx.textBaseline = "middle";
   const width = Math.ceil(ctx.measureText(label).width) + 14;
   const boxY = y + radius + 8;
-  ctx.fillStyle = "rgba(15, 23, 42, 0.82)";
+  ctx.fillStyle = "rgba(4, 18, 26, 0.88)";
   ctx.beginPath();
   ctx.roundRect(x - width / 2, boxY, width, 18, 9);
   ctx.fill();
+  ctx.strokeStyle = "rgba(0, 210, 255, 0.55)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
   ctx.fillStyle = "#ffffff";
   ctx.fillText(label, x, boxY + 9);
 }
@@ -311,6 +324,10 @@ export default function LocationPlatform() {
   const [searchOpen, setSearchOpen] = useState(true);
   const [playingVoiceId, setPlayingVoiceId] = useState("");
   const [miniPos, setMiniPos] = useState(() => readMiniPos() || { x: null, y: null });
+  const [roomBusy, setRoomBusy] = useState("");
+  const [routeMode, setRouteMode] = useState("recommend");
+  const [routePickerOpen, setRoutePickerOpen] = useState(false);
+  const [nativeMini, setNativeMini] = useState(false);
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
@@ -340,6 +357,11 @@ export default function LocationPlatform() {
   const wakeLockRef = useRef(null);
   const voiceAudioRef = useRef(null);
   const miniDragRef = useRef(null);
+  const leaveLock = useRef(false);
+  const guideOnRef = useRef(false);
+  const routeModeRef = useRef("recommend");
+  guideOnRef.current = guideOn;
+  routeModeRef.current = routeMode;
 
   useEffect(() => subscribeLocationSession(setSession), []);
   roomRef.current = room;
@@ -358,8 +380,13 @@ export default function LocationPlatform() {
 
   useEffect(() => {
     const onOpen = (event) => openLocation(event?.detail?.mode || "family");
+    const onRestore = () => restoreLocation();
     window.addEventListener("vlue-open-location", onOpen);
-    return () => window.removeEventListener("vlue-open-location", onOpen);
+    window.addEventListener("vlue-restore-vmap", onRestore);
+    return () => {
+      window.removeEventListener("vlue-open-location", onOpen);
+      window.removeEventListener("vlue-restore-vmap", onRestore);
+    };
   }, []);
 
   const theme = resolveMapTheme(session.theme, self?.lat, self?.lng);
@@ -441,6 +468,7 @@ export default function LocationPlatform() {
       const navigating =
         session.mode === "vmap" &&
         session.departed &&
+        guideOnRef.current &&
         !selfRow?.arrived &&
         liveRoom?.placeReady &&
         !dragRef.current &&
@@ -581,7 +609,8 @@ export default function LocationPlatform() {
             fromLat: member.lat,
             fromLng: member.lng,
             toLat: room.placeLat,
-            toLng: room.placeLng
+            toLng: room.placeLng,
+            mode: routeModeRef.current
           });
           if (data?.ok && Array.isArray(data.points)) next[member.userId] = data;
         } catch {
@@ -593,14 +622,15 @@ export default function LocationPlatform() {
     return () => {
       cancelled = true;
     };
-  }, [session.mode, room?.placeReady, room?.placeLat, room?.placeLng, departedKey]);
+  }, [session.mode, room?.placeReady, room?.placeLat, room?.placeLng, departedKey, routeMode]);
 
   paintRef.current = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const follow = followRef.current;
+    const guideFollow = Boolean(guideOnRef.current);
     const busy = dragRef.current || pinDragRef.current || pinchRef.current || flyingRef.current || performance.now() - gestureAtRef.current < 1400;
-    if (follow && !busy) {
+    if (follow && guideFollow && !busy) {
       const view = viewRef.current;
       const lat = view.lat + (follow.lat - view.lat) * 0.18;
       const lng = view.lng + (follow.lng - view.lng) * 0.18;
@@ -626,7 +656,7 @@ export default function LocationPlatform() {
     const centerX = worldX(view.lng, zoom) * TILE;
     const centerY = worldY(view.lat, zoom) * TILE;
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#e7eef6";
+    ctx.fillStyle = "#eef2f5";
     ctx.fillRect(0, 0, width, height);
     const cache = tileCacheRef.current;
     const left = Math.floor((centerX - width / 2) / base) - 1;
@@ -661,8 +691,9 @@ export default function LocationPlatform() {
           const guided = liveRoutes?.[member.userId];
           if (!guided?.points?.length) return;
           const own = member.userId === mineId;
-          ctx.strokeStyle = own ? ACCENT : "rgba(125, 211, 252, 0.9)";
-          ctx.lineWidth = own ? 5 : 4;
+          ctx.save();
+          ctx.strokeStyle = own ? "rgba(0, 210, 255, 0.35)" : "rgba(56, 189, 248, 0.28)";
+          ctx.lineWidth = own ? 10 : 8;
           ctx.lineJoin = "round";
           ctx.lineCap = "round";
           ctx.beginPath();
@@ -672,6 +703,16 @@ export default function LocationPlatform() {
             else ctx.lineTo(point.x, point.y);
           });
           ctx.stroke();
+          ctx.strokeStyle = own ? ACCENT : "#38bdf8";
+          ctx.lineWidth = own ? 5 : 4;
+          ctx.beginPath();
+          guided.points.forEach((pair, index) => {
+            const point = project(pair[1], pair[0]);
+            if (index === 0) ctx.moveTo(point.x, point.y);
+            else ctx.lineTo(point.x, point.y);
+          });
+          ctx.stroke();
+          ctx.restore();
         });
       }
     }
@@ -809,6 +850,53 @@ export default function LocationPlatform() {
   }, [session.open]);
 
   useEffect(() => {
+    if (!(session.minimized && !session.open && session.mode === "vmap" && session.roomId)) {
+      setNativeVmapMiniOverlay(false);
+      setNativeMini(false);
+      return undefined;
+    }
+    const mine = membersRef.current.find((member) => member.userId === getLocalVlueUserId()) || self;
+    const liveRoom = roomRef.current;
+    const eta =
+      mine?.lat != null && liveRoom?.placeReady
+        ? `약 ${estimateEtaMinutes(haversineMeters(mine.lat, mine.lng, liveRoom.placeLat, liveRoom.placeLng))}분`
+        : "";
+    const ok = setNativeVmapMiniOverlay(true, {
+      label: getProfileHeaderName() || "V-Map",
+      eta,
+      place: liveRoom?.placeLabel || "",
+      lat: mine?.lat,
+      lng: mine?.lng
+    });
+    setNativeMini(Boolean(ok));
+    return undefined;
+  }, [session.minimized, session.open, session.mode, session.roomId, self]);
+
+  useEffect(() => {
+    if (!(session.minimized && !session.open && nativeMini)) return undefined;
+    const mine = members.find((member) => member.userId === getLocalVlueUserId()) || self;
+    const eta =
+      mine?.lat != null && room?.placeReady
+        ? `약 ${estimateEtaMinutes(haversineMeters(mine.lat, mine.lng, room.placeLat, room.placeLng))}분`
+        : "";
+    updateNativeVmapMiniOverlay({
+      label: getProfileHeaderName() || "V-Map",
+      eta,
+      place: room?.placeLabel || "",
+      lat: mine?.lat,
+      lng: mine?.lng
+    });
+    return undefined;
+  }, [session.minimized, session.open, nativeMini, members, self, room]);
+
+  useEffect(() => {
+    if (session.open) {
+      setNativeVmapMiniOverlay(false);
+      setNativeMini(false);
+    }
+  }, [session.open]);
+
+  useEffect(() => {
     if (settingsOpen || membersOpen || keyboardInset > 80) hideLocationAds();
   }, [settingsOpen, membersOpen, keyboardInset]);
 
@@ -901,6 +989,7 @@ export default function LocationPlatform() {
     const drag = dragRef.current;
     if (!drag) return;
     const z = drag.zoom;
+    /* 손가락을 민 방향으로 지도 내용이 따라온다 (카카오·네이버와 동일). */
     const wx = worldX(drag.lng, z) - (event.clientX - drag.x) / TILE;
     const wy = worldY(drag.lat, z) + (event.clientY - drag.y) / TILE;
     viewRef.current = {
@@ -943,49 +1032,85 @@ export default function LocationPlatform() {
       return Math.hypot(point.x - (event.clientX - rect.left), point.y - (event.clientY - rect.top)) < 26;
     });
     setSelected(hit || null);
+    if (hit?.lat != null) {
+      userZoomedRef.current = true;
+      markGesture();
+      patchLocationSession({ flyTo: { lat: hit.lat, lng: hit.lng, at: Date.now() } });
+    }
   };
 
   const makeRoom = async () => {
+    if (roomBusy || leaveLock.current) return;
     if (!self?.lat) {
       pushNotice("현재 위치를 아직 못 받았습니다.");
       return;
     }
-    const data = await createVmapRoom({
-      placeLat: self.lat,
-      placeLng: self.lng,
-      placeLabel: self.addressLabel || "약속 장소",
-      displayName: getProfileHeaderName() || "나",
-      title: "V-Map 약속"
-    });
-    patchLocationSession({ mode: "vmap", roomId: data.room.id, departed: false, open: true, minimized: false });
-    setRoom(data.room);
+    setRoomBusy("create");
+    pushNotice("방개설중...");
+    try {
+      const data = await createVmapRoom({
+        placeLat: self.lat,
+        placeLng: self.lng,
+        placeLabel: self.addressLabel || "약속 장소",
+        displayName: getProfileHeaderName() || "나",
+        title: "V-Map 약속"
+      });
+      patchLocationSession({ mode: "vmap", roomId: data.room.id, departed: false, open: true, minimized: false });
+      setRoom(data.room);
+      pushNotice("방이 열렸습니다.");
+    } catch (error) {
+      pushNotice(error.message || "방을 만들지 못했습니다.");
+    } finally {
+      setRoomBusy("");
+    }
   };
 
   const joinRoom = async () => {
+    if (roomBusy) return;
     const roomId = joinCode.trim();
     if (!roomId) return;
-    await joinVmapRoom(roomId, { displayName: getProfileHeaderName() || "참여자" });
-    patchLocationSession({ mode: "vmap", roomId, departed: false, open: true, minimized: false });
+    setRoomBusy("join");
+    pushNotice("입장 중...");
+    try {
+      await joinVmapRoom(roomId, { displayName: getProfileHeaderName() || "참여자" });
+      patchLocationSession({ mode: "vmap", roomId, departed: false, open: true, minimized: false });
+    } catch (error) {
+      pushNotice(error.message || "입장하지 못했습니다.");
+    } finally {
+      setRoomBusy("");
+    }
   };
 
   const leaveForGood = async () => {
+    if (leaveLock.current || roomBusy === "leave") return;
+    leaveLock.current = true;
+    setRoomBusy("leave");
     hideLocationAds();
     setSettingsOpen(false);
     setMembersOpen(false);
     const roomId = session.roomId;
     const host = Boolean(roomRef.current?.hostUserId) && roomRef.current.hostUserId === getLocalVlueUserId();
-    pushNotice(host ? "방을 삭제하는 중…" : "나가는 중…");
-    try {
-      if (roomId) await exitVmapApi(roomId);
-    } catch (error) {
-      pushNotice(error.message || "방을 나가지 못했습니다.");
-      return;
-    }
-    syncOwnerInboxFromServer().catch(() => {});
+    pushNotice(host ? "방삭제중..." : "방 나가는 중...");
+    setNativeVmapMiniOverlay(false);
+    setNativeMini(false);
     setNativeVmapSession(false);
     setRoom(null);
     setMessages([]);
+    setMembers([]);
     exitVmapRoom();
+    try {
+      if (roomId) await exitVmapApi(roomId);
+    } catch (error) {
+      const msg = String(error?.message || "");
+      if (!/종료|없|참여|404|이미/.test(msg)) {
+        pushNotice(msg || (host ? "방 삭제를 완료하지 못했습니다." : "나가기에 실패했습니다."));
+      }
+    } finally {
+      syncOwnerInboxFromServer().catch(() => {});
+      leaveLock.current = false;
+      setRoomBusy("");
+      pushNotice(host ? "방이 삭제되었습니다." : "방에서 나갔습니다.");
+    }
   };
 
   const playVoice = (row) => {
@@ -1128,6 +1253,7 @@ export default function LocationPlatform() {
   if (!visible) return null;
 
   if (session.minimized && !session.open) {
+    if (nativeMini) return null;
     const miniW = 148;
     const miniH = 168;
     const left = Number.isFinite(miniPos.x) ? miniPos.x : Math.max(12, (typeof window !== "undefined" ? window.innerWidth : 360) - miniW - 12);
@@ -1258,18 +1384,23 @@ export default function LocationPlatform() {
             <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "vmap" ? tabOn : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>V-Map</button>
           </div>
           {session.mode === "vmap" && !session.roomId ? (
-            <button type="button" className={`shrink-0 ${accentBtn}`} onClick={() => void makeRoom()}>방 만들기</button>
+            <button type="button" className={`shrink-0 ${accentBtn}`} disabled={Boolean(roomBusy)} onClick={() => void makeRoom()}>
+              {roomBusy === "create" ? "방개설중..." : "방 만들기"}
+            </button>
           ) : null}
           <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
         {session.mode === "vmap" && guideOn && cue ? (
-          <div className="absolute right-3 top-[calc(64px+env(safe-area-inset-top))] z-30 flex w-[9.5rem] flex-col overflow-hidden rounded-[22px] border border-[#00D2FF]/35 bg-[#04121a]/92 text-white shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-            <div className="flex items-center justify-center bg-[#00D2FF] px-2 py-3 text-[34px] font-black leading-none text-[#04121a]">
+          <div className="absolute right-3 top-[calc(64px+env(safe-area-inset-top))] z-30 w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)]">
+            <div className="flex items-center justify-center bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] px-2 py-4 text-[42px] font-black leading-none text-[#04121a]">
               {maneuverGlyph(cue.instruction)}
             </div>
-            <div className="px-3 py-2.5 text-center">
-              <p className="text-[18px] font-black tracking-tight text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</p>
-              <p className="mt-0.5 text-[12px] font-semibold leading-snug text-white/90">{cue.instruction}</p>
+            <div className="px-3 py-3 text-center">
+              <p className="text-[22px] font-black tracking-tight text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</p>
+              <p className="mt-1 text-[13px] font-bold leading-snug text-white">{cue.instruction}</p>
+              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#00D2FF]/80">
+                {routeMode === "free" ? "무료도로" : routeMode === "highway" ? "고속도로" : "추천경로"}
+              </p>
             </div>
           </div>
         ) : null}
@@ -1280,7 +1411,7 @@ export default function LocationPlatform() {
             <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
           </div>
         ) : null}
-        <p className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold text-slate-700/80">© OpenStreetMap</p>
+        <p className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold text-slate-600/70">© CARTO · OSM</p>
         {farewell ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 px-8 text-center">
             <p className="text-[18px] font-black leading-snug text-white">{farewell}</p>
@@ -1378,6 +1509,8 @@ export default function LocationPlatform() {
                   >
                     {playingVoiceId === row.id ? "❚❚" : "▶"} 음성
                   </button>
+                ) : row.kind === "system" ? (
+                  <span className="text-white/80">{row.body}</span>
                 ) : (
                   <span>{row.body}</span>
                 )}
@@ -1430,7 +1563,14 @@ export default function LocationPlatform() {
                     <button
                       type="button"
                       aria-pressed={guideOn}
-                      onClick={() => setGuideOn((on) => !on)}
+                      onClick={() => {
+                        if (guideOn) {
+                          setGuideOn(false);
+                          setRoutePickerOpen(false);
+                          return;
+                        }
+                        setRoutePickerOpen(true);
+                      }}
                       className={guideOn ? accentBtn : quietBtn}
                     >
                       길안내
@@ -1487,6 +1627,35 @@ export default function LocationPlatform() {
                 </button>
               )}
             </div>
+            {routePickerOpen ? (
+              <div className={`rounded-2xl p-2 ${dark ? "bg-white/5" : "bg-slate-50"}`}>
+                <p className="mb-2 px-1 text-[11px] font-semibold opacity-70">경로 선택 · 카카오 길찾기</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    ["recommend", "추천경로"],
+                    ["free", "무료도로"],
+                    ["highway", "고속도로"]
+                  ].map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={routeMode === mode && guideOn ? accentBtn : quietBtn}
+                      onClick={() => {
+                        setRouteMode(mode);
+                        routeModeRef.current = mode;
+                        userZoomedRef.current = false;
+                        setGuideOn(true);
+                        setRoutePickerOpen(false);
+                        setRoutes({});
+                        pushNotice(`${label}로 길안내를 시작합니다.`);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <form className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 ${dark ? "border-white/10 bg-white/10" : "border-black/10 bg-slate-100/80"}`} onSubmit={(event) => { event.preventDefault(); void sendText(); }}>
               <input
                 value={draft}
@@ -1503,7 +1672,25 @@ export default function LocationPlatform() {
               <button type="submit" aria-label="보내기" disabled={sending} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${draft.trim() ? "bg-[#00D2FF] text-[#04121a]" : dark ? "bg-white/10 text-white/35" : "bg-slate-200 text-slate-400"}`}>
                 <SendIcon />
               </button>
-              <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : dark ? "bg-white/10 text-white/80" : "bg-slate-200 text-slate-700"}`} aria-label="길게 눌러 음성 메시지">🎤</button>
+              <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : dark ? "bg-white/10 text-white/80" : "bg-slate-200 text-slate-700"}`} aria-label="길게 눌러 음성 메시지">
+                {recording ? (
+                  <span className="flex h-5 items-end gap-[2px]" aria-hidden>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <span
+                        key={i}
+                        className="w-[2px] rounded-full bg-white"
+                        style={{
+                          height: "100%",
+                          animation: `vmap-voice-wave 0.9s ease-in-out ${i * 0.08}s infinite`,
+                          transformOrigin: "bottom"
+                        }}
+                      />
+                    ))}
+                  </span>
+                ) : (
+                  "🎤"
+                )}
+              </button>
             </form>
           </div>
         ) : null}
@@ -1565,14 +1752,15 @@ export default function LocationPlatform() {
             {session.mode === "vmap" && session.roomId ? (
               <button
                 type="button"
-                className="mt-2 block w-full rounded-2xl bg-rose-500 px-3 py-3 text-[14px] font-semibold text-white"
+                className="mt-2 block w-full rounded-2xl bg-rose-500 px-3 py-3 text-[14px] font-semibold text-white disabled:opacity-60"
+                disabled={roomBusy === "leave"}
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
                   void leaveForGood();
                 }}
               >
-                {isHost ? "방 삭제" : "나가기"}
+                {roomBusy === "leave" ? (isHost ? "방삭제중..." : "나가는 중...") : isHost ? "방 삭제" : "방 나가기"}
               </button>
             ) : null}
           </div>
@@ -1622,6 +1810,12 @@ export default function LocationPlatform() {
         </div>
       ) : null}
       {notice ? <p className="pointer-events-none absolute left-1/2 top-[4.6rem] z-[80] max-w-[90%] -translate-x-1/2 rounded-full border border-[#00D2FF]/40 bg-[#04121a] px-4 py-2 text-center text-[12px] font-medium text-white shadow-lg">{notice}</p> : null}
+      <style>{`
+        @keyframes vmap-voice-wave {
+          0%, 100% { transform: scaleY(0.35); opacity: 0.7; }
+          50% { transform: scaleY(1); opacity: 1; }
+        }
+      `}</style>
     </section>
   );
 }

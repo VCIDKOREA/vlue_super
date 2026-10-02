@@ -108,15 +108,24 @@ export function parseKakaoDirections(payload: unknown): ParsedDirections | null 
   };
 }
 
-export async function fetchKakaoCarDirections(originLng: number, originLat: number, destLng: number, destLat: number) {
+export async function fetchKakaoCarDirections(
+  originLng: number,
+  originLat: number,
+  destLng: number,
+  destLat: number,
+  options: { mode?: string } = {}
+) {
   const key = kakaoRestApiKey();
   if (!key) return { ok: false as const, error: "카카오 길찾기 키가 없습니다." };
+  const mode = String(options.mode || "recommend").toLowerCase();
   const query = new URLSearchParams({
     origin: `${originLng},${originLat}`,
     destination: `${destLng},${destLat}`,
-    priority: "RECOMMEND",
+    priority: mode === "highway" ? "TIME" : mode === "free" ? "DISTANCE" : "RECOMMEND",
     summary: "false"
   });
+  if (mode === "free") query.set("avoid", "toll");
+  if (mode === "highway") query.set("avoid", "ferries");
   const res = await fetch(`${KAKAO_DIRECTIONS_URL}?${query}`, {
     headers: {
       Authorization: `KakaoAK ${key}`,
@@ -127,5 +136,5 @@ export async function fetchKakaoCarDirections(originLng: number, originLat: numb
   const data = await res.json().catch(() => null);
   const parsed = parseKakaoDirections(data);
   if (!res.ok || !parsed) return { ok: false as const, error: "경로를 찾지 못했습니다." };
-  return { ok: true as const, ...parsed };
+  return { ok: true as const, mode, ...parsed };
 }

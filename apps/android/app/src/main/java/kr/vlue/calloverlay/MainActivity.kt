@@ -403,6 +403,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             )
         }
         handleMemoShareIntent(intent)
+        handleVmapRestoreIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -412,9 +413,25 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             applyNotificationWakeFlags(intent)
             handleMemoShareIntent(intent)
             handleFamilyInviteIntent(intent)
+            handleVmapRestoreIntent(intent)
             VlueAppUpdatePrompt.applyIntentExtras(intent, this)
             VlueAppUpdatePrompt.maybeShow(this)
         }
+    }
+
+    private fun handleVmapRestoreIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("vlue_restore_vmap", false) != true) return
+        VmapMiniOverlay.hide(this)
+        if (!::webView.isInitialized) return
+        webView.postDelayed({
+            try {
+                webView.evaluateJavascript(
+                    "(function(){try{window.dispatchEvent(new CustomEvent('vlue-restore-vmap'));}catch(e){}})();",
+                    null
+                )
+            } catch (_: Exception) {
+            }
+        }, 350)
     }
 
     private fun clearWebCacheIfVersionBumped() {
@@ -422,8 +439,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         val last = prefs.getInt("web_cache_version", -1)
         val lastRev = prefs.getInt("web_content_rev", 0)
         val current = BuildConfig.VERSION_CODE
-        /* 2 = Esri 도로 타일. 같은 versionCode 재설치에서도 옛 Carto HTML 을 버린다. */
-        val contentRev = 2
+        /* 3 = Carto Positron 타일. 같은 versionCode 재설치에서도 옛 OSM HTML 을 버린다. */
+        val contentRev = 3
         if (last == current && lastRev == contentRev) return
         webView.clearCache(true)
         prefs.edit()
@@ -994,6 +1011,16 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 vibrateTap:function(ms){
                   try{if(window.Android&&window.Android.vibrateTap)window.Android.vibrateTap(Number(ms)||14);}catch(e){}
                 },
+                showVmapMiniOverlay:function(json){
+                  try{return window.Android&&window.Android.showVmapMiniOverlay?window.Android.showVmapMiniOverlay(String(json||'{}')):'{"ok":false}';}
+                  catch(e){return '{"ok":false}';}
+                },
+                updateVmapMiniOverlay:function(json){
+                  try{if(window.Android&&window.Android.updateVmapMiniOverlay)window.Android.updateVmapMiniOverlay(String(json||'{}'));}catch(e){}
+                },
+                hideVmapMiniOverlay:function(){
+                  try{if(window.Android&&window.Android.hideVmapMiniOverlay)window.Android.hideVmapMiniOverlay();}catch(e){}
+                },
                 analyzeSms:function(requestId,sender,messageText){
                   try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
                   catch(e){return JSON.stringify({ok:false,error:String(e&&e.message||e)});}
@@ -1491,6 +1518,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 } catch (_: Exception) {
                 }
             }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun showVmapMiniOverlay(json: String?): String {
+            return VmapMiniOverlay.show(activity, json)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun updateVmapMiniOverlay(json: String?) {
+            VmapMiniOverlay.update(activity, json)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun hideVmapMiniOverlay() {
+            VmapMiniOverlay.hide(activity)
         }
 
         /** V-Map이 미니맵으로 내려가도 프로세스를 유지. Exit Room에서 중지. */

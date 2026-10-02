@@ -179,11 +179,12 @@ locationMapRoutes.get("/guide", requireUserHeader, async (c) => {
   const fromLng = num(c.req.query("fromLng"), NaN);
   const toLat = num(c.req.query("toLat"), NaN);
   const toLng = num(c.req.query("toLng"), NaN);
+  const mode = String(c.req.query("mode") || "recommend").toLowerCase();
   if (![fromLat, fromLng, toLat, toLng].every(Number.isFinite)) {
     return c.json({ ok: false, error: "좌표가 없습니다." }, 400);
   }
   try {
-    const guided = await fetchKakaoCarDirections(fromLng, fromLat, toLng, toLat);
+    const guided = await fetchKakaoCarDirections(fromLng, fromLat, toLng, toLat, { mode });
     if (!guided.ok) return c.json({ ok: false, error: guided.error }, 200);
     return c.json(guided);
   } catch {
@@ -519,7 +520,8 @@ locationMapRoutes.post("/vmap/:id/exit", requireUserHeader, async (c) => {
   const userId = await me(c);
   const roomId = paramId(c);
   const room = await prisma.vmapRoom.findUnique({ where: { id: roomId } });
-  if (!room) return c.json({ ok: true, closed: false });
+  if (!room) return c.json({ ok: true, closed: false, missing: true });
+  if (!room.active) return c.json({ ok: true, closed: true, already: true });
   if (room.hostUserId === userId) {
     const pending = arrivalTimers.get(roomId);
     if (pending) {
@@ -529,8 +531,20 @@ locationMapRoutes.post("/vmap/:id/exit", requireUserHeader, async (c) => {
     const record = await closeVmapRoom(roomId, room.closingReason === "arrived" ? "arrived" : "host");
     return c.json({ ok: true, closed: true, record });
   }
+  const mine = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
+  if (!mine) return c.json({ ok: true, closed: false, left: true });
+  const leaveName = String(mine.displayName || "참여자").trim() || "참여자";
+  await prisma.vmapMessage.create({
+    data: {
+      roomId,
+      userId,
+      displayName: "시스템",
+      kind: "system",
+      body: `${leaveName}님이 방을 나가셨습니다.`
+    }
+  });
   await prisma.vmapMember.deleteMany({ where: { roomId, userId } });
-  return c.json({ ok: true, closed: false });
+  return c.json({ ok: true, closed: false, left: true, displayName: leaveName });
 });
 
 locationMapRoutes.post("/vmap/:id/finish", requireUserHeader, async (c) => {
