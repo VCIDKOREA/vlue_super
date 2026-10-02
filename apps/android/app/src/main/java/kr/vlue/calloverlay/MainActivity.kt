@@ -86,12 +86,25 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             pendingWebPermissionRequest = null
             pendingWebGrantResources = null
             if (req == null) return@registerForActivityResult
-            val camOk =
+            val resources = toGrant ?: emptyArray()
+            val wantsCam = resources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+            val wantsMic = resources.contains(android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+            val camOk = !wantsCam ||
                 LetteringPermissionHelper.hasCamera(this) ||
-                    grants[android.Manifest.permission.CAMERA] == true
+                grants[android.Manifest.permission.CAMERA] == true
+            val micOk = !wantsMic ||
+                LetteringPermissionHelper.hasMic(this) ||
+                grants[android.Manifest.permission.RECORD_AUDIO] == true
+            val allowed = resources.filter { resource ->
+                when (resource) {
+                    android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE -> camOk
+                    android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE -> micOk
+                    else -> true
+                }
+            }
             try {
-                if (camOk && !toGrant.isNullOrEmpty()) {
-                    req.grant(toGrant)
+                if (allowed.isNotEmpty()) {
+                    req.grant(allowed.toTypedArray())
                 } else {
                     req.deny()
                 }
@@ -151,6 +164,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         bannerAdManager = VlueBannerAdManager(this, mainRoot, webView)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.setSupportZoom(false)
+        webView.settings.builtInZoomControls = false
+        webView.settings.displayZoomControls = false
         /* 지도·쇼케이스 웹 배포가 버전코드와 무관하게 바로 보이게 — 디스크 캐시의 옛 index 금지 */
         webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
         webView.settings.allowFileAccess = true
@@ -253,12 +269,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                                     need.add(android.Manifest.permission.CAMERA)
                                 }
                             }
-                            // AUDIO: 매니페스트에 RECORD_AUDIO 없음 → 스캐너용으로 생략
-                            else -> {
-                                if (r != android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE) {
-                                    grantable.add(r)
+                            android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE -> {
+                                grantable.add(r)
+                                if (!LetteringPermissionHelper.hasMic(this@MainActivity)) {
+                                    need.add(android.Manifest.permission.RECORD_AUDIO)
                                 }
                             }
+                            else -> grantable.add(r)
                         }
                     }
                     if (grantable.isEmpty()) {

@@ -158,6 +158,9 @@ object LetteringPermissionHelper {
     fun hasCamera(context: Context): Boolean =
         hasPermission(context, Manifest.permission.CAMERA)
 
+    fun hasMic(context: Context): Boolean =
+        hasPermission(context, Manifest.permission.RECORD_AUDIO)
+
     fun hasPhotos(context: Context): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             hasPermission(context, Manifest.permission.READ_MEDIA_IMAGES)

@@ -40,6 +40,8 @@ import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 
 const TILE = 256;
+const ACCENT = "#00D2FF";
+const AD_BANNER_PX = 56;
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
 
 function zoomForMeters(meters) {
@@ -83,11 +85,67 @@ function unproject(x, y, view, width, height) {
   return { lat, lng };
 }
 
+function latFromWorldY(y, z) {
+  const n = Math.PI - (2 * Math.PI * y) / 2 ** z;
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+/** 화면 좌표가 같은 지점을 가리키도록 줌만 바꾼다. */
+function zoomAt(view, nextZoom, sx, sy, width, height) {
+  const zoom = Math.max(3, Math.min(19, nextZoom));
+  const geo = unproject(sx, sy, view, width, height);
+  const geoX = worldX(geo.lng, zoom) * TILE;
+  const geoY = worldY(geo.lat, zoom) * TILE;
+  const centerX = geoX - (sx - width / 2);
+  const centerY = geoY - (sy - height / 2);
+  const lng = (centerX / TILE / 2 ** zoom) * 360 - 180;
+  const lat = latFromWorldY(centerY / TILE, zoom);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return view;
+  return { ...view, zoom, lat: Math.max(-80, Math.min(80, lat)), lng, placed: true };
+}
+
+function rememberTile(cache, z, x, y) {
+  const wrap = 2 ** z;
+  const xx = ((x % wrap) + wrap) % wrap;
+  const yy = Math.max(0, Math.min(wrap - 1, y));
+  const key = `${z}/${xx}/${yy}`;
+  let image = cache.get(key);
+  if (image) {
+    cache.delete(key);
+    cache.set(key, image);
+  } else {
+    image = new Image();
+    image.decoding = "async";
+    image.src = tileUrl(z, xx, yy);
+    cache.set(key, image);
+    while (cache.size > 240) {
+      const oldest = cache.keys().next().value;
+      if (oldest === undefined || oldest === key) break;
+      cache.delete(oldest);
+    }
+  }
+  return image.complete && image.naturalWidth ? image : null;
+}
+
+function paintTile(ctx, cache, z, x, y, dx, dy, size) {
+  const image = rememberTile(cache, z, x, y);
+  if (image) {
+    ctx.drawImage(image, dx, dy, size, size);
+    return;
+  }
+  if (z <= 2) return;
+  const wrap = 2 ** z;
+  const wrapped = ((x % wrap) + wrap) % wrap;
+  const parent = rememberTile(cache, z - 1, Math.floor(wrapped / 2), Math.floor(y / 2));
+  if (!parent || y < 0) return;
+  ctx.drawImage(parent, (wrapped % 2) * 128, (y % 2) * 128, 128, 128, dx, dy, size, size);
+}
+
 function liveOpacity(createdAt, now) {
   const age = now - new Date(createdAt).getTime();
-  if (age < 4200) return 1;
-  if (age > 7600) return 0;
-  return 1 - (age - 4200) / 3400;
+  if (age < 12000) return 1;
+  if (age > 20000) return 0;
+  return 1 - (age - 12000) / 8000;
 }
 
 function readBattery() {
@@ -123,7 +181,7 @@ function drawPerson(ctx, x, y, image, name, live) {
   ctx.shadowBlur = 8;
   ctx.beginPath();
   ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = live ? ACCENT : "rgba(255,255,255,0.72)";
   ctx.fill();
   ctx.shadowColor = "transparent";
   ctx.beginPath();
@@ -132,7 +190,7 @@ function drawPerson(ctx, x, y, image, name, live) {
   if (image) {
     ctx.drawImage(image, x - radius, y - radius, radius * 2, radius * 2);
   } else {
-    ctx.fillStyle = live ? "#2563eb" : "#94a3b8";
+    ctx.fillStyle = live ? "#083044" : "#94a3b8";
     ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
     ctx.fillStyle = "#ffffff";
     ctx.font = "700 16px sans-serif";
@@ -164,10 +222,18 @@ function drawPerson(ctx, x, y, image, name, live) {
   ctx.fillText(label, x, boxY + 9);
 }
 
+function SendIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="M3.2 11.1 20.4 4.2c.8-.4 1.6.5 1.2 1.3L15 21.2c-.4 1-1.7.9-2-.1l-2.1-6.4-6.6-2.2c-1-.4-1-1.7-.1-2.4Z" />
+    </svg>
+  );
+}
+
 function drawPlacePin(ctx, x, y, ready) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = ready ? "#2563eb" : "#f59e0b";
+  ctx.fillStyle = ready ? ACCENT : "#f59e0b";
   ctx.beginPath();
   ctx.arc(0, -16, 11, Math.PI * 0.15, Math.PI * 0.85, true);
   ctx.lineTo(0, 2);
@@ -202,6 +268,9 @@ export default function LocationPlatform() {
   const [placeHits, setPlaceHits] = useState([]);
   const [liveNow, setLiveNow] = useState(() => Date.now());
   const [farewell, setFarewell] = useState("");
+  const [arriveState, setArriveState] = useState("idle");
+  const [sending, setSending] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
@@ -215,11 +284,25 @@ export default function LocationPlatform() {
   const mediaRef = useRef(null);
   const seenVoice = useRef(new Set());
   const afterRef = useRef("");
+  const tileCacheRef = useRef(new Map());
+  const faceCacheRef = useRef(new Map());
+  const sceneRef = useRef({});
+  const paintRef = useRef(() => {});
+  const followRef = useRef(null);
+  const userZoomedRef = useRef(false);
+  const gestureAtRef = useRef(0);
+  const flyingRef = useRef(false);
+  const pointersRef = useRef(new Map());
+  const pinchRef = useRef(null);
+  const sendLock = useRef(false);
+  const arriveLock = useRef(false);
+  const lastTapRef = useRef(0);
 
   useEffect(() => subscribeLocationSession(setSession), []);
   roomRef.current = room;
   membersRef.current = members;
   sessionRef.current = session;
+  sceneRef.current = { members, room, self, routes, draftPin, mode: session.mode, departed: session.departed };
   endSessionRef.current = () => {
     setFarewell("");
     setNativeVmapSession(false);
@@ -319,15 +402,17 @@ export default function LocationPlatform() {
         liveRoom?.placeReady &&
         !dragRef.current &&
         !pinDragRef.current;
+      if (!viewRef.current.placed) {
+        viewRef.current = { lat, lng, zoom: 16, placed: true };
+      }
       if (navigating) {
-        viewRef.current = {
+        followRef.current = {
           lat,
           lng,
-          zoom: zoomForMeters(haversineMeters(lat, lng, liveRoom.placeLat, liveRoom.placeLng)),
-          placed: true
+          zoom: userZoomedRef.current ? null : zoomForMeters(haversineMeters(lat, lng, liveRoom.placeLat, liveRoom.placeLng))
         };
-      } else if (!viewRef.current.placed) {
-        viewRef.current = { ...viewRef.current, lat, lng, placed: true };
+      } else {
+        followRef.current = null;
       }
       if (session.mode === "family") {
         publishPresence(next).then(refreshFamily).catch(() => {});
@@ -398,7 +483,11 @@ export default function LocationPlatform() {
         const rows = data.messages || [];
         if (!rows.length) return;
         afterRef.current = rows[rows.length - 1].createdAt;
-        setMessages((prev) => [...prev, ...rows].slice(-40));
+        setMessages((prev) => {
+          const known = new Set(prev.map((row) => row.id));
+          const fresh = rows.filter((row) => !known.has(row.id));
+          return fresh.length ? [...prev, ...fresh].slice(-40) : prev;
+        });
         rows.filter((row) => row.kind === "voice" && row.userId !== getLocalVlueUserId()).forEach((row) => {
           if (seenVoice.current.has(row.id)) return;
           seenVoice.current.add(row.id);
@@ -463,115 +552,148 @@ export default function LocationPlatform() {
     };
   }, [session.mode, room?.placeReady, room?.placeLat, room?.placeLng, departedKey]);
 
-  useEffect(() => {
+  paintRef.current = () => {
     const canvas = canvasRef.current;
-    if (!canvas || !visible) return undefined;
-    const ctx = canvas.getContext("2d");
-    let frame = 0;
-    const cache = new Map();
-    const faces = new Map();
-    const paint = () => {
-      const rect = canvas.getBoundingClientRect();
-      const width = Math.max(1, Math.floor(rect.width));
-      const height = Math.max(1, Math.floor(rect.height));
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
-        canvas.width = Math.floor(width * dpr);
-        canvas.height = Math.floor(height * dpr);
-      }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!canvas) return;
+    const follow = followRef.current;
+    const busy = dragRef.current || pinDragRef.current || pinchRef.current || flyingRef.current || performance.now() - gestureAtRef.current < 1400;
+    if (follow && !busy) {
       const view = viewRef.current;
-      const zoom = view.zoom;
-      const centerX = worldX(view.lng, zoom) * TILE;
-      const centerY = worldY(view.lat, zoom) * TILE;
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "#dbe4ee";
-      ctx.fillRect(0, 0, width, height);
-      const left = Math.floor((centerX - width / 2) / TILE);
-      const top = Math.floor((centerY - height / 2) / TILE);
-      const right = Math.ceil((centerX + width / 2) / TILE);
-      const bottom = Math.ceil((centerY + height / 2) / TILE);
-      for (let tx = left; tx <= right; tx += 1) {
-        for (let ty = top; ty <= bottom; ty += 1) {
-          const key = `${zoom}/${tx}/${ty}`;
-          let image = cache.get(key);
-          if (!image) {
-            image = new Image();
-            image.src = tileUrl(zoom, tx, ty);
-            cache.set(key, image);
-          }
-          const dx = tx * TILE - (centerX - width / 2);
-          const dy = ty * TILE - (centerY - height / 2);
-          if (image.complete && image.naturalWidth) ctx.drawImage(image, dx, dy, TILE, TILE);
-        }
+      const lat = view.lat + (follow.lat - view.lat) * 0.18;
+      const lng = view.lng + (follow.lng - view.lng) * 0.18;
+      const zoom = follow.zoom == null || userZoomedRef.current ? view.zoom : view.zoom + (follow.zoom - view.zoom) * 0.12;
+      viewRef.current = { ...view, lat, lng, zoom, placed: true };
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const scene = sceneRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.floor(rect.width));
+    const height = Math.max(1, Math.floor(rect.height));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const view = viewRef.current;
+    const zoom = view.zoom;
+    const z = Math.max(0, Math.min(19, Math.round(zoom)));
+    const base = TILE * 2 ** (zoom - z);
+    const centerX = worldX(view.lng, zoom) * TILE;
+    const centerY = worldY(view.lat, zoom) * TILE;
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#e7eef6";
+    ctx.fillRect(0, 0, width, height);
+    const cache = tileCacheRef.current;
+    const left = Math.floor((centerX - width / 2) / base) - 1;
+    const top = Math.floor((centerY - height / 2) / base) - 1;
+    const right = Math.ceil((centerX + width / 2) / base) + 1;
+    const bottom = Math.ceil((centerY + height / 2) / base) + 1;
+    for (let tx = left; tx <= right; tx += 1) {
+      for (let ty = top; ty <= bottom; ty += 1) {
+        if (ty < 0 || ty >= 2 ** z) continue;
+        paintTile(ctx, cache, z, tx, ty, tx * base - (centerX - width / 2), ty * base - (centerY - height / 2), base + 0.5);
       }
-      const project = (lat, lng) => ({
-        x: width / 2 + (worldX(lng, zoom) * TILE - centerX),
-        y: height / 2 + (worldY(lat, zoom) * TILE - centerY)
-      });
-      canvas.__project = project;
-      if (room && session.mode === "vmap") {
-        const hostView = room.hostUserId === getLocalVlueUserId();
-        const pinSource = hostView && draftPin ? draftPin : room.placeReady ? room : null;
-        if (pinSource?.lat != null) {
-          const pin = project(pinSource.lat, pinSource.lng);
-          drawPlacePin(ctx, pin.x, pin.y, Boolean(room.placeReady));
-        }
-        if (room.placeReady) {
-          const mineId = getLocalVlueUserId();
-          const lines = members.filter((member) => member.departed && member.lat != null);
-          lines.sort((a, b) => Number(a.userId === mineId) - Number(b.userId === mineId));
-          lines.forEach((member) => {
-            const guided = routes[member.userId];
-            if (!guided?.points?.length) return;
-            const own = member.userId === mineId;
-            ctx.strokeStyle = own ? "#f97316" : "#2563eb";
-            ctx.lineWidth = own ? 5 : 4;
-            ctx.beginPath();
-            guided.points.forEach((pair, index) => {
-              const point = project(pair[1], pair[0]);
-              if (index === 0) ctx.moveTo(point.x, point.y);
-              else ctx.lineTo(point.x, point.y);
-            });
-            ctx.stroke();
+    }
+    const project = (lat, lng) => ({
+      x: width / 2 + (worldX(lng, zoom) * TILE - centerX),
+      y: height / 2 + (worldY(lat, zoom) * TILE - centerY)
+    });
+    canvas.__project = project;
+    const { members: plottedMembers, room: liveRoom, self: liveSelf, routes: liveRoutes, draftPin: livePin, mode, departed } = scene;
+    const markers = Array.isArray(plottedMembers) ? plottedMembers : [];
+    if (liveRoom && mode === "vmap") {
+      const hostView = liveRoom.hostUserId === getLocalVlueUserId();
+      const pinSource = hostView && livePin ? livePin : liveRoom.placeReady ? liveRoom : null;
+      if (pinSource?.lat != null) {
+        const pin = project(pinSource.lat, pinSource.lng);
+        drawPlacePin(ctx, pin.x, pin.y, Boolean(liveRoom.placeReady && livePin?.ready !== false));
+      }
+      if (liveRoom.placeReady) {
+        const mineId = getLocalVlueUserId();
+        const lines = markers.filter((member) => member.departed && member.lat != null);
+        lines.sort((a, b) => Number(a.userId === mineId) - Number(b.userId === mineId));
+        lines.forEach((member) => {
+          const guided = liveRoutes?.[member.userId];
+          if (!guided?.points?.length) return;
+          const own = member.userId === mineId;
+          ctx.strokeStyle = own ? ACCENT : "rgba(125, 211, 252, 0.9)";
+          ctx.lineWidth = own ? 5 : 4;
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          guided.points.forEach((pair, index) => {
+            const point = project(pair[1], pair[0]);
+            if (index === 0) ctx.moveTo(point.x, point.y);
+            else ctx.lineTo(point.x, point.y);
           });
-        }
+          ctx.stroke();
+        });
       }
-      const plotted = [...members];
-      const selfPhoto = readProfilePhotoAvatar();
-      if (self?.lat != null && session.mode === "family" && !plotted.some((member) => member.self || member.userId === getLocalVlueUserId())) {
-        plotted.push({ ...self, userId: getLocalVlueUserId(), displayName: self.displayName || "나", photoUrl: selfPhoto, grayscale: self.online === false, online: self.online });
-      }
-      if (self?.lat != null && session.mode === "vmap" && session.departed && !plotted.some((member) => member.userId === getLocalVlueUserId() && member.lat != null)) {
-        plotted.push({ ...self, userId: getLocalVlueUserId(), displayName: self.displayName || "나", photoUrl: selfPhoto, departed: true, online: true });
-      }
-      plotted.filter((member) => member.lat != null && member.lng != null && (session.mode === "family" || member.departed)).forEach((member) => {
-        const point = project(member.lat, member.lng);
-        const dead = session.mode === "family" && (member.grayscale || member.online === false || member.batteryPct === 0);
-        const mine = member.self || member.userId === getLocalVlueUserId();
-        const face = roundImage(faces, mine && selfPhoto ? selfPhoto : member.photoUrl);
-        const status =
-          session.mode === "vmap" && member.departed && room
-            ? member.arrived
-              ? "도착"
-              : member.dropout
-                ? "이탈"
-                : `${estimateEtaMinutes(haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng))}분`
-            : "";
-        drawPerson(ctx, point.x, point.y, face, [member.displayName || "멤버", status].filter(Boolean).join(" · "), !dead);
-      });
-    };
+    }
+    const plotted = [...markers];
+    const selfPhoto = readProfilePhotoAvatar();
+    if (liveSelf?.lat != null && mode === "family" && !plotted.some((member) => member.self || member.userId === getLocalVlueUserId())) {
+      plotted.push({ ...liveSelf, userId: getLocalVlueUserId(), displayName: liveSelf.displayName || "나", photoUrl: selfPhoto, grayscale: liveSelf.online === false, online: liveSelf.online });
+    }
+    if (liveSelf?.lat != null && mode === "vmap" && departed && !plotted.some((member) => member.userId === getLocalVlueUserId() && member.lat != null)) {
+      plotted.push({ ...liveSelf, userId: getLocalVlueUserId(), displayName: liveSelf.displayName || "나", photoUrl: selfPhoto, departed: true, online: true });
+    }
+    plotted.filter((member) => member.lat != null && member.lng != null && (mode === "family" || member.departed)).forEach((member) => {
+      const point = project(member.lat, member.lng);
+      const dead = mode === "family" && (member.grayscale || member.online === false || member.batteryPct === 0);
+      const mine = member.self || member.userId === getLocalVlueUserId();
+      const face = roundImage(faceCacheRef.current, mine && selfPhoto ? selfPhoto : member.photoUrl);
+      const status =
+        mode === "vmap" && member.departed && liveRoom
+          ? member.arrived
+            ? "도착"
+            : member.dropout
+              ? "이탈"
+              : `${estimateEtaMinutes(haversineMeters(member.lat, member.lng, liveRoom.placeLat, liveRoom.placeLng))}분`
+          : "";
+      drawPerson(ctx, point.x, point.y, face, [member.displayName || "멤버", status].filter(Boolean).join(" · "), !dead);
+    });
+  };
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    let frame = 0;
+    let alive = true;
     const loop = () => {
-      paint();
+      if (!alive) return;
+      paintRef.current();
       frame = requestAnimationFrame(loop);
     };
     frame = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frame);
-  }, [visible, theme, members, room, session.mode, session.departed, self, routes, draftPin]);
+    return () => {
+      alive = false;
+      cancelAnimationFrame(frame);
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !visible) return undefined;
+    const onWheel = (event) => {
+      event.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const raw = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+      const step = Math.max(-1.25, Math.min(1.25, -raw / 260));
+      if (!step) return;
+      userZoomedRef.current = true;
+      gestureAtRef.current = performance.now();
+      viewRef.current = zoomAt(viewRef.current, viewRef.current.zoom + step, event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height);
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, [visible, session.open, session.minimized]);
 
   useEffect(() => {
     const target = session.flyTo;
     if (!target?.lat) return undefined;
+    flyingRef.current = true;
     const start = { ...viewRef.current };
     const begun = performance.now();
     let frame = 0;
@@ -581,19 +703,70 @@ export default function LocationPlatform() {
       viewRef.current = {
         ...viewRef.current,
         lat: start.lat + (target.lat - start.lat) * ease,
-        lng: start.lng + (target.lng - start.lng) * ease
+        lng: start.lng + (target.lng - start.lng) * ease,
+        placed: true
       };
       if (t < 1) frame = requestAnimationFrame(step);
+      else flyingRef.current = false;
     };
     frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      flyingRef.current = false;
+      cancelAnimationFrame(frame);
+    };
   }, [session.flyTo]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return undefined;
+    const sync = () => {
+      const overlap = Math.max(0, window.innerHeight - viewport.offsetTop - viewport.height);
+      setKeyboardInset(overlap > 80 ? Math.round(overlap) : 0);
+    };
+    viewport.addEventListener("resize", sync);
+    viewport.addEventListener("scroll", sync);
+    return () => {
+      viewport.removeEventListener("resize", sync);
+      viewport.removeEventListener("scroll", sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    arriveLock.current = false;
+    setArriveState("idle");
+  }, [session.roomId]);
+
+  const markGesture = () => {
+    gestureAtRef.current = performance.now();
+  };
+
+  const nudgeZoom = (dir) => {
+    const canvas = canvasRef.current;
+    const rect = canvas?.getBoundingClientRect();
+    const width = rect?.width || 320;
+    const height = rect?.height || 480;
+    userZoomedRef.current = true;
+    markGesture();
+    viewRef.current = zoomAt(viewRef.current, viewRef.current.zoom + dir, width / 2, height / 2, width, height);
+  };
 
   const onPointerDown = (event) => {
     const canvas = canvasRef.current;
-    const project = canvas?.__project;
-    const hostPin = room?.hostUserId === getLocalVlueUserId() ? draftPin : null;
-    if (project && hostPin && session.mode === "vmap") {
+    if (!canvas) return;
+    canvas.setPointerCapture?.(event.pointerId);
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    markGesture();
+    if (pointersRef.current.size >= 2) {
+      dragRef.current = null;
+      pinDragRef.current = false;
+      const pts = [...pointersRef.current.values()];
+      pinchRef.current = { dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1 };
+      return;
+    }
+    const project = canvas.__project;
+    const scene = sceneRef.current;
+    const hostPin = scene.room?.hostUserId === getLocalVlueUserId() ? scene.draftPin : null;
+    if (project && hostPin && scene.mode === "vmap") {
       const rect = canvas.getBoundingClientRect();
       const pin = project(hostPin.lat, hostPin.lng);
       if (Math.hypot(pin.x - (event.clientX - rect.left), pin.y - (event.clientY - rect.top)) < 28) {
@@ -601,29 +774,59 @@ export default function LocationPlatform() {
         return;
       }
     }
-    dragRef.current = { x: event.clientX, y: event.clientY, lat: viewRef.current.lat, lng: viewRef.current.lng };
+    dragRef.current = { x: event.clientX, y: event.clientY, lat: viewRef.current.lat, lng: viewRef.current.lng, zoom: viewRef.current.zoom };
   };
   const onPointerMove = (event) => {
-    if (pinDragRef.current && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (pointersRef.current.size >= 2 && pinchRef.current) {
+      const pts = [...pointersRef.current.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+      const ratio = dist / pinchRef.current.dist;
+      pinchRef.current.dist = dist;
+      if (ratio > 0 && Number.isFinite(ratio) && Math.abs(ratio - 1) > 0.004) {
+        const rect = canvas.getBoundingClientRect();
+        userZoomedRef.current = true;
+        markGesture();
+        viewRef.current = zoomAt(
+          viewRef.current,
+          viewRef.current.zoom + Math.log2(ratio),
+          (pts[0].x + pts[1].x) / 2 - rect.left,
+          (pts[0].y + pts[1].y) / 2 - rect.top,
+          rect.width,
+          rect.height
+        );
+      }
+      return;
+    }
+    if (pinDragRef.current) {
+      const rect = canvas.getBoundingClientRect();
       const next = unproject(event.clientX - rect.left, event.clientY - rect.top, viewRef.current, rect.width, rect.height);
       if (Number.isFinite(next.lat) && Number.isFinite(next.lng)) {
         pinDirtyRef.current = true;
-        setDraftPin((prev) => ({ ...(prev || {}), lat: next.lat, lng: next.lng, ready: false }));
+        const nextPin = { ...(sceneRef.current.draftPin || {}), lat: next.lat, lng: next.lng, ready: false };
+        sceneRef.current = { ...sceneRef.current, draftPin: nextPin };
+        setDraftPin(nextPin);
       }
       return;
     }
     const drag = dragRef.current;
     if (!drag) return;
-    const zoom = viewRef.current.zoom;
-    const scale = (360 / (2 ** zoom)) / TILE;
+    const z = drag.zoom;
+    const wx = worldX(drag.lng, z) - (event.clientX - drag.x) / TILE;
+    const wy = worldY(drag.lat, z) + (event.clientY - drag.y) / TILE;
     viewRef.current = {
       ...viewRef.current,
-      lng: drag.lng - (event.clientX - drag.x) * scale,
-      lat: Math.max(-80, Math.min(80, drag.lat + (event.clientY - drag.y) * scale * 0.7))
+      lng: (wx / 2 ** z) * 360 - 180,
+      lat: Math.max(-80, Math.min(80, latFromWorldY(wy, z))),
+      placed: true
     };
   };
   const onPointerUp = (event) => {
+    pointersRef.current.delete(event.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
     if (pinDragRef.current) {
       pinDragRef.current = false;
       return;
@@ -631,14 +834,27 @@ export default function LocationPlatform() {
     const drag = dragRef.current;
     dragRef.current = null;
     if (!drag || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 8) return;
+    const now = Date.now();
+    if (now - lastTapRef.current < 280) {
+      lastTapRef.current = 0;
+      const canvas = canvasRef.current;
+      const rect = canvas?.getBoundingClientRect();
+      if (rect) {
+        userZoomedRef.current = true;
+        markGesture();
+        viewRef.current = zoomAt(viewRef.current, Math.round(viewRef.current.zoom) + 1, event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height);
+      }
+      return;
+    }
+    lastTapRef.current = now;
     const canvas = canvasRef.current;
     const project = canvas?.__project;
     if (!project) return;
     const rect = canvas.getBoundingClientRect();
-    const hit = members.find((member) => {
+    const hit = (sceneRef.current.members || []).find((member) => {
       if (member.lat == null) return false;
       const point = project(member.lat, member.lng);
-      return Math.hypot(point.x - (event.clientX - rect.left), point.y - (event.clientY - rect.top)) < 22;
+      return Math.hypot(point.x - (event.clientX - rect.left), point.y - (event.clientY - rect.top)) < 26;
     });
     setSelected(hit || null);
   };
@@ -677,12 +893,26 @@ export default function LocationPlatform() {
 
   const startVoice = async (event) => {
     event.preventDefault();
+    event.stopPropagation();
     if (!session.roomId || recording) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      pushNotice("이 기기에서는 마이크를 쓸 수 없습니다. 보내기 버튼으로 메시지를 전송하세요.");
+      return;
+    }
+    try {
+      const perm = await navigator.permissions?.query?.({ name: "microphone" });
+      if (perm?.state === "denied") {
+        pushNotice("마이크 권한이 꺼져 있습니다. 설정에서 허용하거나, 보내기 버튼으로 전송하세요.");
+        return;
+      }
+    } catch {
+      /* 권한 조회를 지원하지 않는 브라우저는 바로 요청한다 */
+    }
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      pushNotice("마이크를 허용해 주세요.");
+      pushNotice("마이크 권한이 필요합니다. 허용 창에서 허용하거나, 글은 보내기 버튼으로 전송하세요.");
       return;
     }
     const recorder = new MediaRecorder(stream);
@@ -715,11 +945,55 @@ export default function LocationPlatform() {
 
   const sendText = async () => {
     const text = draft.trim();
-    if (!text || !session.roomId) return;
+    if (!text || !session.roomId || sendLock.current) return;
+    sendLock.current = true;
+    setSending(true);
     setDraft("");
-    const sent = await postVmapMessage(session.roomId, { kind: "text", body: text });
-    setMessages((prev) => [...prev, sent.message]);
-    pingVmap(session.roomId);
+    const localId = `local-${Date.now()}`;
+    const pending = {
+      id: localId,
+      kind: "text",
+      body: text,
+      displayName: getProfileHeaderName() || "나",
+      createdAt: new Date().toISOString(),
+      userId: getLocalVlueUserId()
+    };
+    setMessages((prev) => [...prev, pending].slice(-40));
+    try {
+      const sent = await postVmapMessage(session.roomId, { kind: "text", body: text });
+      if (sent?.message) {
+        afterRef.current = sent.message.createdAt || afterRef.current;
+        setMessages((prev) => prev.map((row) => (row.id === localId ? sent.message : row)));
+        pingVmap(session.roomId);
+      }
+    } catch (error) {
+      setMessages((prev) => prev.filter((row) => row.id !== localId));
+      setDraft(text);
+      pushNotice(error.message || "메시지를 보내지 못했습니다.");
+    } finally {
+      sendLock.current = false;
+      setSending(false);
+    }
+  };
+
+  const completeArrival = async () => {
+    if (!session.roomId || arriveState === "pending" || arriveLock.current) return;
+    const mine = membersRef.current.find((member) => member.userId === getLocalVlueUserId());
+    if (mine?.arrived) return;
+    arriveLock.current = true;
+    setArriveState("pending");
+    try {
+      const data = await arriveVmap(session.roomId);
+      setArriveState("done");
+      setMembers((prev) => prev.map((member) => (member.userId === getLocalVlueUserId() ? { ...member, arrived: true } : member)));
+      if (data?.closingAt) setRoom((prev) => (prev ? { ...prev, closingAt: data.closingAt, closingReason: "arrived" } : prev));
+      pushNotice("도착으로 표시했습니다.");
+      refreshRoom(session.roomId);
+    } catch (error) {
+      arriveLock.current = false;
+      setArriveState("idle");
+      pushNotice(error.message || "도착 처리를 하지 못했습니다.");
+    }
   };
 
   if (!visible) return null;
@@ -743,12 +1017,25 @@ export default function LocationPlatform() {
   const selfMember = members.find((member) => member.userId === getLocalVlueUserId());
   const selfArrived = Boolean(selfMember?.arrived);
   const cue = guideOn && session.mode === "vmap" && session.departed && !selfArrived ? nextGuideCue(routes[getLocalVlueUserId()]?.steps) : null;
-  const liveComments = messages.filter((row) => liveNow - new Date(row.createdAt).getTime() < 7600).slice(-5);
+  const liveComments = messages.filter((row) => liveNow - new Date(row.createdAt).getTime() < 20000).slice(-5);
   const people = members.length ? members : self?.lat ? [{ ...self, userId: getLocalVlueUserId(), self: true, displayName: self.displayName || "나", grayscale: !locationOn }] : [];
 
-  const sheet = theme === "dark" ? "bg-[#121826] text-white" : "bg-white text-slate-900";
+  const dark = theme === "dark";
+  const glass = dark
+    ? "border border-white/10 bg-[#0c1220]/80 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-2xl"
+    : "border border-black/[0.06] bg-white/82 text-slate-900 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-2xl";
+  const tabOn = dark ? "bg-white text-[#0c1220] shadow-[0_0_0_1px_#00D2FF]" : "bg-[#0c1220] text-white shadow-[0_0_0_1px_#00D2FF]";
+  const accentBtn = "rounded-full bg-[#00D2FF] px-3.5 py-2 text-[12px] font-semibold tracking-tight text-[#04121a] shadow-[0_8px_22px_rgba(0,210,255,0.32)] disabled:opacity-60";
+  const quietBtn = dark
+    ? "rounded-full border border-white/12 bg-white/10 px-3.5 py-2 text-[12px] font-semibold tracking-tight text-white"
+    : "rounded-full border border-black/10 bg-white px-3.5 py-2 text-[12px] font-semibold tracking-tight text-slate-800";
+  const arrivedNow = selfArrived || arriveState === "done";
+  const sheetPad = "pb-[max(20px,calc(12px+env(safe-area-inset-bottom)))]";
   return (
-    <section className={`fixed inset-0 z-[530] flex flex-col ${theme === "dark" ? "bg-[#0f141c] text-white" : "bg-[#f4f7fb] text-slate-900"}`}>
+    <section
+      className={`fixed inset-x-0 top-0 z-[530] flex flex-col overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
+      style={{ bottom: keyboardInset }}
+    >
       <div className="relative min-h-0 flex-1">
         <canvas
           ref={canvasRef}
@@ -756,23 +1043,29 @@ export default function LocationPlatform() {
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          onPointerLeave={() => { dragRef.current = null; pinDragRef.current = false; }}
+          onPointerCancel={onPointerUp}
         />
         <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pt-[max(12px,env(safe-area-inset-top))]">
-          <button type="button" onClick={dismissLocation} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/80 text-lg text-white shadow" aria-label="닫기">×</button>
-          <div className="flex min-w-0 flex-1 rounded-full bg-black/80 p-1 text-white shadow">
-            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-black ${session.mode === "family" ? "bg-white text-slate-900" : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); setMembers([]); patchLocationSession({ mode: "family" }); }}>가족</button>
-            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-black ${session.mode === "vmap" ? "bg-white text-slate-900" : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>V-Map</button>
+          <button type="button" onClick={dismissLocation} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="닫기">×</button>
+          <div className={`flex min-w-0 flex-1 rounded-full p-1 backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-700"}`}>
+            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "family" ? tabOn : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); setMembers([]); patchLocationSession({ mode: "family" }); }}>가족</button>
+            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "vmap" ? tabOn : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>V-Map</button>
           </div>
           {session.mode === "vmap" && !session.roomId ? (
-            <button type="button" className="shrink-0 rounded-full bg-blue-600 px-3 py-2 text-[12px] font-black text-white shadow" onClick={() => void makeRoom()}>방 만들기</button>
+            <button type="button" className={`shrink-0 ${accentBtn}`} onClick={() => void makeRoom()}>방 만들기</button>
           ) : null}
-          <button type="button" onClick={() => { setMembersOpen(false); setSettingsOpen((open) => !open); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/80 text-white shadow" aria-label="화면 설정">☼</button>
+          <button type="button" onClick={() => { setMembersOpen(false); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
+        </div>
+        <div className={`absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
+          <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
+          <div className={dark ? "h-px bg-white/10" : "h-px bg-black/10"} />
+          <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
         </div>
         <p className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold text-slate-700/80">© OpenStreetMap</p>
         {session.mode === "vmap" && guideOn && cue ? (
-          <div className="absolute left-1/2 bottom-24 z-10 -translate-x-1/2 rounded-full bg-orange-500 px-4 py-2 text-[13px] font-black text-white shadow">
-            {formatGuideDistance(cue.distanceM)} 앞 {cue.instruction}
+          <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#04121a]/88 px-4 py-2 text-[13px] font-semibold tracking-tight text-white shadow-lg backdrop-blur-xl">
+            <span className="mr-1 text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</span>
+            앞 {cue.instruction}
           </div>
         ) : null}
         {farewell ? (
@@ -780,40 +1073,8 @@ export default function LocationPlatform() {
             <p className="text-[18px] font-black leading-snug text-white">{farewell}</p>
           </div>
         ) : null}
-        {selected ? (
-          <article className={`absolute bottom-3 left-3 right-3 rounded-3xl p-4 shadow-xl ${theme === "dark" ? "bg-slate-900" : "bg-white"}`}>
-            <div className="flex items-start justify-between gap-3">
-              {session.mode === "family" ? (
-                <div>
-                  <p className="text-[15px] font-black">{selected.displayName}</p>
-                  <p className="mt-1 text-[12px] leading-snug opacity-80">{selected.addressLabel || "도로명 주소를 확인 중입니다."}</p>
-                  <p className="mt-1 text-[12px] font-bold">{selected.online === false ? "접속 끊김" : "접속 중"} · 배터리 {selected.batteryPct == null ? "—" : `${selected.batteryPct}%`}</p>
-                  {/* TODO: 1일 1회 VLUÉ 안심패치 — 가족 위치에만 자리를 둔다 */}
-                  <span className="mt-2 inline-flex rounded-full border border-dashed px-2 py-1 text-[10px] font-bold opacity-60">안심패치 예정</span>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-[15px] font-black">{selected.displayName}</p>
-                  <p className="mt-1 text-[13px] font-bold">
-                    {selected.arrived
-                      ? "도착 완료"
-                      : selected.dropout
-                        ? "미도착 이탈자"
-                        : selected.departed && selected.lat != null && room?.placeReady
-                          ? `도착 예상 ${routes[selected.userId]?.durationSec ? Math.max(1, Math.round(routes[selected.userId].durationSec / 60)) : estimateEtaMinutes(haversineMeters(selected.lat, selected.lng, room.placeLat, room.placeLng))}분`
-                          : selected.departed
-                            ? "도착지가 정해지면 예상 시간이 나옵니다"
-                            : "출발 전"}
-                  </p>
-                  <p className="mt-1 text-[12px] opacity-70">소통은 아래 채팅과 음성만 됩니다.</p>
-                </div>
-              )}
-              <button type="button" onClick={() => setSelected(null)} aria-label="닫기">×</button>
-            </div>
-          </article>
-        ) : null}
         {session.mode === "vmap" && isHost && session.roomId ? (
-          <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-10 space-y-2 rounded-3xl p-3 shadow-lg ${sheet}`}>
+          <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-10 space-y-2 rounded-[28px] p-3 ${glass}`}>
             <form
               className="flex gap-2"
               onSubmit={(event) => {
@@ -822,7 +1083,7 @@ export default function LocationPlatform() {
               }}
             >
               <input value={placeQuery} onChange={(event) => setPlaceQuery(event.target.value)} placeholder="주소·장소 검색" className="min-w-0 flex-1 rounded-full border bg-white/90 px-3 py-2 text-[13px] text-slate-900" />
-              <button type="submit" className="rounded-full bg-white/90 px-3 text-[12px] font-black text-slate-900">검색</button>
+              <button type="submit" className={accentBtn}>검색</button>
             </form>
             {placeHits.length ? (
               <ul className="max-h-36 overflow-y-auto rounded-2xl bg-white/95 text-slate-900 shadow">
@@ -848,7 +1109,7 @@ export default function LocationPlatform() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className="rounded-full bg-blue-600 px-3 py-1.5 text-[12px] font-black text-white shadow"
+                className={accentBtn}
                 onClick={() => {
                   if (!draftPin) return;
                   pinDirtyRef.current = false;
@@ -871,53 +1132,88 @@ export default function LocationPlatform() {
             </div>
           </div>
         ) : null}
-        {session.mode === "vmap" && session.roomId ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex flex-col justify-end px-3">
-            <div className="mb-2 flex max-h-[7.5rem] flex-col justify-end gap-1 overflow-hidden">
-              {liveComments.map((row) => (
-                <p
-                  key={row.id}
-                  className="w-fit max-w-[88%] rounded-2xl bg-black/45 px-3 py-1 text-[13px] font-bold text-white"
-                  style={{ opacity: liveOpacity(row.createdAt, liveNow) }}
-                >
-                  <span className="mr-1 font-black">{row.displayName}</span>
-                  {row.kind === "voice" ? "음성" : row.body}
-                </p>
-              ))}
+        {liveComments.length ? (
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex max-h-[7.5rem] flex-col justify-end gap-1 overflow-hidden">
+            {liveComments.map((row) => (
+              <p
+                key={row.id}
+                className="w-fit max-w-[88%] rounded-2xl border border-white/10 bg-[#0c1220]/55 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-md"
+                style={{ opacity: liveOpacity(row.createdAt, liveNow) }}
+              >
+                <span className="mr-1 font-semibold text-[#00D2FF]">{row.displayName}</span>
+                {row.kind === "voice" ? "음성" : row.body}
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="relative z-30 shrink-0 space-y-2 px-3 pb-1 pt-2">
+        {selected ? (
+          <article className={`rounded-[24px] px-4 py-3 ${glass}`}>
+            <div className="flex items-start justify-between gap-3">
+              {session.mode === "family" ? (
+                <div>
+                  <p className="text-[15px] font-semibold tracking-tight">{selected.displayName}</p>
+                  <p className="mt-1 text-[12px] leading-snug opacity-80">{selected.addressLabel || "도로명 주소를 확인 중입니다."}</p>
+                  <p className="mt-1 text-[12px] font-medium">{selected.online === false ? "접속 끊김" : "접속 중"} · 배터리 {selected.batteryPct == null ? "—" : `${selected.batteryPct}%`}</p>
+                  {/* TODO: 1일 1회 VLUÉ 안심패치 — 가족 위치에만 자리를 둔다 */}
+                  <span className="mt-2 inline-flex rounded-full border border-dashed border-[#00D2FF]/50 px-2 py-1 text-[10px] font-semibold text-[#00D2FF]">안심패치 예정</span>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-[15px] font-semibold tracking-tight">{selected.displayName}</p>
+                  <p className={`mt-2 inline-flex rounded-full bg-[#00D2FF]/15 px-2.5 py-1 text-[12px] font-semibold ${dark ? "text-[#00D2FF]" : "text-[#0e7490]"}`}>
+                    {selected.arrived
+                      ? "도착 완료"
+                      : selected.dropout
+                        ? "미도착 이탈자"
+                        : selected.departed && selected.lat != null && room?.placeReady
+                          ? `도착 예상 ${routes[selected.userId]?.durationSec ? Math.max(1, Math.round(routes[selected.userId].durationSec / 60)) : estimateEtaMinutes(haversineMeters(selected.lat, selected.lng, room.placeLat, room.placeLng))}분`
+                          : selected.departed
+                            ? "도착지가 정해지면 예상 시간이 나옵니다"
+                            : "출발 전"}
+                  </p>
+                </div>
+              )}
+              <button type="button" onClick={() => setSelected(null)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg" aria-label="닫기">×</button>
             </div>
-            <div className="pointer-events-auto flex items-center gap-2">
+          </article>
+        ) : null}
+        {session.mode === "vmap" && session.roomId ? (
+          <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
+            <div className="flex items-center gap-2">
               {session.departed ? (
-                selfArrived ? (
-                  <span className="rounded-full bg-orange-500 px-3 py-2 text-[12px] font-black text-white shadow">도착함</span>
+                arrivedNow ? (
+                  <span className="rounded-full bg-[#00D2FF]/15 px-3 py-2 text-[12px] font-semibold text-[#00D2FF]">도착함</span>
                 ) : (
                   <>
                     <button
                       type="button"
                       aria-pressed={guideOn}
                       onClick={() => setGuideOn((on) => !on)}
-                      className={`rounded-full px-3 py-2 text-[12px] font-black shadow ${guideOn ? "bg-orange-500 text-white" : "bg-white/85 text-slate-900"}`}
+                      className={guideOn ? accentBtn : quietBtn}
                     >
                       길안내
                     </button>
                     <button
                       type="button"
-                      className="rounded-full bg-orange-500 px-3 py-2 text-[12px] font-black text-white shadow"
-                      onClick={() => {
-                        arriveVmap(session.roomId).then((data) => {
-                          setMembers((prev) => prev.map((member) => (member.userId === getLocalVlueUserId() ? { ...member, arrived: true } : member)));
-                          if (data?.closingAt) setRoom((prev) => (prev ? { ...prev, closingAt: data.closingAt, closingReason: "arrived" } : prev));
-                          refreshRoom(session.roomId);
-                        }).catch((error) => pushNotice(error.message));
+                      className={accentBtn}
+                      disabled={arriveState === "pending"}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void completeArrival();
                       }}
                     >
-                      도착 완료
+                      {arriveState === "pending" ? "처리 중…" : "도착 완료"}
                     </button>
                   </>
                 )
               ) : (
                 <button
                   type="button"
-                  className="rounded-full bg-blue-600 px-3 py-2 text-[12px] font-black text-white shadow"
+                  className={accentBtn}
                   onClick={() => {
                     if (!room?.placeReady) {
                       pushNotice("방장이 도착 핀을 꽂은 뒤에 출발할 수 있습니다.");
@@ -928,6 +1224,7 @@ export default function LocationPlatform() {
                       return;
                     }
                     departVmap(session.roomId, { lat: self.lat, lng: self.lng, online: true, displayName: self.displayName }).then(() => {
+                      userZoomedRef.current = false;
                       patchLocationSession({ departed: true });
                       viewRef.current = {
                         ...viewRef.current,
@@ -944,43 +1241,57 @@ export default function LocationPlatform() {
                   출발
                 </button>
               )}
-              <form className="flex min-w-0 flex-1 items-center gap-2" onSubmit={(event) => { event.preventDefault(); void sendText(); }}>
-                <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="대화를 시작하세요." className="min-w-0 flex-1 rounded-full border border-white/30 bg-black/35 px-3 py-2 text-[13px] text-white placeholder:text-white/70" />
-                <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`flex h-11 w-11 items-center justify-center rounded-full text-white ${recording ? "bg-rose-500" : "bg-black/55"}`} aria-label="음성 메시지">🎤</button>
-              </form>
             </div>
+            <form className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 ${dark ? "border-white/10 bg-white/10" : "border-black/10 bg-slate-100/80"}`} onSubmit={(event) => { event.preventDefault(); void sendText(); }}>
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    void sendText();
+                  }
+                }}
+                placeholder="메시지를 입력하세요"
+                className={`min-w-0 flex-1 bg-transparent py-2 text-[13px] font-medium outline-none ${dark ? "text-white placeholder:text-white/45" : "text-slate-900 placeholder:text-slate-400"}`}
+              />
+              <button type="submit" aria-label="보내기" disabled={sending} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${draft.trim() ? "bg-[#00D2FF] text-[#04121a]" : dark ? "bg-white/10 text-white/35" : "bg-slate-200 text-slate-400"}`}>
+                <SendIcon />
+              </button>
+              <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : dark ? "bg-white/10 text-white/80" : "bg-slate-200 text-slate-700"}`} aria-label="길게 눌러 음성 메시지">🎤</button>
+            </form>
           </div>
         ) : null}
         {session.mode === "vmap" && !session.roomId ? (
-          <form className="absolute inset-x-3 bottom-3 z-10 flex gap-2" onSubmit={(event) => { event.preventDefault(); void joinRoom(); }}>
-            <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="약속 코드로 입장" className="min-w-0 flex-1 rounded-full border bg-white/90 px-3 py-2 text-[13px] text-slate-900" />
-            <button type="submit" className="rounded-full bg-slate-900 px-3 text-[12px] font-black text-white">입장</button>
+          <form className={`flex gap-2 rounded-[24px] p-2 ${glass}`} onSubmit={(event) => { event.preventDefault(); void joinRoom(); }}>
+            <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="약속 코드로 입장" className={`min-w-0 flex-1 rounded-full border px-3 py-2 text-[13px] ${dark ? "border-white/10 bg-white/10 text-white placeholder:text-white/40" : "border-black/10 bg-white text-slate-900"}`} />
+            <button type="submit" className={accentBtn}>입장</button>
           </form>
         ) : null}
       </div>
 
-      <div className="px-3 pb-[max(8px,env(safe-area-inset-bottom))]">
+      <div className="shrink-0 px-3 pt-2" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
         {sponsor ? (
-          <a href={sponsor.linkUrl || undefined} target="_blank" rel="noreferrer" className="flex h-[52px] items-center gap-3 overflow-hidden rounded-xl bg-amber-50 px-3 text-slate-900">
+          <a href={sponsor.linkUrl || undefined} target="_blank" rel="noreferrer" className="flex items-center gap-3 overflow-hidden rounded-xl bg-amber-50 px-3 text-slate-900" style={{ height: AD_BANNER_PX }}>
             {sponsor.imageUrl ? <img src={sponsor.imageUrl} alt="" className="h-9 w-16 rounded object-cover" /> : null}
             <span className="min-w-0">
-              <span className="block truncate text-[12px] font-black">{sponsor.title}</span>
+              <span className="block truncate text-[12px] font-semibold">{sponsor.title}</span>
               <span className="block truncate text-[10px]">{sponsor.body}</span>
             </span>
           </a>
         ) : sponsorReady ? (
-          <AdMobBannerSlot slotId="location_map" heightPx={52} preferredSize="ADAPTIVE" />
+          <AdMobBannerSlot slotId="location_map" heightPx={AD_BANNER_PX} preferredSize="BANNER" enabled={!settingsOpen && !membersOpen && !keyboardInset} />
         ) : (
-          <div className="h-[52px]" />
+          <div style={{ height: AD_BANNER_PX }} />
         )}
       </div>
 
       {settingsOpen ? (
-        <div className="absolute inset-0 z-30 bg-black/40" onClick={() => setSettingsOpen(false)}>
-          <div className={`absolute inset-x-0 bottom-0 rounded-t-[28px] px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 shadow-2xl ${sheet}`} onClick={(event) => event.stopPropagation()}>
-            <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${theme === "dark" ? "bg-white/20" : "bg-slate-200"}`} />
-            <p className="text-[16px] font-black">화면</p>
-            <p className={`mt-1 text-[12px] ${theme === "dark" ? "text-white/60" : "text-slate-500"}`}>지도는 컬러 도로지도로 두고, 버튼과 패널만 밝기를 바꿉니다.</p>
+        <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-sm" onClick={() => setSettingsOpen(false)}>
+          <div className={`absolute inset-x-0 bottom-0 rounded-t-[28px] px-4 pt-3 shadow-2xl ${sheetPad} ${dark ? "bg-[#0c1220]/95 text-white" : "bg-white/95 text-slate-900"}`} onClick={(event) => event.stopPropagation()}>
+            <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${dark ? "bg-white/20" : "bg-slate-200"}`} />
+            <p className="text-[16px] font-semibold tracking-tight">화면</p>
+            <p className={`mt-1 text-[12px] ${dark ? "text-white/60" : "text-slate-500"}`}>지도는 컬러 도로지도로 두고, 버튼과 패널만 밝기를 바꿉니다.</p>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {[
                 ["auto", "시간"],
@@ -990,18 +1301,18 @@ export default function LocationPlatform() {
                 <button
                   key={item}
                   type="button"
-                  className={`rounded-2xl px-2 py-3 text-[13px] font-black ${session.theme === item ? "bg-blue-600 text-white" : theme === "dark" ? "bg-white/10" : "bg-slate-100"}`}
+                  className={`rounded-2xl px-2 py-3 text-[13px] font-semibold ${session.theme === item ? "bg-[#00D2FF] text-[#04121a]" : dark ? "bg-white/10" : "bg-slate-100"}`}
                   onClick={() => setMapThemePreference(item)}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <button type="button" className={`mt-3 block w-full rounded-2xl px-3 py-3 text-left text-[14px] font-black ${theme === "dark" ? "bg-white/10" : "bg-slate-100"}`} onClick={() => { setMembersOpen(true); setSettingsOpen(false); }}>
+            <button type="button" className={`mt-3 block w-full rounded-2xl px-3 py-3 text-left text-[14px] font-semibold ${dark ? "bg-white/10" : "bg-slate-100"}`} onClick={() => { setMembersOpen(true); setSettingsOpen(false); }}>
               함께 있는 사람
             </button>
             {session.mode === "vmap" && session.roomId ? (
-              <button type="button" className="mt-2 block w-full rounded-2xl bg-rose-500 px-3 py-3 text-[14px] font-black text-white" onClick={() => void leaveForGood()}>
+              <button type="button" className="mt-2 block w-full rounded-2xl bg-rose-500 px-3 py-3 text-[14px] font-semibold text-white" onClick={() => void leaveForGood()}>
                 {isHost ? "방 삭제" : "나가기"}
               </button>
             ) : null}
@@ -1009,9 +1320,9 @@ export default function LocationPlatform() {
         </div>
       ) : null}
       {membersOpen ? (
-        <div className="absolute inset-0 z-20 bg-black/40" onClick={() => setMembersOpen(false)}>
-          <div className={`absolute inset-x-0 bottom-0 rounded-t-3xl p-4 ${theme === "dark" ? "bg-slate-900" : "bg-white"}`} onClick={(event) => event.stopPropagation()}>
-            <p className="text-[14px] font-black">멤버</p>
+        <div className="absolute inset-0 z-40 bg-black/45 backdrop-blur-sm" onClick={() => setMembersOpen(false)}>
+          <div className={`absolute inset-x-0 bottom-0 rounded-t-[28px] p-4 ${sheetPad} ${dark ? "bg-[#0c1220]/95 text-white" : "bg-white/95 text-slate-900"}`} onClick={(event) => event.stopPropagation()}>
+            <p className="text-[15px] font-semibold tracking-tight">함께 있는 사람</p>
             <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
               {people.map((member) => (
                 <li key={member.userId}>
@@ -1047,7 +1358,7 @@ export default function LocationPlatform() {
           </div>
         </div>
       ) : null}
-      {notice ? <p className="absolute left-1/2 top-20 -translate-x-1/2 rounded-full bg-black px-3 py-1 text-[12px] text-white">{notice}</p> : null}
+      {notice ? <p className="pointer-events-none absolute left-1/2 top-[4.6rem] z-[80] max-w-[90%] -translate-x-1/2 rounded-full border border-[#00D2FF]/40 bg-[#04121a] px-4 py-2 text-center text-[12px] font-medium text-white shadow-lg">{notice}</p> : null}
     </section>
   );
 }
