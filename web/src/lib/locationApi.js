@@ -51,6 +51,18 @@ export function joinVmapRoom(roomId, payload) {
   return vlueAuthFetch(apiUrl(`/api/location/vmap/${roomId}/join`), authInit("POST", payload)).then(read);
 }
 
+export function fetchVmapFriends(roomId = "") {
+  const q = roomId ? `?roomId=${encodeURIComponent(String(roomId))}` : "";
+  return vlueAuthFetch(apiUrl(`/api/location/friends${q}`), { headers: vlueAuthHeaders() }).then(read);
+}
+
+export function inviteVmapFriends(roomId, userIds) {
+  return vlueAuthFetch(
+    apiUrl(`/api/location/vmap/${roomId}/invite`),
+    authInit("POST", { userIds: Array.isArray(userIds) ? userIds : [] })
+  ).then(read);
+}
+
 export function departVmap(roomId, payload) {
   return vlueAuthFetch(apiUrl(`/api/location/vmap/${roomId}/depart`), authInit("POST", payload)).then(read);
 }

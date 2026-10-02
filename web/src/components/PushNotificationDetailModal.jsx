@@ -14,12 +14,13 @@ import {
   showcaseLikeNavFromNotification
 } from "../lib/showcase/openOwnShowcaseSlide.js";
 
-const CATEGORY_STYLE = {
+  const CATEGORY_STYLE = {
   가족보호: "bg-emerald-50 text-emerald-700",
   안심: "bg-emerald-50 text-emerald-700",
   앱: "bg-blue-50 text-blue-700",
   공지: "bg-indigo-50 text-indigo-700",
   결제: "bg-sky-50 text-sky-800",
+  "V-Map": "bg-cyan-50 text-cyan-800",
   기타: "bg-gray-100 text-gray-600"
 };
 
@@ -82,6 +83,13 @@ export default function PushNotificationDetailModal({
     Boolean(current.familyInvitePending) ||
     Boolean(current.familyInviteResolved);
   const canFamilyRespond = isFamilyInviteKind && Boolean(current.linkId) && !inviteResolved;
+  const vmapInvitePin = String(current.pinKey || "").startsWith("vmap-inv:")
+    ? String(current.pinKey).slice("vmap-inv:".length)
+    : "";
+  const vmapRoomId = String(current.linkId || vmapInvitePin).trim();
+  const isVmapInvite =
+    (current.kind === "vmap_invite" || current.kind === "vlue-vmap-invite" || Boolean(vmapInvitePin)) &&
+    Boolean(vmapRoomId);
   const likeNav = showcaseLikeNavFromNotification(current);
   const isLikeNotice = Boolean(likeNav);
 
@@ -331,6 +339,22 @@ export default function PushNotificationDetailModal({
                 거절
               </button>
             </>
+          ) : null}
+          {isVmapInvite ? (
+            <button
+              type="button"
+              className="w-full rounded-xl bg-[#00D2FF] py-3 text-[14px] font-black text-[#04121a] active:scale-[0.99]"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("vlue-open-location", {
+                    detail: { mode: "vmap", roomId: vmapRoomId, join: true }
+                  })
+                );
+                onClose?.();
+              }}
+            >
+              V-Map 입장
+            </button>
           ) : null}
           {inviteResolved ? (
             <button

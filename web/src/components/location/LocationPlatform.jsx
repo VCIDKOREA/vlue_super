@@ -44,6 +44,7 @@ import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readLastGeo, writeLastGeo } from "../../lib/lastGeoCache.js";
 import VmapNaverSurface from "./VmapNaverSurface.jsx";
+import VmapFriendInviteSheet from "./VmapFriendInviteSheet.jsx";
 
 const TILE = 256;
 const ACCENT = "#00D2FF";
@@ -343,6 +344,7 @@ export default function LocationPlatform() {
   const [nativeMini, setNativeMini] = useState(false);
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
@@ -395,7 +397,39 @@ export default function LocationPlatform() {
   };
 
   useEffect(() => {
-    const onOpen = (event) => openLocation(event?.detail?.mode || "family");
+    const onOpen = (event) => {
+      const mode = event?.detail?.mode || "family";
+      const roomId = String(event?.detail?.roomId || "").trim();
+      const shouldJoin = Boolean(event?.detail?.join && roomId);
+      openLocation(mode === "vmap" || roomId ? "vmap" : "family");
+      if (shouldJoin) {
+        void (async () => {
+          try {
+            await joinVmapRoom(roomId, { displayName: getProfileHeaderName() || "참여자" });
+            patchLocationSession({
+              mode: "vmap",
+              roomId,
+              departed: false,
+              open: true,
+              minimized: false
+            });
+            setJoinCode("");
+            const data = await fetchVmapRoom(roomId);
+            setRoom(data.room || null);
+            setMembers(Array.isArray(data.members) ? data.members : []);
+            setNotice("V-Map에 입장했습니다.");
+            window.setTimeout(() => setNotice(""), 2400);
+          } catch (error) {
+            patchLocationSession({ mode: "vmap", open: true, minimized: false });
+            setJoinCode(roomId);
+            setNotice(error?.message || "초대 방에 입장하지 못했습니다.");
+            window.setTimeout(() => setNotice(""), 2400);
+          }
+        })();
+      } else if (roomId) {
+        patchLocationSession({ mode: "vmap", roomId, open: true, minimized: false });
+      }
+    };
     const onRestore = () => restoreLocation();
     window.addEventListener("vlue-open-location", onOpen);
     window.addEventListener("vlue-restore-vmap", onRestore);
@@ -1682,6 +1716,16 @@ export default function LocationPlatform() {
                   출발
                 </button>
               )}
+              <button
+                type="button"
+                className={quietBtn}
+                onClick={() => {
+                  hideLocationAds();
+                  setInviteOpen(true);
+                }}
+              >
+                친구 초대
+              </button>
             </div>
             {routePickerOpen ? (
               <div className={`rounded-2xl p-2 ${dark ? "bg-white/5" : "bg-slate-50"}`}>
@@ -1866,6 +1910,17 @@ export default function LocationPlatform() {
         </div>
       ) : null}
       {notice ? <p className="pointer-events-none absolute left-1/2 top-[4.6rem] z-[80] max-w-[90%] -translate-x-1/2 rounded-full border border-[#00D2FF]/40 bg-[#04121a] px-4 py-2 text-center text-[12px] font-medium text-white shadow-lg">{notice}</p> : null}
+      <VmapFriendInviteSheet
+        open={inviteOpen && Boolean(session.roomId)}
+        roomId={session.roomId}
+        dark={dark}
+        onClose={() => setInviteOpen(false)}
+        onInvited={(data) => {
+          const n = Number(data?.invited) || 0;
+          pushNotice(n > 0 ? `${n}명에게 초대를 보냈습니다.` : "초대를 보냈습니다.");
+        }}
+        onError={(message) => pushNotice(message)}
+      />
       <style>{`
         @keyframes vmap-voice-wave {
           0%, 100% { transform: scaleY(0.35); opacity: 0.7; }

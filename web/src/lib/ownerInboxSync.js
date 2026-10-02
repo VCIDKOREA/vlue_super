@@ -24,8 +24,18 @@ export async function syncOwnerInboxFromServer() {
         item.payload && typeof item.payload === "object" && !Array.isArray(item.payload)
           ? item.payload
           : {};
+      const payloadType = String(payload.type || "");
+      const mappedKind =
+        item.kind ||
+        (payloadType === "vlue-vmap-invite"
+          ? "vmap_invite"
+          : payloadType === "vlue-friend-request"
+            ? "friend_request"
+            : payloadType === "vlue-friend-accepted"
+              ? "friend_accepted"
+              : payloadType || null);
       const entry = addPushNotification({
-        category: item.category || "앱",
+        category: item.category || (mappedKind === "vmap_invite" ? "V-Map" : "앱"),
         title: item.title || "",
         body: item.body || "",
         createdAt: item.createdAt,
@@ -34,8 +44,8 @@ export async function syncOwnerInboxFromServer() {
         pinned: Boolean(item.pinned),
         pinKind: item.pinKind || null,
         pinKey: item.pinKey || null,
-        kind: item.kind || payload.type || null,
-        linkId: item.linkId || null,
+        kind: mappedKind,
+        linkId: item.linkId || payload.roomId || null,
         familyRelation: item.familyRelation || null,
         familyInvitePending: item.kind === "family_invite",
         actorUserId: item.actorUserId || payload.actorUserId || null,

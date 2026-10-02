@@ -13,6 +13,7 @@ export const notificationRoutes = new Hono();
 function inboxCategory(title: string, body: string, pinKind?: string | null) {
   if (pinKind === "line_grace") return "결제";
   const t = `${title} ${body}`;
+  if (/V-Map|VMAP|브이맵/i.test(t)) return "V-Map";
   if (/좋아요|댓글|답글|공유|쇼케이스/.test(t)) return "쇼케이스";
   if (/친구/.test(t)) return "친구";
   if (/팔로우/.test(t)) return "팔로우";
@@ -28,14 +29,18 @@ function payloadRecord(payload: unknown): Record<string, unknown> | null {
 
 function extractInboxLinkId(payload: unknown): string | null {
   const p = payloadRecord(payload);
-  const linkId = p?.linkId;
+  const linkId = p?.linkId ?? p?.roomId;
   return linkId != null ? String(linkId) : null;
 }
 
 function extractInboxKind(payload: unknown): string | null {
   const p = payloadRecord(payload);
-  const kind = p?.kind;
-  return kind != null ? String(kind) : null;
+  if (p?.kind != null) return String(p.kind);
+  const type = p?.type != null ? String(p.type) : "";
+  if (type === "vlue-vmap-invite") return "vmap_invite";
+  if (type === "vlue-friend-request") return "friend_request";
+  if (type === "vlue-friend-accepted") return "friend_accepted";
+  return type || null;
 }
 
 function extractInboxFamilyRelation(payload: unknown): string | null {

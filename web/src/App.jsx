@@ -1190,6 +1190,25 @@ function App() {
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
       }
+      if (data.type === "vlue-vmap-invite") {
+        const title = String(n.title || data.title || "V-Map 초대");
+        const body = String(n.body || data.body || data.message || "V-Map 약속에 초대되었습니다.");
+        const roomId = String(data.roomId || "").trim();
+        addPushNotification({
+          category: "V-Map",
+          title,
+          body,
+          kind: "vmap_invite",
+          serverId: data.notificationId || n.notificationId,
+          pinKey: roomId ? `vmap-inv:${roomId}` : "",
+          linkId: roomId || undefined,
+          actorUserId: data.actorUserId || undefined,
+          actorName: data.actorName || undefined
+        });
+        deliverLocalPushNotification(title, body, String(data.notificationId || roomId || "vmap-invite"));
+        setBottomToast(body);
+        setTimeout(() => setBottomToast(""), 4200);
+      }
       if (
         data.type === "vlue-showcase-like" ||
         data.type === "vlue-showcase-comment" ||
@@ -1442,6 +1461,25 @@ function App() {
             actorUserId: data.actorUserId || undefined,
             actorName: data.actorName || undefined
           });
+        }
+        if (data?.type === "vlue-vmap-invite") {
+          const title = String(data.title || "V-Map 초대");
+          const body = String(data.body || data.message || "V-Map 약속에 초대되었습니다.");
+          const roomId = String(data.roomId || "").trim();
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 4200);
+          addPushNotification({
+            category: "V-Map",
+            title,
+            body,
+            kind: "vmap_invite",
+            serverId: data.notificationId,
+            pinKey: roomId ? `vmap-inv:${roomId}` : "",
+            linkId: roomId || undefined,
+            actorUserId: data.actorUserId || undefined,
+            actorName: data.actorName || undefined
+          });
+          deliverLocalPushNotification(title, body, String(data.notificationId || roomId || "vmap-invite"));
         }
         if (
           data?.type === "vlue-showcase-like" ||

@@ -3,6 +3,8 @@ import { prisma } from "../db/client.js";
 import { fetchKakaoCarDirections } from "../integrations/kakao/kakaoMobilityDirections.js";
 import { searchKakaoLocalList } from "../integrations/kakao/kakaoLocalSearch.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
+import { ssePublish } from "../realtime/sseHub.js";
+import { sendShowcaseSocialPushToUser } from "../services/fcmNotificationService.js";
 import { AUTO_ARRIVE_METERS, isVmapDropout, vmapRoomReadyToClose } from "../services/location/vmapArrival.js";
 
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
@@ -374,6 +376,175 @@ locationMapRoutes.post("/vmap/:id/join", requireUserHeader, async (c) => {
     update: { displayName: clip(body.displayName, 80) || "참여자" }
   });
   return c.json({ ok: true, room });
+});
+
+/** VLUE 수락 친구 목록 (V-Map 초대 피커) */
+locationMapRoutes.get("/friends", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = clip(c.req.query("roomId"), 80);
+  const friendRows = await prisma.friendRequest.findMany({
+    where: {
+      status: "accepted",
+      OR: [{ fromUserId: userId }, { toUserId: userId }]
+    },
+    select: { fromUserId: true, toUserId: true },
+    take: 400
+  });
+  const peerIds = [
+    ...new Set(
+      friendRows
+        .map((row) => (row.fromUserId === userId ? row.toUserId : row.fromUserId))
+        .filter((id) => id && id !== userId)
+    )
+  ].slice(0, 100);
+
+  let inRoom = new Set<string>();
+  if (roomId) {
+    const members = await prisma.vmapMember.findMany({
+      where: { roomId },
+      select: { userId: true }
+    });
+    inRoom = new Set(members.map((m) => m.userId));
+  }
+
+  if (!peerIds.length) return c.json({ ok: true, friends: [] });
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: peerIds } },
+    select: { id: true, legalName: true, publicHandle: true }
+  });
+  const photos = await profilePhotos(peerIds);
+  const friends = users
+    .map((user) => ({
+      userId: user.id,
+      displayName: String(user.legalName || user.publicHandle || "친구").replace(/^@+/, "").trim() || "친구",
+      publicHandle: String(user.publicHandle || "").replace(/^@+/, "").trim(),
+      photoUrl: photos.get(user.id) || "",
+      inRoom: inRoom.has(user.id)
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "ko"));
+  return c.json({ ok: true, friends });
+});
+
+/** V-Map 친구 초대 — 알림함 + SSE + FCM */
+locationMapRoutes.post("/vmap/:id/invite", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
+  if (!room) return c.json({ error: "약속을 찾을 수 없습니다." }, 404);
+
+  const member = await prisma.vmapMember.findUnique({
+    where: { roomId_userId: { roomId, userId } }
+  });
+  if (!member && room.hostUserId !== userId) {
+    return c.json({ error: "방에 참여한 회원만 초대할 수 있습니다." }, 403);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const rawIds = Array.isArray(body.userIds) ? body.userIds : [];
+  const targetIds = [
+    ...new Set(rawIds.map((id: unknown) => String(id || "").trim()).filter((id) => id && id !== userId))
+  ].slice(0, 30);
+  if (!targetIds.length) return c.json({ error: "초대할 친구를 선택해 주세요." }, 400);
+
+  const friendRows = await prisma.friendRequest.findMany({
+    where: {
+      status: "accepted",
+      OR: [
+        { fromUserId: userId, toUserId: { in: targetIds } },
+        { toUserId: userId, fromUserId: { in: targetIds } }
+      ]
+    },
+    select: { fromUserId: true, toUserId: true }
+  });
+  const friendSet = new Set(
+    friendRows.map((row) => (row.fromUserId === userId ? row.toUserId : row.fromUserId))
+  );
+  const invitees = targetIds.filter((id) => friendSet.has(id));
+  if (!invitees.length) return c.json({ error: "VLUE 친구만 초대할 수 있습니다." }, 400);
+
+  const host = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { legalName: true, publicHandle: true }
+  });
+  const hostName =
+    String(host?.legalName || host?.publicHandle || "친구").replace(/^@+/, "").trim() || "친구";
+  const place = room.placeLabel || room.title || "약속";
+  const title = "V-Map 초대";
+  const noticeBody = `${hostName}님이 V-Map 약속에 초대했습니다. · ${place}`;
+
+  let invited = 0;
+  for (const inviteeId of invitees) {
+    const pinKey = `vmap-inv:${roomId}`;
+    let notificationId = "";
+    try {
+      const row = await prisma.ownerNotification.upsert({
+        where: { ownerUserId_pinKey: { ownerUserId: inviteeId, pinKey } },
+        create: {
+          ownerUserId: inviteeId,
+          actorUserId: userId,
+          title,
+          body: noticeBody,
+          pinKey,
+          payloadJson: {
+            type: "vlue-vmap-invite",
+            roomId,
+            actorUserId: userId,
+            actorName: hostName,
+            placeLabel: place
+          }
+        },
+        update: {
+          actorUserId: userId,
+          title,
+          body: noticeBody,
+          status: "unread",
+          payloadJson: {
+            type: "vlue-vmap-invite",
+            roomId,
+            actorUserId: userId,
+            actorName: hostName,
+            placeLabel: place
+          }
+        }
+      });
+      notificationId = row.id;
+    } catch (err) {
+      console.warn("[vmap] invite notification_failed", err);
+      continue;
+    }
+
+    const payload = {
+      type: "vlue-vmap-invite",
+      title,
+      body: noticeBody,
+      message: noticeBody,
+      roomId,
+      actorUserId: userId,
+      actorName: hostName,
+      placeLabel: place,
+      notificationId,
+      at: new Date().toISOString()
+    };
+    try {
+      ssePublish(inviteeId, payload);
+    } catch (err) {
+      console.warn("[vmap] invite sse_failed", err);
+    }
+    void sendShowcaseSocialPushToUser(inviteeId, title, noticeBody, {
+      type: "vlue-vmap-invite",
+      roomId,
+      actorUserId: userId,
+      actorName: hostName,
+      placeLabel: place,
+      notificationId
+    }).catch((err) => {
+      console.warn("[vmap] invite fcm_failed", err);
+    });
+    invited += 1;
+  }
+
+  return c.json({ ok: true, invited, skipped: targetIds.length - invited });
 });
 
 locationMapRoutes.post("/vmap/:id/depart", requireUserHeader, async (c) => {
