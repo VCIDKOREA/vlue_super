@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { fetchNaverMapClientId, loadNaverMaps } from "../../lib/naverMapLoader.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
@@ -29,6 +29,33 @@ function pinHtml(ready) {
       <circle cx="11" cy="10" r="4.5" fill="#fff"/>
     </svg>
   </div>`;
+}
+
+function clearOverlays(store) {
+  store.people.forEach((item) => {
+    try {
+      item.marker.setMap(null);
+    } catch {
+      /* ignore */
+    }
+  });
+  store.people.clear();
+  store.lines.forEach((line) => {
+    try {
+      line.setMap(null);
+    } catch {
+      /* ignore */
+    }
+  });
+  store.lines.clear();
+  if (store.pin?.marker) {
+    try {
+      store.pin.marker.setMap(null);
+    } catch {
+      /* ignore */
+    }
+  }
+  store.pin = null;
 }
 
 /**
@@ -67,12 +94,17 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
   const onSelectRef = useRef(onSelectMember);
   const onPinRef = useRef(onDraftPinChange);
   const onGestureRef = useRef(onUserGesture);
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
+  const [mapEpoch, setMapEpoch] = useState(0);
 
   guideFollowRef.current = guideFollow;
   pinEditableRef.current = pinEditable;
   onSelectRef.current = onSelectMember;
   onPinRef.current = onDraftPinChange;
   onGestureRef.current = onUserGesture;
+  onReadyRef.current = onReady;
+  onErrorRef.current = onError;
 
   useImperativeHandle(ref, () => ({
     zoomBy(delta) {
@@ -101,6 +133,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     let cancelled = false;
     let dragListener = null;
     let zoomListener = null;
+    let dragEndListener = null;
     let idleTimer = 0;
 
     (async () => {
@@ -131,25 +164,40 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         };
         dragListener = naverMaps.Event.addListener(map, "dragstart", markGesture);
         zoomListener = naverMaps.Event.addListener(map, "zoom_changed", markGesture);
-        naverMaps.Event.addListener(map, "dragend", markGesture);
+        dragEndListener = naverMaps.Event.addListener(map, "dragend", markGesture);
 
         idleTimer = window.setInterval(() => {
           const target = followTargetRef.current;
-          if (!guideFollowRef.current || !target || !mapRef.current) return;
+          const liveMap = mapRef.current;
+          if (!guideFollowRef.current || !target || !liveMap || !mapsApiRef.current) return;
           if (performance.now() - gestureAtRef.current < 1400) return;
-          const cur = mapRef.current.getCenter();
-          const lat = cur.lat() + (target.lat - cur.lat()) * 0.22;
-          const lng = cur.lng() + (target.lng - cur.lng()) * 0.22;
-          mapRef.current.panTo(new naverMaps.LatLng(lat, lng));
-          if (Number.isFinite(target.zoom)) {
-            const z = mapRef.current.getZoom();
-            mapRef.current.setZoom(z + (target.zoom - z) * 0.15);
+          const cur = liveMap.getCenter();
+          const dLat = target.lat - cur.lat();
+          const dLng = target.lng - cur.lng();
+          if (Math.abs(dLat) < 0.00002 && Math.abs(dLng) < 0.00002) {
+            if (Number.isFinite(target.zoom)) {
+              const z = liveMap.getZoom();
+              if (Math.abs(target.zoom - z) > 0.08) {
+                liveMap.setZoom(z + (target.zoom - z) * 0.18);
+              }
+            }
+            return;
           }
-        }, 320);
+          liveMap.setCenter(
+            new mapsApiRef.current.LatLng(cur.lat() + dLat * 0.28, cur.lng() + dLng * 0.28)
+          );
+          if (Number.isFinite(target.zoom)) {
+            const z = liveMap.getZoom();
+            if (Math.abs(target.zoom - z) > 0.08) {
+              liveMap.setZoom(z + (target.zoom - z) * 0.18);
+            }
+          }
+        }, 400);
 
-        onReady?.();
+        setMapEpoch((n) => n + 1);
+        onReadyRef.current?.();
       } catch (error) {
-        onError?.(error);
+        onErrorRef.current?.(error);
       }
     })();
 
@@ -159,12 +207,13 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       const naver = mapsApiRef.current;
       if (naver && dragListener) naver.Event.removeListener(dragListener);
       if (naver && zoomListener) naver.Event.removeListener(zoomListener);
-      overlaysRef.current.people.forEach((item) => item.setMap(null));
-      overlaysRef.current.people.clear();
-      overlaysRef.current.lines.forEach((line) => line.setMap(null));
-      overlaysRef.current.lines.clear();
-      overlaysRef.current.pin?.setMap(null);
-      overlaysRef.current.pin = null;
+      if (naver && dragEndListener) naver.Event.removeListener(dragEndListener);
+      clearOverlays(overlaysRef.current);
+      try {
+        mapRef.current?.destroy?.();
+      } catch {
+        /* ignore */
+      }
       try {
         if (hostRef.current) hostRef.current.innerHTML = "";
       } catch {
@@ -172,7 +221,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       }
       mapRef.current = null;
     };
-  }, [active, onReady, onError]);
+  }, [active]);
 
   useEffect(() => {
     if (!flyTo?.lat || !mapRef.current || !mapsApiRef.current) return;
@@ -183,7 +232,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
   useEffect(() => {
     const map = mapRef.current;
     const naver = mapsApiRef.current;
-    if (!map || !naver || !active) return;
+    if (!map || !naver || !active || mapEpoch < 1) return;
 
     const mineId = getLocalVlueUserId();
     const selfPhoto = readProfilePhotoAvatar();
@@ -212,10 +261,11 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
               : `${estimateEtaMinutes(haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng))}분`
           : "";
       const html = personHtml(member.displayName || "멤버", status, mine && selfPhoto ? selfPhoto : member.photoUrl, !dead);
-      let overlay = overlaysRef.current.people.get(id);
-      if (!overlay) {
-        overlay = new naver.Marker({
-          position: new naver.LatLng(member.lat, member.lng),
+      let entry = overlaysRef.current.people.get(id);
+      const nextPos = new naver.LatLng(member.lat, member.lng);
+      if (!entry) {
+        const marker = new naver.Marker({
+          position: nextPos,
           map,
           icon: {
             content: html,
@@ -224,11 +274,19 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           },
           zIndex: mine ? 120 : 100
         });
-        naver.Event.addListener(overlay, "click", () => onSelectRef.current?.(member));
-        overlaysRef.current.people.set(id, overlay);
+        naver.Event.addListener(marker, "click", () => onSelectRef.current?.(member));
+        entry = { marker, html, lat: member.lat, lng: member.lng };
+        overlaysRef.current.people.set(id, entry);
       } else {
-        overlay.setPosition(new naver.LatLng(member.lat, member.lng));
-        overlay.setIcon({ content: html, size: new naver.Size(48, 72), anchor: new naver.Point(24, 54) });
+        if (entry.html !== html) {
+          entry.marker.setIcon({ content: html, size: new naver.Size(48, 72), anchor: new naver.Point(24, 54) });
+          entry.html = html;
+        }
+        if (entry.lat !== member.lat || entry.lng !== member.lng) {
+          entry.marker.setPosition(nextPos);
+          entry.lat = member.lat;
+          entry.lng = member.lng;
+        }
       }
       if (mine && guideFollow && !member.arrived) {
         followTargetRef.current = {
@@ -242,9 +300,9 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       }
     });
 
-    overlaysRef.current.people.forEach((overlay, id) => {
+    overlaysRef.current.people.forEach((entry, id) => {
       if (keep.has(id)) return;
-      overlay.setMap(null);
+      entry.marker.setMap(null);
       overlaysRef.current.people.delete(id);
     });
 
@@ -253,16 +311,18 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     if (mode === "vmap" && pinSource?.lat != null) {
       const ready = Boolean(room?.placeReady && draftPin?.ready !== false);
       const html = pinHtml(ready);
+      const nextPos = new naver.LatLng(pinSource.lat, pinSource.lng);
       if (!overlaysRef.current.pin) {
-        overlaysRef.current.pin = new naver.Marker({
-          position: new naver.LatLng(pinSource.lat, pinSource.lng),
+        const marker = new naver.Marker({
+          position: nextPos,
           map,
           icon: { content: html, size: new naver.Size(22, 32), anchor: new naver.Point(11, 32) },
           draggable: Boolean(pinEditableRef.current && hostView),
           zIndex: 90
         });
-        naver.Event.addListener(overlaysRef.current.pin, "dragend", (event) => {
-          const coord = event?.coord || overlaysRef.current.pin.getPosition();
+        naver.Event.addListener(marker, "dragend", (event) => {
+          const coord = event?.coord || overlaysRef.current.pin?.marker?.getPosition?.();
+          if (!coord) return;
           onPinRef.current?.({
             lat: coord.lat(),
             lng: coord.lng(),
@@ -271,13 +331,22 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           });
           onGestureRef.current?.();
         });
+        overlaysRef.current.pin = { marker, html, lat: pinSource.lat, lng: pinSource.lng };
       } else {
-        overlaysRef.current.pin.setPosition(new naver.LatLng(pinSource.lat, pinSource.lng));
-        overlaysRef.current.pin.setIcon({ content: html, size: new naver.Size(22, 32), anchor: new naver.Point(11, 32) });
-        overlaysRef.current.pin.setDraggable(Boolean(pinEditableRef.current && hostView));
+        const pin = overlaysRef.current.pin;
+        if (pin.html !== html) {
+          pin.marker.setIcon({ content: html, size: new naver.Size(22, 32), anchor: new naver.Point(11, 32) });
+          pin.html = html;
+        }
+        if (pin.lat !== pinSource.lat || pin.lng !== pinSource.lng) {
+          pin.marker.setPosition(nextPos);
+          pin.lat = pinSource.lat;
+          pin.lng = pinSource.lng;
+        }
+        pin.marker.setDraggable(Boolean(pinEditableRef.current && hostView));
       }
     } else if (overlaysRef.current.pin) {
-      overlaysRef.current.pin.setMap(null);
+      overlaysRef.current.pin.marker.setMap(null);
       overlaysRef.current.pin = null;
     }
 
@@ -314,7 +383,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     });
 
     if (!guideFollow) followTargetRef.current = null;
-  }, [active, members, self, room, draftPin, routes, mode, departed, guideFollow, pinEditable]);
+  }, [active, mapEpoch, members, self, room, draftPin, routes, mode, departed, guideFollow, pinEditable]);
 
   return <div ref={hostRef} className="h-full w-full bg-[#eef2f5]" />;
 });
