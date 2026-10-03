@@ -442,9 +442,12 @@ locationMapRoutes.post("/vmap/:id/invite", requireUserHeader, async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const rawIds = Array.isArray(body.userIds) ? body.userIds : [];
-  const targetIds = [
-    ...new Set(rawIds.map((id: unknown) => String(id || "").trim()).filter((id) => id && id !== userId))
-  ].slice(0, 30);
+  const cleanedIds: string[] = [];
+  for (const raw of rawIds) {
+    const id = String(raw ?? "").trim();
+    if (id && id !== userId) cleanedIds.push(id);
+  }
+  const targetIds = [...new Set(cleanedIds)].slice(0, 30);
   if (!targetIds.length) return c.json({ error: "초대할 친구를 선택해 주세요." }, 400);
 
   const friendRows = await prisma.friendRequest.findMany({
@@ -457,10 +460,10 @@ locationMapRoutes.post("/vmap/:id/invite", requireUserHeader, async (c) => {
     },
     select: { fromUserId: true, toUserId: true }
   });
-  const friendSet = new Set(
+  const friendSet = new Set<string>(
     friendRows.map((row) => (row.fromUserId === userId ? row.toUserId : row.fromUserId))
   );
-  const invitees = targetIds.filter((id) => friendSet.has(id));
+  const invitees: string[] = targetIds.filter((id) => friendSet.has(id));
   if (!invitees.length) return c.json({ error: "VLUE 친구만 초대할 수 있습니다." }, 400);
 
   const host = await prisma.user.findUnique({
