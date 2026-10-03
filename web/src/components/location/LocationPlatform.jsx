@@ -7,6 +7,7 @@ import {
   arriveVmap,
   exitVmapApi,
   fetchFamilyLocations,
+  fetchFamilyLocationMessages,
   fetchMapSponsor,
   fetchVmapGuide,
   fetchVmapMessages,
@@ -16,6 +17,7 @@ import {
   searchVmapPlaces,
   updateVmapPlace,
   pingVmap,
+  postFamilyLocationMessage,
   postVmapMessage,
   publishPresence,
   publishVmapPresence,
@@ -45,6 +47,7 @@ import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserI
 import { readLastGeo, writeLastGeo } from "../../lib/lastGeoCache.js";
 import VmapNaverSurface from "./VmapNaverSurface.jsx";
 import VmapFriendInviteSheet from "./VmapFriendInviteSheet.jsx";
+import VMapChatOverlay from "./VMapChatOverlay.jsx";
 
 const TILE = 256;
 const ACCENT = "#00D2FF";
@@ -182,13 +185,6 @@ function paintTile(ctx, cache, z, x, y, dx, dy, size) {
   const parent = rememberTile(cache, z - 1, Math.floor(wrapped / 2), Math.floor(y / 2));
   if (!parent || y < 0) return;
   ctx.drawImage(parent, (wrapped % 2) * 128, (y % 2) * 128, 128, 128, dx, dy, size, size);
-}
-
-function liveOpacity(createdAt, now) {
-  const age = now - new Date(createdAt).getTime();
-  if (age < 12000) return 1;
-  if (age > 20000) return 0;
-  return 1 - (age - 12000) / 8000;
 }
 
 function readBattery() {
@@ -330,10 +326,10 @@ export default function LocationPlatform() {
   const [draftPin, setDraftPin] = useState(null);
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeHits, setPlaceHits] = useState([]);
-  const [liveNow, setLiveNow] = useState(() => Date.now());
   const [farewell, setFarewell] = useState("");
   const [arriveState, setArriveState] = useState("idle");
   const [sending, setSending] = useState(false);
+  const [chatExpandToken, setChatExpandToken] = useState(0);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [searchOpen, setSearchOpen] = useState(true);
   const [playingVoiceId, setPlayingVoiceId] = useState("");
@@ -401,7 +397,12 @@ export default function LocationPlatform() {
       const mode = event?.detail?.mode || "family";
       const roomId = String(event?.detail?.roomId || "").trim();
       const shouldJoin = Boolean(event?.detail?.join && roomId);
-      openLocation(mode === "vmap" || roomId ? "vmap" : "family");
+      const expandChat = Boolean(event?.detail?.expandChat);
+      const nextMode = mode === "vmap" || roomId ? "vmap" : "family";
+      openLocation(nextMode);
+      if (expandChat) {
+        window.setTimeout(() => setChatExpandToken((n) => n + 1), 500);
+      }
       if (shouldJoin) {
         void (async () => {
           try {
@@ -419,6 +420,7 @@ export default function LocationPlatform() {
             setMembers(Array.isArray(data.members) ? data.members : []);
             setNotice("V-Map에 입장했습니다.");
             window.setTimeout(() => setNotice(""), 2400);
+            if (expandChat) setChatExpandToken((n) => n + 1);
           } catch (error) {
             patchLocationSession({ mode: "vmap", open: true, minimized: false });
             setJoinCode(roomId);
@@ -428,6 +430,8 @@ export default function LocationPlatform() {
         })();
       } else if (roomId) {
         patchLocationSession({ mode: "vmap", roomId, open: true, minimized: false });
+      } else if (nextMode === "family") {
+        patchLocationSession({ mode: "family", open: true, minimized: false });
       }
     };
     const onRestore = () => restoreLocation();
@@ -624,17 +628,28 @@ export default function LocationPlatform() {
   }, [room?.closingAt]);
 
   useEffect(() => {
-    if (!session.roomId || !session.open) return undefined;
+    afterRef.current = "";
+    setMessages([]);
+    seenVoice.current = new Set();
+  }, [session.mode, session.roomId]);
+
+  useEffect(() => {
+    if (!session.open) return undefined;
+    const canVmap = session.mode === "vmap" && Boolean(session.roomId);
+    const canFamily = session.mode === "family";
+    if (!canVmap && !canFamily) return undefined;
     const pull = async () => {
       try {
-        const data = await fetchVmapMessages(session.roomId, afterRef.current);
+        const data = canVmap
+          ? await fetchVmapMessages(session.roomId, afterRef.current)
+          : await fetchFamilyLocationMessages(afterRef.current);
         const rows = data.messages || [];
         if (!rows.length) return;
         afterRef.current = rows[rows.length - 1].createdAt;
         setMessages((prev) => {
           const known = new Set(prev.map((row) => row.id));
           const fresh = rows.filter((row) => !known.has(row.id));
-          return fresh.length ? [...prev, ...fresh].slice(-40) : prev;
+          return fresh.length ? [...prev, ...fresh].slice(-80) : prev;
         });
         rows.filter((row) => row.kind === "voice" && row.userId !== getLocalVlueUserId()).forEach((row) => {
           if (seenVoice.current.has(row.id)) return;
@@ -643,24 +658,18 @@ export default function LocationPlatform() {
           audio.play().catch(() => {});
         });
       } catch {
-        /* 방 입장 전 */
+        /* 방 입장 전 / 가족 미연결 */
       }
     };
     pull();
     const timer = window.setInterval(pull, 2500);
     return () => window.clearInterval(timer);
-  }, [session.roomId, session.open]);
+  }, [session.roomId, session.open, session.mode]);
 
   const departedKey = members
     .filter((member) => member.departed && member.lat != null)
     .map((member) => `${member.userId}:${Number(member.lat).toFixed(3)}:${Number(member.lng).toFixed(3)}`)
     .join("|");
-
-  useEffect(() => {
-    if (!session.roomId || session.mode !== "vmap") return undefined;
-    const timer = window.setInterval(() => setLiveNow(Date.now()), 400);
-    return () => window.clearInterval(timer);
-  }, [session.roomId, session.mode]);
 
   useEffect(() => {
     if (!room || pinDirtyRef.current) return;
@@ -1178,7 +1187,9 @@ export default function LocationPlatform() {
   const startVoice = async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!session.roomId || recording) return;
+    const canChat =
+      (session.mode === "vmap" && session.roomId) || session.mode === "family";
+    if (!canChat || recording) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       pushNotice("이 기기에서는 마이크를 쓸 수 없습니다. 보내기 버튼으로 메시지를 전송하세요.");
       return;
@@ -1208,13 +1219,20 @@ export default function LocationPlatform() {
       const url = URL.createObjectURL(blob);
       new Audio(url).play().catch(() => {});
       const dataUrl = await blobToDataUrl(blob);
-      const sent = await postVmapMessage(session.roomId, { kind: "voice", body: dataUrl }).catch((error) => {
-        pushNotice(error.message);
-        return null;
-      });
+      const payload = { kind: "voice", body: dataUrl, displayName: getProfileHeaderName() || "나" };
+      const sent =
+        session.mode === "family"
+          ? await postFamilyLocationMessage(payload).catch((error) => {
+              pushNotice(error.message);
+              return null;
+            })
+          : await postVmapMessage(session.roomId, payload).catch((error) => {
+              pushNotice(error.message);
+              return null;
+            });
       if (sent?.message) {
         seenVoice.current.add(sent.message.id);
-        pingVmap(session.roomId);
+        if (session.mode === "vmap") pingVmap(session.roomId);
       }
     };
     mediaRef.current = recorder;
@@ -1229,7 +1247,9 @@ export default function LocationPlatform() {
 
   const sendText = async () => {
     const text = draft.trim();
-    if (!text || !session.roomId || sendLock.current) return;
+    const canChat =
+      (session.mode === "vmap" && session.roomId) || session.mode === "family";
+    if (!text || !canChat || sendLock.current) return;
     sendLock.current = true;
     setSending(true);
     setDraft("");
@@ -1242,13 +1262,20 @@ export default function LocationPlatform() {
       createdAt: new Date().toISOString(),
       userId: getLocalVlueUserId()
     };
-    setMessages((prev) => [...prev, pending].slice(-40));
+    setMessages((prev) => [...prev, pending].slice(-80));
     try {
-      const sent = await postVmapMessage(session.roomId, { kind: "text", body: text });
+      const sent =
+        session.mode === "family"
+          ? await postFamilyLocationMessage({
+              kind: "text",
+              body: text,
+              displayName: getProfileHeaderName() || "나"
+            })
+          : await postVmapMessage(session.roomId, { kind: "text", body: text });
       if (sent?.message) {
         afterRef.current = sent.message.createdAt || afterRef.current;
         setMessages((prev) => prev.map((row) => (row.id === localId ? sent.message : row)));
-        pingVmap(session.roomId);
+        if (session.mode === "vmap") pingVmap(session.roomId);
       }
     } catch (error) {
       setMessages((prev) => prev.filter((row) => row.id !== localId));
@@ -1396,8 +1423,9 @@ export default function LocationPlatform() {
   const selfMember = members.find((member) => member.userId === getLocalVlueUserId());
   const selfArrived = Boolean(selfMember?.arrived);
   const cue = guideOn && session.mode === "vmap" && session.departed && !selfArrived ? nextGuideCue(routes[getLocalVlueUserId()]?.steps) : null;
-  const liveComments = messages.filter((row) => liveNow - new Date(row.createdAt).getTime() < 20000).slice(-5);
   const people = members.length ? members : self?.lat ? [{ ...self, userId: getLocalVlueUserId(), self: true, displayName: self.displayName || "나", grayscale: !locationOn }] : [];
+  const chatReady =
+    session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
 
   const dark = theme === "dark";
   const glass = dark
@@ -1581,32 +1609,15 @@ export default function LocationPlatform() {
             </button>
           )
         ) : null}
-        {liveComments.length ? (
-          <div className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex max-h-[7.5rem] flex-col justify-end gap-1 overflow-hidden">
-            {liveComments.map((row) => (
-              <div
-                key={row.id}
-                className="pointer-events-auto flex w-fit max-w-[88%] items-center gap-2 rounded-2xl border border-white/10 bg-[#0c1220]/55 px-2.5 py-1.5 text-[13px] font-medium text-white backdrop-blur-md"
-                style={{ opacity: liveOpacity(row.createdAt, liveNow) }}
-              >
-                <span className="font-semibold text-[#00D2FF]">{row.displayName}</span>
-                {row.kind === "voice" ? (
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-full bg-[#00D2FF]/20 px-2 py-0.5 text-[12px] font-semibold text-[#00D2FF]"
-                    onClick={() => playVoice(row)}
-                    aria-label="음성 다시 듣기"
-                  >
-                    {playingVoiceId === row.id ? "❚❚" : "▶"} 음성
-                  </button>
-                ) : row.kind === "system" ? (
-                  <span className="text-white/80">{row.body}</span>
-                ) : (
-                  <span>{row.body}</span>
-                )}
-              </div>
-            ))}
-          </div>
+        {chatReady ? (
+          <VMapChatOverlay
+            messages={messages}
+            dark={dark}
+            playingVoiceId={playingVoiceId}
+            onPlayVoice={playVoice}
+            expandToken={chatExpandToken}
+            bottomOffset={0}
+          />
         ) : null}
       </div>
 
@@ -1773,6 +1784,64 @@ export default function LocationPlatform() {
                 <SendIcon />
               </button>
               <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : dark ? "bg-white/10 text-white/80" : "bg-slate-200 text-slate-700"}`} aria-label="길게 눌러 음성 메시지">
+                {recording ? (
+                  <span className="flex h-5 items-end gap-[2px]" aria-hidden>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <span
+                        key={i}
+                        className="w-[2px] rounded-full bg-white"
+                        style={{
+                          height: "100%",
+                          animation: `vmap-voice-wave 0.9s ease-in-out ${i * 0.08}s infinite`,
+                          transformOrigin: "bottom"
+                        }}
+                      />
+                    ))}
+                  </span>
+                ) : (
+                  "🎤"
+                )}
+              </button>
+            </form>
+          </div>
+        ) : null}
+        {session.mode === "family" ? (
+          <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
+            <form
+              className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 ${dark ? "border-white/10 bg-white/10" : "border-black/10 bg-slate-100/80"}`}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void sendText();
+              }}
+            >
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    void sendText();
+                  }
+                }}
+                placeholder="가족에게 메시지"
+                className={`min-w-0 flex-1 bg-transparent py-2 text-[13px] font-medium outline-none ${dark ? "text-white placeholder:text-white/45" : "text-slate-900 placeholder:text-slate-400"}`}
+              />
+              <button
+                type="submit"
+                aria-label="보내기"
+                disabled={sending}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${draft.trim() ? "bg-[#00D2FF] text-[#04121a]" : dark ? "bg-white/10 text-white/35" : "bg-slate-200 text-slate-400"}`}
+              >
+                <SendIcon />
+              </button>
+              <button
+                type="button"
+                onPointerDown={startVoice}
+                onPointerUp={stopVoice}
+                onPointerCancel={stopVoice}
+                className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : dark ? "bg-white/10 text-white/80" : "bg-slate-200 text-slate-700"}`}
+                aria-label="길게 눌러 음성 메시지"
+              >
                 {recording ? (
                   <span className="flex h-5 items-end gap-[2px]" aria-hidden>
                     {[0, 1, 2, 3, 4].map((i) => (

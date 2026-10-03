@@ -223,6 +223,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 scanRemoteApps()
                 scanDangerousApps()
                 handleFamilyInviteIntent(intent)
+                handleLocationChatIntent(intent)
                 VlueAppUpdatePrompt.maybeShow(this@MainActivity)
             }
         }
@@ -403,6 +404,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             )
         }
         handleMemoShareIntent(intent)
+        handleLocationChatIntent(intent)
         handleVmapRestoreIntent(intent)
     }
 
@@ -413,6 +415,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             applyNotificationWakeFlags(intent)
             handleMemoShareIntent(intent)
             handleFamilyInviteIntent(intent)
+            handleLocationChatIntent(intent)
             handleVmapRestoreIntent(intent)
             VlueAppUpdatePrompt.applyIntentExtras(intent, this)
             VlueAppUpdatePrompt.maybeShow(this)
@@ -440,7 +443,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         val lastRev = prefs.getInt("web_content_rev", 0)
         val current = BuildConfig.VERSION_CODE
         /* 3 = Carto Positron 타일. 같은 versionCode 재설치에서도 옛 OSM HTML 을 버린다. */
-        val contentRev = 3
+        val contentRev = 4
         if (last == current && lastRev == contentRev) return
         webView.clearCache(true)
         prefs.edit()
@@ -485,6 +488,47 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 null
             )
         }
+    }
+
+    private fun handleLocationChatIntent(intent: Intent?) {
+        if (intent == null) return
+        var type = intent.getStringExtra("vlue_location_chat_type")?.trim().orEmpty()
+        var mode = intent.getStringExtra("vlue_location_chat_mode")?.trim().orEmpty()
+        var roomId = intent.getStringExtra("vlue_location_chat_room_id")?.trim().orEmpty()
+        /* FCM notification+data 클릭 시 OS가 data 키를 extras로 전달 */
+        if (type.isEmpty()) {
+            type = intent.getStringExtra("type")?.trim().orEmpty()
+        }
+        if (mode.isEmpty()) {
+            mode = intent.getStringExtra("mode")?.trim().orEmpty()
+        }
+        if (roomId.isEmpty()) {
+            roomId = intent.getStringExtra("roomId")?.trim().orEmpty()
+        }
+        val isVmap = type == "vlue-vmap-message" || mode == "vmap"
+        val isFamily = type == "vlue-family-location-message" || mode == "family"
+        if (!isVmap && !isFamily) return
+        if (!::webView.isInitialized) return
+        val safeMode = org.json.JSONObject.quote(if (isFamily) "family" else "vmap")
+        val safeRoom = org.json.JSONObject.quote(roomId)
+        val join = isVmap && roomId.isNotEmpty()
+        webView.postDelayed({
+            try {
+                webView.evaluateJavascript(
+                    """
+                    (function(){
+                      try{
+                        window.dispatchEvent(new CustomEvent('vlue-open-location',{
+                          detail:{ mode:$safeMode, roomId:$safeRoom, join:$join, expandChat:true }
+                        }));
+                      }catch(e){}
+                    })();
+                    """.trimIndent(),
+                    null
+                )
+            } catch (_: Exception) {
+            }
+        }, 450)
     }
 
     override fun onStart() {

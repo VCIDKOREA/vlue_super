@@ -417,17 +417,45 @@ function App() {
     try {
       const q = new URLSearchParams(window.location.search || "");
       const roomId = String(q.get("vmapJoin") || "").trim();
-      if (!roomId) return;
+      const locationMode = String(q.get("location") || "").trim().toLowerCase();
+      const vmapChat = String(q.get("vmapChat") || "").trim();
+      if (!roomId && !locationMode && !vmapChat) return;
       q.delete("vmapJoin");
+      q.delete("location");
+      q.delete("vmapChat");
       const next = `${window.location.pathname}${q.toString() ? `?${q}` : ""}${window.location.hash || ""}`;
       window.history.replaceState({}, "", next);
       setShowSplash(false);
       window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent("vlue-open-location", {
-            detail: { mode: "vmap", roomId, join: true }
-          })
-        );
+        if (locationMode === "family" || (!roomId && !vmapChat && locationMode === "family")) {
+          window.dispatchEvent(
+            new CustomEvent("vlue-open-location", {
+              detail: { mode: "family", expandChat: true }
+            })
+          );
+          return;
+        }
+        const targetRoom = roomId || vmapChat;
+        if (targetRoom) {
+          window.dispatchEvent(
+            new CustomEvent("vlue-open-location", {
+              detail: {
+                mode: "vmap",
+                roomId: targetRoom,
+                join: Boolean(roomId),
+                expandChat: true
+              }
+            })
+          );
+          return;
+        }
+        if (locationMode === "vmap") {
+          window.dispatchEvent(
+            new CustomEvent("vlue-open-location", {
+              detail: { mode: "vmap", expandChat: true }
+            })
+          );
+        }
       }, 400);
     } catch {
       /* ignore */
@@ -1231,6 +1259,26 @@ function App() {
         setBottomToast(body);
         setTimeout(() => setBottomToast(""), 4200);
       }
+      if (data.type === "vlue-vmap-message" || data.type === "vlue-family-location-message") {
+        const isFamily = data.type === "vlue-family-location-message" || data.mode === "family";
+        const roomId = String(data.roomId || "").trim();
+        const title = String(n.title || data.title || (isFamily ? "가족 위치 채팅" : "V-Map 채팅"));
+        const body = String(n.body || data.body || data.message || "새 메시지가 있습니다.");
+        addPushNotification({
+          category: isFamily ? "가족" : "V-Map",
+          title,
+          body,
+          kind: isFamily ? "family_location_message" : "vmap_message",
+          serverId: data.notificationId || n.notificationId,
+          pinKey: isFamily ? "family-loc-chat" : roomId ? `vmap-chat:${roomId}` : "",
+          linkId: roomId || undefined,
+          actorUserId: data.actorUserId || undefined,
+          actorName: data.actorName || undefined
+        });
+        deliverLocalPushNotification(title, body, String(data.notificationId || data.type || "location-chat"));
+        setBottomToast(body);
+        setTimeout(() => setBottomToast(""), 4200);
+      }
       if (
         data.type === "vlue-showcase-like" ||
         data.type === "vlue-showcase-comment" ||
@@ -1502,6 +1550,26 @@ function App() {
             actorName: data.actorName || undefined
           });
           deliverLocalPushNotification(title, body, String(data.notificationId || roomId || "vmap-invite"));
+        }
+        if (data?.type === "vlue-vmap-message" || data?.type === "vlue-family-location-message") {
+          const isFamily = data.type === "vlue-family-location-message" || data.mode === "family";
+          const roomId = String(data.roomId || "").trim();
+          const title = String(data.title || (isFamily ? "가족 위치 채팅" : "V-Map 채팅"));
+          const body = String(data.body || data.message || "새 메시지가 있습니다.");
+          setBottomToast(body);
+          setTimeout(() => setBottomToast(""), 4200);
+          addPushNotification({
+            category: isFamily ? "가족" : "V-Map",
+            title,
+            body,
+            kind: isFamily ? "family_location_message" : "vmap_message",
+            serverId: data.notificationId,
+            pinKey: isFamily ? "family-loc-chat" : roomId ? `vmap-chat:${roomId}` : "",
+            linkId: roomId || undefined,
+            actorUserId: data.actorUserId || undefined,
+            actorName: data.actorName || undefined
+          });
+          deliverLocalPushNotification(title, body, String(data.notificationId || data.type || "location-chat"));
         }
         if (
           data?.type === "vlue-showcase-like" ||

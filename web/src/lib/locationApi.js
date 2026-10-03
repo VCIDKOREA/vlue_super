@@ -88,6 +88,15 @@ export function fetchVmapMessages(roomId, after) {
   return vlueAuthFetch(apiUrl(`/api/location/vmap/${roomId}/messages${q}`), { headers: vlueAuthHeaders() }).then(read);
 }
 
+export function postFamilyLocationMessage(payload) {
+  return vlueAuthFetch(apiUrl("/api/location/family/messages"), authInit("POST", payload)).then(read);
+}
+
+export function fetchFamilyLocationMessages(after) {
+  const q = after ? `?after=${encodeURIComponent(after)}` : "";
+  return vlueAuthFetch(apiUrl(`/api/location/family/messages${q}`), { headers: vlueAuthHeaders() }).then(read);
+}
+
 export function fetchVmapGuide({ fromLat, fromLng, toLat, toLng, mode }) {
   const q = new URLSearchParams({
     fromLat: String(fromLat),

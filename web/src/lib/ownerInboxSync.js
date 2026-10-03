@@ -29,13 +29,23 @@ export async function syncOwnerInboxFromServer() {
         item.kind ||
         (payloadType === "vlue-vmap-invite"
           ? "vmap_invite"
-          : payloadType === "vlue-friend-request"
-            ? "friend_request"
-            : payloadType === "vlue-friend-accepted"
-              ? "friend_accepted"
-              : payloadType || null);
+          : payloadType === "vlue-vmap-message"
+            ? "vmap_message"
+            : payloadType === "vlue-family-location-message"
+              ? "family_location_message"
+              : payloadType === "vlue-friend-request"
+                ? "friend_request"
+                : payloadType === "vlue-friend-accepted"
+                  ? "friend_accepted"
+                  : payloadType || null);
       const entry = addPushNotification({
-        category: item.category || (mappedKind === "vmap_invite" ? "V-Map" : "앱"),
+        category:
+          item.category ||
+          (mappedKind === "vmap_invite" || mappedKind === "vmap_message"
+            ? "V-Map"
+            : mappedKind === "family_location_message"
+              ? "가족"
+              : "앱"),
         title: item.title || "",
         body: item.body || "",
         createdAt: item.createdAt,
@@ -43,7 +53,13 @@ export async function syncOwnerInboxFromServer() {
         read: Boolean(item.read) && !item.pinned,
         pinned: Boolean(item.pinned),
         pinKind: item.pinKind || null,
-        pinKey: item.pinKey || null,
+        pinKey:
+          item.pinKey ||
+          (mappedKind === "vmap_message" && payload.roomId
+            ? `vmap-chat:${payload.roomId}`
+            : mappedKind === "family_location_message"
+              ? "family-loc-chat"
+              : null),
         kind: mappedKind,
         linkId: item.linkId || payload.roomId || null,
         familyRelation: item.familyRelation || null,

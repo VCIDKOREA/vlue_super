@@ -86,10 +86,21 @@ export default function PushNotificationDetailModal({
   const vmapInvitePin = String(current.pinKey || "").startsWith("vmap-inv:")
     ? String(current.pinKey).slice("vmap-inv:".length)
     : "";
-  const vmapRoomId = String(current.linkId || vmapInvitePin).trim();
+  const vmapChatPin = String(current.pinKey || "").startsWith("vmap-chat:")
+    ? String(current.pinKey).slice("vmap-chat:".length)
+    : "";
+  const vmapRoomId = String(current.linkId || vmapInvitePin || vmapChatPin).trim();
   const isVmapInvite =
     (current.kind === "vmap_invite" || current.kind === "vlue-vmap-invite" || Boolean(vmapInvitePin)) &&
     Boolean(vmapRoomId);
+  const isVmapChat =
+    current.kind === "vmap_message" ||
+    current.kind === "vlue-vmap-message" ||
+    Boolean(vmapChatPin);
+  const isFamilyLocationChat =
+    current.kind === "family_location_message" ||
+    current.kind === "vlue-family-location-message" ||
+    String(current.pinKey || "") === "family-loc-chat";
   const likeNav = showcaseLikeNavFromNotification(current);
   const isLikeNotice = Boolean(likeNav);
 
@@ -347,13 +358,45 @@ export default function PushNotificationDetailModal({
               onClick={() => {
                 window.dispatchEvent(
                   new CustomEvent("vlue-open-location", {
-                    detail: { mode: "vmap", roomId: vmapRoomId, join: true }
+                    detail: { mode: "vmap", roomId: vmapRoomId, join: true, expandChat: true }
                   })
                 );
                 onClose?.();
               }}
             >
               V-Map 입장
+            </button>
+          ) : null}
+          {isVmapChat && vmapRoomId ? (
+            <button
+              type="button"
+              className="w-full rounded-xl bg-[#00D2FF] py-3 text-[14px] font-black text-[#04121a] active:scale-[0.99]"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("vlue-open-location", {
+                    detail: { mode: "vmap", roomId: vmapRoomId, join: true, expandChat: true }
+                  })
+                );
+                onClose?.();
+              }}
+            >
+              지도 · 채팅 열기
+            </button>
+          ) : null}
+          {isFamilyLocationChat ? (
+            <button
+              type="button"
+              className="w-full rounded-xl bg-[#00D2FF] py-3 text-[14px] font-black text-[#04121a] active:scale-[0.99]"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("vlue-open-location", {
+                    detail: { mode: "family", expandChat: true }
+                  })
+                );
+                onClose?.();
+              }}
+            >
+              가족 위치 · 채팅 열기
             </button>
           ) : null}
           {inviteResolved ? (

@@ -3621,3 +3621,17 @@ model VmapMessage {
   @@index([roomId, createdAt])
   @@map("vmap_messages")
 }
+
+/// 가족 위치방 채팅 — 30일 TTL (cron / POST 시 정제). 연속 보관.
+model LocationFamilyMessage {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  displayName String   @default("") @map("display_name") @db.VarChar(80)
+  kind        String   @default("text") @db.VarChar(16)
+  body        String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("location_family_messages")
+}

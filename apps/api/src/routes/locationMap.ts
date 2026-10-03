@@ -28,6 +28,85 @@ async function me(c: { get: (key: "vlueUserId") => string | undefined }) {
   return c.get("vlueUserId") || "";
 }
 
+/** 활성 가족보호 링크로 연결된 회원 원(본인 포함) */
+async function familyCircleUserIds(userId: string): Promise<string[]> {
+  const links = await prisma.familyProtectionLink.findMany({
+    where: {
+      status: "active",
+      OR: [{ guardianUserId: userId }, { wardUserId: userId }]
+    },
+    select: { guardianUserId: true, wardUserId: true }
+  });
+  const ids = new Set<string>([userId]);
+  for (const link of links) {
+    ids.add(link.guardianUserId);
+    ids.add(link.wardUserId);
+  }
+  return [...ids];
+}
+
+async function notifyLocationChat(opts: {
+  recipientIds: string[];
+  actorUserId: string;
+  actorName: string;
+  title: string;
+  body: string;
+  mode: "vmap" | "family";
+  roomId?: string;
+}) {
+  const preview = String(opts.body || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  const noticeBody = `${opts.actorName}: ${preview || "(메시지)"}`;
+  for (const ownerUserId of opts.recipientIds) {
+    if (!ownerUserId || ownerUserId === opts.actorUserId) continue;
+    let notificationId = "";
+    try {
+      const row = await prisma.ownerNotification.create({
+        data: {
+          ownerUserId,
+          actorUserId: opts.actorUserId,
+          title: opts.title,
+          body: noticeBody,
+          payloadJson: {
+            type: opts.mode === "vmap" ? "vlue-vmap-message" : "vlue-family-location-message",
+            mode: opts.mode,
+            roomId: opts.roomId || "",
+            actorUserId: opts.actorUserId,
+            actorName: opts.actorName
+          }
+        }
+      });
+      notificationId = row.id;
+    } catch (err) {
+      console.warn("[location] chat notification_failed", err);
+    }
+    const payload = {
+      type: opts.mode === "vmap" ? "vlue-vmap-message" : "vlue-family-location-message",
+      title: opts.title,
+      body: noticeBody,
+      message: noticeBody,
+      mode: opts.mode,
+      roomId: opts.roomId || "",
+      actorUserId: opts.actorUserId,
+      actorName: opts.actorName,
+      notificationId,
+      at: new Date().toISOString()
+    };
+    try {
+      ssePublish(ownerUserId, payload);
+    } catch (err) {
+      console.warn("[location] chat sse_failed", err);
+    }
+    void sendShowcaseSocialPushToUser(ownerUserId, opts.title, noticeBody, {
+      type: payload.type,
+      mode: opts.mode,
+      roomId: opts.roomId || "",
+      actorUserId: opts.actorUserId,
+      actorName: opts.actorName,
+      notificationId
+    }).catch((err) => console.warn("[location] chat fcm_failed", err));
+  }
+}
+
 /** 지도 마커용. data URL 은 응답이 커지므로 http 사진만 붙인다. */
 async function profilePhotos(userIds: string[]) {
   const ids = [...new Set(userIds.filter(Boolean))];
@@ -674,11 +753,19 @@ locationMapRoutes.post("/vmap/:id/messages", requireUserHeader, async (c) => {
       body: text
     }
   });
-  await prisma.vmapMessage.deleteMany({
-    where: {
-      roomId,
-      createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-    }
+  /* 방 유지 중에는 대화 유지. 방 종료(closeVmapRoom) 시 전체 삭제. */
+  const peers = await prisma.vmapMember.findMany({
+    where: { roomId, NOT: { userId } },
+    select: { userId: true }
+  });
+  void notifyLocationChat({
+    recipientIds: peers.map((p) => p.userId),
+    actorUserId: userId,
+    actorName: mine.displayName || "참여자",
+    title: "V-Map 채팅",
+    body: kind === "voice" ? "음성 메시지" : text,
+    mode: "vmap",
+    roomId
   });
   return c.json({ ok: true, message: { ...message, createdAt: message.createdAt.toISOString() } });
 });
@@ -698,6 +785,73 @@ locationMapRoutes.get("/vmap/:id/messages", requireUserHeader, async (c) => {
     ok: true,
     messages: rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
   });
+});
+
+/** 가족 위치방 채팅 — 30일 보관 */
+locationMapRoutes.get("/family/messages", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const circle = await familyCircleUserIds(userId);
+  const after = String(c.req.query("after") || "");
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const rows = await prisma.locationFamilyMessage.findMany({
+    where: {
+      userId: { in: circle },
+      createdAt: { gte: cutoff, ...(after ? { gt: new Date(after) } : {}) }
+    },
+    orderBy: { createdAt: "asc" },
+    take: 40
+  });
+  return c.json({
+    ok: true,
+    messages: rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
+  });
+});
+
+locationMapRoutes.post("/family/messages", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const circle = await familyCircleUserIds(userId);
+  if (circle.length < 2) return c.json({ error: "연결된 가족이 없습니다." }, 400);
+  const body = await c.req.json().catch(() => ({}));
+  const kind = body.kind === "voice" ? "voice" : "text";
+  const text = String(body.body || "");
+  if (!text.trim()) return c.json({ error: "내용이 없습니다." }, 400);
+  if (text.length > 180_000) return c.json({ error: "음성 메시지가 너무 깁니다." }, 413);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { legalName: true, publicHandle: true }
+  });
+  const displayName =
+    clip(body.displayName, 80) ||
+    String(user?.legalName || user?.publicHandle || "나").replace(/^@+/, "").trim() ||
+    "나";
+  const message = await prisma.locationFamilyMessage.create({
+    data: { userId, displayName, kind, body: text }
+  });
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  await prisma.locationFamilyMessage.deleteMany({
+    where: { userId: { in: circle }, createdAt: { lt: cutoff } }
+  });
+  void notifyLocationChat({
+    recipientIds: circle,
+    actorUserId: userId,
+    actorName: displayName,
+    title: "가족 위치 채팅",
+    body: kind === "voice" ? "음성 메시지" : text,
+    mode: "family"
+  });
+  return c.json({ ok: true, message: { ...message, createdAt: message.createdAt.toISOString() } });
+});
+
+/** 가족 채팅 30일 TTL 크론 */
+locationMapRoutes.post("/cron/purge-family-chat", async (c) => {
+  const secret = c.req.header("X-Family-Cron-Secret") || "";
+  const expected = process.env.FAMILY_CRON_SECRET || "";
+  if (!expected || secret !== expected) return c.json({ error: "unauthorized" }, 401);
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const result = await prisma.locationFamilyMessage.deleteMany({
+    where: { createdAt: { lt: cutoff } }
+  });
+  return c.json({ ok: true, deleted: result.count, cutoff: cutoff.toISOString() });
 });
 
 locationMapRoutes.post("/vmap/:id/exit", requireUserHeader, async (c) => {

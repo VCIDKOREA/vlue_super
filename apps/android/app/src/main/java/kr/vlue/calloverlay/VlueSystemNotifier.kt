@@ -56,7 +56,10 @@ object VlueSystemNotifier {
         body: String,
         tag: String? = null,
         forceUpdate: Boolean = false,
-        minVersionCode: Int = 0
+        minVersionCode: Int = 0,
+        locationMode: String? = null,
+        locationRoomId: String? = null,
+        locationType: String? = null
     ) {
         val app = context.applicationContext
         val tagSafe = tag.orEmpty()
@@ -64,7 +67,7 @@ object VlueSystemNotifier {
             tagSafe.contains("family", ignoreCase = true) ||
                 title.contains("가족") ||
                 body.contains("가족 보호")
-        if (isFamily) {
+        if (isFamily && locationType.isNullOrBlank()) {
             try {
                 kr.vlue.calloverlay.family.FamilyProtectionNotificationHelper.showAlert(
                     app,
@@ -93,6 +96,11 @@ object VlueSystemNotifier {
                     putExtra(VlueAppUpdatePrompt.EXTRA_UPDATE_TITLE, safeTitle)
                     putExtra(VlueAppUpdatePrompt.EXTRA_UPDATE_BODY, fullBody)
                     putExtra(VlueAppUpdatePrompt.EXTRA_MIN_VERSION_CODE, minVersionCode)
+                }
+                if (!locationType.isNullOrBlank()) {
+                    putExtra("vlue_location_chat_type", locationType)
+                    putExtra("vlue_location_chat_mode", locationMode.orEmpty())
+                    putExtra("vlue_location_chat_room_id", locationRoomId.orEmpty())
                 }
             }
         val builder =

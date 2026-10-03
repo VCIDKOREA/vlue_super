@@ -55,13 +55,18 @@ class VlueFirebaseMessagingService : FirebaseMessagingService() {
             data["minVersionCode"]?.toIntOrNull()
                 ?: data["min_version_code"]?.toIntOrNull()
                 ?: 0
+        val isLocationChat =
+            type == "vlue-vmap-message" || type == "vlue-family-location-message"
         VlueSystemNotifier.show(
             applicationContext,
             title,
             body,
             tag,
             forceUpdate = forceUpdate,
-            minVersionCode = minVc
+            minVersionCode = minVc,
+            locationMode = if (isLocationChat) data["mode"] else null,
+            locationRoomId = if (isLocationChat) data["roomId"] else null,
+            locationType = if (isLocationChat) type else null
         )
     }
 
