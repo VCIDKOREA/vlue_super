@@ -76,6 +76,10 @@ export function fetchFamilySafetyReport(targetUserId, roomId = "") {
   }).then(readJson);
 }
 
+export function fetchSafetyPatchBrief() {
+  return vlueAuthFetch(apiUrl("/api/safety-patch/brief"), { headers: vlueAuthHeaders() }).then(readJson);
+}
+
 /** 쿠팡 제휴 링크를 연 뒤 VLUÉ로 돌아온다. */
 export function openCoupangAffiliateSession(url = COUPANG_AFFILIATE_URL) {
   const native = typeof window !== "undefined" ? window.Android || window.VlueLettering : null;

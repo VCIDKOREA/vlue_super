@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import {
   buildFamilySafetyReport,
+  buildTodayPatchBrief,
   completeSafetyPatch,
   isUuid,
   notifySafetyPatchExpiry,
@@ -23,7 +24,15 @@ safetyPatchRoutes.post("/complete", async (c) => {
   const userId = String(c.get("vlueUserId") || "");
   if (!isUuid(userId)) return c.json({ ok: false, error: "로그인 세션이 없습니다." }, 401);
   const status = await completeSafetyPatch(userId);
-  return c.json(status);
+  const brief = await buildTodayPatchBrief(userId).catch(() => null);
+  return c.json({ ...status, brief });
+});
+
+safetyPatchRoutes.get("/brief", async (c) => {
+  const userId = String(c.get("vlueUserId") || "");
+  if (!isUuid(userId)) return c.json({ ok: false, error: "로그인 세션이 없습니다." }, 401);
+  const brief = await buildTodayPatchBrief(userId);
+  return c.json(brief);
 });
 
 /** 앱이 열려 있을 때 만료 임박 푸시를 한 번 더 확인한다. */

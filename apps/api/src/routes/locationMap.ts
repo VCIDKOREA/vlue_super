@@ -531,6 +531,51 @@ locationMapRoutes.post("/vmap/:id/join", requireUserHeader, async (c) => {
   return c.json({ ok: true, room });
 });
 
+/**
+ * V-Map 초대 가능 여부 — 나와 친구의 country_code가 같을 때만 is_eligible.
+ * 위치·국가 상세는 응답에 넣지 않는다.
+ */
+locationMapRoutes.post("/vmap/eligible-friends", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const body = (await c.req.json().catch(() => ({}))) as { userIds?: unknown };
+  const rawIds = Array.isArray(body.userIds) ? body.userIds : [];
+  const userIds: string[] = [
+    ...new Set(
+      rawIds
+        .map((id) => String(id || "").trim())
+        .filter((id): id is string => Boolean(id) && id !== userId && /^[0-9a-f-]{36}$/i.test(id))
+    )
+  ].slice(0, 120);
+
+  await ensureLocationPresenceOverseasSchema();
+  const mine = await prisma.locationPresence.findUnique({
+    where: { userId },
+    select: { countryCode: true }
+  });
+  const myCode = String(mine?.countryCode || "").trim().toUpperCase();
+  if (!userIds.length || !myCode) {
+    return c.json({
+      ok: true,
+      friends: userIds.map((id) => ({ userId: id, is_eligible: false }))
+    });
+  }
+
+  const peers = await prisma.locationPresence.findMany({
+    where: { userId: { in: userIds } },
+    select: { userId: true, countryCode: true }
+  });
+  const codeById = new Map(
+    peers.map((row) => [row.userId, String(row.countryCode || "").trim().toUpperCase()])
+  );
+  return c.json({
+    ok: true,
+    friends: userIds.map((id) => ({
+      userId: id,
+      is_eligible: Boolean(codeById.get(id)) && codeById.get(id) === myCode
+    }))
+  });
+});
+
 /** VLUE 수락 친구 목록 (V-Map 초대 피커) */
 locationMapRoutes.get("/friends", requireUserHeader, async (c) => {
   const userId = await me(c);

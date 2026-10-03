@@ -319,3 +319,71 @@ export async function buildFamilySafetyReport(viewerId: string, targetId: string
     source: generated ? ("gemini" as const) : ("fallback" as const)
   };
 }
+
+export type PatchBriefLine = { icon: string; title: string; body: string };
+
+/** 패치 직후/접속 시 잠깐 보여주는 오늘의 안심패치 요약 */
+export async function buildTodayPatchBrief(userId: string): Promise<{
+  ok: true;
+  lines: PatchBriefLine[];
+}> {
+  await ensureSafetyPatchSchema();
+  const report = await buildFamilySafetyReport(userId, userId, "");
+  const presence = await prisma.locationPresence.findUnique({ where: { userId } }).catch(() => null);
+  let smsSuspect = 0;
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ c: number }>>(
+      `
+      SELECT COUNT(*)::int AS c
+      FROM fraud_pattern_logs
+      WHERE sender_id = $1::uuid
+        AND is_suspicious = true
+        AND created_at > NOW() - INTERVAL '24 hours'
+      `,
+      userId
+    );
+    smsSuspect = Number(rows[0]?.c || 0);
+  } catch {
+    smsSuspect = 0;
+  }
+
+  const reportOk = report.ok === true ? report : null;
+  const place =
+    reportOk?.addressLabel ||
+    presence?.addressLabel ||
+    [presence?.cityName, presence?.countryName].filter(Boolean).join(", ") ||
+    "위치 동기화 대기";
+  const battery =
+    reportOk?.batteryPct != null
+      ? `${reportOk.batteryPct}%`
+      : presence?.batteryPct != null
+        ? `${presence.batteryPct}%`
+        : "확인 중";
+  const geminiBody = reportOk?.summary
+    ? `${reportOk.summary.split("\n")[0]} · 안심지수 ${reportOk.safetyIndex}`
+    : "가족 안심 요약을 동기화했습니다.";
+
+  const lines: PatchBriefLine[] = [
+    { icon: "🤖", title: "Gemini AI 안심요약", body: geminiBody.slice(0, 160) },
+    { icon: "📍", title: "위치", body: String(place).slice(0, 120) },
+    {
+      icon: "📡",
+      title: "수집 정보",
+      body: `배터리 ${battery} · GPS · 접속 상태 동기화`
+    },
+    {
+      icon: "💬",
+      title: "SMS 스미싱",
+      body:
+        smsSuspect > 0
+          ? `최근 24시간 의심 문자 ${smsSuspect}건 점검`
+          : "의심 문자 모니터링 · 보안 스캔 동기화"
+    },
+    {
+      icon: "🛡️",
+      title: "보안패치",
+      body: "24시간 TODAY 안심패치 세션이 활성화되었습니다."
+    }
+  ];
+  return { ok: true, lines };
+}

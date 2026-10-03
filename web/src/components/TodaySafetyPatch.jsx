@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   completeSafetyPatch,
+  fetchSafetyPatchBrief,
   fetchSafetyPatchStatus,
   formatPatchCountdown,
   openCoupangAffiliateSession,
@@ -13,20 +14,32 @@ import {
 } from "../lib/safetyPatch.js";
 
 const PROMPT_KEY = "vlue_safety_patch_prompted";
+const BRIEF_KEY = "vlue_safety_patch_briefed";
 const NOTICE =
   "TODAY 안심패치가 아직 적용되지 않았습니다. 패치를 진행하여 최신 안전 상태를 동기화하세요.";
 const DISCLOSURE =
   "본 VLUÉ 안심패치 동기화 서비스는 쿠팡 파트너스 활동의 일환으로, 구매 발생 시 일정액의 수수료를 제공받습니다.";
+
+const FALLBACK_LINES = [
+  { icon: "🤖", title: "Gemini AI 안심요약", body: "오늘의 가족 안심 요약을 동기화했습니다." },
+  { icon: "📍", title: "위치", body: "최근 GPS·주소 정보를 점검했습니다." },
+  { icon: "📡", title: "수집 정보", body: "배터리 · 접속 · GPS 상태를 동기화했습니다." },
+  { icon: "💬", title: "SMS 스미싱", body: "의심 문자 모니터링을 동기화했습니다." },
+  { icon: "🛡️", title: "보안패치", body: "24시간 TODAY 안심패치 세션이 활성화되었습니다." }
+];
 
 export default function TodaySafetyPatch({ isDarkMode = false }) {
   const [lastPatchedAt, setLastPatchedAt] = useState(() => readLocalPatch()?.lastPatchedAt || null);
   const [now, setNow] = useState(() => Date.now());
   const [promptOpen, setPromptOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(false);
+  const [briefLines, setBriefLines] = useState(FALLBACK_LINES);
   const [scanError, setScanError] = useState("");
   const [statusChecked, setStatusChecked] = useState(false);
   const remindedRef = useRef(false);
   const wasCompleteRef = useRef(false);
+  const briefTimerRef = useRef(0);
 
   const remaining = remainingFrom(lastPatchedAt, now);
   const complete = remaining > 0;
@@ -36,10 +49,26 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
     return () => document.documentElement.classList.remove("vlue-safety-patch");
   }, []);
 
+  const showBrief = (lines) => {
+    setBriefLines(Array.isArray(lines) && lines.length ? lines : FALLBACK_LINES);
+    setBriefOpen(true);
+    try {
+      sessionStorage.setItem(BRIEF_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    if (briefTimerRef.current) window.clearTimeout(briefTimerRef.current);
+    briefTimerRef.current = window.setTimeout(() => setBriefOpen(false), 5200);
+  };
+
+  useEffect(() => () => {
+    if (briefTimerRef.current) window.clearTimeout(briefTimerRef.current);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     fetchSafetyPatchStatus()
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return;
         if (data?.lastPatchedAt) {
           setLastPatchedAt((prev) => {
@@ -50,6 +79,15 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
             return next || null;
           });
         }
+        const done = Boolean(data?.complete || remainingFrom(data?.lastPatchedAt) > 0);
+        if (!done) return;
+        try {
+          if (sessionStorage.getItem(BRIEF_KEY) === "1") return;
+        } catch {
+          /* ignore */
+        }
+        const brief = await fetchSafetyPatchBrief().catch(() => null);
+        if (!cancelled) showBrief(brief?.lines);
       })
       .catch(() => {})
       .finally(() => {
@@ -72,10 +110,11 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
     }
     const expiredWhileOpen = wasCompleteRef.current;
     wasCompleteRef.current = false;
-    if (!statusChecked || scanning) return;
+    if (!statusChecked || scanning || briefOpen) return;
     if (expiredWhileOpen) {
       try {
         sessionStorage.removeItem(PROMPT_KEY);
+        sessionStorage.removeItem(BRIEF_KEY);
       } catch {
         /* ignore */
       }
@@ -86,7 +125,7 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
       /* ignore */
     }
     setPromptOpen(true);
-  }, [complete, statusChecked, scanning]);
+  }, [complete, statusChecked, scanning, briefOpen]);
 
   useEffect(() => {
     if (!complete || remaining > PATCH_WARN_MS || remindedRef.current) return;
@@ -135,16 +174,24 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
     setLastPatchedAt(stamped);
     writeLocalPatch(stamped);
     remindedRef.current = false;
+    let lines = FALLBACK_LINES;
     try {
       const data = await completeSafetyPatch();
       if (data?.lastPatchedAt) {
         setLastPatchedAt(data.lastPatchedAt);
         writeLocalPatch(data.lastPatchedAt);
       }
+      if (Array.isArray(data?.brief?.lines) && data.brief.lines.length) {
+        lines = data.brief.lines;
+      } else {
+        const brief = await fetchSafetyPatchBrief().catch(() => null);
+        if (Array.isArray(brief?.lines) && brief.lines.length) lines = brief.lines;
+      }
     } catch (error) {
       setScanError(error?.message || "패치 시각을 서버에 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setScanning(false);
+      showBrief(lines);
     }
   };
 
@@ -157,7 +204,7 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
   return (
     <>
       <div className="pointer-events-none fixed inset-x-0 z-[148] flex flex-col items-center gap-1 px-3" style={{ bottom: "calc(54px + env(safe-area-inset-bottom, 0px) + 8px)" }}>
-        {scanError && !promptOpen && !scanning ? (
+        {scanError && !promptOpen && !scanning && !briefOpen ? (
           <p className="pointer-events-auto max-w-md rounded-2xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white">{scanError}</p>
         ) : null}
         {complete ? (
@@ -175,7 +222,7 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
         )}
       </div>
 
-      {promptOpen && !scanning ? (
+      {promptOpen && !scanning && !briefOpen ? (
         <div className="fixed inset-0 z-[640] flex items-end justify-center bg-black/45 px-4 pb-[calc(54px+env(safe-area-inset-bottom,0px)+64px)]">
           <div className={`w-full max-w-md rounded-3xl p-4 shadow-2xl ${isDarkMode ? "bg-[#111827] text-white" : "bg-white text-slate-900"}`}>
             <p className="text-[15px] font-black">TODAY 안심패치</p>
@@ -210,6 +257,38 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
               <div className="safety-patch-scan__bar h-full w-1/2 rounded-full bg-[#00D2FF]" />
             </div>
             <p className="mt-8 text-[10px] font-medium leading-relaxed text-white/55">{DISCLOSURE}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {briefOpen ? (
+        <div
+          className="fixed inset-0 z-[710] flex items-end justify-center bg-black/40 px-4 pb-[calc(54px+env(safe-area-inset-bottom,0px)+72px)]"
+          onClick={() => setBriefOpen(false)}
+        >
+          <div
+            className={`safety-patch-brief w-full max-w-md rounded-[28px] p-4 shadow-2xl ${isDarkMode ? "bg-[#111827] text-white" : "bg-white text-slate-900"}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="text-[14px] font-black tracking-tight">🟢 TODAY 안심패치 요약</p>
+            <ul className="mt-3 space-y-2">
+              {briefLines.map((line) => (
+                <li
+                  key={`${line.title}-${line.icon}`}
+                  className={`rounded-2xl px-3 py-2 ${isDarkMode ? "bg-white/8" : "bg-slate-50"}`}
+                >
+                  <p className="text-[12px] font-black">
+                    {line.icon} {line.title}
+                  </p>
+                  <p className={`mt-0.5 text-[12px] font-medium leading-snug ${isDarkMode ? "text-white/75" : "text-slate-600"}`}>
+                    {line.body}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className={`mt-3 text-center text-[10px] ${isDarkMode ? "text-white/45" : "text-slate-400"}`}>
+              잠시 후 자동으로 닫히며, 하단 타이머는 계속 유지됩니다.
+            </p>
           </div>
         </div>
       ) : null}

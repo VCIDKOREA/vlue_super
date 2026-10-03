@@ -9,12 +9,12 @@ import {
 } from "../../lib/contactSyncStorage.js";
 import { mergeDeviceContactsCache } from "../../lib/contacts/deviceContactsCache.js";
 import { readLetteringPermissionStatus } from "../../lib/letteringSettings.js";
-import { inviteVmapFriends } from "../../lib/locationApi.js";
+import { fetchVmapEligibleFriends, inviteVmapFriends } from "../../lib/locationApi.js";
 import { shareVmapInviteViaKakao, shareVmapInviteViaSms } from "../../lib/vmapInviteShare.js";
 import ShareShowcaseChannelSheet from "../call/ShareShowcaseChannelSheet.jsx";
 
 /**
- * V-Map 친구 초대 — 전화부 동기화 + 카톡/문자 초대링크 (쇼케이스 전달과 동일 UX)
+ * V-Map 친구 초대 — 전화부 동기화 + 동일 지역(eligible)만 초대 버튼
  */
 export default function VmapFriendInviteSheet({
   open,
@@ -31,6 +31,7 @@ export default function VmapFriendInviteSheet({
   const [channelOpen, setChannelOpen] = useState(false);
   const [channelBusy, setChannelBusy] = useState(false);
   const [pending, setPending] = useState(null);
+  const [tipOpen, setTipOpen] = useState(false);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
@@ -46,7 +47,8 @@ export default function VmapFriendInviteSheet({
           phone: phoneE164,
           phoneE164,
           userId: "",
-          isFriend: false
+          isFriend: false,
+          isEligible: false
         };
       })
       .filter(Boolean)
@@ -54,7 +56,32 @@ export default function VmapFriendInviteSheet({
     setRows(list);
   };
 
-  const applyMatch = (result) => {
+  const applyEligibility = async (list) => {
+    const ids = [...new Set(list.map((row) => row.userId).filter(Boolean))];
+    if (!ids.length) {
+      setRows(list.map((row) => ({ ...row, isEligible: false })));
+      return;
+    }
+    try {
+      const data = await fetchVmapEligibleFriends(ids);
+      const map = new Map(
+        (Array.isArray(data?.friends) ? data.friends : []).map((item) => [
+          String(item.userId || ""),
+          Boolean(item.is_eligible ?? item.isEligible)
+        ])
+      );
+      setRows(
+        list.map((row) => ({
+          ...row,
+          isEligible: row.userId ? Boolean(map.get(row.userId)) : false
+        }))
+      );
+    } catch {
+      setRows(list.map((row) => ({ ...row, isEligible: false })));
+    }
+  };
+
+  const applyMatch = async (result) => {
     const registered = Array.isArray(result?.registered) ? result.registered : [];
     const unregistered = Array.isArray(result?.unregistered) ? result.unregistered : [];
     const list = [
@@ -65,7 +92,8 @@ export default function VmapFriendInviteSheet({
         phone: user.phoneDisplay || user.phoneE164 || "",
         phoneE164: user.phoneE164 || "",
         userId: user.userId || "",
-        isFriend: Boolean(user.isFriend)
+        isFriend: Boolean(user.isFriend),
+        isEligible: false
       })),
       ...unregistered.map((row) => ({
         key: `u:${row.phoneE164}`,
@@ -74,17 +102,18 @@ export default function VmapFriendInviteSheet({
         phone: row.phoneDisplay || row.phoneE164 || "",
         phoneE164: row.phoneE164 || "",
         userId: "",
-        isFriend: false
+        isFriend: false,
+        isEligible: false
       }))
     ].sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    setRows(list);
+    await applyEligibility(list);
   };
 
   const loadContacts = async () => {
     setLoading(true);
     try {
       const cached = readContactMatchCache?.() || null;
-      if (cached) applyMatch(cached);
+      if (cached) await applyMatch(cached);
 
       const contactsGranted = Boolean(readLetteringPermissionStatus()?.contacts);
       if (!contactsGranted && !hasContactSyncConsent()) {
@@ -108,14 +137,13 @@ export default function VmapFriendInviteSheet({
         const result = await matchContactsWithVlue(contacts);
         setContactSyncConsent(true);
         saveContactMatchCache(result);
-        applyMatch(result);
+        await applyMatch(result);
       } catch (matchErr) {
-        /* 매칭 API 실패해도 기기 연락처로는 카톡/문자 초대 가능 */
         applyDeviceOnly(contacts);
         onErrorRef.current?.(
           matchErr?.message
-            ? `회원 매칭 실패 · 기기 연락처로 초대합니다 (${matchErr.message})`
-            : "회원 매칭 실패 · 기기 연락처로 초대합니다"
+            ? `회원 매칭 실패 · 기기 연락처로 표시합니다 (${matchErr.message})`
+            : "회원 매칭 실패 · 기기 연락처로 표시합니다"
         );
       }
     } catch (error) {
@@ -130,10 +158,20 @@ export default function VmapFriendInviteSheet({
     setQuery("");
     setPending(null);
     setChannelOpen(false);
+    setTipOpen(false);
     void loadContacts();
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, roomId]);
+
+  useEffect(() => {
+    if (!tipOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") setTipOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tipOpen]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase().replace(/\s|-/g, "");
@@ -146,12 +184,13 @@ export default function VmapFriendInviteSheet({
   }, [rows, query]);
 
   const openInvite = (row) => {
+    if (!row?.isEligible) return;
     setPending(row);
     setChannelOpen(true);
   };
 
   const runChannel = async (channel) => {
-    if (!pending || !roomId || channelBusy) return;
+    if (!pending || !roomId || channelBusy || !pending.isEligible) return;
     setChannelBusy(true);
     try {
       const toast = (msg) => onErrorRef.current?.(msg);
@@ -202,7 +241,10 @@ export default function VmapFriendInviteSheet({
     <>
       <div
         className="fixed inset-0 z-[560] flex items-end justify-center bg-black/50 px-3 pb-[max(12px,env(safe-area-inset-bottom))]"
-        onClick={onClose}
+        onClick={() => {
+          setTipOpen(false);
+          onClose?.();
+        }}
       >
         <div
           className={`mb-2 flex max-h-[78vh] w-full max-w-md flex-col overflow-hidden rounded-[28px] border shadow-2xl ${panel}`}
@@ -210,17 +252,51 @@ export default function VmapFriendInviteSheet({
         >
           <div className="px-4 pb-2 pt-3">
             <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${dark ? "bg-white/20" : "bg-slate-200"}`} />
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-[16px] font-semibold tracking-tight">친구 초대</p>
-                <p className={`text-[12px] ${dark ? "text-white/55" : "text-slate-500"}`}>
-                  전화부 연락처에서 카톡·문자로 초대합니다
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="relative flex items-center gap-1.5">
+                  <p className="text-[16px] font-semibold tracking-tight">친구 초대</p>
+                  <button
+                    type="button"
+                    aria-label="초대 안내"
+                    aria-expanded={tipOpen}
+                    onClick={() => setTipOpen((prev) => !prev)}
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[13px] font-black ${
+                      dark ? "bg-white/10 text-white/80" : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    ⓘ
+                  </button>
+                  {tipOpen ? (
+                    <div
+                      className={`absolute left-0 top-[calc(100%+8px)] z-20 w-[min(100vw-3rem,280px)] rounded-2xl px-3 py-2.5 text-left shadow-xl ${
+                        dark
+                          ? "border border-white/15 bg-[#1a2438] text-white"
+                          : "border border-slate-200 bg-white text-slate-800"
+                      }`}
+                      role="tooltip"
+                    >
+                      <span
+                        className={`absolute -top-1.5 left-14 h-3 w-3 rotate-45 ${
+                          dark ? "border-l border-t border-white/15 bg-[#1a2438]" : "border-l border-t border-slate-200 bg-white"
+                        }`}
+                        aria-hidden
+                      />
+                      <p className="text-[12px] font-black">💡 안내</p>
+                      <p className={`mt-1 text-[12px] font-medium leading-snug ${dark ? "text-white/75" : "text-slate-600"}`}>
+                        현재 연결 가능한 동일 지역 내 지인에게만 초대 버튼이 노출됩니다.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                <p className={`mt-0.5 text-[12px] ${dark ? "text-white/55" : "text-slate-500"}`}>
+                  전화부 연락처에서 동일 지역 지인만 초대합니다
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-lg ${dark ? "bg-white/10" : "bg-slate-100"}`}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg ${dark ? "bg-white/10" : "bg-slate-100"}`}
                 aria-label="닫기"
               >
                 ×
@@ -244,7 +320,12 @@ export default function VmapFriendInviteSheet({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
+          <div
+            className="min-h-0 flex-1 overflow-y-auto px-3 pb-2"
+            onClick={() => {
+              if (tipOpen) setTipOpen(false);
+            }}
+          >
             {loading && rows.length === 0 ? (
               <p className={`px-2 py-8 text-center text-[13px] ${dark ? "text-white/50" : "text-slate-500"}`}>
                 전화부 불러오는 중…
@@ -270,13 +351,15 @@ export default function VmapFriendInviteSheet({
                             {row.kind === "registered" ? (row.isFriend ? " · VLUE 친구" : " · VLUE 회원") : ""}
                           </span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => openInvite(row)}
-                          className="shrink-0 rounded-full bg-[#00D2FF] px-3 py-1.5 text-[12px] font-semibold text-[#04121a]"
-                        >
-                          초대
-                        </button>
+                        {row.isEligible ? (
+                          <button
+                            type="button"
+                            onClick={() => openInvite(row)}
+                            className="shrink-0 rounded-full bg-[#00D2FF] px-3 py-1.5 text-[12px] font-semibold text-[#04121a]"
+                          >
+                            초대
+                          </button>
+                        ) : null}
                       </div>
                     </li>
                   );

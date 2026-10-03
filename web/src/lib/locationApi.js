@@ -113,6 +113,14 @@ export function fetchVmapFriends(roomId = "") {
   return vlueAuthFetch(apiUrl(`/api/location/friends${q}`), { headers: vlueAuthHeaders() }).then(read);
 }
 
+/** 동일 country_code 여부만 반환 (위치 상세 없음) */
+export function fetchVmapEligibleFriends(userIds) {
+  return vlueAuthFetch(
+    apiUrl("/api/location/vmap/eligible-friends"),
+    authInit("POST", { userIds: Array.isArray(userIds) ? userIds : [] })
+  ).then(read);
+}
+
 export function inviteVmapFriends(roomId, userIds) {
   return vlueAuthFetch(
     apiUrl(`/api/location/vmap/${roomId}/invite`),
