@@ -1913,11 +1913,11 @@ export default function LocationPlatform() {
       <VmapFriendInviteSheet
         open={inviteOpen && Boolean(session.roomId)}
         roomId={session.roomId}
+        placeLabel={room?.placeLabel || room?.title || ""}
         dark={dark}
         onClose={() => setInviteOpen(false)}
-        onInvited={(data) => {
-          const n = Number(data?.invited) || 0;
-          pushNotice(n > 0 ? `${n}명에게 초대를 보냈습니다.` : "초대를 보냈습니다.");
+        onInvited={() => {
+          pushNotice("초대를 보냈습니다.");
         }}
         onError={(message) => pushNotice(message)}
       />

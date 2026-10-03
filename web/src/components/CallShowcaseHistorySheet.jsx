@@ -858,6 +858,11 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       setExpanded(true);
       setLoading(false);
       setAuthPopup({ open: false, name: "", phone: "", handle: "" });
+      try {
+        setPlaybackPhase?.("idle", { fade: true, steal: true, owner: "call-history" });
+      } catch {
+        /* ignore */
+      }
       return undefined;
     }
     const next = {};

@@ -39,7 +39,9 @@ export default function MyCaseScreen({
   layout = "mobile",
   showSearch = false,
   showLineSwitcher = false,
-  showcasePickEnabled = false
+  showcasePickEnabled = false,
+  /** 하단 문자함·통화목록 등 오버레이가 떠 있으면 false — BGM 정지 */
+  surfaceActive = true
 }) {
   const isDesktop = layout === "desktop";
   const [detailOpen, setDetailOpen] = useState(false);
@@ -53,7 +55,7 @@ export default function MyCaseScreen({
   const [previewTick, setPreviewTick] = useState(0);
   const [composerEditTarget, setComposerEditTarget] = useState(null);
 
-  const caseBgmEnabled = !cardOpen;
+  const caseBgmEnabled = Boolean(surfaceActive) && !cardOpen;
 
   useEffect(() => {
     const bump = () => setPreviewTick((n) => n + 1);

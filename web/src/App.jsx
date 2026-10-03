@@ -412,6 +412,28 @@ function App() {
     }
   }, []);
 
+  /** V-Map 초대 딥링크 ?vmapJoin=roomId → 지도 입장 */
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search || "");
+      const roomId = String(q.get("vmapJoin") || "").trim();
+      if (!roomId) return;
+      q.delete("vmapJoin");
+      const next = `${window.location.pathname}${q.toString() ? `?${q}` : ""}${window.location.hash || ""}`;
+      window.history.replaceState({}, "", next);
+      setShowSplash(false);
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent("vlue-open-location", {
+            detail: { mode: "vmap", roomId, join: true }
+          })
+        );
+      }, 400);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   /** 비밀번호 변경 PASS redirect 복귀 — 설정 화면으로 */
   useEffect(() => {
     try {
@@ -4146,6 +4168,10 @@ function App() {
           setAppNotificationOpen(false);
           return true;
         }
+        if (smsInboxOpen) {
+          setSmsInboxOpen(false);
+          return true;
+        }
         if (callShowcaseSheetOpen) {
           setCallShowcaseSheetOpen(false);
           return true;
@@ -4201,6 +4227,7 @@ function App() {
   }, [
     page,
     appNotificationOpen,
+    smsInboxOpen,
     callShowcaseSheetOpen,
     showcaseStyleSheetOpen,
     cardWalletModalOpen,
@@ -4221,6 +4248,7 @@ function App() {
 
   const activeBottomTab = useMemo(() => {
     if (showcaseStyleSheetOpen) return "home";
+    if (smsInboxOpen) return "sms";
     if (callShowcaseSheetOpen) return "calls";
     if (appNotificationOpen) return "notifications";
     if (page === "main") return "";
@@ -4235,7 +4263,7 @@ function App() {
     if (page === "manage") return "chat";
     if (page === "list" || page === "room" || page === "feed") return "chat";
     return "";
-  }, [page, appNotificationOpen, callShowcaseSheetOpen, showcaseStyleSheetOpen]);
+  }, [page, appNotificationOpen, callShowcaseSheetOpen, showcaseStyleSheetOpen, smsInboxOpen]);
 
   const bottomNavPulseChat = totalUnread > 0 && activeBottomTab !== "chat";
   const bottomNavPulseFriendSearch = friendInboxRequests.length > 0 && activeBottomTab !== "home";
@@ -5491,6 +5519,7 @@ function App() {
           layout={isWideApp ? "desktop" : "mobile"}
           showcasePickEnabled
           showLineSwitcher
+          surfaceActive={!smsInboxOpen && !callShowcaseSheetOpen && !appNotificationOpen}
           onToast={(msg) => {
             setBottomToast(msg);
             setTimeout(() => setBottomToast(""), 2800);
@@ -5842,6 +5871,7 @@ function App() {
                 triggerHeaderEyeNavBlink();
                 setAppNotificationOpen(false);
                 setCallShowcaseSheetOpen(false);
+                setSmsInboxOpen(false);
                 setShowcaseStyleSheetOpen(false);
                 if (isBrowseGuest) {
                   requireAuth(() => navigate({ nextPage: "mycase", nextTab: activeTab, nextRoomId: null }));
@@ -5942,7 +5972,7 @@ function App() {
                 strokeWidth="2.3"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={smsInboxOpen ? "text-blue-500" : "text-gray-400"}
+                className={activeBottomTab === "sms" ? "text-blue-500" : "text-gray-400"}
               >
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>

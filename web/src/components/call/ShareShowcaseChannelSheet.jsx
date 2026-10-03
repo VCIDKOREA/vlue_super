@@ -2,9 +2,17 @@ import { createPortal } from "react-dom";
 import { MessageCircle, X } from "lucide-react";
 
 /**
- * 비회원 쇼케이스 전달 — 카톡 / SMS 선택
+ * 비회원 쇼케이스 전달 / V-Map 초대 — 카톡 / SMS 선택
  */
-export default function ShareShowcaseChannelSheet({ open, onClose, onPick, busy = false }) {
+export default function ShareShowcaseChannelSheet({
+  open,
+  onClose,
+  onPick,
+  busy = false,
+  title = "쇼케이스 전달하기",
+  subtitle = "전달 방법을 선택하세요",
+  smsHint = "통화 번호로 초대 문자를 보냅니다"
+}) {
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
@@ -12,7 +20,7 @@ export default function ShareShowcaseChannelSheet({ open, onClose, onPick, busy 
       className="share-showcase-channel-root"
       role="dialog"
       aria-modal="true"
-      aria-label="쇼케이스 전달하기"
+      aria-label={title}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) onClose?.();
       }}
@@ -20,8 +28,8 @@ export default function ShareShowcaseChannelSheet({ open, onClose, onPick, busy 
       <div className="share-showcase-channel-sheet">
         <header className="share-showcase-channel-sheet__head">
           <div>
-            <p className="share-showcase-channel-sheet__title">쇼케이스 전달하기</p>
-            <p className="share-showcase-channel-sheet__sub">전달 방법을 선택하세요</p>
+            <p className="share-showcase-channel-sheet__title">{title}</p>
+            <p className="share-showcase-channel-sheet__sub">{subtitle}</p>
           </div>
           <button
             type="button"
@@ -58,7 +66,7 @@ export default function ShareShowcaseChannelSheet({ open, onClose, onPick, busy 
           <MessageCircle size={22} strokeWidth={2.2} aria-hidden />
           <span className="share-showcase-channel-sheet__btn-text">
             <strong>SMS 문자 보내기</strong>
-            <em>통화 번호로 초대 문자를 보냅니다</em>
+            <em>{smsHint}</em>
           </span>
         </button>
 
