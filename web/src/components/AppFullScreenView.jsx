@@ -52,19 +52,23 @@ export default function AppFullScreenView({
       : "bg-white/95 text-slate-700 shadow-sm ring-1 ring-slate-200/80"
   }`;
 
-  let bottom = 0;
-  if (!coverBottomNav && reserveBottomNav) {
-    bottom =
-      bottomInsetPx != null && Number.isFinite(Number(bottomInsetPx))
+  /*
+   * reserveBottomNav: 패널 bottom을 띄우지 말고(친구목록이 틈으로 비침),
+   * 불투명 배경은 화면 하단까지 깔고 padding-bottom만 네비 높이만큼 확보한다.
+   * 하단 내비(z-160)가 시트(z-140) 위에 그대로 보인다.
+   */
+  const bottomPad =
+    !coverBottomNav && reserveBottomNav
+      ? bottomInsetPx != null && Number.isFinite(Number(bottomInsetPx))
         ? Number(bottomInsetPx)
-        : "var(--vlue-bottom-nav-offset, 0px)";
-  }
+        : "var(--vlue-bottom-nav-offset, 0px)"
+      : 0;
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 flex flex-col ${zClass} ${isDarkMode ? "dark-mode bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
-      style={{ bottom, margin: 0, padding: 0 }}
-      data-afv-bottom={typeof bottom === "number" ? String(bottom) : "css-var"}
+      className={`fixed inset-x-0 top-0 bottom-0 flex flex-col ${zClass} ${isDarkMode ? "dark-mode bg-[#111827] text-gray-100" : "bg-white text-slate-900"} ${className}`.trim()}
+      style={{ margin: 0, paddingBottom: bottomPad, paddingLeft: 0, paddingRight: 0, paddingTop: 0 }}
+      data-afv-bottom={bottomPad === 0 ? "0" : typeof bottomPad === "number" ? String(bottomPad) : "css-var"}
       data-theme={isDarkMode ? "dark" : "light"}
       role="dialog"
       aria-modal="true"
