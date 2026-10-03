@@ -44,7 +44,7 @@ class VlueRewardedAdViewModel : ViewModel() {
         val adUnitId =
             when (request.action) {
                 "showcase_slot_unlock" -> BuildConfig.ADMOB_REWARDED_30_ID
-                "showcase_save", "bgm_apply", "sms_analyze" -> BuildConfig.ADMOB_REWARDED_15_ID
+                "showcase_save", "bgm_apply", "sms_analyze", "vmap_create" -> BuildConfig.ADMOB_REWARDED_15_ID
                 else -> {
                     notifyWeb(resultJson(request, "error", "invalid_action"))
                     return

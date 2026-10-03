@@ -1,6 +1,63 @@
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 import { getSupabase, isSupabaseConfigured } from "./supabaseClient.js";
+import { getLocalVlueUserId } from "./showcase/resolveShowcaseOwnerUserId.js";
+
+function nativeBridge() {
+  if (typeof window === "undefined") return null;
+  return window.VlueLettering || window.Android || null;
+}
+
+function waitRewardedResult(requestId, timeoutMs = 120_000) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      window.removeEventListener("vlue-rewarded-ad-result", onResult);
+      reject(new Error("광고 응답 시간이 초과되었습니다."));
+    }, timeoutMs);
+    function onResult(event) {
+      const detail = event?.detail || {};
+      if (String(detail.requestId || "") !== requestId) return;
+      window.clearTimeout(timer);
+      window.removeEventListener("vlue-rewarded-ad-result", onResult);
+      resolve(detail);
+    }
+    window.addEventListener("vlue-rewarded-ad-result", onResult);
+  });
+}
+
+/** 무료 회원 V-Map 방 개설 — 15초 보상형 광고 시청 완료 후에만 진행 */
+export async function watchVmapCreateAd() {
+  const native = nativeBridge();
+  if (typeof native?.showRewardedAd !== "function") {
+    throw new Error("보상형 광고는 VLUÉ Android 앱에서 이용할 수 있습니다.");
+  }
+  const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}`;
+  const userId = getLocalVlueUserId() || "vmap-local";
+  const pending = waitRewardedResult(requestId);
+  let raw;
+  try {
+    raw = native.showRewardedAd(requestId, "vmap_create", userId, "vmap-create");
+  } catch (error) {
+    window.dispatchEvent(new CustomEvent("vlue-rewarded-ad-result", { detail: { requestId, status: "error" } }));
+    await pending.catch(() => {});
+    throw error;
+  }
+  let accepted = raw;
+  try {
+    accepted = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    accepted = { ok: false };
+  }
+  if (!accepted?.ok) {
+    window.dispatchEvent(new CustomEvent("vlue-rewarded-ad-result", { detail: { requestId, status: "error" } }));
+    await pending.catch(() => {});
+    throw new Error("보상형 광고를 시작하지 못했습니다.");
+  }
+  const detail = await pending;
+  if (detail.status !== "earned") {
+    throw new Error("광고 시청을 완료해야 방을 개설할 수 있습니다.");
+  }
+}
 
 async function read(res) {
   const data = await res.json().catch(() => ({}));

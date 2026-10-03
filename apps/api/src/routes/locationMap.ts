@@ -6,6 +6,7 @@ import { requireUserHeader } from "../middleware/cardGate.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { sendShowcaseSocialPushToUser } from "../services/fcmNotificationService.js";
 import { AUTO_ARRIVE_METERS, isVmapDropout, vmapRoomReadyToClose } from "../services/location/vmapArrival.js";
+import { resolveUserPolicy } from "../services/membership/userPolicyManager.js";
 
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
 
@@ -43,6 +44,23 @@ async function familyCircleUserIds(userId: string): Promise<string[]> {
     ids.add(link.wardUserId);
   }
   return [...ids];
+}
+
+/** 유료·가족플랜 피보호자 → 시안 블루 VLUE 인증 배지 */
+async function cyanBadgeByUserIds(userIds: string[]): Promise<Map<string, boolean>> {
+  const map = new Map<string, boolean>();
+  const ids = [...new Set(userIds.filter(Boolean))];
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const policy = await resolveUserPolicy(id);
+        map.set(id, Boolean(policy.cyanBadgeActive));
+      } catch {
+        map.set(id, false);
+      }
+    })
+  );
+  return map;
 }
 
 async function notifyLocationChat(opts: {
@@ -767,7 +785,15 @@ locationMapRoutes.post("/vmap/:id/messages", requireUserHeader, async (c) => {
     mode: "vmap",
     roomId
   });
-  return c.json({ ok: true, message: { ...message, createdAt: message.createdAt.toISOString() } });
+  const badges = await cyanBadgeByUserIds([userId]);
+  return c.json({
+    ok: true,
+    message: {
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+      cyanBadgeActive: badges.get(userId) === true
+    }
+  });
 });
 
 locationMapRoutes.get("/vmap/:id/messages", requireUserHeader, async (c) => {
@@ -781,9 +807,14 @@ locationMapRoutes.get("/vmap/:id/messages", requireUserHeader, async (c) => {
     orderBy: { createdAt: "asc" },
     take: 40
   });
+  const badges = await cyanBadgeByUserIds(rows.map((row) => row.userId));
   return c.json({
     ok: true,
-    messages: rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
+    messages: rows.map((row) => ({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      cyanBadgeActive: badges.get(row.userId) === true
+    }))
   });
 });
 
@@ -801,9 +832,14 @@ locationMapRoutes.get("/family/messages", requireUserHeader, async (c) => {
     orderBy: { createdAt: "asc" },
     take: 40
   });
+  const badges = await cyanBadgeByUserIds(rows.map((row) => row.userId));
   return c.json({
     ok: true,
-    messages: rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
+    messages: rows.map((row) => ({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      cyanBadgeActive: badges.get(row.userId) === true
+    }))
   });
 });
 
@@ -839,7 +875,15 @@ locationMapRoutes.post("/family/messages", requireUserHeader, async (c) => {
     body: kind === "voice" ? "음성 메시지" : text,
     mode: "family"
   });
-  return c.json({ ok: true, message: { ...message, createdAt: message.createdAt.toISOString() } });
+  const badges = await cyanBadgeByUserIds([userId]);
+  return c.json({
+    ok: true,
+    message: {
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+      cyanBadgeActive: badges.get(userId) === true
+    }
+  });
 });
 
 /** 가족 채팅 30일 TTL 크론 */

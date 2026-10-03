@@ -166,11 +166,23 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       onGestureRef.current?.();
       map.setZoom(Math.max(5, Math.min(21, map.getZoom() + delta)), true);
     },
+    /** 프로필/핀 포커스 — 짧고 부드럽게 (기본 panTo보다 끊김 적음) */
     panTo(lat, lng, zoom) {
       const map = mapRef.current;
       const naver = mapsApiRef.current;
       if (!map || !naver || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-      map.panTo(new naver.LatLng(lat, lng));
+      gestureAtRef.current = performance.now();
+      const coord = new naver.LatLng(lat, lng);
+      const nextZoom = Number.isFinite(zoom) ? zoom : map.getZoom();
+      try {
+        if (typeof map.morph === "function") {
+          map.morph(coord, nextZoom, { duration: 260, easing: "easeOutCubic" });
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      map.panTo(coord);
       if (Number.isFinite(zoom)) map.setZoom(zoom, true);
     },
     getCenter() {
@@ -262,33 +274,35 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           resizeObserver.observe(hostRef.current);
         }
 
+        /* 길안내 추적: 잦은 setCenter(뚝뚝) 대신 임계값+ morph 1회 */
         idleTimer = window.setInterval(() => {
           const target = followTargetRef.current;
           const liveMap = mapRef.current;
-          if (!guideFollowRef.current || !target || !liveMap || !mapsApiRef.current) return;
-          if (performance.now() - gestureAtRef.current < 1400) return;
+          const naver = mapsApiRef.current;
+          if (!guideFollowRef.current || !target || !liveMap || !naver) return;
+          if (performance.now() - gestureAtRef.current < 900) return;
           const cur = liveMap.getCenter();
           const dLat = target.lat - cur.lat();
           const dLng = target.lng - cur.lng();
-          if (Math.abs(dLat) < 0.00002 && Math.abs(dLng) < 0.00002) {
-            if (Number.isFinite(target.zoom)) {
-              const z = liveMap.getZoom();
-              if (Math.abs(target.zoom - z) > 0.08) {
-                liveMap.setZoom(z + (target.zoom - z) * 0.18);
-              }
+          const dist = Math.hypot(dLat, dLng);
+          if (dist < 0.00004) return;
+          const coord = new naver.LatLng(target.lat, target.lng);
+          const nextZoom = Number.isFinite(target.zoom) ? target.zoom : liveMap.getZoom();
+          try {
+            if (typeof liveMap.morph === "function") {
+              liveMap.morph(coord, nextZoom, { duration: 320, easing: "easeOutCubic" });
+              gestureAtRef.current = performance.now();
+              return;
             }
-            return;
+          } catch {
+            /* fall through */
           }
-          liveMap.setCenter(
-            new mapsApiRef.current.LatLng(cur.lat() + dLat * 0.28, cur.lng() + dLng * 0.28)
-          );
-          if (Number.isFinite(target.zoom)) {
-            const z = liveMap.getZoom();
-            if (Math.abs(target.zoom - z) > 0.08) {
-              liveMap.setZoom(z + (target.zoom - z) * 0.18);
-            }
+          liveMap.panTo(coord);
+          if (Number.isFinite(target.zoom) && Math.abs(liveMap.getZoom() - target.zoom) > 0.2) {
+            liveMap.setZoom(target.zoom, true);
           }
-        }, 400);
+          gestureAtRef.current = performance.now();
+        }, 700);
 
         setMapEpoch((n) => n + 1);
         onReadyRef.current?.();
@@ -327,8 +341,20 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
 
   useEffect(() => {
     if (!flyTo?.lat || !mapRef.current || !mapsApiRef.current) return;
+    const map = mapRef.current;
+    const naver = mapsApiRef.current;
     gestureAtRef.current = performance.now();
-    mapRef.current.panTo(new mapsApiRef.current.LatLng(flyTo.lat, flyTo.lng));
+    const coord = new naver.LatLng(flyTo.lat, flyTo.lng);
+    const zoom = Number.isFinite(flyTo.zoom) ? flyTo.zoom : map.getZoom();
+    try {
+      if (typeof map.morph === "function") {
+        map.morph(coord, zoom, { duration: 260, easing: "easeOutCubic" });
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    map.panTo(coord);
   }, [flyTo]);
 
   useEffect(() => {

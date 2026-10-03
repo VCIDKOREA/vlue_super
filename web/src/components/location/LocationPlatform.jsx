@@ -25,8 +25,12 @@ import {
   setMapKeepScreenOn,
   setNativeVmapMiniOverlay,
   updateNativeVmapMiniOverlay,
-  subscribeVmapPing
+  subscribeVmapPing,
+  watchVmapCreateAd
 } from "../../lib/locationApi.js";
+import { canUseV1PaidFeatures } from "../../lib/effectiveMembership.js";
+import { isPaidMembershipKind, isB2bMembershipKind, normalizeMembershipKind } from "../../lib/membershipBm.js";
+import { readMembershipTier } from "../../lib/bizcardAccountSync.js";
 import {
   dismissLocation,
   exitVmapRoom,
@@ -56,6 +60,21 @@ const AD_BANNER_PX = 56;
 const MANUAL_ARRIVE_METERS = 180;
 const MINI_KEY = "vlue_vmap_mini_pos_v1";
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
+const VMAP_CHAT_NEED_PEERS = "입장된 인원이 없습니다. 초대를 통해 회원간 소통이 가능합니다.";
+const FAMILY_PLAN_TOAST = "해당 기능을 사용하기 위해 가족보호플랜을 사용하세요.";
+
+function localHasCyanBadge() {
+  return canUseV1PaidFeatures();
+}
+
+function localCanUseFamilyLocation() {
+  return canUseV1PaidFeatures();
+}
+
+function localIsPaidForAds() {
+  const kind = normalizeMembershipKind(readMembershipTier());
+  return isPaidMembershipKind(kind) || isB2bMembershipKind(kind) || canUseV1PaidFeatures();
+}
 
 function readMiniPos() {
   try {
@@ -398,6 +417,7 @@ export default function LocationPlatform() {
       const roomId = String(event?.detail?.roomId || "").trim();
       const shouldJoin = Boolean(event?.detail?.join && roomId);
       const expandChat = Boolean(event?.detail?.expandChat);
+      const familyPaywall = Boolean(event?.detail?.familyPaywall);
       const nextMode = mode === "vmap" || roomId ? "vmap" : "family";
       openLocation(nextMode);
       if (expandChat) {
@@ -431,7 +451,14 @@ export default function LocationPlatform() {
       } else if (roomId) {
         patchLocationSession({ mode: "vmap", roomId, open: true, minimized: false });
       } else if (nextMode === "family") {
+        /* 탭(가족/V-Map)은 유지. 무료는 토스트만 — 가족 위치 데이터는 아래에서 게이트 */
         patchLocationSession({ mode: "family", open: true, minimized: false });
+        if (familyPaywall || !localCanUseFamilyLocation()) {
+          window.setTimeout(() => {
+            setNotice(FAMILY_PLAN_TOAST);
+            window.setTimeout(() => setNotice(""), 2800);
+          }, 120);
+        }
       }
     };
     const onRestore = () => restoreLocation();
@@ -449,10 +476,15 @@ export default function LocationPlatform() {
 
   const pushNotice = (text) => {
     setNotice(text);
-    window.setTimeout(() => setNotice(""), 2400);
+    const ms = String(text || "").length > 36 ? 3600 : 2400;
+    window.setTimeout(() => setNotice(""), ms);
   };
 
   const refreshFamily = useCallback(async () => {
+    if (!localCanUseFamilyLocation()) {
+      setMembers([]);
+      return;
+    }
     try {
       const data = await fetchFamilyLocations();
       setMembers(Array.isArray(data.members) ? data.members : []);
@@ -552,17 +584,14 @@ export default function LocationPlatform() {
           lng,
           zoom: userZoomedRef.current ? null : zoomForMeters(haversineMeters(lat, lng, liveRoom.placeLat, liveRoom.placeLng))
         };
-        if (!userZoomedRef.current) {
-          mapSurfaceRef.current?.panTo?.(lat, lng, followRef.current.zoom || 16);
-        }
+        /* 카메라 추적은 VmapNaverSurface follow만 사용 — GPS마다 panTo 하면 끊김 */
       } else {
         followRef.current = null;
-        if (viewRef.current.placed && mapReady) {
-          /* 첫 위치만 네이버 지도 중심으로 — 이후는 사용자/길안내가 담당 */
-        }
       }
       if (session.mode === "family") {
-        publishPresence(next).then(refreshFamily).catch(() => {});
+        if (localCanUseFamilyLocation()) {
+          publishPresence(next).then(refreshFamily).catch(() => {});
+        }
       } else if (session.roomId && session.departed) {
         publishVmapPresence(session.roomId, { lat, lng, online, displayName: name })
           .then((data) => {
@@ -848,9 +877,9 @@ export default function LocationPlatform() {
   useEffect(() => {
     const target = session.flyTo;
     if (!target?.lat) return undefined;
+    /* 실제 이동은 VmapNaverSurface flyTo effect 한 곳에서만 — 이중 panTo 끊김 방지 */
     userZoomedRef.current = true;
     markGesture();
-    mapSurfaceRef.current?.panTo?.(target.lat, target.lng);
     return undefined;
   }, [session.flyTo]);
 
@@ -1096,8 +1125,12 @@ export default function LocationPlatform() {
       return;
     }
     setRoomBusy("create");
-    pushNotice("방개설중...");
     try {
+      if (!localIsPaidForAds()) {
+        pushNotice("광고 시청 후 방을 개설합니다…");
+        await watchVmapCreateAd();
+      }
+      pushNotice("방개설중...");
       const data = await createVmapRoom({
         placeLat: self.lat,
         placeLng: self.lng,
@@ -1184,12 +1217,34 @@ export default function LocationPlatform() {
     });
   };
 
+  const vmapHasPeers = () => {
+    const mine = getLocalVlueUserId();
+    return membersRef.current.some((member) => member.userId && member.userId !== mine);
+  };
+
+  const assertCanSendChat = () => {
+    if (session.mode === "family") {
+      if (!localCanUseFamilyLocation()) {
+        pushNotice(FAMILY_PLAN_TOAST);
+        return false;
+      }
+      return true;
+    }
+    if (session.mode === "vmap") {
+      if (!session.roomId || !vmapHasPeers()) {
+        pushNotice(VMAP_CHAT_NEED_PEERS);
+        return false;
+      }
+      return true;
+    }
+    return false;
+  };
+
   const startVoice = async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const canChat =
-      (session.mode === "vmap" && session.roomId) || session.mode === "family";
-    if (!canChat || recording) return;
+    if (recording) return;
+    if (!assertCanSendChat()) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       pushNotice("이 기기에서는 마이크를 쓸 수 없습니다. 보내기 버튼으로 메시지를 전송하세요.");
       return;
@@ -1247,9 +1302,8 @@ export default function LocationPlatform() {
 
   const sendText = async () => {
     const text = draft.trim();
-    const canChat =
-      (session.mode === "vmap" && session.roomId) || session.mode === "family";
-    if (!text || !canChat || sendLock.current) return;
+    if (!text || sendLock.current) return;
+    if (!assertCanSendChat()) return;
     sendLock.current = true;
     setSending(true);
     setDraft("");
@@ -1260,7 +1314,8 @@ export default function LocationPlatform() {
       body: text,
       displayName: getProfileHeaderName() || "나",
       createdAt: new Date().toISOString(),
-      userId: getLocalVlueUserId()
+      userId: getLocalVlueUserId(),
+      cyanBadgeActive: localHasCyanBadge()
     };
     setMessages((prev) => [...prev, pending].slice(-80));
     try {
@@ -1497,7 +1552,22 @@ export default function LocationPlatform() {
         <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pt-[max(12px,env(safe-area-inset-top))]">
           <button type="button" onClick={dismissLocation} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="닫기">×</button>
           <div className={`flex min-w-0 flex-1 rounded-full p-1 backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-700"}`}>
-            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "family" ? tabOn : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); setMembers([]); patchLocationSession({ mode: "family" }); }}>가족</button>
+            <button
+              type="button"
+              className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "family" ? tabOn : ""}`}
+              onClick={() => {
+                setSelected(null);
+                setRoutes({});
+                setGuideOn(false);
+                setMembers([]);
+                patchLocationSession({ mode: "family" });
+                if (!localCanUseFamilyLocation()) {
+                  pushNotice(FAMILY_PLAN_TOAST);
+                }
+              }}
+            >
+              가족
+            </button>
             <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "vmap" ? tabOn : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>V-Map</button>
           </div>
           {session.mode === "vmap" && !session.roomId ? (
@@ -1616,7 +1686,7 @@ export default function LocationPlatform() {
             playingVoiceId={playingVoiceId}
             onPlayVoice={playVoice}
             expandToken={chatExpandToken}
-            bottomOffset={0}
+            bottomOffset={4}
           />
         ) : null}
       </div>
@@ -1653,92 +1723,94 @@ export default function LocationPlatform() {
             </div>
           </article>
         ) : null}
-        {session.mode === "vmap" && session.roomId ? (
+        {session.mode === "vmap" ? (
           <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
-            <div className="flex items-center gap-2">
-              {session.departed ? (
-                arrivedNow ? (
-                  <span className="rounded-full bg-[#00D2FF]/15 px-3 py-2 text-[12px] font-semibold text-[#00D2FF]">도착함</span>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      aria-pressed={guideOn}
-                      onClick={() => {
-                        if (guideOn) {
-                          setGuideOn(false);
-                          setRoutePickerOpen(false);
-                          return;
-                        }
-                        setRoutePickerOpen(true);
-                      }}
-                      className={guideOn ? accentBtn : quietBtn}
-                    >
-                      길안내
-                    </button>
-                    <button
-                      type="button"
-                      className={nearArrive ? accentBtn : quietBtn}
-                      disabled={arriveState === "pending"}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        void completeArrival();
-                      }}
-                    >
-                      {arriveState === "pending"
-                        ? "처리 중…"
-                        : nearArrive
-                          ? "도착 완료"
-                          : metersToPlace == null
+            {session.roomId ? (
+              <div className="flex items-center gap-2">
+                {session.departed ? (
+                  arrivedNow ? (
+                    <span className="rounded-full bg-[#00D2FF]/15 px-3 py-2 text-[12px] font-semibold text-[#00D2FF]">도착함</span>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        aria-pressed={guideOn}
+                        onClick={() => {
+                          if (guideOn) {
+                            setGuideOn(false);
+                            setRoutePickerOpen(false);
+                            return;
+                          }
+                          setRoutePickerOpen(true);
+                        }}
+                        className={guideOn ? accentBtn : quietBtn}
+                      >
+                        길안내
+                      </button>
+                      <button
+                        type="button"
+                        className={nearArrive ? accentBtn : quietBtn}
+                        disabled={arriveState === "pending"}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void completeArrival();
+                        }}
+                      >
+                        {arriveState === "pending"
+                          ? "처리 중…"
+                          : nearArrive
                             ? "도착 완료"
-                            : `도착까지 ${Math.round(metersToPlace)}m`}
-                    </button>
-                  </>
-                )
-              ) : (
+                            : metersToPlace == null
+                              ? "도착 완료"
+                              : `도착까지 ${Math.round(metersToPlace)}m`}
+                      </button>
+                    </>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className={accentBtn}
+                    onClick={() => {
+                      if (!room?.placeReady) {
+                        pushNotice("방장이 도착 핀을 꽂은 뒤에 출발할 수 있습니다.");
+                        return;
+                      }
+                      if (self?.lat == null) {
+                        pushNotice("현재 위치를 받은 뒤에 출발할 수 있습니다.");
+                        return;
+                      }
+                      departVmap(session.roomId, { lat: self.lat, lng: self.lng, online: true, displayName: self.displayName }).then(() => {
+                        userZoomedRef.current = false;
+                        patchLocationSession({ departed: true });
+                        viewRef.current = {
+                          ...viewRef.current,
+                          lat: self.lat,
+                          lng: self.lng,
+                          zoom: zoomForMeters(haversineMeters(self.lat, self.lng, room.placeLat, room.placeLng)),
+                          placed: true
+                        };
+                        setNativeVmapSession(true);
+                        refreshRoom(session.roomId);
+                      }).catch((error) => pushNotice(error.message));
+                    }}
+                  >
+                    출발
+                  </button>
+                )}
                 <button
                   type="button"
-                  className={accentBtn}
+                  className={quietBtn}
                   onClick={() => {
-                    if (!room?.placeReady) {
-                      pushNotice("방장이 도착 핀을 꽂은 뒤에 출발할 수 있습니다.");
-                      return;
-                    }
-                    if (self?.lat == null) {
-                      pushNotice("현재 위치를 받은 뒤에 출발할 수 있습니다.");
-                      return;
-                    }
-                    departVmap(session.roomId, { lat: self.lat, lng: self.lng, online: true, displayName: self.displayName }).then(() => {
-                      userZoomedRef.current = false;
-                      patchLocationSession({ departed: true });
-                      viewRef.current = {
-                        ...viewRef.current,
-                        lat: self.lat,
-                        lng: self.lng,
-                        zoom: zoomForMeters(haversineMeters(self.lat, self.lng, room.placeLat, room.placeLng)),
-                        placed: true
-                      };
-                      setNativeVmapSession(true);
-                      refreshRoom(session.roomId);
-                    }).catch((error) => pushNotice(error.message));
+                    hideLocationAds();
+                    setInviteOpen(true);
                   }}
                 >
-                  출발
+                  친구 초대
                 </button>
-              )}
-              <button
-                type="button"
-                className={quietBtn}
-                onClick={() => {
-                  hideLocationAds();
-                  setInviteOpen(true);
-                }}
-              >
-                친구 초대
-              </button>
-            </div>
-            {routePickerOpen ? (
+              </div>
+            ) : null}
+            {session.roomId && routePickerOpen ? (
               <div className={`rounded-2xl p-2 ${dark ? "bg-white/5" : "bg-slate-50"}`}>
                 <p className="mb-2 px-1 text-[11px] font-semibold opacity-70">경로 선택 · 카카오 길찾기</p>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -1978,7 +2050,11 @@ export default function LocationPlatform() {
           </div>
         </div>
       ) : null}
-      {notice ? <p className="pointer-events-none absolute left-1/2 top-[4.6rem] z-[80] max-w-[90%] -translate-x-1/2 rounded-full border border-[#00D2FF]/40 bg-[#04121a] px-4 py-2 text-center text-[12px] font-medium text-white shadow-lg">{notice}</p> : null}
+      {notice ? (
+        <p className="pointer-events-none absolute left-1/2 top-[4.6rem] z-[80] max-w-[92%] -translate-x-1/2 rounded-2xl border border-[#00D2FF]/40 bg-[#04121a] px-4 py-2.5 text-center text-[12px] font-medium leading-snug text-white shadow-lg">
+          {notice}
+        </p>
+      ) : null}
       <VmapFriendInviteSheet
         open={inviteOpen && Boolean(session.roomId)}
         roomId={session.roomId}

@@ -1524,9 +1524,23 @@ function ProfilePanel({
                   type="button"
                   className={`mb-2 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ${isDarkMode ? "bg-white/10" : "bg-slate-50"}`}
                   onClick={() => {
+                    const canFamily =
+                      familyProtectionEligible ||
+                      familyProtectionActive ||
+                      isB2bMembershipKind(membershipKind) ||
+                      isPaidMembershipKind(membershipKind);
                     setLocationMenuOpen(false);
-                    onClose?.();
-                    window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }));
+                    /* 지도·가족/V-Map 탭은 그대로 열고, 무료는 토스트(+결제 유도)만 */
+                    window.dispatchEvent(
+                      new CustomEvent("vlue-open-location", {
+                        detail: { mode: "family", familyPaywall: !canFamily }
+                      })
+                    );
+                    if (!canFamily) {
+                      setUpgradeOpen(true);
+                    } else {
+                      onClose?.();
+                    }
                   }}
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[16px] font-black text-white">가</span>
