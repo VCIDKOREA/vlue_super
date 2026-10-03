@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { fetchKakaoCarDirections } from "../integrations/kakao/kakaoMobilityDirections.js";
 import { searchKakaoLocalList } from "../integrations/kakao/kakaoLocalSearch.js";
+import { reverseGeocodeGoogle } from "../integrations/google/googleMapsGeocode.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { sendShowcaseSocialPushToUser } from "../services/fcmNotificationService.js";
 import { AUTO_ARRIVE_METERS, isVmapDropout, vmapRoomReadyToClose } from "../services/location/vmapArrival.js";
+import { ensureLocationPresenceOverseasSchema } from "../services/location/locationPresenceOverseasSchema.js";
 import { resolveUserPolicy } from "../services/membership/userPolicyManager.js";
 
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
@@ -295,13 +297,15 @@ locationMapRoutes.get("/guide", requireUserHeader, async (c) => {
   }
 });
 
-/** 웹/앱 지도 SDK용 — Client ID만 공개 (Secret 금지). */
+/** 웹/앱 지도 SDK용 — Client ID·Maps 키만 공개 (Secret 금지). */
 locationMapRoutes.get("/map-config", async (c) => {
   const clientId = String(process.env.NAVER_MAP_CLIENT_ID || "").trim();
+  const googleMapsApiKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
   return c.json({
     ok: true,
     provider: clientId ? "naver" : "none",
-    clientId: clientId || null
+    clientId: clientId || null,
+    googleMapsApiKey: googleMapsApiKey || null
   });
 });
 
@@ -334,6 +338,17 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
   const lat = num(body.lat, NaN);
   const lng = num(body.lng, NaN);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return c.json({ error: "좌표가 없습니다." }, 400);
+  await ensureLocationPresenceOverseasSchema();
+  const geo = await reverseGeocodeGoogle(lat, lng);
+  const addressLabel = clip(geo?.addressLabel || body.addressLabel, 240);
+  const batteryPct = body.batteryPct == null ? null : Math.max(0, Math.min(100, Math.round(num(body.batteryPct))));
+  const overseas = {
+    isOverseas: Boolean(geo?.isOverseas),
+    countryCode: clip(geo?.countryCode, 8),
+    countryName: clip(geo?.countryName, 80),
+    cityName: clip(geo?.cityName, 80),
+    timeZoneId: clip(geo?.timeZoneId, 64)
+  };
   const row = await prisma.locationPresence.upsert({
     where: { userId },
     create: {
@@ -341,20 +356,30 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
       displayName: clip(body.displayName, 80),
       lat,
       lng,
-      addressLabel: clip(body.addressLabel, 240),
-      batteryPct: body.batteryPct == null ? null : Math.max(0, Math.min(100, Math.round(num(body.batteryPct)))),
-      online: body.online !== false
+      addressLabel,
+      batteryPct,
+      online: body.online !== false,
+      ...overseas
     },
     update: {
       displayName: clip(body.displayName, 80),
       lat,
       lng,
-      addressLabel: clip(body.addressLabel, 240),
-      batteryPct: body.batteryPct == null ? null : Math.max(0, Math.min(100, Math.round(num(body.batteryPct)))),
-      online: body.online !== false
+      addressLabel,
+      batteryPct,
+      online: body.online !== false,
+      ...overseas
     }
   });
-  return c.json({ ok: true, presence: row });
+  return c.json({
+    ok: true,
+    presence: {
+      ...row,
+      is_overseas: row.isOverseas,
+      country_name: row.countryName,
+      city_name: row.cityName
+    }
+  });
 });
 
 locationMapRoutes.get("/family", requireUserHeader, async (c) => {
@@ -381,13 +406,32 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
     }
   }
   const photos = await profilePhotos([...ids]);
+  await ensureLocationPresenceOverseasSchema();
   const rows = await prisma.locationPresence.findMany({ where: { userId: { in: [...ids] } } });
   const byId = new Map(rows.map((row) => [row.userId, row]));
-  const members = [...ids].map((id) => {
-    const row = byId.get(id);
+  const members = [];
+  for (const id of ids) {
+    let row = byId.get(id) || null;
+    if (row && row.lat != null && row.lng != null && !row.countryCode) {
+      const geo = await reverseGeocodeGoogle(row.lat, row.lng);
+      if (geo) {
+        row = await prisma.locationPresence.update({
+          where: { userId: id },
+          data: {
+            addressLabel: geo.addressLabel || row.addressLabel,
+            isOverseas: geo.isOverseas,
+            countryCode: geo.countryCode,
+            countryName: geo.countryName,
+            cityName: geo.cityName,
+            timeZoneId: geo.timeZoneId
+          }
+        });
+        byId.set(id, row);
+      }
+    }
     const stale = !row || Date.now() - row.updatedAt.getTime() > 3 * 60 * 1000;
     const dead = !row || row.online === false || row.batteryPct === 0 || stale;
-    return {
+    members.push({
       userId: id,
       self: id === userId,
       displayName: row?.displayName || names.get(id) || (id === userId ? "나" : "가족"),
@@ -398,9 +442,17 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
       online: Boolean(row) && !dead,
       grayscale: dead,
       photoUrl: photos.get(id) || "",
-      updatedAt: row?.updatedAt?.toISOString() || null
-    };
-  });
+      updatedAt: row?.updatedAt?.toISOString() || null,
+      isOverseas: Boolean(row?.isOverseas),
+      is_overseas: Boolean(row?.isOverseas),
+      countryCode: row?.countryCode || "",
+      countryName: row?.countryName || "",
+      country_name: row?.countryName || "",
+      cityName: row?.cityName || "",
+      city_name: row?.cityName || "",
+      timeZoneId: row?.timeZoneId || ""
+    });
+  }
   return c.json({ ok: true, members });
 });
 

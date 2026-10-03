@@ -67,6 +67,7 @@ PowerShell:
 | `CORS_ORIGIN` | 웹 URL (예: `https://vlueweb-production.up.railway.app`) — 코드에 기본 포함되나 명시 권장 |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` / `PUBLIC_DATA_SERVICE_KEY` | `GET /api/v1/search/verify` 기관 검색 |
 | `NAVER_MAP_CLIENT_ID` / `NAVER_MAP_CLIENT_SECRET` | V-Map 네이버 Dynamic Map (`/api/location/map-config`는 Client ID만 공개) |
+| `GOOGLE_MAPS_API_KEY` | 가족위치 해외 판별·Google Maps JS (`/api/location/map-config`로 웹에 Maps 키 공개, HTTP 리퍼러 제한 권장) |
 | `DIRECT_URL` | Prisma direct URL (Supabase/Neon 사용 시) |
 
 ## 이메일 인증번호 (Resend + SES 폴백)

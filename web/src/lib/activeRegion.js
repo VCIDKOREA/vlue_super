@@ -75,10 +75,19 @@ export async function reverseGeocodeLatLng(lat, lng) {
     String(data.name || "").trim() ||
     `위도 ${Number(lat).toFixed(3)}, 경도 ${Number(lng).toFixed(3)}`;
   const detailedAddress = formatDetailedKoreanAddress(data.address, data.display_name) || label;
+  const countryCode = String(data.address?.country_code || "").trim().toUpperCase();
+  const countryName = String(data.address?.country || "").trim();
+  const cityName = String(
+    data.address?.city || data.address?.town || data.address?.state || data.address?.county || ""
+  ).trim();
   return {
     label,
     detailedAddress,
     displayName: detailedAddress || data.display_name || label,
+    countryCode,
+    countryName,
+    cityName,
+    isOverseas: Boolean(countryCode) && countryCode !== "KR",
     lat,
     lng,
     at: Date.now()

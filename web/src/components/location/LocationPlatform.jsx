@@ -51,7 +51,9 @@ import { bindMapTapFeedback, mapTapFeedback } from "../../lib/mapTapFeedback.js"
 import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readLastGeo, writeLastGeo } from "../../lib/lastGeoCache.js";
+import { isOverseasMember } from "../../lib/overseasLocation.js";
 import VmapNaverSurface from "./VmapNaverSurface.jsx";
+import VmapGoogleSurface from "./VmapGoogleSurface.jsx";
 import VmapFriendInviteSheet from "./VmapFriendInviteSheet.jsx";
 import VMapChatOverlay from "./VMapChatOverlay.jsx";
 
@@ -557,11 +559,26 @@ export default function LocationPlatform() {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       writeLastGeo(lat, lng);
       /* 주소/배터리 조회가 느려도 프로필 마커는 즉시 올리기 */
-      const next = { lat, lng, addressLabel: "", batteryPct: null, online, displayName: name };
+      const next = {
+        lat,
+        lng,
+        addressLabel: "",
+        batteryPct: null,
+        online,
+        displayName: name,
+        isOverseas: false,
+        countryCode: "",
+        countryName: "",
+        cityName: ""
+      };
       setSelf(next);
       try {
         const region = await reverseGeocodeLatLng(lat, lng);
         next.addressLabel = region.detailedAddress || region.displayName || region.label || "";
+        next.isOverseas = Boolean(region.isOverseas);
+        next.countryCode = region.countryCode || "";
+        next.countryName = region.countryName || "";
+        next.cityName = region.cityName || "";
       } catch {
         next.addressLabel = "";
       }
@@ -1644,8 +1661,21 @@ export default function LocationPlatform() {
       ? haversineMeters(self.lat, self.lng, familyNavTarget.lat, familyNavTarget.lng)
       : null;
   const people = members.length ? members : self?.lat ? [{ ...self, userId: getLocalVlueUserId(), self: true, displayName: self.displayName || "나", grayscale: !locationOn }] : [];
+  const overseasMembers = session.mode === "family" ? people.filter((member) => isOverseasMember(member)) : [];
+  const domesticMembers =
+    session.mode === "family" ? people.filter((member) => !isOverseasMember(member)) : members;
+  const useGoogleMap = session.mode === "family" && isOverseasMember(selected);
   const chatReady =
     session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
+
+  const focusMember = (member) => {
+    setSelected(member || null);
+    if (member?.lat != null && member?.lng != null) {
+      userZoomedRef.current = true;
+      markGesture();
+      patchLocationSession({ flyTo: { lat: member.lat, lng: member.lng, at: Date.now() } });
+    }
+  };
 
   const dark = theme === "dark";
   const glass = dark
@@ -1670,55 +1700,104 @@ export default function LocationPlatform() {
       onPointerDownCapture={bindMapTapFeedback}
     >
       <div className="relative min-h-0 flex-1">
-        <VmapNaverSurface
-          ref={mapSurfaceRef}
-          active={session.open}
-          members={members}
-          self={self}
-          room={room}
-          draftPin={draftPin}
-          destPin={
-            familyNavTarget
-              ? { lat: familyNavTarget.lat, lng: familyNavTarget.lng, label: familyNavTarget.name }
-              : null
-          }
-          routes={routes}
-          mode={session.mode}
-          departed={session.departed}
-          guideFollow={
-            (guideOn && session.mode === "vmap" && session.departed && !selfArrived) || familyGuiding
-          }
-          flyTo={session.flyTo}
-          pinEditable={Boolean(room?.hostUserId === getLocalVlueUserId())}
-          onSelectMember={(member) => {
-            setSelected(member || null);
-            if (member?.lat != null) {
+        {useGoogleMap ? (
+          <VmapGoogleSurface
+            ref={mapSurfaceRef}
+            active={session.open}
+            members={overseasMembers}
+            self={isOverseasMember(self) ? self : null}
+            flyTo={session.flyTo}
+            onSelectMember={focusMember}
+            onReady={() => {
+              setMapReady(true);
+              setMapError("");
+            }}
+            onError={(error) => {
+              setMapReady(false);
+              setMapError(error?.message || "Google 지도를 불러오지 못했습니다.");
+              pushNotice(error?.message || "Google 지도를 불러오지 못했습니다.");
+            }}
+          />
+        ) : (
+          <VmapNaverSurface
+            ref={mapSurfaceRef}
+            active={session.open}
+            members={session.mode === "family" ? domesticMembers : members}
+            self={session.mode === "family" && isOverseasMember(self) ? null : self}
+            room={room}
+            draftPin={draftPin}
+            destPin={
+              familyNavTarget
+                ? { lat: familyNavTarget.lat, lng: familyNavTarget.lng, label: familyNavTarget.name }
+                : null
+            }
+            routes={routes}
+            mode={session.mode}
+            departed={session.departed}
+            guideFollow={
+              (guideOn && session.mode === "vmap" && session.departed && !selfArrived) || familyGuiding
+            }
+            flyTo={session.flyTo}
+            pinEditable={Boolean(room?.hostUserId === getLocalVlueUserId())}
+            onSelectMember={focusMember}
+            onDraftPinChange={(next) => {
+              pinDirtyRef.current = true;
+              setDraftPin((prev) => ({ ...(prev || {}), ...next, ready: false }));
+            }}
+            onUserGesture={() => {
               userZoomedRef.current = true;
               markGesture();
-              patchLocationSession({ flyTo: { lat: member.lat, lng: member.lng, at: Date.now() } });
-            }
-          }}
-          onDraftPinChange={(next) => {
-            pinDirtyRef.current = true;
-            setDraftPin((prev) => ({ ...(prev || {}), ...next, ready: false }));
-          }}
-          onUserGesture={() => {
-            userZoomedRef.current = true;
-            markGesture();
-          }}
-          onReady={() => {
-            setMapReady(true);
-            setMapError("");
-          }}
-          onError={(error) => {
-            setMapReady(false);
-            setMapError(error?.message || "네이버 지도를 불러오지 못했습니다.");
-            pushNotice(error?.message || "네이버 지도를 불러오지 못했습니다.");
-          }}
-        />
+            }}
+            onReady={() => {
+              setMapReady(true);
+              setMapError("");
+            }}
+            onError={(error) => {
+              setMapReady(false);
+              setMapError(error?.message || "네이버 지도를 불러오지 못했습니다.");
+              pushNotice(error?.message || "네이버 지도를 불러오지 못했습니다.");
+            }}
+          />
+        )}
         {mapError ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#eef2f5] px-6 text-center">
             <p className="text-[14px] font-semibold text-slate-700">{mapError}</p>
+          </div>
+        ) : null}
+        {session.mode === "family" && overseasMembers.length ? (
+          <div className="pointer-events-none absolute inset-x-0 top-[calc(64px+env(safe-area-inset-top))] z-30 flex justify-end px-3">
+            <div className={`pointer-events-auto max-w-[min(100%,280px)] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${dark ? "border border-violet-300/30 bg-[#1a1030]/88 text-white" : "border border-violet-200 bg-white/92 text-slate-900"}`}>
+              <p className="text-[12px] font-black tracking-tight">✈️ 해외 구성원 ({overseasMembers.length}명)</p>
+              <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
+                {overseasMembers.map((member) => (
+                  <li key={member.userId}>
+                    <button
+                      type="button"
+                      className={`block w-full rounded-xl px-2 py-1.5 text-left text-[11px] font-semibold ${
+                        selected?.userId === member.userId
+                          ? "bg-violet-500 text-white"
+                          : dark
+                            ? "bg-white/10"
+                            : "bg-violet-50 text-violet-900"
+                      }`}
+                      onClick={() => focusMember(member)}
+                    >
+                      <span className="block truncate">{member.displayName}</span>
+                      <span className="block truncate opacity-80">
+                        {[member.cityName || member.city_name, member.countryName || member.country_name]
+                          .filter(Boolean)
+                          .join(", ") || "해외"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {useGoogleMap ? (
+                <p className="mt-1.5 text-[10px] font-medium opacity-70">Google Maps · 해외 모드</p>
+              ) : (
+                <p className="mt-1.5 text-[10px] font-medium opacity-70">프로필을 누르면 Google Maps로 전환</p>
+              )}
+            </div>
           </div>
         ) : null}
         <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pt-[max(12px,env(safe-area-inset-top))]">
@@ -2256,12 +2335,16 @@ export default function LocationPlatform() {
                     type="button"
                     className="flex w-full items-center justify-between rounded-2xl px-2 py-2 text-left"
                     onClick={() => {
-                      if (member.lat != null) patchLocationSession({ flyTo: { lat: member.lat, lng: member.lng, at: Date.now() } });
-                      setSelected(member);
+                      focusMember(member);
                       setMembersOpen(false);
                     }}
                   >
-                    <span className="font-bold">{member.displayName}</span>
+                    <span className="font-bold">
+                      {member.displayName}
+                      {session.mode === "family" && isOverseasMember(member) ? (
+                        <span className="ml-1 text-[10px] font-black text-violet-500">✈️ 해외</span>
+                      ) : null}
+                    </span>
                     <span className="text-[11px] opacity-70">
                       {session.mode === "vmap"
                         ? member.arrived
@@ -2271,11 +2354,15 @@ export default function LocationPlatform() {
                             : member.departed && member.lat != null && room?.placeReady
                               ? `도착 약 ${estimateEtaMinutes(haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng))}분`
                               : "출발 전"
-                        : member.lat == null
-                          ? "위치 없음"
-                          : member.grayscale
-                            ? "마지막 위치"
-                            : "실시간"}
+                        : isOverseasMember(member)
+                          ? [member.cityName || member.city_name, member.countryName || member.country_name]
+                              .filter(Boolean)
+                              .join(", ") || "해외"
+                          : member.lat == null
+                            ? "위치 없음"
+                            : member.grayscale
+                              ? "마지막 위치"
+                              : "실시간"}
                     </span>
                   </button>
                 </li>

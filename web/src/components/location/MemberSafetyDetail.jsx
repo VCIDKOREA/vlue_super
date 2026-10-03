@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { reverseGeocodeLatLng } from "../../lib/activeRegion.js";
+import { formatLocalTime, isOverseasMember, overseasPlaceLabel } from "../../lib/overseasLocation.js";
 import { fetchFamilySafetyReport } from "../../lib/safetyPatch.js";
 
 export default function MemberSafetyDetail({ member, roomId = "", dark = false }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [localAddress, setLocalAddress] = useState("");
+  const [clock, setClock] = useState(() => Date.now());
+  const overseas = isOverseasMember(member);
 
   useEffect(() => {
     if (!member?.userId) {
@@ -32,7 +35,7 @@ export default function MemberSafetyDetail({ member, roomId = "", dark = false }
   }, [member?.userId, roomId]);
 
   useEffect(() => {
-    const known = report?.addressLabel || member?.addressLabel;
+    const known = report?.addressLabel || member?.addressLabel || overseasPlaceLabel(member);
     if (known || member?.lat == null || member?.lng == null) {
       setLocalAddress("");
       return undefined;
@@ -50,15 +53,35 @@ export default function MemberSafetyDetail({ member, roomId = "", dark = false }
     };
   }, [member?.userId, member?.lat, member?.lng, member?.addressLabel, report?.addressLabel]);
 
-  const address = report?.addressLabel || member?.addressLabel || localAddress;
+  useEffect(() => {
+    if (!overseas || !member?.timeZoneId) return undefined;
+    const id = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [overseas, member?.timeZoneId]);
+
+  const place = overseasPlaceLabel(member);
+  const address =
+    place ||
+    report?.addressLabel ||
+    member?.addressLabel ||
+    localAddress;
   const battery = report?.batteryPct ?? member?.batteryPct;
+  const localTime = overseas ? formatLocalTime(member?.timeZoneId, new Date(clock)) : "";
   const muted = dark ? "text-white/75" : "text-slate-600";
 
   return (
     <div className="mt-2 space-y-2">
+      {overseas ? (
+        <p className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-black ${dark ? "bg-violet-500/20 text-violet-200" : "bg-violet-50 text-violet-800"}`}>
+          ✈️ 해외 접속자
+        </p>
+      ) : null}
       <p className={`text-[12px] font-medium leading-snug ${muted}`}>
         {address || "도로명 주소를 확인 중입니다."}
       </p>
+      {localTime ? (
+        <p className="text-[12px] font-semibold">🕒 현지 시각 {localTime}</p>
+      ) : null}
       <p className="text-[12px] font-semibold">🔋 {battery == null ? "—" : `${battery}%`}</p>
       <div className={`rounded-2xl px-3 py-2 ${dark ? "bg-[#00D2FF]/10" : "bg-cyan-50"}`}>
         <p className={`text-[11px] font-black ${dark ? "text-[#00D2FF]" : "text-cyan-800"}`}>Gemini AI 안심패치 리포트</p>
