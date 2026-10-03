@@ -26,6 +26,7 @@ import {
   setNativeVmapMiniOverlay,
   updateNativeVmapMiniOverlay,
   subscribeVmapPing,
+  startFamilyNavigate,
   watchVmapCreateAd
 } from "../../lib/locationApi.js";
 import { canUseV1PaidFeatures } from "../../lib/effectiveMembership.js";
@@ -360,6 +361,10 @@ export default function LocationPlatform() {
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  /** 가족방에서 상대 위치로 이동 중 — V-Map 모드로 전환하지 않음 */
+  const [familyNavTarget, setFamilyNavTarget] = useState(null);
+  const [familyNavBusy, setFamilyNavBusy] = useState(false);
+  const familyNavRef = useRef(null);
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
@@ -400,6 +405,7 @@ export default function LocationPlatform() {
   roomRef.current = room;
   membersRef.current = members;
   sessionRef.current = session;
+  familyNavRef.current = familyNavTarget;
   sceneRef.current = { members, room, self, routes, draftPin, mode: session.mode, departed: session.departed };
   endSessionRef.current = () => {
     setFarewell("");
@@ -567,7 +573,8 @@ export default function LocationPlatform() {
       setSelf({ ...next });
       const liveRoom = roomRef.current;
       const selfRow = membersRef.current.find((member) => member.userId === getLocalVlueUserId());
-      const navigating =
+      const familyDest = familyNavRef.current;
+      const navigatingVmap =
         session.mode === "vmap" &&
         session.departed &&
         guideOnRef.current &&
@@ -575,16 +582,31 @@ export default function LocationPlatform() {
         liveRoom?.placeReady &&
         !dragRef.current &&
         !pinDragRef.current;
+      const navigatingFamily =
+        session.mode === "family" &&
+        guideOnRef.current &&
+        familyDest?.lat != null &&
+        familyDest?.lng != null &&
+        !dragRef.current;
       if (!viewRef.current.placed) {
         viewRef.current = { lat, lng, zoom: 16, placed: true };
       }
-      if (navigating) {
+      if (navigatingVmap) {
         followRef.current = {
           lat,
           lng,
-          zoom: userZoomedRef.current ? null : zoomForMeters(haversineMeters(lat, lng, liveRoom.placeLat, liveRoom.placeLng))
+          zoom: userZoomedRef.current
+            ? null
+            : zoomForMeters(haversineMeters(lat, lng, liveRoom.placeLat, liveRoom.placeLng))
         };
-        /* 카메라 추적은 VmapNaverSurface follow만 사용 — GPS마다 panTo 하면 끊김 */
+      } else if (navigatingFamily) {
+        followRef.current = {
+          lat,
+          lng,
+          zoom: userZoomedRef.current
+            ? null
+            : zoomForMeters(haversineMeters(lat, lng, familyDest.lat, familyDest.lng))
+        };
       } else {
         followRef.current = null;
       }
@@ -738,6 +760,51 @@ export default function LocationPlatform() {
       cancelled = true;
     };
   }, [session.mode, room?.placeReady, room?.placeLat, room?.placeLng, departedKey, routeMode]);
+
+  /* 가족방 이동 안내 — 내 GPS → 상대 위치 경로 갱신 */
+  const familyNavKey = familyNavTarget
+    ? `${familyNavTarget.userId}:${Number(familyNavTarget.lat).toFixed(4)}:${Number(familyNavTarget.lng).toFixed(4)}`
+    : "";
+  const selfNavKey =
+    self?.lat != null ? `${Number(self.lat).toFixed(4)}:${Number(self.lng).toFixed(4)}` : "";
+  useEffect(() => {
+    if (session.mode !== "family" || !familyNavTarget || !guideOn || self?.lat == null || self?.lng == null) {
+      return undefined;
+    }
+    let cancelled = false;
+    const mineId = getLocalVlueUserId();
+    (async () => {
+      try {
+        const data = await fetchVmapGuide({
+          fromLat: self.lat,
+          fromLng: self.lng,
+          toLat: familyNavTarget.lat,
+          toLng: familyNavTarget.lng,
+          mode: routeModeRef.current
+        });
+        if (cancelled) return;
+        if (data?.ok && Array.isArray(data.points)) {
+          setRoutes({ [mineId]: data });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.mode, familyNavKey, selfNavKey, guideOn, routeMode, familyNavTarget, self?.lat, self?.lng]);
+
+  useEffect(() => {
+    if (session.mode !== "family") {
+      setFamilyNavTarget(null);
+      if (session.mode === "vmap") {
+        /* vmap routes handled separately */
+      } else {
+        setGuideOn(false);
+      }
+    }
+  }, [session.mode]);
 
   paintRef.current = () => {
     const canvas = canvasRef.current;
@@ -1118,6 +1185,82 @@ export default function LocationPlatform() {
     }
   };
 
+  const stopFamilyNavigate = () => {
+    setFamilyNavTarget(null);
+    setGuideOn(false);
+    setRoutePickerOpen(false);
+    setRoutes({});
+    pushNotice("이동 안내를 종료했습니다.");
+  };
+
+  const startFamilyMove = async (member) => {
+    if (familyNavBusy || !member) return;
+    if (!localCanUseFamilyLocation()) {
+      pushNotice(FAMILY_PLAN_TOAST);
+      return;
+    }
+    const mineId = getLocalVlueUserId();
+    if (!member.userId || member.userId === mineId || member.self) {
+      pushNotice("다른 가족 위치를 선택해 주세요.");
+      return;
+    }
+    if (member.lat == null || member.lng == null) {
+      pushNotice("상대 위치를 아직 받지 못했습니다.");
+      return;
+    }
+    if (self?.lat == null || self?.lng == null) {
+      pushNotice("현재 위치를 받은 뒤에 이동할 수 있습니다.");
+      return;
+    }
+    setFamilyNavBusy(true);
+    pushNotice("경로를 안내합니다…");
+    try {
+      const actorName = getProfileHeaderName() || self.displayName || "나";
+      const targetName = member.displayName || "가족";
+      const notified = await startFamilyNavigate({
+        targetUserId: member.userId,
+        displayName: actorName,
+        targetDisplayName: targetName
+      });
+      if (notified?.message) {
+        setMessages((prev) => [...prev, notified.message].slice(-80));
+      }
+      const data = await fetchVmapGuide({
+        fromLat: self.lat,
+        fromLng: self.lng,
+        toLat: member.lat,
+        toLng: member.lng,
+        mode: routeModeRef.current
+      });
+      if (!data?.ok || !Array.isArray(data.points)) {
+        throw new Error(data?.error || "경로를 찾지 못했습니다.");
+      }
+      const dest = {
+        userId: member.userId,
+        name: targetName,
+        lat: member.lat,
+        lng: member.lng
+      };
+      setFamilyNavTarget(dest);
+      setRoutes({ [mineId]: data });
+      setGuideOn(true);
+      userZoomedRef.current = false;
+      mapSurfaceRef.current?.panTo?.(
+        self.lat,
+        self.lng,
+        zoomForMeters(haversineMeters(self.lat, self.lng, member.lat, member.lng))
+      );
+      const etaMin = data.durationSec
+        ? Math.max(1, Math.round(data.durationSec / 60))
+        : estimateEtaMinutes(haversineMeters(self.lat, self.lng, member.lat, member.lng));
+      pushNotice(`${targetName}님께 이동 · 약 ${etaMin}분`);
+    } catch (error) {
+      pushNotice(error?.message || "이동을 시작하지 못했습니다.");
+    } finally {
+      setFamilyNavBusy(false);
+    }
+  };
+
   const makeRoom = async () => {
     if (roomBusy || leaveLock.current) return;
     if (!self?.lat) {
@@ -1477,7 +1620,22 @@ export default function LocationPlatform() {
   const isHost = Boolean(room?.hostUserId) && room.hostUserId === getLocalVlueUserId();
   const selfMember = members.find((member) => member.userId === getLocalVlueUserId());
   const selfArrived = Boolean(selfMember?.arrived);
-  const cue = guideOn && session.mode === "vmap" && session.departed && !selfArrived ? nextGuideCue(routes[getLocalVlueUserId()]?.steps) : null;
+  const familyGuiding = session.mode === "family" && guideOn && Boolean(familyNavTarget);
+  const cue =
+    guideOn &&
+    ((session.mode === "vmap" && session.departed && !selfArrived) || familyGuiding)
+      ? nextGuideCue(routes[getLocalVlueUserId()]?.steps)
+      : null;
+  const familyRoute = familyGuiding ? routes[getLocalVlueUserId()] : null;
+  const familyEtaMin = familyRoute?.durationSec
+    ? Math.max(1, Math.round(familyRoute.durationSec / 60))
+    : familyNavTarget && self?.lat != null
+      ? estimateEtaMinutes(haversineMeters(self.lat, self.lng, familyNavTarget.lat, familyNavTarget.lng))
+      : null;
+  const metersToFamily =
+    familyNavTarget && self?.lat != null
+      ? haversineMeters(self.lat, self.lng, familyNavTarget.lat, familyNavTarget.lng)
+      : null;
   const people = members.length ? members : self?.lat ? [{ ...self, userId: getLocalVlueUserId(), self: true, displayName: self.displayName || "나", grayscale: !locationOn }] : [];
   const chatReady =
     session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
@@ -1512,10 +1670,17 @@ export default function LocationPlatform() {
           self={self}
           room={room}
           draftPin={draftPin}
+          destPin={
+            familyNavTarget
+              ? { lat: familyNavTarget.lat, lng: familyNavTarget.lng, label: familyNavTarget.name }
+              : null
+          }
           routes={routes}
           mode={session.mode}
           departed={session.departed}
-          guideFollow={guideOn && session.mode === "vmap" && session.departed && !selfArrived}
+          guideFollow={
+            (guideOn && session.mode === "vmap" && session.departed && !selfArrived) || familyGuiding
+          }
           flyTo={session.flyTo}
           pinEditable={Boolean(room?.hostUserId === getLocalVlueUserId())}
           onSelectMember={(member) => {
@@ -1557,6 +1722,7 @@ export default function LocationPlatform() {
               className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "family" ? tabOn : ""}`}
               onClick={() => {
                 setSelected(null);
+                setFamilyNavTarget(null);
                 setRoutes({});
                 setGuideOn(false);
                 setMembers([]);
@@ -1568,7 +1734,19 @@ export default function LocationPlatform() {
             >
               가족
             </button>
-            <button type="button" className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "vmap" ? tabOn : ""}`} onClick={() => { setSelected(null); setRoutes({}); setGuideOn(false); patchLocationSession({ mode: "vmap" }); }}>V-Map</button>
+            <button
+              type="button"
+              className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "vmap" ? tabOn : ""}`}
+              onClick={() => {
+                setSelected(null);
+                setFamilyNavTarget(null);
+                setRoutes({});
+                setGuideOn(false);
+                patchLocationSession({ mode: "vmap" });
+              }}
+            >
+              V-Map
+            </button>
           </div>
           {session.mode === "vmap" && !session.roomId ? (
             <button type="button" className={`shrink-0 ${accentBtn}`} disabled={Boolean(roomBusy)} onClick={() => void makeRoom()}>
@@ -1577,7 +1755,7 @@ export default function LocationPlatform() {
           ) : null}
           <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
-        {session.mode === "vmap" && guideOn && cue ? (
+        {guideOn && cue && (session.mode === "vmap" || familyGuiding) ? (
           <div className="absolute right-3 top-[calc(64px+env(safe-area-inset-top))] z-30 w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)]">
             <div className="flex items-center justify-center bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] px-2 py-4 text-[42px] font-black leading-none text-[#04121a]">
               {maneuverGlyph(cue.instruction)}
@@ -1586,7 +1764,15 @@ export default function LocationPlatform() {
               <p className="text-[22px] font-black tracking-tight text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</p>
               <p className="mt-1 text-[13px] font-bold leading-snug text-white">{cue.instruction}</p>
               <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#00D2FF]/80">
-                {routeMode === "free" ? "무료도로" : routeMode === "highway" ? "고속도로" : "추천경로"}
+                {familyGuiding
+                  ? familyEtaMin != null
+                    ? `약 ${familyEtaMin}분`
+                    : "가족 이동"
+                  : routeMode === "free"
+                    ? "무료도로"
+                    : routeMode === "highway"
+                      ? "고속도로"
+                      : "추천경로"}
               </p>
             </div>
           </div>
@@ -1696,12 +1882,53 @@ export default function LocationPlatform() {
           <article className={`rounded-[24px] px-4 py-3 ${glass}`}>
             <div className="flex items-start justify-between gap-3">
               {session.mode === "family" ? (
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold tracking-tight">{selected.displayName}</p>
-                  <p className="mt-1 text-[12px] leading-snug opacity-80">{selected.addressLabel || "도로명 주소를 확인 중입니다."}</p>
-                  <p className="mt-1 text-[12px] font-medium">{selected.online === false ? "접속 끊김" : "접속 중"} · 배터리 {selected.batteryPct == null ? "—" : `${selected.batteryPct}%`}</p>
+                  <div className="mt-1 flex items-start gap-2">
+                    <p className="min-w-0 flex-1 text-[12px] leading-snug opacity-80">
+                      {selected.addressLabel || "도로명 주소를 확인 중입니다."}
+                    </p>
+                    {!selected.self &&
+                    selected.userId !== getLocalVlueUserId() &&
+                    selected.lat != null &&
+                    selected.lng != null ? (
+                      <button
+                        type="button"
+                        className={`${accentBtn} shrink-0 !px-2.5 !py-1 text-[11px]`}
+                        disabled={familyNavBusy}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void startFamilyMove(selected);
+                        }}
+                      >
+                        {familyNavBusy && familyNavTarget?.userId === selected.userId
+                          ? "안내중…"
+                          : familyNavTarget?.userId === selected.userId && guideOn
+                            ? "안내중"
+                            : "이동"}
+                      </button>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-[12px] font-medium">
+                    {selected.online === false ? "접속 끊김" : "접속 중"} · 배터리{" "}
+                    {selected.batteryPct == null ? "—" : `${selected.batteryPct}%`}
+                  </p>
+                  {familyNavTarget?.userId === selected.userId && guideOn ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full bg-[#00D2FF]/15 px-2.5 py-1 text-[11px] font-semibold ${dark ? "text-[#00D2FF]" : "text-[#0e7490]"}`}>
+                        {familyEtaMin != null ? `도착 약 ${familyEtaMin}분` : "경로 안내 중"}
+                        {metersToFamily != null ? ` · ${Math.round(metersToFamily)}m` : ""}
+                      </span>
+                      <button type="button" className={quietBtn} onClick={stopFamilyNavigate}>
+                        안내 종료
+                      </button>
+                    </div>
+                  ) : null}
                   {/* TODO: 1일 1회 VLUÉ 안심패치 — 가족 위치에만 자리를 둔다 */}
-                  <span className="mt-2 inline-flex rounded-full border border-dashed border-[#00D2FF]/50 px-2 py-1 text-[10px] font-semibold text-[#00D2FF]">안심패치 예정</span>
+                  <span className="mt-2 inline-flex rounded-full border border-dashed border-[#00D2FF]/50 px-2 py-1 text-[10px] font-semibold text-[#00D2FF]">
+                    안심패치 예정
+                  </span>
                 </div>
               ) : (
                 <div>

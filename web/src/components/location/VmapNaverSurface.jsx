@@ -118,6 +118,8 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     self = null,
     room = null,
     draftPin = null,
+    /** 가족 이동 목적지 핀 { lat, lng, label } — family 모드 전용 */
+    destPin = null,
     routes = {},
     mode = "family",
     departed = false,
@@ -412,12 +414,17 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         }
       }
       if (mine && guideFollow && !member.arrived) {
+        const destLat = mode === "family" ? toLatLngNum(destPin?.lat) : room?.placeReady ? room.placeLat : null;
+        const destLng = mode === "family" ? toLatLngNum(destPin?.lng) : room?.placeReady ? room.placeLng : null;
         followTargetRef.current = {
           lat: member.lat,
           lng: member.lng,
           zoom:
-            room?.placeReady
-              ? Math.max(12, Math.min(18, 16 - Math.log2(Math.max(150, haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng)) / 400)))
+            destLat != null && destLng != null
+              ? Math.max(
+                  12,
+                  Math.min(18, 16 - Math.log2(Math.max(150, haversineMeters(member.lat, member.lng, destLat, destLng)) / 400))
+                )
               : null
         };
       }
@@ -430,17 +437,30 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     });
 
     const hostView = Boolean(room?.hostUserId) && room.hostUserId === mineId;
-    const pinSource = hostView && draftPin ? draftPin : room?.placeReady ? room : null;
-    if (mode === "vmap" && pinSource?.lat != null) {
-      const ready = Boolean(room?.placeReady && draftPin?.ready !== false);
+    const pinSource =
+      mode === "family"
+        ? destPin?.lat != null
+          ? destPin
+          : null
+        : hostView && draftPin
+          ? draftPin
+          : room?.placeReady
+            ? room
+            : null;
+    if ((mode === "vmap" || mode === "family") && pinSource?.lat != null) {
+      const ready =
+        mode === "family"
+          ? true
+          : Boolean(room?.placeReady && draftPin?.ready !== false);
       const html = pinHtml(ready);
       const nextPos = new naver.LatLng(pinSource.lat, pinSource.lng);
+      const canDragPin = mode === "vmap" && Boolean(pinEditableRef.current && hostView);
       if (!overlaysRef.current.pin) {
         const marker = new naver.Marker({
           position: nextPos,
           map,
           icon: { content: html, size: new naver.Size(22, 32), anchor: new naver.Point(11, 32) },
-          draggable: Boolean(pinEditableRef.current && hostView),
+          draggable: canDragPin,
           zIndex: 90
         });
         naver.Event.addListener(marker, "dragend", (event) => {
@@ -466,7 +486,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           pin.lat = pinSource.lat;
           pin.lng = pinSource.lng;
         }
-        pin.marker.setDraggable(Boolean(pinEditableRef.current && hostView));
+        pin.marker.setDraggable(canDragPin);
       }
     } else if (overlaysRef.current.pin) {
       overlaysRef.current.pin.marker.setMap(null);
@@ -474,7 +494,10 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     }
 
     const lineKeep = new Set();
-    if (mode === "vmap" && room?.placeReady) {
+    const drawRoutes =
+      (mode === "vmap" && room?.placeReady) ||
+      (mode === "family" && Object.keys(routes || {}).length > 0);
+    if (drawRoutes) {
       Object.entries(routes || {}).forEach(([userId, guided]) => {
         if (!guided?.points?.length) return;
         lineKeep.add(userId);
@@ -514,7 +537,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       map.setCenter(new naver.LatLng(selfLat, selfLng));
       if (map.getZoom() < 14) map.setZoom(16);
     }
-  }, [active, mapEpoch, members, self, room, draftPin, routes, mode, departed, guideFollow, pinEditable]);
+  }, [active, mapEpoch, members, self, room, draftPin, destPin, routes, mode, departed, guideFollow, pinEditable]);
 
   return <div ref={hostRef} className="h-full w-full bg-[#eef2f5]" />;
 });

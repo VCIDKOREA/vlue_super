@@ -149,6 +149,11 @@ export function postFamilyLocationMessage(payload) {
   return vlueAuthFetch(apiUrl("/api/location/family/messages"), authInit("POST", payload)).then(read);
 }
 
+/** 가족 위치방에서 상대 위치로 이동 시작 — 채팅·푸시·알림함 */
+export function startFamilyNavigate(payload) {
+  return vlueAuthFetch(apiUrl("/api/location/family/navigate"), authInit("POST", payload)).then(read);
+}
+
 export function fetchFamilyLocationMessages(after) {
   const q = after ? `?after=${encodeURIComponent(after)}` : "";
   return vlueAuthFetch(apiUrl(`/api/location/family/messages${q}`), { headers: vlueAuthHeaders() }).then(read);
