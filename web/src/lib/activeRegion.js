@@ -47,6 +47,22 @@ export function formatKoreanRegionLabel(address = {}) {
   return "";
 }
 
+/** 도로명·지번이 있으면 상세 주소, 없으면 시·구·동 */
+export function formatDetailedKoreanAddress(address = {}, displayName = "") {
+  const a = address || {};
+  const region = formatKoreanRegionLabel(a);
+  const road = [a.road, a.house_number].filter(Boolean).join(" ").trim();
+  if (road) return [region, road].filter(Boolean).join(" ");
+  const display = String(displayName || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part && !/대한민국|south korea/i.test(part))
+    .slice(0, 4)
+    .reverse()
+    .join(" ");
+  return display || region;
+}
+
 export async function reverseGeocodeLatLng(lat, lng) {
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=ko`;
   const res = await fetch(url, {
@@ -58,9 +74,11 @@ export async function reverseGeocodeLatLng(lat, lng) {
     formatKoreanRegionLabel(data.address) ||
     String(data.name || "").trim() ||
     `위도 ${Number(lat).toFixed(3)}, 경도 ${Number(lng).toFixed(3)}`;
+  const detailedAddress = formatDetailedKoreanAddress(data.address, data.display_name) || label;
   return {
     label,
-    displayName: data.display_name || label,
+    detailedAddress,
+    displayName: detailedAddress || data.display_name || label,
     lat,
     lng,
     at: Date.now()

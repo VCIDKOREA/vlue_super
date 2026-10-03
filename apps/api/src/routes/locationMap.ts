@@ -750,7 +750,7 @@ locationMapRoutes.get("/vmap/:id", requireUserHeader, async (c) => {
       arrived: member.arrived,
       dropout: isVmapDropout(member),
       photoUrl: photos.get(member.userId) || "",
-      batteryPct: null,
+      batteryPct: member.batteryPct,
       addressLabel: ""
     }))
   });

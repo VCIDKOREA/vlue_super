@@ -15,6 +15,7 @@ import type { Server } from "node:http";
 import { loadPricingConfig } from "./services/pricing/pricingConfigService.js";
 import { startExternalMailSyncScheduler } from "./services/email/externalMailSyncQueue.js";
 import { egressLogMiddleware, startEgressSummaryTimer } from "./lib/egressLog.js";
+import { startSafetyPatchExpiryWatcher } from "./services/safetyPatch/safetyPatchService.js";
 
 assertProductionEnvLocked();
 await import("./lib/safeRedis.js").then((m) => m.initRedisFromEnv());
@@ -153,6 +154,7 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
   }, minorAdultExpiryMs);
 
   startExternalMailSyncScheduler();
+  startSafetyPatchExpiryWatcher();
 
   const withdrawalCronMs = Number(process.env.WITHDRAWAL_CRON_MS) || 15 * 60 * 1000;
   setInterval(() => {

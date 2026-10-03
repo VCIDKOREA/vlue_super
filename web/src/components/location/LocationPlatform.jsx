@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdMobBannerSlot from "../ads/AdMobBannerSlot.jsx";
+import MemberSafetyDetail from "./MemberSafetyDetail.jsx";
 import { reverseGeocodeLatLng } from "../../lib/activeRegion.js";
 import {
   createVmapRoom,
@@ -560,7 +561,7 @@ export default function LocationPlatform() {
       setSelf(next);
       try {
         const region = await reverseGeocodeLatLng(lat, lng);
-        next.addressLabel = region.displayName || region.label || "";
+        next.addressLabel = region.detailedAddress || region.displayName || region.label || "";
       } catch {
         next.addressLabel = "";
       }
@@ -615,7 +616,13 @@ export default function LocationPlatform() {
           publishPresence(next).then(refreshFamily).catch(() => {});
         }
       } else if (session.roomId && session.departed) {
-        publishVmapPresence(session.roomId, { lat, lng, online, displayName: name })
+        publishVmapPresence(session.roomId, {
+          lat,
+          lng,
+          online,
+          displayName: name,
+          batteryPct: next.batteryPct
+        })
           .then((data) => {
             if (data?.member?.arrived) {
               setMembers((prev) => prev.map((member) => (member.userId === getLocalVlueUserId() ? { ...member, arrived: true } : member)));
@@ -1883,11 +1890,8 @@ export default function LocationPlatform() {
             <div className="flex items-start justify-between gap-3">
               {session.mode === "family" ? (
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold tracking-tight">{selected.displayName}</p>
-                  <div className="mt-1 flex items-start gap-2">
-                    <p className="min-w-0 flex-1 text-[12px] leading-snug opacity-80">
-                      {selected.addressLabel || "도로명 주소를 확인 중입니다."}
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <p className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">{selected.displayName}</p>
                     {!selected.self &&
                     selected.userId !== getLocalVlueUserId() &&
                     selected.lat != null &&
@@ -1910,9 +1914,9 @@ export default function LocationPlatform() {
                       </button>
                     ) : null}
                   </div>
+                  <MemberSafetyDetail member={selected} roomId={session.roomId || ""} dark={dark} />
                   <p className="mt-1 text-[12px] font-medium">
-                    {selected.online === false ? "접속 끊김" : "접속 중"} · 배터리{" "}
-                    {selected.batteryPct == null ? "—" : `${selected.batteryPct}%`}
+                    {selected.online === false ? "접속 끊김" : "접속 중"}
                   </p>
                   {familyNavTarget?.userId === selected.userId && guideOn ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1925,10 +1929,6 @@ export default function LocationPlatform() {
                       </button>
                     </div>
                   ) : null}
-                  {/* TODO: 1일 1회 VLUÉ 안심패치 — 가족 위치에만 자리를 둔다 */}
-                  <span className="mt-2 inline-flex rounded-full border border-dashed border-[#00D2FF]/50 px-2 py-1 text-[10px] font-semibold text-[#00D2FF]">
-                    안심패치 예정
-                  </span>
                 </div>
               ) : (
                 <div>
@@ -1943,6 +1943,13 @@ export default function LocationPlatform() {
                           : selected.departed
                             ? "도착지가 정해지면 예상 시간이 나옵니다"
                             : "출발 전"}
+                  </p>
+                  <p className="mt-2 text-[12px] font-semibold">
+                    🔋 {(() => {
+                      const mine = selected.self || selected.userId === getLocalVlueUserId();
+                      const battery = mine ? (self?.batteryPct ?? selected.batteryPct) : selected.batteryPct;
+                      return battery == null ? "—" : `${battery}%`;
+                    })()}
                   </p>
                 </div>
               )}

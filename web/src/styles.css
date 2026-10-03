@@ -115,6 +115,19 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
   }
 }
 
+.safety-patch-scan__bar {
+  transform: translateX(-120%);
+  animation: sms-scan-light 1.15s linear infinite;
+}
+
+html.vlue-safety-patch .home-main-feed--spaced {
+  padding-bottom: calc(8rem + 44px) !important;
+}
+
+html.vlue-safety-patch .home-kakao-stack {
+  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 56px) + 48px);
+}
+
 .vlue-scroll-pad-bottom-nav {
   padding-bottom: calc(var(--vlue-bottom-nav-offset) + 28px);
   overflow-anchor: none;

@@ -43,6 +43,7 @@ import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
 import LocationPlatform from "./components/location/LocationPlatform.jsx";
+import TodaySafetyPatch from "./components/TodaySafetyPatch.jsx";
 import VlueBrandWordmark from "./components/VlueBrandWordmark.jsx";
 import V1PaidPackageGateModal from "./components/V1PaidPackageGateModal.jsx";
 import {
@@ -5692,6 +5693,8 @@ function App() {
           setTimeout(() => setBottomToast(""), 2800);
         }}
       />
+
+      {page === "main" && isLoggedIn && !showSplash ? <TodaySafetyPatch isDarkMode={isDarkMode} /> : null}
 
       <footer
         className={`fixed bottom-0 left-0 right-0 z-[160] ${showBottomNav ? "block" : "hidden"}`}

@@ -1133,6 +1133,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 openUrl:function(url){
                   try{if(window.Android&&window.Android.openExternalUrl)window.Android.openExternalUrl(String(url||''));}catch(e){}
                 },
+                openAffiliateAndReturn:function(url){
+                  try{if(window.Android&&window.Android.openAffiliateAndReturn)window.Android.openAffiliateAndReturn(String(url||''));}catch(e){}
+                },
                 openAppSettings:function(){
                   try{if(window.Android&&window.Android.openAppSettings)window.Android.openAppSettings();}catch(e){}
                 }
@@ -1849,6 +1852,45 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun openAppSettings() {
             activity.runOnUiThread { LetteringPermissionHelper.openAppSettings(activity) }
+        }
+
+        /**
+         * 쿠팡 제휴 딥링크를 연 뒤 VLUÉ로 복귀해 24시간 정산 세션만 남긴다.
+         * host 는 link.coupang.com / coupang.com 만 허용한다.
+         */
+        @android.webkit.JavascriptInterface
+        fun openAffiliateAndReturn(url: String?) {
+            val u = url?.trim().orEmpty()
+            val host = try {
+                Uri.parse(u).host?.lowercase().orEmpty()
+            } catch (_: Exception) {
+                ""
+            }
+            val allowed = host == "link.coupang.com" || host == "coupang.com" || host == "www.coupang.com"
+            if (!u.startsWith("https://") || !allowed) return
+            activity.runOnUiThread {
+                try {
+                    val view = Intent(Intent.ACTION_VIEW, Uri.parse(u)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    val coupangInstalled = activity.packageManager.getLaunchIntentForPackage("com.coupang.mobile") != null
+                    if (coupangInstalled) view.setPackage("com.coupang.mobile")
+                    try {
+                        activity.startActivity(view)
+                    } catch (_: Exception) {
+                        view.`package` = null
+                        activity.startActivity(view)
+                    }
+                    activity.window.decorView.postDelayed({
+                        val back = Intent(activity, MainActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        }
+                        activity.startActivity(back)
+                    }, 1100)
+                } catch (e: Exception) {
+                    Log.e(TAG, "openAffiliateAndReturn failed", e)
+                }
+            }
         }
 
         /** https·앱스킴 — WebView 내 로드 대신 외부 브라우저/네이티브 앱으로 열어 /app 셸 유지 */

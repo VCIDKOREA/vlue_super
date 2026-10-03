@@ -3635,3 +3635,29 @@ model LocationFamilyMessage {
   @@index([createdAt])
   @@map("location_family_messages")
 }
+
+/// TODAY 안심패치 — 마지막 패치 시각부터 24시간.
+model SafetyPatchSession {
+  userId           String    @id @map("user_id") @db.Uuid
+  lastPatchedAt    DateTime  @map("last_patched_at") @db.Timestamptz(6)
+  expiryNotifiedAt DateTime? @map("expiry_notified_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([lastPatchedAt])
+  @@map("safety_patch_sessions")
+}
+
+/// 가족 프로필 Gemini 안심 요약 캐시.
+model SafetyPatchReport {
+  id           String   @id @default(uuid()) @db.Uuid
+  viewerUserId String   @map("viewer_user_id") @db.Uuid
+  targetUserId String   @map("target_user_id") @db.Uuid
+  summary      String   @db.Text
+  safetyIndex  Int      @map("safety_index")
+  addressLabel String   @default("") @map("address_label") @db.VarChar(240)
+  batteryPct   Int?     @map("battery_pct")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([viewerUserId, targetUserId, createdAt])
+  @@map("safety_patch_reports")
+}
