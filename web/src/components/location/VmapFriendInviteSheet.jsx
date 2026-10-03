@@ -8,7 +8,7 @@ import {
   setContactSyncConsent
 } from "../../lib/contactSyncStorage.js";
 import { mergeDeviceContactsCache } from "../../lib/contacts/deviceContactsCache.js";
-import { readLetteringPermissionStatus } from "../../lib/letteringPermissionStatus.js";
+import { readLetteringPermissionStatus } from "../../lib/letteringSettings.js";
 import { inviteVmapFriends } from "../../lib/locationApi.js";
 import { shareVmapInviteViaKakao, shareVmapInviteViaSms } from "../../lib/vmapInviteShare.js";
 import ShareShowcaseChannelSheet from "../call/ShareShowcaseChannelSheet.jsx";
@@ -34,39 +34,24 @@ export default function VmapFriendInviteSheet({
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
-  const loadContacts = async () => {
-    setLoading(true);
-    try {
-      const cached = readContactMatchCache?.() || null;
-      if (cached) applyMatch(cached);
-
-      const contactsGranted = Boolean(readLetteringPermissionStatus()?.contacts);
-      if (!contactsGranted && !hasContactSyncConsent()) {
-        onErrorRef.current?.("주소록 권한을 허용한 뒤 다시 시도해 주세요.");
-        setLoading(false);
-        return;
-      }
-
-      const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
-      if (!contacts?.length) {
-        onErrorRef.current?.(
-          contactsGranted
-            ? "기기에 저장된 연락처가 없습니다."
-            : "주소록 권한을 허용한 뒤 다시 시도해 주세요."
-        );
-        setLoading(false);
-        return;
-      }
-      mergeDeviceContactsCache(contacts);
-      const result = await matchContactsWithVlue(contacts);
-      setContactSyncConsent(true);
-      saveContactMatchCache(result);
-      applyMatch(result);
-    } catch (error) {
-      onErrorRef.current?.(error?.message || "전화부 동기화에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
+  const applyDeviceOnly = (contacts) => {
+    const list = (contacts || [])
+      .map((c, idx) => {
+        const phoneE164 = String(c.phone || c.phoneE164 || "").trim();
+        if (!phoneE164) return null;
+        return {
+          key: `d:${phoneE164}:${idx}`,
+          kind: "unregistered",
+          name: String(c.name || c.contactName || "연락처").trim() || "연락처",
+          phone: phoneE164,
+          phoneE164,
+          userId: "",
+          isFriend: false
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    setRows(list);
   };
 
   const applyMatch = (result) => {
@@ -93,6 +78,51 @@ export default function VmapFriendInviteSheet({
       }))
     ].sort((a, b) => a.name.localeCompare(b.name, "ko"));
     setRows(list);
+  };
+
+  const loadContacts = async () => {
+    setLoading(true);
+    try {
+      const cached = readContactMatchCache?.() || null;
+      if (cached) applyMatch(cached);
+
+      const contactsGranted = Boolean(readLetteringPermissionStatus()?.contacts);
+      if (!contactsGranted && !hasContactSyncConsent()) {
+        onErrorRef.current?.("주소록 권한을 허용한 뒤 다시 시도해 주세요.");
+        setLoading(false);
+        return;
+      }
+
+      const contacts = await collectDeviceContactsForSync({ allowDemoConfirm: false });
+      if (!contacts?.length) {
+        onErrorRef.current?.(
+          contactsGranted
+            ? "기기에 저장된 연락처가 없습니다."
+            : "주소록 권한을 허용한 뒤 다시 시도해 주세요."
+        );
+        setLoading(false);
+        return;
+      }
+      mergeDeviceContactsCache(contacts);
+      try {
+        const result = await matchContactsWithVlue(contacts);
+        setContactSyncConsent(true);
+        saveContactMatchCache(result);
+        applyMatch(result);
+      } catch (matchErr) {
+        /* 매칭 API 실패해도 기기 연락처로는 카톡/문자 초대 가능 */
+        applyDeviceOnly(contacts);
+        onErrorRef.current?.(
+          matchErr?.message
+            ? `회원 매칭 실패 · 기기 연락처로 초대합니다 (${matchErr.message})`
+            : "회원 매칭 실패 · 기기 연락처로 초대합니다"
+        );
+      }
+    } catch (error) {
+      onErrorRef.current?.(error?.message || "전화부 동기화에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

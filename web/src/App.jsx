@@ -5919,6 +5919,10 @@ function App() {
                   setShowcaseStyleSheetOpen(false);
                   setSmsInboxOpen(false);
                   setCallShowcaseSheetOpen(true);
+                  /* 케이스함 언마운트 → BGM 즉시 정지, 닫아도 케이스함으로 복귀하지 않음 */
+                  if (page === "mycase") {
+                    navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+                  }
                 });
               }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
@@ -5957,6 +5961,10 @@ function App() {
                   setShowcaseStyleSheetOpen(false);
                   setCallShowcaseSheetOpen(false);
                   setSmsInboxOpen(true);
+                  /* 케이스함 언마운트 → BGM 즉시 정지, 문자함 닫아도 케이스함으로 복귀하지 않음 */
+                  if (page === "mycase") {
+                    navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
+                  }
                 });
               }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"

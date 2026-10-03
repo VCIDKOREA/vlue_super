@@ -2080,6 +2080,8 @@ class CallOverlayService : Service() {
         allowFromMiniRestore: Boolean = false
     ) {
         if (dismissing || !CompanionRuntimeStabilityDiag.isCallSessionActive()) return
+        /* 잠금·화면 꺼짐에서도 안심/인증 팝업이 BigPush처럼 즉시 보이게 */
+        wakeScreenForCallOverlay()
         /*
          * 확인→Mini 이후 웹 connected / 카드 갱신이 다시 여기로 오면
          * onAnswer+hideChrome 으로 Mini 가 사라지고 BigPush 가 재부착된다.
@@ -3083,14 +3085,14 @@ class CallOverlayService : Service() {
             dp(320),
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            0,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.CENTER
             width = dp(320)
             height = WindowManager.LayoutParams.WRAP_CONTENT
+            /* BigPush와 동일 — 잠금화면 위에서도 안심/인증 팝업 표시 */
+            applyPassThroughTouchFlags(this)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -4864,6 +4866,23 @@ class CallOverlayService : Service() {
             detail = detail
         )
         applyLayoutFromController(source = "screen:$previous→$next")
+        /*
+         * 잠금 해제·화면 ON 직후: 수화했는데 BigPush만 남은 경우 안심팝업/쇼케이스 재시도.
+         * (잠금 중 DCP 팝업이 키가드 뒤에 가려졌다가 해지 후에도 안 뜨는 경우 보정)
+         */
+        if (next == ScreenState.SCREEN_ON &&
+            companion.state == OverlayState.BIG_PUSH &&
+            remoteConnected &&
+            !authPopupConfirmedToMini &&
+            !userMinimized &&
+            dcpPopupView?.isAttachedToWindow != true
+        ) {
+            VlueBigPushTrace.lifecycle(
+                "SCREEN_ON_ANSWER_RETRY",
+                "prev=$previous → enterShowcaseFromAnswer"
+            )
+            enterShowcaseFromAnswer(source = "screen_on_answer_retry")
+        }
     }
 
     /**
