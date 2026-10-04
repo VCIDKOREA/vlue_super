@@ -1127,6 +1127,38 @@ export default function LocationPlatform() {
     setSearchOpen(true);
   }, [session.roomId]);
 
+  /* early return(visible/minimized) 앞 — 훅 순서 고정 */
+  useEffect(() => {
+    const onFocus = (event) => {
+      const userId = String(event?.detail?.userId || "").trim();
+      if (!userId) return;
+      const locationOn = self?.online !== false && self?.lat != null;
+      const pool = members.length
+        ? members
+        : self?.lat
+          ? [
+              {
+                ...self,
+                userId: getLocalVlueUserId(),
+                self: true,
+                displayName: self.displayName || "나",
+                grayscale: !locationOn
+              }
+            ]
+          : [];
+      const hit = pool.find((m) => m.userId === userId);
+      if (!hit) return;
+      setSelected(hit);
+      if (hit.lat != null && hit.lng != null) {
+        userZoomedRef.current = true;
+        gestureAtRef.current = performance.now();
+        patchLocationSession({ flyTo: { lat: hit.lat, lng: hit.lng, at: Date.now() } });
+      }
+    };
+    window.addEventListener("vlue-focus-family-member", onFocus);
+    return () => window.removeEventListener("vlue-focus-family-member", onFocus);
+  }, [members, self]);
+
   const markGesture = () => {
     gestureAtRef.current = performance.now();
   };
@@ -1719,20 +1751,6 @@ export default function LocationPlatform() {
       patchLocationSession({ flyTo: { lat: member.lat, lng: member.lng, at: Date.now() } });
     }
   };
-
-  useEffect(() => {
-    const onFocus = (event) => {
-      const userId = String(event?.detail?.userId || "").trim();
-      if (!userId) return;
-      const pool = members.length ? members : people;
-      const hit =
-        pool.find((m) => m.userId === userId) ||
-        people.find((m) => m.userId === userId);
-      if (hit) focusMember(hit);
-    };
-    window.addEventListener("vlue-focus-family-member", onFocus);
-    return () => window.removeEventListener("vlue-focus-family-member", onFocus);
-  }, [members, people]);
 
   const dark = theme === "dark";
   const glass = dark
