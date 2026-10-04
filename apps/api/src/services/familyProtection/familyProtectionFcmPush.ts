@@ -45,6 +45,74 @@ export function fcmMessageElderRemoteApp(appName: string) {
   };
 }
 
+/** 원격 보안 1차 — 가족 전원(본인 제외) */
+export function fcmMessageRemoteSecurityStage1(memberName: string) {
+  const who = memberName?.trim() || "가족";
+  return {
+    title: "🚨 [VLUÉ 긴급] 원격 제어 감지",
+    body: `${who} 님의 기기에서 원격 제어 앱이 감지되어 작동 중입니다! 즉시 전화로 확인해 주세요. (피싱범의 전화 차단으로 통화 연결이 안 될 수 있으니 빠른 조치가 필요합니다.)`,
+    data: {
+      kind: "remote_security_stage1",
+      stage: "1",
+      mode: "family",
+      openLocation: "1",
+      lastKnownLocation: "1"
+    }
+  };
+}
+
+/** 원격 활성 중 강제 종료 */
+export function fcmMessageRemoteForceQuit(memberName: string, appName?: string) {
+  const who = memberName?.trim() || "가족";
+  const app = appName?.trim() || "원격 앱";
+  return {
+    title: "🚨 [VLUÉ 긴급] 앱 강제 종료",
+    body: `${who} 님의 기기에서 (${app}) VLUÉ 앱이 강제 종료되었습니다. 확인이 필요합니다.`,
+    data: {
+      kind: "remote_security_force_quit",
+      stage: "2",
+      mode: "family",
+      openLocation: "1",
+      lastKnownLocation: "1",
+      appName: app
+    }
+  };
+}
+
+/** 원격 활성 중/후 삭제 */
+export function fcmMessageRemoteSessionDeleted(memberName: string, appName?: string) {
+  const who = memberName?.trim() || "가족";
+  const app = appName?.trim() || "원격 앱";
+  return {
+    title: "🚨 [VLUÉ 긴급] 앱 삭제 감지",
+    body: `${who} 님의 기기에서 (${app}) VLUÉ 앱이 삭제되었습니다. 확인이 필요합니다.`,
+    data: {
+      kind: "remote_security_remote_deleted",
+      stage: "2",
+      mode: "family",
+      openLocation: "1",
+      lastKnownLocation: "1",
+      appName: app
+    }
+  };
+}
+
+/** 일반 직접 삭제 (원격 비활성) */
+export function fcmMessageRemoteNormalDeleted(memberName: string) {
+  const who = memberName?.trim() || "가족";
+  return {
+    title: "[VLUÉ] 앱 삭제 알림",
+    body: `${who} 님의 기기에서 VLUÉ 앱이 삭제되었습니다.`,
+    data: {
+      kind: "remote_security_normal_deleted",
+      stage: "2",
+      mode: "family",
+      openLocation: "1",
+      lastKnownLocation: "1"
+    }
+  };
+}
+
 export function fcmMessageChildBankThreshold(amountKrw: number) {
   const amt = Math.abs(Math.floor(amountKrw)).toLocaleString("ko-KR");
   return {

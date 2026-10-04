@@ -238,13 +238,23 @@ object FamilyProtectionNotificationHelper {
         }
     }
 
-    fun showAlert(context: Context, title: String, body: String, tag: String?) {
+    fun showAlert(
+        context: Context,
+        title: String,
+        body: String,
+        tag: String?,
+        extras: Map<String, String> = emptyMap()
+    ) {
         val app = context.applicationContext
         ensureChannel(app)
         val safeTitle = title.ifBlank { "VLUÉ" }
         val multiBody = formatInviteBodyLines(body.ifBlank { title })
         val contentPi =
-            VlueNotificationWake.activityPendingIntent(app, (tag ?: "family-alert").hashCode())
+            VlueNotificationWake.activityPendingIntent(app, (tag ?: "family-alert").hashCode()) {
+                for ((k, v) in extras) {
+                    if (k.isNotBlank() && v.isNotBlank()) putExtra(k, v)
+                }
+            }
         val builder =
             NotificationCompat.Builder(app, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)

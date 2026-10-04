@@ -43,7 +43,26 @@ class VlueFirebaseMessagingService : FirebaseMessagingService() {
         }
 
         if (type.startsWith("vlue-family-protection") || data["channel"] == "family_protection") {
-            FamilyProtectionNotificationHelper.showAlert(applicationContext, title, body, tag)
+            val deepExtras = linkedMapOf<String, String>()
+            for (key in listOf(
+                "kind", "mode", "openLocation", "lastKnownLocation",
+                "focusUserId", "wardUserId", "stage", "appName"
+            )) {
+                val v = data[key]?.trim().orEmpty()
+                if (v.isNotEmpty()) deepExtras[key] = v
+            }
+            if (deepExtras["mode"].isNullOrBlank() &&
+                (deepExtras["openLocation"] == "1" || deepExtras["lastKnownLocation"] == "1")
+            ) {
+                deepExtras["mode"] = "family"
+            }
+            FamilyProtectionNotificationHelper.showAlert(
+                applicationContext,
+                title,
+                body,
+                tag,
+                deepExtras
+            )
             return
         }
 

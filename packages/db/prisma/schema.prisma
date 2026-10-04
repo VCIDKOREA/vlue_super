@@ -3573,9 +3573,36 @@ model LocationPresence {
   countryName  String   @default("") @map("country_name") @db.VarChar(80)
   cityName     String   @default("") @map("city_name") @db.VarChar(80)
   timeZoneId   String   @default("") @map("time_zone_id") @db.VarChar(64)
+  /// 앱 중단/삭제 시에도 24시간 유지하는 마지막 확인 위치
+  lastLat      Float?   @map("last_lat")
+  lastLng      Float?   @map("last_lng")
+  lastSeenAt   DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  /// CONNECTED | DISCONNECTED | TERMINATED
+  connectionStatus String @default("CONNECTED") @map("connection_status") @db.VarChar(24)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("location_presence")
+}
+
+/// 원격제어 감지·하트비트·2단계 가족 푸시 상태
+model FamilyRemoteSecurityState {
+  userId            String    @id @map("user_id") @db.Uuid
+  isRemoteActive    Boolean   @default(false) @map("is_remote_active")
+  remoteAppPackage  String    @default("") @map("remote_app_package") @db.VarChar(160)
+  remoteAppLabel    String    @default("") @map("remote_app_label") @db.VarChar(80)
+  remoteDetectedAt  DateTime? @map("remote_detected_at") @db.Timestamptz(6)
+  lastHeartbeatAt   DateTime? @map("last_heartbeat_at") @db.Timestamptz(6)
+  deviceStatus      String    @default("CONNECTED") @map("device_status") @db.VarChar(24)
+  lastLat           Float?    @map("last_lat")
+  lastLng           Float?    @map("last_lng")
+  lastSeenAt        DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  stage1NotifiedAt  DateTime? @map("stage1_notified_at") @db.Timestamptz(6)
+  stage2Reason      String    @default("") @map("stage2_reason") @db.VarChar(32)
+  stage2NotifiedAt  DateTime? @map("stage2_notified_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("family_remote_security_state")
 }
 
 model VmapRoom {

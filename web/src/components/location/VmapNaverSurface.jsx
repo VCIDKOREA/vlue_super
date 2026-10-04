@@ -374,7 +374,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
     visiblePeople.forEach((member) => {
       const id = String(member.userId || member.displayName);
       keep.add(id);
-      const dead = mode === "family" && (member.grayscale || member.online === false || member.batteryPct === 0);
+      const dead = mode === "family" && (member.grayscale || member.online === false || member.batteryPct === 0 || member.lastKnownLocation);
       const mine = Boolean(member.self) || (mineId && member.userId === mineId);
       const status =
         mode === "vmap" && member.departed && room
@@ -383,7 +383,9 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
             : member.dropout
               ? "이탈"
               : `${estimateEtaMinutes(haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng))}분`
-          : "";
+          : mode === "family" && member.lastKnownLocation
+            ? "📍 마지막 확인 위치"
+            : "";
       const html = personHtml(member.displayName || "멤버", status, mine && selfPhoto ? selfPhoto : member.photoUrl, !dead);
       let entry = overlaysRef.current.people.get(id);
       const nextPos = new naver.LatLng(member.lat, member.lng);

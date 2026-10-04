@@ -1,13 +1,11 @@
 import { prisma } from "../../db/client.js";
 import { matchGovernmentHotline, normalizePhoneDigits } from "../../lib/governmentHotlines.js";
 import { classifyKrPhoneKind, krPhoneKindLabel, type KrPhoneKind } from "../../lib/krPhoneKind.js";
-import { matchRemoteControlApp } from "../../lib/remoteControlApps.js";
 import { createFamilyAlertAndNotifyGuardians } from "./familyProtectionNotify.js";
 import { expandFamilyAlertRecipients } from "./familyProtectionCircle.js";
 import {
   fcmMessageElderGovernmentCall,
   fcmMessageElderLongCall,
-  fcmMessageElderRemoteApp,
   pushFamilyProtectionFcmToGuardians
 } from "./familyProtectionFcmPush.js";
 import { getGuardianElderLinks, getOrCreateFamilySettings, mergeLinkAlertConfig } from "./familyProtectionSettingsHelper.js";
@@ -187,45 +185,14 @@ export async function recordWardGovernmentCall(
   return { ok: true, alerted: r.alerted, agency: label };
 }
 
-/** 원격제어 앱 설치·실행 — 네이티브 PackageManager 연동 */
+/** 원격제어 앱 설치·실행 — /security/remote-detected 통합 경로 */
 export async function reportWardRemoteControlApp(wardUserId: string, packageOrLabel: string) {
-  const match = matchRemoteControlApp(packageOrLabel);
-  if (!match) return { ok: true, matched: false };
-
-  const links = await getGuardianElderLinks(wardUserId);
-  if (!links.length) return { ok: true, matched: true, alerted: 0 };
-
-  const guardianIds: string[] = [];
-  for (const link of links) {
-    const settings = await getOrCreateFamilySettings(link.guardianUserId);
-    const cfg = mergeLinkAlertConfig(link, settings);
-    if (cfg.remoteAppEnabled) guardianIds.push(link.guardianUserId);
-  }
-  if (!guardianIds.length) return { ok: true, matched: true, app: match.label, alerted: 0 };
-
-  const name = await wardDisplayName(wardUserId);
-  const title = "[가족 보호] 원격제어 앱";
-  const body = `${name} 님 기기에서 ${match.label} 사용·설치가 감지되었습니다.`;
-  const r = await createFamilyAlertAndNotifyGuardians({
-    wardUserId,
-    kind: "elder_remote_control_app",
-    title,
-    body,
-    guardianUserIds: guardianIds,
-    skipFcm: true,
-    payload: { appId: match.id, appLabel: match.label, raw: packageOrLabel }
+  const { reportRemoteDetected } = await import("./familyRemoteSecurityService.js");
+  return reportRemoteDetected(wardUserId, {
+    packageName: packageOrLabel,
+    appLabel: packageOrLabel,
+    is_remote_active: true
   });
-
-  if (!r.skippedCooldown && r.alerted > 0) {
-    const push = fcmMessageElderRemoteApp(match.label);
-    const recipients = await expandFamilyAlertRecipients(guardianIds, wardUserId);
-    void pushFamilyProtectionFcmToGuardians(recipients, push.title, push.body, {
-      wardUserId,
-      ...push.data
-    });
-  }
-
-  return { ok: true, matched: true, app: match.label, alerted: r.alerted };
 }
 
 function maskPhone(phone: string) {

@@ -313,7 +313,8 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             <div className={`rounded-xl border p-2.5 ${settingsBox}`}>
               <p className={`text-[11px] font-bold ${strong}`}>부모(노부모) 보호</p>
               <p className={`mt-0.5 text-[10px] leading-relaxed ${sub}`}>
-                VLUÉ 비회원·저장되지 않은 모르는 번호(내선·대표·휴대폰)와 장시간 통화, 원격제어 앱, 112·119·금감원 등 정부·공공기관 통화 시 알림 (네이티브 연동)
+                VLUÉ 비회원·저장되지 않은 모르는 번호(내선·대표·휴대폰)와 장시간 통화, 원격제어 앱, 112·119·금감원 등 정부·공공기관 통화 시 알림 (네이티브 연동).
+                원격 감지 시 본인 단말은 묵음·앱 진입 차단되고, 가족 전원에게 긴급 푸시가 갑니다. 앱 중단/삭제 시 마지막 위치는 24시간 V-MAP에 유지됩니다.
               </p>
               <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
                 <span>앱 미접속</span>
@@ -355,10 +356,31 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                   <input type="number" min={3} max={180} value={fp.elderLongCallMinutes} onChange={(e) => fp.setElderLongCallMinutes(e.target.value)} className={`mt-0.5 w-full rounded-lg border px-2 py-1.5 text-[12px] ${inputCls}`} />
                 </label>
               ) : null}
-              <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
-                <span>원격제어 앱 (팀뷰어 등)</span>
-                <input type="checkbox" checked={fp.elderRemoteAppEnabled} onChange={(e) => fp.setElderRemoteAppEnabled(e.target.checked)} />
+              <label className={`mt-2 flex items-start justify-between gap-2 text-[11px] ${sub}`}>
+                <span className="min-w-0 flex-1 leading-snug">
+                  원격제어·원격보안 (TeamViewer·AnyDesk·RustDesk 등)
+                  <span className={`mt-0.5 block text-[9px] font-medium ${sub}`}>
+                    1차: 가족 긴급 푸시 · 본인 앱 진입/터치 차단(묵음) · 2차: 강제종료/삭제 알림 · 마지막 위치 24시간
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="mt-0.5 shrink-0"
+                  checked={fp.elderRemoteAppEnabled}
+                  onChange={(e) => fp.setElderRemoteAppEnabled(e.target.checked)}
+                />
               </label>
+              {fp.elderRemoteAppEnabled ? (
+                <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${isDarkMode ? "border-amber-400/25 bg-amber-500/10 text-amber-100" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
+                  <p className="font-bold">동의·안내 (위치·푸시)</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    <li>가족 위치 확인(V-MAP)은 보호 연결·동의된 구성원에게만 공유됩니다.</li>
+                    <li>원격 제어 앱이 작동하면 피해자 단말에는 알림 없이 앱 진입이 차단되고, 가족 전원(본인 제외)에게 긴급 푸시가 발송됩니다.</li>
+                    <li>앱이 강제 종료되거나 삭제되면 2차 푸시가 가며, 마지막 확인 위치는 24시간 동안 지도에 표시됩니다.</li>
+                    <li>자녀 폰에도 동일 원격보안 원리가 적용됩니다. 푸시 탭 시 해당 구성원의 마지막 위치로 이동합니다.</li>
+                  </ul>
+                </div>
+              ) : null}
               <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
                 <span>정부·공공기관 통화</span>
                 <input type="checkbox" checked={fp.elderGovCallEnabled} onChange={(e) => fp.setElderGovCallEnabled(e.target.checked)} />

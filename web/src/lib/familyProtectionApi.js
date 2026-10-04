@@ -180,6 +180,34 @@ export async function postWardRemoteApp(packageOrLabel) {
   return parseJson(res);
 }
 
+/** 원격 보안 1차 — /api/security/remote-detected */
+export async function postRemoteSecurityDetected(payload) {
+  const res = await vlueAuthFetch(apiUrl("/api/security/remote-detected"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify(payload || {})
+  });
+  return parseJson(res);
+}
+
+export async function postRemoteSecurityHeartbeat(payload) {
+  const res = await vlueAuthFetch(apiUrl("/api/security/remote-heartbeat"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify(payload || {})
+  });
+  return parseJson(res);
+}
+
+export async function postRemoteAppLifecycle(payload) {
+  const res = await vlueAuthFetch(apiUrl("/api/security/app-lifecycle"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify(payload || {})
+  });
+  return parseJson(res);
+}
+
 export async function requestBankConsent(linkId, payload) {
   const res = await vlueAuthFetch(apiUrl(`/api/family-protection/links/${linkId}/bank-consent/request`), {
     method: "POST",

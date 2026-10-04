@@ -24,6 +24,8 @@ const FALLBACK_LINES = [
   { icon: "🤖", title: "Gemini AI 안심요약", body: "오늘의 가족 안심 요약을 동기화했습니다." },
   { icon: "📍", title: "위치", body: "최근 GPS·주소 정보를 점검했습니다." },
   { icon: "📡", title: "수집 정보", body: "배터리 · 접속 · GPS 상태를 동기화했습니다." },
+  { icon: "🦠", title: "기기 악성 APP 감지", body: "최근 24시간 기기 악성·위험 권한 APP 감지 현황을 동기화합니다." },
+  { icon: "🖥️", title: "원격앱 활성화", body: "최근 24시간 원격제어 앱 활성화·감지 횟수를 동기화합니다." },
   { icon: "💬", title: "SMS 스미싱", body: "의심 문자 모니터링을 동기화했습니다." },
   { icon: "🛡️", title: "보안패치", body: "24시간 TODAY 안심패치 세션이 활성화되었습니다." }
 ];
@@ -40,6 +42,7 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
   const remindedRef = useRef(false);
   const wasCompleteRef = useRef(false);
   const briefTimerRef = useRef(0);
+  const briefTapGuardRef = useRef(0);
 
   const remaining = remainingFrom(lastPatchedAt, now);
   const complete = remaining > 0;
@@ -49,7 +52,7 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
     return () => document.documentElement.classList.remove("vlue-safety-patch");
   }, []);
 
-  const showBrief = (lines) => {
+  const showBrief = (lines, { autoCloseMs = 5200 } = {}) => {
     setBriefLines(Array.isArray(lines) && lines.length ? lines : FALLBACK_LINES);
     setBriefOpen(true);
     try {
@@ -58,7 +61,32 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
       /* ignore */
     }
     if (briefTimerRef.current) window.clearTimeout(briefTimerRef.current);
-    briefTimerRef.current = window.setTimeout(() => setBriefOpen(false), 5200);
+    if (autoCloseMs > 0) {
+      briefTimerRef.current = window.setTimeout(() => setBriefOpen(false), autoCloseMs);
+    } else {
+      briefTimerRef.current = 0;
+    }
+  };
+
+  const openCompletedBrief = async (event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (scanning) return;
+    const nowTs = Date.now();
+    if (nowTs - briefTapGuardRef.current < 450) return;
+    briefTapGuardRef.current = nowTs;
+    if (briefTimerRef.current) window.clearTimeout(briefTimerRef.current);
+    /* 완료 상태가 아니어도 탭 시 요약은 열어 준다 (로컬/서버 시각 어긋남 대비) */
+    setBriefOpen(true);
+    showBrief(briefLines.length ? briefLines : FALLBACK_LINES, { autoCloseMs: 0 });
+    try {
+      const brief = await fetchSafetyPatchBrief();
+      if (Array.isArray(brief?.lines) && brief.lines.length) {
+        showBrief(brief.lines, { autoCloseMs: 0 });
+      }
+    } catch {
+      /* 이미 FALLBACK 표시 */
+    }
   };
 
   useEffect(() => () => {
@@ -201,21 +229,39 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
       ? "bg-slate-900 text-white ring-1 ring-amber-300/70"
       : "bg-white text-slate-900 ring-1 ring-amber-400 shadow-lg";
 
+  /* 하단 크롬(--vlue-bottom-nav-offset) + 친구시트 접힘 높이 위. pointer-events-none 부모는 쓰지 않음. */
+  const stickerBottom =
+    "calc(var(--vlue-bottom-nav-offset, calc(54px + env(safe-area-inset-bottom, 0px))) + var(--friend-sheet-collapsed-h, 52px) + 10px)";
+
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 z-[148] flex flex-col items-center gap-1 px-3" style={{ bottom: "calc(54px + env(safe-area-inset-bottom, 0px) + 8px)" }}>
+      <div
+        className="fixed inset-x-0 z-[170] flex flex-col items-center gap-1 px-3"
+        style={{ bottom: stickerBottom }}
+      >
         {scanError && !promptOpen && !scanning && !briefOpen ? (
-          <p className="pointer-events-auto max-w-md rounded-2xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white">{scanError}</p>
+          <p className="max-w-md rounded-2xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white">{scanError}</p>
         ) : null}
         {complete ? (
-          <div className={`pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight ${stickerClass}`}>
+          <button
+            type="button"
+            onClick={(e) => void openCompletedBrief(e)}
+            onPointerUp={(e) => {
+              /* 일부 WebView는 click이 누락되고 pointerup만 옴 */
+              if (e.pointerType === "touch" || e.pointerType === "pen") {
+                void openCompletedBrief(e);
+              }
+            }}
+            aria-label="안심패치 내용 보기"
+            className={`inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight shadow-md active:scale-[0.98] ${stickerClass}`}
+          >
             <span className="truncate">🟢 TODAY 안심패치 완료 | {formatPatchCountdown(remaining)}</span>
-          </div>
+          </button>
         ) : (
           <button
             type="button"
             onClick={() => void runPatch()}
-            className={`pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight ${stickerClass}`}
+            className={`inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight shadow-md active:scale-[0.98] ${stickerClass}`}
           >
             <span className="truncate">🛡️ TODAY 안심패치 미완료</span>
           </button>
@@ -263,18 +309,30 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
 
       {briefOpen ? (
         <div
-          className="fixed inset-0 z-[710] flex items-end justify-center bg-black/40 px-4 pb-[calc(54px+env(safe-area-inset-bottom,0px)+72px)]"
+          className="fixed inset-0 z-[710] flex items-end justify-center bg-black/40 px-4 pb-[calc(54px+env(safe-area-inset-bottom,0px)+var(--friend-sheet-collapsed-h,52px)+24px)]"
           onClick={() => setBriefOpen(false)}
+          role="presentation"
         >
           <div
-            className={`safety-patch-brief w-full max-w-md rounded-[28px] p-4 shadow-2xl ${isDarkMode ? "bg-[#111827] text-white" : "bg-white text-slate-900"}`}
+            className={`safety-patch-brief max-h-[min(70vh,520px)] w-full max-w-md overflow-y-auto rounded-[28px] p-4 shadow-2xl ${isDarkMode ? "bg-[#111827] text-white" : "bg-white text-slate-900"}`}
             onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-label="TODAY 안심패치 요약"
           >
-            <p className="text-[14px] font-black tracking-tight">🟢 TODAY 안심패치 요약</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[14px] font-black tracking-tight">🟢 TODAY 안심패치 요약</p>
+              <button
+                type="button"
+                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${isDarkMode ? "bg-white/10" : "bg-slate-100"}`}
+                onClick={() => setBriefOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
             <ul className="mt-3 space-y-2">
-              {briefLines.map((line) => (
+              {briefLines.map((line, idx) => (
                 <li
-                  key={`${line.title}-${line.icon}`}
+                  key={`${line.title}-${line.icon}-${idx}`}
                   className={`rounded-2xl px-3 py-2 ${isDarkMode ? "bg-white/8" : "bg-slate-50"}`}
                 >
                   <p className="text-[12px] font-black">
@@ -287,7 +345,7 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
               ))}
             </ul>
             <p className={`mt-3 text-center text-[10px] ${isDarkMode ? "text-white/45" : "text-slate-400"}`}>
-              잠시 후 자동으로 닫히며, 하단 타이머는 계속 유지됩니다.
+              하단 타이머는 계속 유지됩니다. 바깥을 탭하면 닫힙니다.
             </p>
           </div>
         </div>

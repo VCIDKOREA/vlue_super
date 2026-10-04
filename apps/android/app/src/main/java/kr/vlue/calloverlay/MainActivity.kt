@@ -35,8 +35,10 @@ import kr.vlue.calloverlay.family.FamilyCareForegroundService
 import kr.vlue.calloverlay.family.FamilyDangerousPermissionScanner
 import kr.vlue.calloverlay.family.FamilyDeleteIntentHelper
 import kr.vlue.calloverlay.family.FamilyRemoteAppScanner
+import kr.vlue.calloverlay.family.FamilyRemoteSecurityGate
 import kr.vlue.calloverlay.family.ScreenSecureHelper
 import kr.vlue.calloverlay.family.VlueFamilyBridge
+import android.view.ViewGroup
 
 /**
  * VLUÉ 메인 WebView + 레터링 + 가족보호 + 앱 PIN 잠금
@@ -199,7 +201,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             activity = this,
             root = mainRoot,
             onUnlockedForLaunch = {
-                webView.visibility = View.VISIBLE
+                if (!FamilyRemoteSecurityGate.isBlocking()) {
+                    webView.visibility = View.VISIBLE
+                }
             },
             onNotifyWeb = { event, detail -> dispatchWebCustomEvent(event, detail) }
         )
@@ -222,8 +226,10 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 injectAppLockBridgeBootstrap()
                 scanRemoteApps()
                 scanDangerousApps()
+                FamilyRemoteSecurityGate.restoreIfNeeded(this@MainActivity, remoteSecurityHost)
                 handleFamilyInviteIntent(intent)
                 handleLocationChatIntent(intent)
+                handleRemoteSecurityDeepLink(intent)
                 VlueAppUpdatePrompt.maybeShow(this@MainActivity)
             }
         }
@@ -405,6 +411,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
         handleMemoShareIntent(intent)
         handleLocationChatIntent(intent)
+        handleRemoteSecurityDeepLink(intent)
         handleVmapRestoreIntent(intent)
     }
 
@@ -416,6 +423,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             handleMemoShareIntent(intent)
             handleFamilyInviteIntent(intent)
             handleLocationChatIntent(intent)
+            handleRemoteSecurityDeepLink(intent)
             handleVmapRestoreIntent(intent)
             VlueAppUpdatePrompt.applyIntentExtras(intent, this)
             VlueAppUpdatePrompt.maybeShow(this)
@@ -531,8 +539,54 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }, 450)
     }
 
+    /** 원격 보안 1·2차 푸시 → V-MAP 마지막 확인 위치 */
+    private fun handleRemoteSecurityDeepLink(intent: Intent?) {
+        if (intent == null || !::webView.isInitialized) return
+        val openLocation = intent.getStringExtra("openLocation")?.trim().orEmpty()
+        val lastKnown = intent.getStringExtra("lastKnownLocation")?.trim().orEmpty()
+        val kind = intent.getStringExtra("kind")?.trim().orEmpty()
+        val focusUserId =
+            intent.getStringExtra("focusUserId")?.trim().orEmpty()
+                .ifBlank { intent.getStringExtra("wardUserId")?.trim().orEmpty() }
+        val mode = intent.getStringExtra("mode")?.trim().orEmpty().ifBlank { "family" }
+        val isRemotePush =
+            kind.startsWith("remote_security") ||
+                openLocation == "1" ||
+                lastKnown == "1"
+        if (!isRemotePush || focusUserId.isBlank()) return
+        val safeMode = org.json.JSONObject.quote(mode)
+        val safeFocus = org.json.JSONObject.quote(focusUserId)
+        webView.postDelayed({
+            try {
+                webView.evaluateJavascript(
+                    """
+                    (function(){
+                      try{
+                        window.dispatchEvent(new CustomEvent('vlue-open-location',{
+                          detail:{
+                            mode:$safeMode,
+                            focusUserId:$safeFocus,
+                            lastKnownLocation:true,
+                            expandChat:false
+                          }
+                        }));
+                      }catch(e){}
+                    })();
+                    """.trimIndent(),
+                    null
+                )
+            } catch (_: Exception) {
+            }
+        }, 500)
+    }
+
     override fun onStart() {
         super.onStart()
+        // 원격 감지 차단: 진입·터치 무반응 (본인 단말 묵음 — 토스트/알림 없음)
+        if (FamilyProtectionPrefs.isRemoteBlockActive(this) || FamilyRemoteSecurityGate.isBlocking()) {
+            FamilyRemoteSecurityGate.restoreIfNeeded(this, remoteSecurityHost)
+            return
+        }
         if (::pinLock.isInitialized) {
             if (pinLock.shouldBlockLaunch() || AppLockStore.requiresIdentityReset()) {
                 webView.visibility = View.INVISIBLE
@@ -882,6 +936,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     }
 
     override fun onDestroy() {
+        try {
+            FamilyRemoteSecurityGate.onAppForceStopping(this)
+        } catch (_: Exception) {
+            /* ignore */
+        }
         VlueFamilyBridge.detachWebView()
         if (::nativeAdManager.isInitialized) nativeAdManager.destroy()
         if (::bannerAdManager.isInitialized) bannerAdManager.destroy()
@@ -909,6 +968,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     override fun scanRemoteApps() {
         if (!FamilyPermissionHelper.allGranted(this)) return
         val found = FamilyRemoteAppScanner.scanInstalled(this)
+        FamilyRemoteSecurityGate.onRemotePackagesFound(this, found, remoteSecurityHost)
         val reported = FamilyProtectionPrefs.loadReportedPackages(this).toMutableSet()
         var changed = false
         for (pkg in found) {
@@ -919,6 +979,33 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             }
         }
         if (changed) FamilyProtectionPrefs.saveReportedPackages(this, reported)
+    }
+
+    private val remoteSecurityHost = object : FamilyRemoteSecurityGate.Host {
+        override fun runOnUi(block: () -> Unit) {
+            runOnUiThread(block)
+        }
+
+        override fun rootContentView(): ViewGroup? =
+            if (::mainRoot.isInitialized) mainRoot else null
+
+        override fun hideWebContentSilently() {
+            if (::webView.isInitialized) webView.visibility = View.INVISIBLE
+        }
+
+        override fun revealWebContent() {
+            if (::webView.isInitialized && !FamilyRemoteSecurityGate.isBlocking()) {
+                webView.visibility = View.VISIBLE
+            }
+        }
+
+        override fun moveToBackgroundSilently() {
+            try {
+                moveTaskToBack(true)
+            } catch (_: Exception) {
+                /* ignore */
+            }
+        }
     }
 
     override fun scanDangerousApps() {

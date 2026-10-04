@@ -2,6 +2,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AdMobBannerSlot from "../ads/AdMobBannerSlot.jsx";
 import MemberSafetyDetail from "./MemberSafetyDetail.jsx";
 import { reverseGeocodeLatLng } from "../../lib/activeRegion.js";
+
+function formatLastSeenLabel(iso) {
+  if (!iso) return "시각 미상";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "시각 미상";
+    const now = new Date();
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+    const time = new Intl.DateTimeFormat("ko-KR", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    }).format(d);
+    if (sameDay) return `오늘 ${time}`;
+    return new Intl.DateTimeFormat("ko-KR", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    }).format(d);
+  } catch {
+    return "시각 미상";
+  }
+}
 import {
   createVmapRoom,
   departVmap,
@@ -427,6 +455,8 @@ export default function LocationPlatform() {
       const shouldJoin = Boolean(event?.detail?.join && roomId);
       const expandChat = Boolean(event?.detail?.expandChat);
       const familyPaywall = Boolean(event?.detail?.familyPaywall);
+      const focusUserId = String(event?.detail?.focusUserId || event?.detail?.wardUserId || "").trim();
+      const lastKnownLocation = Boolean(event?.detail?.lastKnownLocation);
       const nextMode = mode === "vmap" || roomId ? "vmap" : "family";
       openLocation(nextMode);
       if (expandChat) {
@@ -467,6 +497,19 @@ export default function LocationPlatform() {
             setNotice(FAMILY_PLAN_TOAST);
             window.setTimeout(() => setNotice(""), 2800);
           }, 120);
+        }
+        if (focusUserId) {
+          window.setTimeout(() => {
+            try {
+              window.dispatchEvent(
+                new CustomEvent("vlue-focus-family-member", {
+                  detail: { userId: focusUserId, lastKnownLocation }
+                })
+              );
+            } catch {
+              /* ignore */
+            }
+          }, 700);
         }
       }
     };
@@ -1677,6 +1720,20 @@ export default function LocationPlatform() {
     }
   };
 
+  useEffect(() => {
+    const onFocus = (event) => {
+      const userId = String(event?.detail?.userId || "").trim();
+      if (!userId) return;
+      const pool = members.length ? members : people;
+      const hit =
+        pool.find((m) => m.userId === userId) ||
+        people.find((m) => m.userId === userId);
+      if (hit) focusMember(hit);
+    };
+    window.addEventListener("vlue-focus-family-member", onFocus);
+    return () => window.removeEventListener("vlue-focus-family-member", onFocus);
+  }, [members, people]);
+
   const dark = theme === "dark";
   const glass = dark
     ? "border border-white/10 bg-[#0c1220]/80 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-2xl"
@@ -1994,9 +2051,23 @@ export default function LocationPlatform() {
                     ) : null}
                   </div>
                   <MemberSafetyDetail member={selected} roomId={session.roomId || ""} dark={dark} />
-                  <p className="mt-1 text-[12px] font-medium">
-                    {selected.online === false ? "접속 끊김" : "접속 중"}
-                  </p>
+                  {selected.lastKnownLocation ||
+                  selected.connectionStatus === "DISCONNECTED" ||
+                  selected.connectionStatus === "TERMINATED" ? (
+                    <div className="mt-1.5 space-y-1">
+                      <p className={`text-[12px] font-semibold ${dark ? "text-amber-200" : "text-amber-800"}`}>
+                        상태: 마지막 수신: {formatLastSeenLabel(selected.last_seen_at || selected.updatedAt)}
+                        {" "}(앱 연결 중단됨)
+                      </p>
+                      <p className={`text-[11px] leading-relaxed ${dark ? "text-white/65" : "text-slate-600"}`}>
+                        앱 연결이 중단되기 전 마지막으로 수신된 위치입니다. 24시간 동안 유지됩니다.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-[12px] font-medium">
+                      {selected.online === false ? "접속 끊김" : "접속 중"}
+                    </p>
+                  )}
                   {familyNavTarget?.userId === selected.userId && guideOn ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className={`inline-flex rounded-full bg-[#00D2FF]/15 px-2.5 py-1 text-[11px] font-semibold ${dark ? "text-[#00D2FF]" : "text-[#0e7490]"}`}>
@@ -2360,9 +2431,11 @@ export default function LocationPlatform() {
                               .join(", ") || "해외"
                           : member.lat == null
                             ? "위치 없음"
-                            : member.grayscale
-                              ? "마지막 위치"
-                              : "실시간"}
+                            : member.lastKnownLocation
+                              ? "📍 마지막 확인 위치"
+                              : member.grayscale
+                                ? "마지막 위치"
+                                : "실시간"}
                     </span>
                   </button>
                 </li>

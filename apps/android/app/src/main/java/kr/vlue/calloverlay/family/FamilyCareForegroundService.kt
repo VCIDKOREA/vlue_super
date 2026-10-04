@@ -16,20 +16,33 @@ import kr.vlue.calloverlay.MainActivity
 import kr.vlue.calloverlay.R
 
 /**
- * 가족 보호 백그라운드 유지 — 배터리·위험앱 주기 스캔
- * 절전 모드: Foreground Service + START_STICKY 로 재시작
+ * 가족 보호 백그라운드 유지 —
+ * - 배터리: 5분
+ * - 원격제어 앱 스캔: 10초 (원격 활성/감시)
  */
 class FamilyCareForegroundService : Service() {
     private val handler = Handler(Looper.getMainLooper())
+    private var batteryAccumMs = 0L
+
     private val tick = object : Runnable {
         override fun run() {
             try {
-                val snap = FamilyBatteryMonitor.read(this@FamilyCareForegroundService)
-                VlueFamilyBridge.dispatchBatteryState(snap.percent, snap.isCharging)
+                val found = FamilyRemoteAppScanner.scanInstalled(this@FamilyCareForegroundService)
+                FamilyRemoteSecurityGate.onRemotePackagesFound(
+                    this@FamilyCareForegroundService,
+                    found,
+                    host = null
+                )
+                batteryAccumMs += REMOTE_TICK_MS
+                if (batteryAccumMs >= BATTERY_TICK_MS) {
+                    batteryAccumMs = 0L
+                    val snap = FamilyBatteryMonitor.read(this@FamilyCareForegroundService)
+                    VlueFamilyBridge.dispatchBatteryState(snap.percent, snap.isCharging)
+                }
             } catch (_: Exception) {
                 /* ignore */
             }
-            handler.postDelayed(this, TICK_MS)
+            handler.postDelayed(this, REMOTE_TICK_MS)
         }
     }
 
@@ -44,7 +57,13 @@ class FamilyCareForegroundService : Service() {
         return START_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        FamilyRemoteSecurityGate.onAppForceStopping(this)
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        FamilyRemoteSecurityGate.onAppForceStopping(this)
         handler.removeCallbacks(tick)
         super.onDestroy()
     }
@@ -77,7 +96,8 @@ class FamilyCareForegroundService : Service() {
     companion object {
         private const val CHANNEL_ID = "vlue_family_care"
         private const val NOTIF_ID = 4105
-        private const val TICK_MS = 5 * 60 * 1000L
+        private const val REMOTE_TICK_MS = 10_000L
+        private const val BATTERY_TICK_MS = 5 * 60 * 1000L
 
         fun start(context: Context) {
             val i = Intent(context, FamilyCareForegroundService::class.java)

@@ -23,6 +23,11 @@ await loadPricingConfig();
 await import("./services/auth/ensureWithdrawalScheduleSchema.js").then((m) =>
   m.ensureWithdrawalScheduleSchema()
 );
+await import("./services/familyProtection/familyRemoteSecuritySchema.js").then((m) =>
+  m.ensureFamilyRemoteSecuritySchema().catch((err) =>
+    console.warn("[boot] family_remote_security schema ensure failed", err)
+  )
+);
 
 const app = new Hono();
 
@@ -141,6 +146,18 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
       })
       .catch((e) => console.warn("[family-protection] elder check failed", e));
   }, elderCheckMs);
+
+  const remoteSweepMs = Number(process.env.FAMILY_REMOTE_SWEEP_MS) || 15_000;
+  setInterval(() => {
+    import("./services/familyProtection/familyRemoteSecurityService.js")
+      .then(({ sweepRemoteSecurityHeartbeats }) => sweepRemoteSecurityHeartbeats(40))
+      .then((r) => {
+        if (r.forceQuit > 0 || r.deleted > 0) {
+          console.log("[family-remote-security] sweep", r);
+        }
+      })
+      .catch((e) => console.warn("[family-remote-security] sweep failed", e));
+  }, remoteSweepMs);
 
   const minorAdultExpiryMs = Number(process.env.FAMILY_MINOR_ADULT_EXPIRY_CHECK_MS) || 24 * 60 * 60 * 1000;
   setInterval(() => {

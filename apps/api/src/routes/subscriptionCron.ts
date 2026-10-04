@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { runSubscriptionBillingBatch } from "../cron/subscriptionScheduler.js";
 import { runPersonalComboReverificationBatch } from "../services/membership/personalComboReverifyScheduler.js";
+import { sweepRemoteSecurityHeartbeats } from "../services/familyProtection/familyRemoteSecurityService.js";
 
 export const subscriptionCronRoutes = new Hono();
 
@@ -61,5 +62,28 @@ subscriptionCronRoutes.post("/personal-combo-reverify", async (c) => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg, code: "PERSONAL_COMBO_REVERIFY_FAILED" }, 500);
+  }
+});
+
+/**
+ * POST /api/cron/remote-security-sweep
+ * 원격 활성 하트비트 유실 → 강제종료/삭제 2차 푸시
+ */
+subscriptionCronRoutes.post("/remote-security-sweep", async (c) => {
+  const secret = c.req.header("X-Subscription-Cron-Secret") || c.req.header("x-cron-secret") || "";
+  const expected =
+    process.env.SUBSCRIPTION_CRON_SECRET ||
+    process.env.CRON_SECRET ||
+    process.env.INTERNAL_CRON_SECRET ||
+    "";
+  if (expected && secret !== expected) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  try {
+    const summary = await sweepRemoteSecurityHeartbeats(80);
+    return c.json({ ok: true, ...summary });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg, code: "REMOTE_SECURITY_SWEEP_FAILED" }, 500);
   }
 });

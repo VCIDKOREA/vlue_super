@@ -8,7 +8,14 @@ import { ssePublish } from "../realtime/sseHub.js";
 import { sendShowcaseSocialPushToUser } from "../services/fcmNotificationService.js";
 import { AUTO_ARRIVE_METERS, isVmapDropout, vmapRoomReadyToClose } from "../services/location/vmapArrival.js";
 import { ensureLocationPresenceOverseasSchema } from "../services/location/locationPresenceOverseasSchema.js";
+import { ensureFamilyRemoteSecuritySchema } from "../services/familyProtection/familyRemoteSecuritySchema.js";
+import {
+  attachLastKnownLocationFields,
+  sweepRemoteSecurityHeartbeats
+} from "../services/familyProtection/familyRemoteSecurityService.js";
 import { resolveUserPolicy } from "../services/membership/userPolicyManager.js";
+
+const LAST_LOCATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const FAREWELL = "전원 목적지까지 안전하게 도착하셨습니다. 오늘도 즐거운 하루 되십시요";
 
@@ -339,6 +346,7 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
   const lng = num(body.lng, NaN);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return c.json({ error: "좌표가 없습니다." }, 400);
   await ensureLocationPresenceOverseasSchema();
+  await ensureFamilyRemoteSecuritySchema();
   const geo = await reverseGeocodeGoogle(lat, lng);
   const addressLabel = clip(geo?.addressLabel || body.addressLabel, 240);
   const batteryPct = body.batteryPct == null ? null : Math.max(0, Math.min(100, Math.round(num(body.batteryPct))));
@@ -349,6 +357,7 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
     cityName: clip(geo?.cityName, 80),
     timeZoneId: clip(geo?.timeZoneId, 64)
   };
+  const online = body.online !== false;
   const row = await prisma.locationPresence.upsert({
     where: { userId },
     create: {
@@ -358,7 +367,7 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
       lng,
       addressLabel,
       batteryPct,
-      online: body.online !== false,
+      online,
       ...overseas
     },
     update: {
@@ -367,10 +376,21 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
       lng,
       addressLabel,
       batteryPct,
-      online: body.online !== false,
+      online,
       ...overseas
     }
   });
+  // 마지막 확인 위치 24시간 보존용 미러 필드 (삭제·중단 시에도 유지)
+  await prisma.$executeRawUnsafe(
+    `UPDATE location_presence
+     SET last_lat = $2, last_lng = $3, last_seen_at = now(),
+         connection_status = CASE WHEN $4 THEN 'CONNECTED' ELSE connection_status END
+     WHERE user_id = $1::uuid`,
+    userId,
+    lat,
+    lng,
+    online
+  );
   return c.json({
     ok: true,
     presence: {
@@ -384,6 +404,7 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
 
 locationMapRoutes.get("/family", requireUserHeader, async (c) => {
   const userId = await me(c);
+  void sweepRemoteSecurityHeartbeats(20).catch(() => {});
   const links = await prisma.familyProtectionLink.findMany({
     where: {
       status: "active",
@@ -407,8 +428,23 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
   }
   const photos = await profilePhotos([...ids]);
   await ensureLocationPresenceOverseasSchema();
+  await ensureFamilyRemoteSecuritySchema();
   const rows = await prisma.locationPresence.findMany({ where: { userId: { in: [...ids] } } });
   const byId = new Map(rows.map((row) => [row.userId, row]));
+  const lastLocRows = await prisma.$queryRawUnsafe<
+    Array<{
+      user_id: string;
+      last_lat: number | null;
+      last_lng: number | null;
+      last_seen_at: Date | null;
+      connection_status: string;
+    }>
+  >(
+    `SELECT user_id, last_lat, last_lng, last_seen_at, connection_status
+     FROM location_presence WHERE user_id = ANY($1::uuid[])`,
+    [...ids]
+  );
+  const lastById = new Map(lastLocRows.map((r) => [r.user_id, r]));
   const members = [];
   for (const id of ids) {
     let row = byId.get(id) || null;
@@ -429,18 +465,39 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
         byId.set(id, row);
       }
     }
+    const last = lastById.get(id);
+    const lastSeenAt = last?.last_seen_at || row?.updatedAt || null;
+    const lastSeenMs = lastSeenAt ? new Date(lastSeenAt).getTime() : 0;
+    const within24h = lastSeenMs > 0 && Date.now() - lastSeenMs <= LAST_LOCATION_TTL_MS;
+    const preservedLat = within24h ? last?.last_lat ?? row?.lat ?? null : row?.lat ?? null;
+    const preservedLng = within24h ? last?.last_lng ?? row?.lng ?? null : row?.lng ?? null;
+    const connectionStatus = last?.connection_status || "CONNECTED";
     const stale = !row || Date.now() - row.updatedAt.getTime() > 3 * 60 * 1000;
-    const dead = !row || row.online === false || row.batteryPct === 0 || stale;
+    const dead =
+      !row ||
+      row.online === false ||
+      row.batteryPct === 0 ||
+      stale ||
+      connectionStatus === "DISCONNECTED" ||
+      connectionStatus === "TERMINATED";
+    const lastKnownLocation = Boolean(
+      dead && within24h && preservedLat != null && preservedLng != null
+    );
     members.push({
       userId: id,
       self: id === userId,
       displayName: row?.displayName || names.get(id) || (id === userId ? "나" : "가족"),
-      lat: row?.lat ?? null,
-      lng: row?.lng ?? null,
+      lat: (lastKnownLocation || within24h) ? preservedLat : (row?.lat ?? null),
+      lng: (lastKnownLocation || within24h) ? preservedLng : (row?.lng ?? null),
       addressLabel: row?.addressLabel || "",
       batteryPct: row?.batteryPct ?? null,
       online: Boolean(row) && !dead,
       grayscale: dead,
+      lastKnownLocation,
+      last_lat: within24h ? last?.last_lat ?? null : null,
+      last_lng: within24h ? last?.last_lng ?? null : null,
+      last_seen_at: within24h && lastSeenAt ? new Date(lastSeenAt).toISOString() : null,
+      connectionStatus,
       photoUrl: photos.get(id) || "",
       updatedAt: row?.updatedAt?.toISOString() || null,
       isOverseas: Boolean(row?.isOverseas),
@@ -453,7 +510,8 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
       timeZoneId: row?.timeZoneId || ""
     });
   }
-  return c.json({ ok: true, members });
+  const enriched = await attachLastKnownLocationFields(members);
+  return c.json({ ok: true, members: enriched });
 });
 
 locationMapRoutes.post("/vmap", requireUserHeader, async (c) => {

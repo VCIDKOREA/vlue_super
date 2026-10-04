@@ -2,7 +2,7 @@
  * Android/iOS — 설치된 원격제어 앱 보고
  * window.VlueFamilyBridge.onRemoteAppDetected?.("com.teamviewer.host")
  */
-import { postWardRemoteApp } from "./familyProtectionApi.js";
+import { postWardRemoteApp, postRemoteSecurityDetected } from "./familyProtectionApi.js";
 import { reportFamilyCrossThreat, syncFamilySecurityState } from "./familyCrossSecurityApi.js";
 import { getDevicePlatformForSync, isIosShell } from "./familyPlatformCapabilities.js";
 import { rememberDccSecurityPackage } from "./dccSecurityAttestation.js";
@@ -35,12 +35,20 @@ export function registerFamilyDeviceBridge() {
     platform: prev.platform || (isIosShell() ? "ios" : prev.platform),
     onRemoteAppDetected: (packageOrLabel) => {
       if (!packageOrLabel) return;
-      emitDetectedPackage("vlue-remote-app-detected", packageOrLabel);
-      postWardRemoteApp(String(packageOrLabel)).catch(() => {});
+      const pkg = String(packageOrLabel);
+      emitDetectedPackage("vlue-remote-app-detected", pkg);
+      // 통합 보안 경로 (1차 가족 푸시 + is_remote_active). 본인 단말 UI 알림은 네이티브가 묵음 처리.
+      postRemoteSecurityDetected({
+        packageName: pkg,
+        packageId: pkg,
+        is_remote_active: true
+      }).catch(() => {
+        postWardRemoteApp(pkg).catch(() => {});
+      });
       reportFamilyCrossThreat({
         threatKind: "remote_control_app",
-        packageName: String(packageOrLabel),
-        appLabel: String(packageOrLabel)
+        packageName: pkg,
+        appLabel: pkg
       }).catch(() => {});
     },
     onDangerousAppDetected: (hit) => {

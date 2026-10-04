@@ -323,6 +323,71 @@ export async function buildFamilySafetyReport(viewerId: string, targetId: string
 export type PatchBriefLine = { icon: string; title: string; body: string };
 
 /** 패치 직후/접속 시 잠깐 보여주는 오늘의 안심패치 요약 */
+async function countDeviceThreats24h(userId: string) {
+  let malware = 0;
+  let remote = 0;
+  try {
+    const { listIncidentsForUser } = await import("../familyProtection/familyCrossSecurityStore.js");
+    const since = Date.now() - 24 * 60 * 60 * 1000;
+    const incidents = await listIncidentsForUser(userId);
+    for (const row of incidents) {
+      if (row.wardUserId !== userId) continue;
+      const t = new Date(row.createdAt).getTime();
+      if (!Number.isFinite(t) || t < since) continue;
+      if (row.threatKind === "dangerous_permission_app") malware += 1;
+      if (row.threatKind === "remote_control_app") remote += 1;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ kind: string; c: number }>>(
+      `
+      SELECT kind::text AS kind, COUNT(*)::int AS c
+      FROM family_protection_alerts
+      WHERE ward_user_id = $1::uuid
+        AND created_at > NOW() - INTERVAL '24 hours'
+        AND kind::text IN ('elder_remote_control_app')
+      GROUP BY kind
+      `,
+      userId
+    );
+    for (const row of rows) {
+      if (String(row.kind) === "elder_remote_control_app") {
+        remote += Number(row.c || 0);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    await import("../familyProtection/familyRemoteSecuritySchema.js").then((m) =>
+      m.ensureFamilyRemoteSecuritySchema()
+    );
+    const remoteRows = await prisma.$queryRawUnsafe<
+      Array<{ is_remote_active: boolean; stage1_notified_at: Date | null; remote_detected_at: Date | null }>
+    >(
+      `
+      SELECT is_remote_active, stage1_notified_at, remote_detected_at
+      FROM family_remote_security_state
+      WHERE user_id = $1::uuid
+      LIMIT 1
+      `,
+      userId
+    );
+    const st = remoteRows[0];
+    if (st?.remote_detected_at && Date.now() - new Date(st.remote_detected_at).getTime() < 24 * 60 * 60 * 1000) {
+      /* 원격 세션이 24h 내 감지됐으면 최소 1회로 반영 (알림 카운트와 중복 가능 → max) */
+      remote = Math.max(remote, 1);
+      if (st.stage1_notified_at) remote = Math.max(remote, 1);
+    }
+    if (st?.is_remote_active) remote = Math.max(remote, 1);
+  } catch {
+    /* ignore */
+  }
+  return { malware, remote };
+}
+
 export async function buildTodayPatchBrief(userId: string): Promise<{
   ok: true;
   lines: PatchBriefLine[];
@@ -347,6 +412,8 @@ export async function buildTodayPatchBrief(userId: string): Promise<{
     smsSuspect = 0;
   }
 
+  const threats = await countDeviceThreats24h(userId);
+
   const reportOk = report.ok === true ? report : null;
   const place =
     reportOk?.addressLabel ||
@@ -363,6 +430,15 @@ export async function buildTodayPatchBrief(userId: string): Promise<{
     ? `${reportOk.summary.split("\n")[0]} · 안심지수 ${reportOk.safetyIndex}`
     : "가족 안심 요약을 동기화했습니다.";
 
+  const malwareBody =
+    threats.malware > 0
+      ? `최근 24시간 기기 악성·위험 권한 APP 감지 ${threats.malware}회`
+      : "최근 24시간 기기 악성·위험 권한 APP 감지 없음";
+  const remoteBody =
+    threats.remote > 0
+      ? `최근 24시간 원격제어 앱 활성화·감지 ${threats.remote}회 (TeamViewer·AnyDesk 등)`
+      : "최근 24시간 원격제어 앱 활성화 감지 없음";
+
   const lines: PatchBriefLine[] = [
     { icon: "🤖", title: "Gemini AI 안심요약", body: geminiBody.slice(0, 160) },
     { icon: "📍", title: "위치", body: String(place).slice(0, 120) },
@@ -370,6 +446,16 @@ export async function buildTodayPatchBrief(userId: string): Promise<{
       icon: "📡",
       title: "수집 정보",
       body: `배터리 ${battery} · GPS · 접속 상태 동기화`
+    },
+    {
+      icon: "🦠",
+      title: "기기 악성 APP 감지",
+      body: malwareBody
+    },
+    {
+      icon: "🖥️",
+      title: "원격앱 활성화",
+      body: remoteBody
     },
     {
       icon: "💬",
