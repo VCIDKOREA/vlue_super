@@ -272,27 +272,32 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         window.setTimeout(relayout, 80);
         window.setTimeout(relayout, 320);
         if (typeof ResizeObserver !== "undefined") {
-          resizeObserver = new ResizeObserver(() => relayout());
+          let resizeRaf = 0;
+          resizeObserver = new ResizeObserver(() => {
+            if (resizeRaf) return;
+            resizeRaf = window.requestAnimationFrame(() => {
+              resizeRaf = 0;
+              relayout();
+            });
+          });
           resizeObserver.observe(hostRef.current);
         }
 
-        /* 길안내 추적: 잦은 setCenter(뚝뚝) 대신 임계값+ morph 1회 */
+        /* 길안내 추적: 잦은 setCenter 대신 임계값 + morph (주기 완화) */
         idleTimer = window.setInterval(() => {
           const target = followTargetRef.current;
           const liveMap = mapRef.current;
           const naver = mapsApiRef.current;
           if (!guideFollowRef.current || !target || !liveMap || !naver) return;
-          if (performance.now() - gestureAtRef.current < 900) return;
+          if (performance.now() - gestureAtRef.current < 1100) return;
           const cur = liveMap.getCenter();
-          const dLat = target.lat - cur.lat();
-          const dLng = target.lng - cur.lng();
-          const dist = Math.hypot(dLat, dLng);
-          if (dist < 0.00004) return;
+          const distM = haversineMeters(cur.lat(), cur.lng(), target.lat, target.lng);
+          if (distM < 8) return;
           const coord = new naver.LatLng(target.lat, target.lng);
           const nextZoom = Number.isFinite(target.zoom) ? target.zoom : liveMap.getZoom();
           try {
             if (typeof liveMap.morph === "function") {
-              liveMap.morph(coord, nextZoom, { duration: 320, easing: "easeOutCubic" });
+              liveMap.morph(coord, nextZoom, { duration: 280, easing: "easeOutCubic" });
               gestureAtRef.current = performance.now();
               return;
             }
@@ -300,11 +305,11 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
             /* fall through */
           }
           liveMap.panTo(coord);
-          if (Number.isFinite(target.zoom) && Math.abs(liveMap.getZoom() - target.zoom) > 0.2) {
+          if (Number.isFinite(target.zoom) && Math.abs(liveMap.getZoom() - target.zoom) > 0.35) {
             liveMap.setZoom(target.zoom, true);
           }
           gestureAtRef.current = performance.now();
-        }, 700);
+        }, 1000);
 
         setMapEpoch((n) => n + 1);
         onReadyRef.current?.();
@@ -409,7 +414,12 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           entry.marker.setIcon({ content: html, size: iconSize, anchor: iconAnchor });
           entry.html = html;
         }
-        if (entry.lat !== member.lat || entry.lng !== member.lng) {
+        /* 미세 GPS 떨림으로 setPosition 남발하면 지도가 버벅임 */
+        const moved =
+          entry.lat == null ||
+          entry.lng == null ||
+          haversineMeters(entry.lat, entry.lng, member.lat, member.lng) >= 2.5;
+        if (moved) {
           entry.marker.setPosition(nextPos);
           entry.lat = member.lat;
           entry.lng = member.lng;

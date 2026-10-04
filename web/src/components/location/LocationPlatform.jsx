@@ -429,6 +429,10 @@ export default function LocationPlatform() {
   const leaveLock = useRef(false);
   const guideOnRef = useRef(false);
   const routeModeRef = useRef("recommend");
+  /** GPS → setSelf / 역지오코딩 / presence 과다 호출 방지 */
+  const lastSelfUiRef = useRef({ lat: null, lng: null, at: 0 });
+  const lastGeocodeRef = useRef({ lat: null, lng: null, at: 0, label: "", meta: null });
+  const lastPresenceRef = useRef({ lat: null, lng: null, at: 0 });
   guideOnRef.current = guideOn;
   routeModeRef.current = routeMode;
 
@@ -601,37 +605,88 @@ export default function LocationPlatform() {
       const lng = coords?.longitude;
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       writeLastGeo(lat, lng);
-      /* 주소/배터리 조회가 느려도 프로필 마커는 즉시 올리기 */
+      const nowTs = Date.now();
+      const prevUi = lastSelfUiRef.current;
+      const movedUi =
+        prevUi.lat == null ||
+        haversineMeters(prevUi.lat, prevUi.lng, lat, lng) >= 4 ||
+        nowTs - prevUi.at >= 2500;
+      const geoCache = lastGeocodeRef.current;
+      const needGeocode =
+        geoCache.lat == null ||
+        haversineMeters(geoCache.lat, geoCache.lng, lat, lng) >= 80 ||
+        nowTs - geoCache.at >= 45000;
+
       const next = {
         lat,
         lng,
-        addressLabel: "",
+        addressLabel: geoCache.label || "",
         batteryPct: null,
         online,
         displayName: name,
-        isOverseas: false,
-        countryCode: "",
-        countryName: "",
-        cityName: ""
+        isOverseas: Boolean(geoCache.meta?.isOverseas),
+        countryCode: geoCache.meta?.countryCode || "",
+        countryName: geoCache.meta?.countryName || "",
+        cityName: geoCache.meta?.cityName || ""
       };
-      setSelf(next);
-      try {
-        const region = await reverseGeocodeLatLng(lat, lng);
-        next.addressLabel = region.detailedAddress || region.displayName || region.label || "";
-        next.isOverseas = Boolean(region.isOverseas);
-        next.countryCode = region.countryCode || "";
-        next.countryName = region.countryName || "";
-        next.cityName = region.cityName || "";
-      } catch {
-        next.addressLabel = "";
+
+      /* 미세 GPS 떨림마다 React 리렌더·네이버 마커 재생성 막기 */
+      if (movedUi) {
+        lastSelfUiRef.current = { lat, lng, at: nowTs };
+        setSelf((prev) => ({
+          ...(prev || {}),
+          ...next,
+          addressLabel: next.addressLabel || prev?.addressLabel || "",
+          batteryPct: prev?.batteryPct ?? null
+        }));
       }
-      try {
-        const battery = await readBattery();
-        if (battery && Number.isFinite(battery.level)) next.batteryPct = Math.round(battery.level * 100);
-      } catch {
-        next.batteryPct = null;
+
+      if (needGeocode) {
+        try {
+          const region = await reverseGeocodeLatLng(lat, lng);
+          const label = region.detailedAddress || region.displayName || region.label || "";
+          const meta = {
+            isOverseas: Boolean(region.isOverseas),
+            countryCode: region.countryCode || "",
+            countryName: region.countryName || "",
+            cityName: region.cityName || ""
+          };
+          lastGeocodeRef.current = { lat, lng, at: Date.now(), label, meta };
+          next.addressLabel = label;
+          next.isOverseas = meta.isOverseas;
+          next.countryCode = meta.countryCode;
+          next.countryName = meta.countryName;
+          next.cityName = meta.cityName;
+          setSelf((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  addressLabel: label,
+                  isOverseas: meta.isOverseas,
+                  countryCode: meta.countryCode,
+                  countryName: meta.countryName,
+                  cityName: meta.cityName
+                }
+              : { ...next }
+          );
+        } catch {
+          /* keep cache */
+        }
       }
-      setSelf({ ...next });
+
+      if (movedUi || needGeocode) {
+        try {
+          const battery = await readBattery();
+          if (battery && Number.isFinite(battery.level)) {
+            const pct = Math.round(battery.level * 100);
+            next.batteryPct = pct;
+            setSelf((prev) => (prev ? { ...prev, batteryPct: pct } : { ...next, batteryPct: pct }));
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
       const liveRoom = roomRef.current;
       const selfRow = membersRef.current.find((member) => member.userId === getLocalVlueUserId());
       const familyDest = familyNavRef.current;
@@ -671,9 +726,19 @@ export default function LocationPlatform() {
       } else {
         followRef.current = null;
       }
+
+      const prevPresence = lastPresenceRef.current;
+      const presenceDue =
+        prevPresence.lat == null ||
+        haversineMeters(prevPresence.lat, prevPresence.lng, lat, lng) >= 12 ||
+        nowTs - prevPresence.at >= 8000;
+      if (!presenceDue) return;
+      lastPresenceRef.current = { lat, lng, at: nowTs };
+
       if (session.mode === "family") {
         if (localCanUseFamilyLocation()) {
-          publishPresence(next).then(refreshFamily).catch(() => {});
+          /* 멤버 목록은 8초 interval이 갱신 — GPS마다 refreshFamily 하지 않음 */
+          publishPresence(next).catch(() => {});
         }
       } else if (session.roomId && session.departed) {
         publishVmapPresence(session.roomId, {
@@ -708,7 +773,7 @@ export default function LocationPlatform() {
     watchId = navigator.geolocation.watchPosition(
       (pos) => void send(pos.coords, true),
       () => setSelf((prev) => (prev ? { ...prev, online: false } : { online: false, lat: null, lng: null })),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+      { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [tracking, session.mode, session.roomId, session.departed, refreshFamily, refreshRoom]);
