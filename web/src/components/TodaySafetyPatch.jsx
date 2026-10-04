@@ -107,15 +107,10 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
             return next || null;
           });
         }
-        const done = Boolean(data?.complete || remainingFrom(data?.lastPatchedAt) > 0);
-        if (!done) return;
-        try {
-          if (sessionStorage.getItem(BRIEF_KEY) === "1") return;
-        } catch {
-          /* ignore */
+        /* 완료 요약은 녹색 버튼 탭(또는 패치 직후)에만 연다 — 쇼케이스 미리보기 등에서 자동 팝업 금지 */
+        if (Array.isArray(data?.brief?.lines) && data.brief.lines.length) {
+          setBriefLines(data.brief.lines);
         }
-        const brief = await fetchSafetyPatchBrief().catch(() => null);
-        if (!cancelled) showBrief(brief?.lines);
       })
       .catch(() => {})
       .finally(() => {
