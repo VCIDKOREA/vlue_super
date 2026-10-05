@@ -102,7 +102,13 @@ export async function applyAbuseProtectionOnNewSignup(input: {
   phoneE164?: string | null;
   phoneNumber?: string | null;
   referrerCode?: string | null;
-}): Promise<{ rejoinDetected: boolean; accumulatedUsingMonths: number; currentDiscountRate: number }> {
+}): Promise<{
+  rejoinDetected: boolean;
+  isFirstJoin: boolean;
+  accumulatedUsingMonths: number;
+  currentDiscountRate: number;
+  referralBlockedReason: string | null;
+}> {
   try {
     const gate = await evaluateSignupGate({
       ciHash: input.ciHash,
@@ -113,10 +119,18 @@ export async function applyAbuseProtectionOnNewSignup(input: {
     await applySignupGateToUser(input.userId, gate);
     return {
       rejoinDetected: gate.branch === "rejoin_from_abuse_log",
+      isFirstJoin: gate.isFirstJoin,
       accumulatedUsingMonths: gate.accumulatedUsingMonths,
-      currentDiscountRate: gate.currentDiscountRate
+      currentDiscountRate: gate.currentDiscountRate,
+      referralBlockedReason: gate.referralBlockedReason
     };
   } catch {
-    return { rejoinDetected: false, accumulatedUsingMonths: 0, currentDiscountRate: 30 };
+    return {
+      rejoinDetected: false,
+      isFirstJoin: true,
+      accumulatedUsingMonths: 0,
+      currentDiscountRate: 30,
+      referralBlockedReason: null
+    };
   }
 }

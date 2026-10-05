@@ -146,7 +146,7 @@ export function resolveSubscriptionChargeFromRecord(
 
   return {
     cycle,
-    amountKrw: listPriceKrw,
+    amountKrw: paidChargeAmountKrw(cycle, false),
     listPriceKrw,
     isPersonalCombo: false,
     reason: "paid_list"

@@ -1034,8 +1034,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     }
 
     private fun injectStatusBarInsetCss() {
-        // setDecorFitsSystemWindows(true) 이면 WebView는 상태바 아래에 그려지므로
-        // CSS 추가 inset은 0. inset-ready로 구버전 28px 폴백만 끈다.
+        /*
+         * setDecorFitsSystemWindows(true) 이면 WebView는 이미 상태바 아래다.
+         * CSS에 statusBar 높이를 또 넣으면 홈 헤더(vlue-top-safe) 위에 이중 빈칸이 생긴다.
+         * inset-ready + 0px 로 구버전 28px 폴백만 끈다.
+         */
         val script =
             """
             (function(){

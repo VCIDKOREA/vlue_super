@@ -18,30 +18,34 @@ const DEFAULT = {
     },
     soho_activity: {
       sku: "soho_activity",
-      label: "유료 회원 (V1)",
-      monthlyKrw: 9900,
-      annualKrw: 99000,
+      label: "유료 회원",
+      monthlyKrw: 14100,
+      annualKrw: 141000,
       listMonthlyKrw: 28300,
       description:
-        "월 9,900원(부가세 포함). VLUÉ V1 출시 기념 파격 65% 특별 할인(종료 시까지!). 연간 구독 시 2개월 추가 무료 혜택: 연 99,000원. 디지털 인증명함·풀 쇼케이스·가족보호."
+        "모바일 이벤트가 월 14,100원(정가 28,300원). 연 141,000원(2개월 추가 무료). 최초 가입+추천인 코드 시 월 9,900원/연 99,000원. 재가입(본인인증 CI)은 추천 할인 불가."
     },
     soho_broadcast_addon: {
       sku: "soho_broadcast_addon",
-      label: "SOHO 영업 송출 옵션",
-      monthlyKrw: 4200,
-      annualKrw: 42000,
+      label: "내선·대표번호 추가(레거시 SKU)",
+      monthlyKrw: 5200,
+      annualKrw: 52000,
       description:
-        "월 +4,200원(부가세 포함, 할인 적용 안 됨). 대표자 계정 외 추가번호에 쇼케이스만 제공되는 기능. 동일 단가로 멀티 프로필+ 추가 슬롯에도 적용됩니다."
+        "내선·대표번호 추가 개당 월 5,200원(추천인 할인 불가). 대표자 모바일 기본 플랜 결제 후 발급."
     }
   },
   legacy: {
     paidListMonthlyKrw: 28300,
-    paidListAnnualKrw: 283000,
-    referralDiscountRate: 0,
+    paidListAnnualKrw: 339600,
+    referralDiscountRate: 4200,
     personalComboAddonMonthlyKrw: 5100,
     personalComboAddonAnnualKrw: 51000,
     b2bRepListMonthlyKrw: 28300,
-    b2bStaffListMonthlyKrw: 14700
+    b2bStaffListMonthlyKrw: 14700,
+    mobilePromoMonthlyKrw: 14100,
+    mobilePromoAnnualKrw: 141000,
+    referralMonthlyKrw: 9900,
+    referralAnnualKrw: 99000
   }
 };
 
@@ -66,6 +70,8 @@ export function pricingNumbers() {
     paidListMonthly: cfg.legacy.paidListMonthlyKrw,
     paidListAnnual: cfg.legacy.paidListAnnualKrw,
     referralDiscountRate: cfg.legacy.referralDiscountRate,
+    referralMonthly: cfg.legacy.referralMonthlyKrw ?? 9900,
+    referralAnnual: cfg.legacy.referralAnnualKrw ?? 99000,
     personalComboMonthly: cfg.legacy.personalComboAddonMonthlyKrw,
     personalComboAnnual: cfg.legacy.personalComboAddonAnnualKrw ?? 51000
   };

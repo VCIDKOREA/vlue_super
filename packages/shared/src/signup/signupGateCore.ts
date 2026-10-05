@@ -14,13 +14,18 @@ export type SignupGateBranch = "brand_new" | "rejoin_from_abuse_log";
 export type SignupGateEvaluation = {
   branch: SignupGateBranch;
   hashedIdentity: string;
+  /** CI 기준 최초 가입 — 추천 할인·파트너 수수료 대상 */
+  isFirstJoin: boolean;
   currentDiscountRate: number;
   promoMonthsRemaining: number;
   accumulatedUsingMonths: number;
   sponsorPenaltyMonthsLeft: number;
   lastReferralCode: string | null;
+  /** 재가입이면 null 강제 (추천 코드 무효) */
   referrerCodeInput: string | null;
   applyReferralRevenueLock: boolean;
+  /** 추천인 혜택 차단 사유 */
+  referralBlockedReason: string | null;
 };
 
 export class SignupGateValidationError extends Error {
@@ -88,30 +93,37 @@ export function evaluateSignupBranchFromAbuseLog(
   } | null,
   referrerCodeInput?: string | null
 ): SignupGateEvaluation {
+  const rawReferrer = String(referrerCodeInput || "").trim() || null;
+
   if (!abuseLog) {
     return {
       branch: "brand_new",
       hashedIdentity,
+      isFirstJoin: true,
       currentDiscountRate: DISCOUNT_RATE_PROMO_PCT,
       promoMonthsRemaining: PROMO_BENEFIT_MONTHS,
       accumulatedUsingMonths: 0,
       sponsorPenaltyMonthsLeft: 0,
       lastReferralCode: null,
-      referrerCodeInput: referrerCodeInput ?? null,
-      applyReferralRevenueLock: false
+      referrerCodeInput: rawReferrer,
+      applyReferralRevenueLock: false,
+      referralBlockedReason: null
     };
   }
 
+  /* CI 재가입 — 추천인 코드·할인·수수료 전부 차단 (명세서 §3) */
   const discount = resolveRejoinConsumerDiscount(abuseLog.accumulatedUsingMonths);
   return {
     branch: "rejoin_from_abuse_log",
     hashedIdentity,
+    isFirstJoin: false,
     currentDiscountRate: discount.currentDiscountRate,
     promoMonthsRemaining: discount.promoMonthsRemaining,
     accumulatedUsingMonths: abuseLog.accumulatedUsingMonths,
     sponsorPenaltyMonthsLeft: REJOIN_REFERRAL_PENALTY_MONTHS,
     lastReferralCode: abuseLog.lastReferralCode,
-    referrerCodeInput: referrerCodeInput ?? null,
-    applyReferralRevenueLock: true
+    referrerCodeInput: null,
+    applyReferralRevenueLock: true,
+    referralBlockedReason: "rejoin_ci_no_referral"
   };
 }

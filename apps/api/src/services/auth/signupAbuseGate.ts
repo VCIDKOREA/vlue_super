@@ -60,16 +60,18 @@ export async function applySignupGateToUser(
   userId: string,
   gate: SignupGateEvaluation
 ): Promise<void> {
+  /* 재가입(CI): 추천 코드 저장 금지 — 수수료·할인 차단 */
   const referrerToStore =
-    gate.referrerCodeInput?.trim().toUpperCase() ||
-    (gate.branch === "rejoin_from_abuse_log" ? gate.lastReferralCode : null) ||
-    null;
+    gate.isFirstJoin && gate.referrerCodeInput?.trim()
+      ? gate.referrerCodeInput.trim().toUpperCase()
+      : null;
 
   await prisma.user.update({
     where: { id: userId },
     data: {
       status: "ACTIVE",
       referrerCode: referrerToStore,
+      isFirstJoin: gate.isFirstJoin,
       currentDiscountRate: gate.currentDiscountRate
     }
   });

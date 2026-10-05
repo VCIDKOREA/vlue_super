@@ -93,10 +93,10 @@ export const v1AppShell = {
   mycase: true,
   /** V1 — 홈 본문 알림 패널 대신 하단 바 아이콘 사용 */
   notificationBottomNavOnly: true,
-  /** V1 — 지인·홍보 추천 프로그램 UI */
-  referralProgram: false,
+  /** V1 — 지인·홍보 추천 프로그램 UI (CI 최초가입만 할인) */
+  referralProgram: true,
   /** V1 — VLUER 파트너 섹션 */
-  vluerPartnerSection: false,
+  vluerPartnerSection: true,
   phoneSearchPortal: true,
   /** 메인 본문 — 업체·명함 검색바 (헤더와 분리) */
   homeBizSearch: true,

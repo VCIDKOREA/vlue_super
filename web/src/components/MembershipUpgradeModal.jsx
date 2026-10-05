@@ -14,9 +14,9 @@ import {
   B2B_STAFF_LIST_MONTHLY_KRW,
   B2B_STAFF_EVENT_MONTHLY_KRW,
   B2B_EVENT_NOTE,
-  SOHO_BROADCAST_MEMBERSHIP_SUBLINE,
-  SOHO_BROADCAST_MONTHLY_KRW,
-  SOHO_BROADCAST_NO_DISCOUNT_NOTE,
+  EXTENSION_LINE_MEMBERSHIP_SUBLINE,
+  EXTENSION_LINE_MONTHLY_KRW,
+  EXTENSION_LINE_NO_REFERRAL_NOTE,
   MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE,
   MULTI_PROFILE_ADDON_MONTHLY_KRW,
   MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE
@@ -196,10 +196,10 @@ export default function MembershipUpgradeModal({
           <div
             className={`mt-4 rounded-xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-violet-100 bg-violet-50/80"}`}
           >
-            <p className={`text-[12px] font-black ${textStrong}`}>SOHO 영업 송출 옵션</p>
-            <p className={`mt-1 text-[11px] leading-snug ${textSub}`}>{SOHO_BROADCAST_MEMBERSHIP_SUBLINE}</p>
+            <p className={`text-[12px] font-black ${textStrong}`}>내선·대표번호 추가</p>
+            <p className={`mt-1 text-[11px] leading-snug ${textSub}`}>{EXTENSION_LINE_MEMBERSHIP_SUBLINE}</p>
             <p className={`mt-1 text-[12px] font-black ${isDarkMode ? "text-violet-200" : "text-violet-800"}`}>
-              +{SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원/월 ({SOHO_BROADCAST_NO_DISCOUNT_NOTE})
+              +{EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원/월 ({EXTENSION_LINE_NO_REFERRAL_NOTE})
             </p>
           </div>
 

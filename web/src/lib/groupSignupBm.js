@@ -32,7 +32,7 @@ export const GROUP_SIGNUP_AT_REGISTRATION_NOTICE =
 
 /** 개인 유료 가입 후 단체 전환 안내 */
 export const INDIVIDUAL_TO_GROUP_CONVERSION_NOTICE =
-  "개인 유료(월 9,900원)로 먼저 가입·이용하신 뒤, 마이페이지에서 B2B 회선을 등록해 단체로 전환할 수 있습니다. 직원 회선 이벤트 요금(5,200원)은 단체 등록 완료 후 익월 결제 주기부터 적용됩니다.";
+  "개인 유료(월 14,100원 · 추천인 최초가입 9,900원)로 먼저 가입·이용하신 뒤, 마이페이지에서 B2B 회선을 등록해 단체로 전환할 수 있습니다. 직원 회선 이벤트 요금(5,200원)은 단체 등록 완료 후 익월 결제 주기부터 적용됩니다.";
 
 /** @deprecated — GROUP_SIGNUP_AT_REGISTRATION_NOTICE 사용 */
 export const GROUP_SIGNUP_NOTICE = GROUP_SIGNUP_AT_REGISTRATION_NOTICE;

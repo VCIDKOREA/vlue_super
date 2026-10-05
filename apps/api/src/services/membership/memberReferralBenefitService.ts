@@ -3,13 +3,9 @@ import { ANNUAL_PAID_MONTHS } from "../vluer/pricingConstants.js";
 import {
   PROMO_BENEFIT_MONTHS,
   REJOIN_REFERRAL_PENALTY_MONTHS,
+  quotePaidCharge,
   type PaidBillingCycle
 } from "./membershipBmConstants.js";
-import { inferReferralChannelFromCode } from "@vlue/shared/referral";
-import {
-  promoMonthsRemaining,
-  resolveSlidingConsumerChargeKrw
-} from "../vluer/referralSettlementPolicy.js";
 
 export type BenefitStateSnapshot = {
   accumulatedBenefitMonths: number;
@@ -42,21 +38,31 @@ export function hadPromoEligibility(
   return Boolean(sub.referralCodeUsed) || sub.isDiscounted || state.accumulatedBenefitMonths > 0;
 }
 
-/** 갱신·checkout 금액 — 누적 혜택 개월 기준 슬라이딩 */
+/** 갱신·checkout 금액 — CI 최초가입+추천코드만 추천가, 그 외 모바일 이벤트가 */
 export async function resolveBenefitAwareChargeKrw(
   userId: string,
   cycle: PaidBillingCycle,
   sub: { isDiscounted: boolean; referralCodeUsed: string | null }
 ): Promise<{ amountKrw: number; inPromoWindow: boolean; accumulatedBefore: number }> {
   const state = await getOrCreateBenefitState(userId);
-  const hadPromo = hadPromoEligibility(sub, state);
-  const referralChannel = inferReferralChannelFromCode(sub.referralCodeUsed);
-  const { amountKrw, inPromoWindow } = resolveSlidingConsumerChargeKrw(
-    state.accumulatedBenefitMonths,
-    cycle,
-    { hadPromoEligibility: hadPromo, referralChannel }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isFirstJoin: true, referrerCode: true }
+  });
+  const isFirstJoin = user?.isFirstJoin !== false && !state.isRejoinFromAbuseLog;
+  const hasReferrerCode = Boolean(
+    String(sub.referralCodeUsed || user?.referrerCode || "").trim()
   );
-  return { amountKrw, inPromoWindow, accumulatedBefore: state.accumulatedBenefitMonths };
+  const quote = quotePaidCharge({
+    cycle,
+    isFirstJoin,
+    hasReferrerCode: isFirstJoin && hasReferrerCode
+  });
+  return {
+    amountKrw: quote.amountKrw,
+    inPromoWindow: quote.referralDiscountApplied || quote.tier === "mobile_promo",
+    accumulatedBefore: state.accumulatedBenefitMonths
+  };
 }
 
 export type PostPaymentBenefitAdvance = {

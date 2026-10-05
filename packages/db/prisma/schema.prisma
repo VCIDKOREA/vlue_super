@@ -286,6 +286,9 @@ model User {
   /// 매니페스트 referrerCode — 가입 시 입력한 파트너 추천인 코드
   referrerCode String? @map("referrer_code") @db.VarChar(24)
 
+  /// CI 기준 최초 가입 여부 — false 면 추천 할인·파트너 수수료 제외
+  isFirstJoin Boolean @default(true) @map("is_first_join")
+
   /// 첫해 30(월 19,800원) · 13개월차~ 15(월 24,050원). 슬라이딩·스케줄러와 동기화
   currentDiscountRate Int @default(30) @map("current_discount_rate")
 
@@ -373,6 +376,7 @@ model User {
   letteringPhoneReports   LetteringPhoneReport[]   @relation("LetteringReportsFiled")
 
   vluerProfile                  UserVluerProfile?
+  partnerDownlineProfiles       UserVluerProfile[]            @relation("PartnerParentEmployee")
   b2bEnterprisesAdministered    B2BEnterpriseAccount[]        @relation("B2BEnterpriseAdmin")
   corporateAttributionsAsMember CorporateAttributionRequest[] @relation("AttributionMember")
   corporateMembership           UserCorporateMembership?
@@ -449,7 +453,8 @@ model User {
   @@unique([socialProvider, socialId], map: "users_social_provider_social_id_key")
   @@index([enterpriseGroupId])
   @@index([enterpriseRole])
-  @@index([ciHash])
+  /// CI 본인인증 유일키 — 동일 CI 재가입 차단·is_first_join 판정의 기준
+  @@unique([ciHash], map: "users_ci_hash_key")
   @@map("users")
 }
 
@@ -1364,6 +1369,18 @@ model UserVluerProfile {
 
   referralCode String? @unique @map("referral_code") @db.VarChar(24)
 
+  /// 정직원 / 외부 파트너 (추천인 코드 발급 권한)
+  partnerType PartnerProgramType? @map("partner_type")
+  /// ACTIVE · SUSPENDED(월 실적 미달) · TERMINATED(퇴직·자격 박탈)
+  partnerStatus PartnerProgramStatus @default(ACTIVE) @map("partner_status")
+  /// 외부 파트너를 영입한 정직원
+  parentEmployeeUserId String? @map("parent_employee_user_id") @db.Uuid
+  parentEmployee       User?   @relation("PartnerParentEmployee", fields: [parentEmployeeUserId], references: [id], onDelete: SetNull)
+  /// 당월 신규 유료 유치 수 (매월 1일 리셋·정지 판정)
+  monthlyActiveReferrals Int @default(0) @map("monthly_active_referrals")
+  partnerSuspendedAt     DateTime? @map("partner_suspended_at") @db.Timestamptz(6)
+  partnerTerminatedAt    DateTime? @map("partner_terminated_at") @db.Timestamptz(6)
+
   canActAsVluer                Boolean   @default(true) @map("can_act_as_vluer")
   isEligibleForVluerSettlement Boolean   @default(true) @map("is_eligible_for_vluer_settlement")
   rewardsFrozen                Boolean   @default(false) @map("rewards_frozen")
@@ -1373,7 +1390,20 @@ model UserVluerProfile {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  @@index([partnerStatus, partnerType])
+  @@index([parentEmployeeUserId])
   @@map("user_vluer_profiles")
+}
+
+enum PartnerProgramType {
+  EMPLOYEE
+  EXTERNAL_PARTNER
+}
+
+enum PartnerProgramStatus {
+  ACTIVE
+  SUSPENDED
+  TERMINATED
 }
 
 model B2BEnterpriseAccount {
@@ -1499,10 +1529,24 @@ model CommissionLedger {
   blockedReason String? @map("blocked_reason") @db.VarChar(80)
   referralCode  String? @map("referral_code") @db.VarChar(24)
 
+  /// pending_hold(14일) → confirmed · clawed_back · company_retained
+  settlementStatus CommissionSettlementStatus @default(pending_hold) @map("settlement_status")
+  /// 확정 가능 시각 (결제 + 14일)
+  eligibleAt       DateTime?                  @map("eligible_at") @db.Timestamptz(6)
+  confirmedAt      DateTime?                  @map("confirmed_at") @db.Timestamptz(6)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([vluerUserId, createdAt])
+  @@index([settlementStatus, eligibleAt])
   @@map("commission_ledgers")
+}
+
+enum CommissionSettlementStatus {
+  pending_hold
+  confirmed
+  clawed_back
+  company_retained
 }
 
 // -----------------------------------------------------------------------------

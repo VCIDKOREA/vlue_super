@@ -16,6 +16,13 @@ import {
   getOrCreateBenefitState
 } from "./memberReferralBenefitService.js";
 import type { PaidBillingCycle } from "./membershipBmConstants.js";
+import {
+  EMPLOYEE_COMMISSION_RATE,
+  EMPLOYEE_DOWNLINE_OVERRIDE_RATE,
+  EXTERNAL_PARTNER_COMMISSION_RATE,
+  EXTERNAL_PARTNER_PAYOUT_MONTHS,
+  PARTNER_WITHHOLDING_TAX_RATE
+} from "@vlue/shared";
 
 function subscriptionLedgerRef(merchantUid: string) {
   return `sub:${merchantUid}`;
@@ -92,7 +99,42 @@ export async function settleSubscriptionReferralCommission(input: {
   const benefitBefore = await getOrCreateBenefitState(input.payerUserId);
   const sponsorPenaltyActive = benefitBefore.sponsorPenaltyMonthsLeft > 0;
 
+  const payer = await prisma.user.findUnique({
+    where: { id: input.payerUserId },
+    select: { isFirstJoin: true }
+  });
+  if (payer && payer.isFirstJoin === false) {
+    await advanceBenefitStateAfterPaid(input.payerUserId, cycle, referralCodeUsed);
+    return {
+      skipped: true as const,
+      reason: "rejoin_ci_no_commission" as const,
+      commissionKrw: 0
+    };
+  }
+  if (benefitBefore.isRejoinFromAbuseLog) {
+    await advanceBenefitStateAfterPaid(input.payerUserId, cycle, referralCodeUsed);
+    return {
+      skipped: true as const,
+      reason: "rejoin_abuse_no_commission" as const,
+      commissionKrw: 0
+    };
+  }
+
   const profile = await prisma.userVluerProfile.findUnique({ where: { userId: sponsorUserId } });
+  if (
+    profile &&
+    (profile.partnerStatus === "SUSPENDED" ||
+      profile.partnerStatus === "TERMINATED" ||
+      profile.rewardsFrozen ||
+      !profile.isEligibleForVluerSettlement)
+  ) {
+    await advanceBenefitStateAfterPaid(input.payerUserId, cycle, referralCodeUsed);
+    return {
+      skipped: true as const,
+      reason: "partner_not_eligible" as const,
+      commissionKrw: 0
+    };
+  }
   const grade = profile ? resolveProfileGrade(profile) : "general";
   const tierCode = grade as VluerTierCode;
   const paidReferrals = await countPaidDirectReferrals(sponsorUserId);
@@ -114,11 +156,52 @@ export async function settleSubscriptionReferralCommission(input: {
     sponsorPaidReferralCount: paidReferrals
   });
 
+  /**
+   * 2026-10 정책: 정직원 10% / 외부 파트너 7%(유치일부터 12개월) — 결제금액 기준.
+   * 개인 파트너 3.3% 원천징수. 레거시 quote 차단 사유는 유지.
+   */
+  let commissionKrw = quote.commissionKrw;
+  let blockedReason = quote.blockedReason;
+  let payoutMode = quote.payoutMode;
+  let rateFraction = quote.rateFraction;
+
+  if (!blockedReason && profile?.partnerType) {
+    const partnerType = profile.partnerType as "EMPLOYEE" | "EXTERNAL_PARTNER";
+    if (partnerType === "EXTERNAL_PARTNER") {
+      const firstPaidAt = await prisma.subscriptionPayment.findFirst({
+        where: { userId: input.payerUserId, status: "paid" },
+        orderBy: { paidAt: "asc" },
+        select: { paidAt: true, createdAt: true }
+      });
+      const start = firstPaidAt?.paidAt || firstPaidAt?.createdAt || new Date();
+      const monthsSince =
+        (Date.now() - new Date(start).getTime()) / (1000 * 60 * 60 * 24 * 30.4375);
+      if (monthsSince > EXTERNAL_PARTNER_PAYOUT_MONTHS) {
+        blockedReason = "external_partner_payout_window_expired";
+        commissionKrw = 0;
+      } else {
+        rateFraction = EXTERNAL_PARTNER_COMMISSION_RATE;
+        const preTax = Math.floor(input.grossPaymentKrw * rateFraction);
+        commissionKrw = Math.floor(preTax * (1 - PARTNER_WITHHOLDING_TAX_RATE));
+        payoutMode = "cash_commission";
+      }
+    } else if (partnerType === "EMPLOYEE") {
+      if (profile.partnerStatus === "TERMINATED") {
+        blockedReason = "employee_terminated";
+        commissionKrw = 0;
+      } else {
+        rateFraction = EMPLOYEE_COMMISSION_RATE;
+        commissionKrw = Math.floor(input.grossPaymentKrw * rateFraction);
+        payoutMode = "cash_commission";
+      }
+    }
+  }
+
   const result = {
-    commissionKrw: quote.commissionKrw,
-    blockedReason: quote.blockedReason,
+    commissionKrw,
+    blockedReason,
     tierCode,
-    payoutMode: quote.payoutMode,
+    payoutMode,
     pgFeeKrw: 0
   };
 
@@ -133,14 +216,80 @@ export async function settleSubscriptionReferralCommission(input: {
     result
   });
 
+  /** 정직원 하부 파트너 관리 포상 3% */
+  if (
+    ledger &&
+    commissionKrw > 0 &&
+    !blockedReason &&
+    profile?.partnerType === "EXTERNAL_PARTNER" &&
+    profile.parentEmployeeUserId
+  ) {
+    try {
+      const parent = await prisma.userVluerProfile.findUnique({
+        where: { userId: profile.parentEmployeeUserId },
+        select: {
+          partnerType: true,
+          partnerStatus: true,
+          isEligibleForVluerSettlement: true
+        }
+      });
+      if (
+        parent?.partnerType === "EMPLOYEE" &&
+        parent.partnerStatus === "ACTIVE" &&
+        parent.isEligibleForVluerSettlement
+      ) {
+        const overrideKrw = Math.floor(
+          input.grossPaymentKrw * EMPLOYEE_DOWNLINE_OVERRIDE_RATE
+        );
+        if (overrideKrw > 0) {
+          await recordCommissionLedger({
+            vluerUserId: profile.parentEmployeeUserId,
+            payerUserId: input.payerUserId,
+            kind: ledgerKind(cycle),
+            grossPaymentKrw: input.grossPaymentKrw,
+            referralCode: `${ref}:override3`,
+            payerIsB2bMember: payerIsB2b,
+            vluerIsB2bBlocked: false,
+            result: {
+              commissionKrw: overrideKrw,
+              blockedReason: null,
+              tierCode,
+              payoutMode: "cash_commission",
+              pgFeeKrw: 0
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[referral-settle] employee override 3% failed", e);
+    }
+  }
+
+  /** 외부 파트너 월 유치 실적 — 수수료 발생(차단 아님) 시에만 +1 */
+  if (ledger && commissionKrw > 0 && !blockedReason) {
+    try {
+      await prisma.userVluerProfile.updateMany({
+        where: {
+          userId: sponsorUserId,
+          partnerType: "EXTERNAL_PARTNER",
+          partnerStatus: "ACTIVE"
+        },
+        data: { monthlyActiveReferrals: { increment: 1 } }
+      });
+    } catch (e) {
+      console.warn("[referral-settle] monthlyActiveReferrals increment failed", sponsorUserId, e);
+    }
+  }
+
   return {
     skipped: false as const,
-    commissionKrw: quote.commissionKrw,
+    commissionKrw,
     tierCode,
     channel: quote.channel,
     phase: quote.phase,
-    blockedReason: quote.blockedReason,
+    blockedReason,
     ledgerId: ledger?.id ?? null,
-    benefitMonthIndex: benefitAfterPay.benefitMonthIndex
+    benefitMonthIndex: benefitAfterPay.benefitMonthIndex,
+    rateFraction
   };
 }

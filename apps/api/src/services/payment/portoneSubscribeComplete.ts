@@ -92,32 +92,37 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
 
   if (expectedAmountKrw !== amount) {
     /**
-     * V1: UI·클라이언트는 출시가 9,900/99,000. 가입 시 pending이 정가 28,300으로 남은 경우 보정.
-     * (shared dist 미재빌드여도 하드코드로 허용)
+     * 모바일 이벤트 14,100/141,000 · 추천인 9,900/99,000.
+     * pending이 정가(28,300) 등 stale 이면 실제 결제액으로 보정.
      */
     const cycleForHeal = parseBillingCycle(input.billingCycle ?? sub.plan);
     const listPrice = paidListAmountKrw(cycleForHeal);
-    const sellMonthly = 9900;
-    const sellAnnual = 99000;
-    const sellPrice = cycleForHeal === "annual" ? sellAnnual : sellMonthly;
+    const allowedSell = new Set(
+      cycleForHeal === "annual" ? [141000, 99000] : [14100, 9900]
+    );
     const stalePending =
       expectedAmountKrw === listPrice ||
       expectedAmountKrw === 28300 ||
       expectedAmountKrw === 283000 ||
+      expectedAmountKrw === 339600 ||
       expectedAmountKrw === 19800 ||
-      expectedAmountKrw === 198000;
+      expectedAmountKrw === 198000 ||
+      expectedAmountKrw === 9900 ||
+      expectedAmountKrw === 99000 ||
+      expectedAmountKrw === 14100 ||
+      expectedAmountKrw === 141000;
 
-    if (amount === sellPrice && stalePending) {
+    if (allowedSell.has(amount) && stalePending) {
       await prisma.userSubscription.update({
         where: { id: sub.id },
         data: {
-          amountKrw: sellPrice,
+          amountKrw: amount,
           listPriceKrw: listPrice,
-          isDiscounted: true
+          isDiscounted: amount < listPrice
         }
       });
-      expectedAmountKrw = sellPrice;
-      expectedDiscounted = true;
+      expectedAmountKrw = amount;
+      expectedDiscounted = amount < listPrice;
     } else {
       throw new Error(`결제 금액이 구독 금액(${expectedAmountKrw}원)과 일치하지 않습니다.`);
     }
@@ -130,11 +135,14 @@ export async function completePortoneSubscribePayment(input: CompleteSubscribeIn
       isDiscounted: expectedDiscounted
     });
   } catch (e) {
-    /** shared dist가 옛 정가 정책을 쓰면 assert가 실패 — V1 출시가와 일치하면 통과 */
+    /** shared dist 미동기화 시 — 정책 판매가(이벤트/추천)와 일치하면 통과 */
     const msg = e instanceof Error ? e.message : String(e);
-    const v1Sell = cycle === "annual" ? 99000 : 9900;
-    if (amount !== v1Sell) throw e instanceof Error ? e : new Error(msg);
-    console.warn("[subscribe-complete] checkout assert bypass for V1 sell price", msg);
+    const allowed =
+      cycle === "annual"
+        ? amount === 141000 || amount === 99000
+        : amount === 14100 || amount === 9900;
+    if (!allowed) throw e instanceof Error ? e : new Error(msg);
+    console.warn("[subscribe-complete] checkout assert bypass for policy sell price", msg);
   }
 
   const existingPay = await prisma.subscriptionPayment.findUnique({

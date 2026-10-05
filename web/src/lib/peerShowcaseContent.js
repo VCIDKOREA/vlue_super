@@ -1,15 +1,24 @@
 /**
  * 통화·공유에서 상대가 DCC/쇼케이스 송출 콘텐츠가 있는지.
+ * 네이티브 VlueAuthMemberPopupPolicy 와 동일:
  * 명시 includeDigitalCard:false 만 인증 팝업. 키 누락 + 실 DCC 는 쇼케이스.
  */
 
-/** 라이브 송출 ON — LetteringOverlayHost 와 동일 (includeDigitalCard === true) */
+/** 라이브 송출이 명시적으로 ON (includeDigitalCard === true) */
 export function peerShowcaseBroadcastOn(style) {
   return Boolean(style && typeof style === "object" && style.includeDigitalCard === true);
 }
 
 export function peerShowcaseBroadcastOff(style) {
   return Boolean(style && typeof style === "object" && style.includeDigitalCard === false);
+}
+
+/**
+ * 풀 쇼케이스/바 허용 여부 — 네이티브 hasBroadcastShowcaseContent 와 동일 게이트.
+ * 명시 false 만 차단. 키 누락은 콘텐츠가 있으면 ON.
+ */
+export function peerMayOpenShowcase(card, style) {
+  return peerHasDccOrShowcaseContent(card, style);
 }
 
 export function styleHasShowcaseMedia(style) {

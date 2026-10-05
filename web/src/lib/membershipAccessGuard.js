@@ -33,8 +33,8 @@ export async function requirePrimaryForFeature(feature, { onBlocked } = {}) {
     if (ok) return { ok: true, access };
     const msg =
       feature === "chat"
-        ? `채팅은 SOHO 활동형(월 ${nums.sohoMonthly.toLocaleString("ko-KR")}원) 또는 B2B 회선이 필요합니다.`
-        : `쇼핑은 SOHO 활동형(월 ${nums.sohoMonthly.toLocaleString("ko-KR")}원) 또는 B2B 회선이 필요합니다.`;
+        ? `채팅은 유료 회원(월 ${nums.sohoMonthly.toLocaleString("ko-KR")}원) 또는 B2B 회선이 필요합니다.`
+        : `쇼핑은 유료 회원(월 ${nums.sohoMonthly.toLocaleString("ko-KR")}원) 또는 B2B 회선이 필요합니다.`;
     onBlocked?.(msg, access);
     return { ok: false, message: msg, access };
   } catch (e) {

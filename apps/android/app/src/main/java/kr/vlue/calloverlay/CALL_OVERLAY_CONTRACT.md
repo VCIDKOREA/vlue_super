@@ -64,6 +64,11 @@ Decision order (first match wins):
 
 Contact promote: if lookup pending/blank **and** device contact name exists → treat as Safe Care (`CENTER_SAFE_POPUP`).
 
+**Hard ban — contact promote must never override member showcase:**
+- Once rule 4–5 already selected `FULL_SHOWCASE` or `CENTER_AUTH_POPUP`, **do not** rewrite `pendingCardJson` to `contact_safe_care` just because the number is in the device address book.
+- `promoteIncomingContactSafeCareAndPopup` may run only on pending/blank / KEEP_BIG_PUSH paths (rules 6–7), never on the `FULL_SHOWCASE` branch.
+- Device-contact name alone is **not** higher tier than a VLUE member with broadcast content. Member showcase ON → answer opens Showcase, not 안심팝업.
+
 **Lookup tiers (v2, `CallPrefetchCache`, ConcurrentHashMap, parallel first-arrival binding):**
 1. VLUE member → `FULL_SHOWCASE` / auth popup (rules 4–5)
 2. Public / local DB (`public_directory_safe`, saved safe-care) → 안심팝업 (rule 3)
@@ -148,7 +153,9 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 - [ ] Auth member explicit broadcast OFF: center auth popup, not empty Showcase
 - [ ] Auth member DCC exists (even if `includeDigitalCard` key missing): full Showcase / call-history 케이스함
 - [ ] Auth member broadcast ON + content: full Showcase
+- [ ] Incoming answered + member showcase ON + number in device contacts: **FULL_SHOWCASE** (not 안심팝업 / contact promote)
 - [ ] In-call Showcase / MiniCase not covered by Android status bar
+- [ ] Peer Digital ID / follow preview: header not under system status bar
 - [ ] MiniCase: phone app under the bar is tappable; bar has 쇼케이스 보기
 - [ ] Path abnormal + member showcase: 안심 팝업 only (no FULL_SHOWCASE)
 - [ ] Call history row「안심 저장」→ next call uses local PublicDirectory/CardLookup cache (ENABLE_DIRECTORY_SYNC remains false)

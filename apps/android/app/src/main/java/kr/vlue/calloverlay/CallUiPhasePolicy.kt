@@ -109,6 +109,7 @@ object CallUiPhasePolicy {
         if (input.isPathAbnormal) return Phase.CENTER_SAFE_POPUP
         if (input.isContactSafeCare) return Phase.CENTER_SAFE_POPUP
         if (input.isAuthMemberOnly) return Phase.CENTER_AUTH_POPUP
+        /* 회원 송출 콘텐츠 > 주소록 안심케어 승격 (주소록에 있어도 FULL_SHOWCASE 유지) */
         if (input.hasBroadcastShowcaseContent) return Phase.FULL_SHOWCASE
         if (input.canPromoteContactSafeCare) return Phase.CENTER_SAFE_POPUP
         if (input.isUnverifiedResolved) {

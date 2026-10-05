@@ -80,10 +80,34 @@ subscriptionCronRoutes.post("/remote-security-sweep", async (c) => {
     return c.json({ error: "unauthorized" }, 401);
   }
   try {
-    const summary = await sweepRemoteSecurityHeartbeats(80);
-    return c.json(summary);
+    const summary = await sweepRemoteSecurityHeartbeats();
+    return c.json({ ok: true, ...summary });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg, code: "REMOTE_SECURITY_SWEEP_FAILED" }, 500);
+  }
+});
+
+/**
+ * POST /api/cron/partner-monthly-eligibility
+ * 매월 1일 권장 — 외부 파트너 월 10명 미만 → SUSPENDED + 수수료 회사 귀속
+ */
+subscriptionCronRoutes.post("/partner-monthly-eligibility", async (c) => {
+  const secret = c.req.header("X-Subscription-Cron-Secret") || c.req.header("x-cron-secret") || "";
+  const expected = process.env.SUBSCRIPTION_CRON_SECRET || process.env.CRON_SECRET || "";
+  if (expected && secret !== expected) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const dryRun = c.req.query("dryRun") === "1" || c.req.query("dryRun") === "true";
+  try {
+    const { runPartnerMonthlyEligibilityCron, confirmHeldCommissions } = await import(
+      "../cron/partnerMonthlyEligibilityCron.js"
+    );
+    const partner = await runPartnerMonthlyEligibilityCron({ dryRun });
+    const hold = await confirmHeldCommissions({ dryRun });
+    return c.json({ ok: true, partner, hold });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg, code: "PARTNER_MONTHLY_CRON_FAILED" }, 500);
   }
 });

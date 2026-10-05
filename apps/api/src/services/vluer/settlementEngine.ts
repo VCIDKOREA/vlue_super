@@ -1,11 +1,7 @@
 import { prisma } from "../../db/client.js";
 import { resolveProfileGrade, type VluerTierCode } from "./tierEngine.js";
 import { commerceVluerShareBp, gradeSpec } from "./tierPolicyConstants.js";
-
-export type CommissionLedgerKind =
-  | "subscription_monthly"
-  | "subscription_annual"
-  | "commerce";
+import { addDaysUtc, COMMISSION_HOLD_DAYS } from "@vlue/shared";
 import { floorWon } from "../../lib/moneyKrw.js";
 import {
   b2cPgFeeKrw,
@@ -22,6 +18,11 @@ import { inferReferralChannelFromCode } from "@vlue/shared/referral";
 import { isVluerPromoActiveGrade } from "./tierEngine.js";
 import { SLIDING_RENEWAL_MONTHLY_KRW } from "../membership/membershipBmConstants.js";
 import { referralDb } from "../../db/referralDb.js";
+
+export type CommissionLedgerKind =
+  | "subscription_monthly"
+  | "subscription_annual"
+  | "commerce";
 
 export type SettlementInput = {
   vluerUserId: string;
@@ -200,6 +201,14 @@ export async function recordCommissionLedger(
     return null;
   }
 
+  const now = new Date();
+  const eligibleAt = addDaysUtc(now, COMMISSION_HOLD_DAYS);
+  const holdFields = {
+    settlementStatus: "pending_hold" as const,
+    eligibleAt,
+    confirmedAt: null as Date | null
+  };
+
   if (input.result.blockedReason === "platform_retained_revenue") {
     return prisma.commissionLedger.create({
       data: {
@@ -212,7 +221,10 @@ export async function recordCommissionLedger(
         pgFeeKrw: 0,
         commissionKrw: 0,
         blockedReason: "platform_retained_revenue",
-        referralCode: input.referralCode ?? null
+        referralCode: input.referralCode ?? null,
+        settlementStatus: "company_retained",
+        eligibleAt: now,
+        confirmedAt: now
       }
     });
   }
@@ -228,7 +240,8 @@ export async function recordCommissionLedger(
       pgFeeKrw: input.result.pgFeeKrw,
       commissionKrw: input.result.commissionKrw,
       blockedReason: input.result.blockedReason,
-      referralCode: input.referralCode ?? null
+      referralCode: input.referralCode ?? null,
+      ...holdFields
     }
   });
 }

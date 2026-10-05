@@ -40,32 +40,26 @@ export function resolveSlidingConsumerChargeKrw(
   cycle: PaidBillingCycle,
   opts: { hadPromoEligibility: boolean; referralChannel?: ReferralChannel | null }
 ): { amountKrw: number; inPromoWindow: boolean } {
+  /** 2026-10: 기본 판매 = 모바일 이벤트가. 슬라이딩 정가 복귀 폐지. */
+  const promoAmount =
+    cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW;
   if (!opts.hadPromoEligibility) {
-    return {
-      amountKrw: cycle === "annual" ? PAID_LIST_PRICE_ANNUAL_KRW : PAID_LIST_PRICE_MONTHLY_KRW,
-      inPromoWindow: false
-    };
+    return { amountKrw: promoAmount, inPromoWindow: true };
   }
-
-  /** 지인 추천 피추천인: 구독 시 30% 할인 유지 (15% 슬라이딩 없음) */
   if (opts.referralChannel === "friend") {
     return {
-      amountKrw: cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW,
+      amountKrw: cycle === "annual" ? 99_000 : 9_900,
       inPromoWindow: true
     };
   }
-
   const remaining = promoMonthsRemaining(accumulatedBeforeCharge);
-  if (remaining > 0) {
+  if (remaining > 0 && opts.referralChannel === "promo") {
     return {
-      amountKrw: cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW,
+      amountKrw: cycle === "annual" ? 99_000 : 9_900,
       inPromoWindow: true
     };
   }
-  if (cycle === "annual") {
-    return { amountKrw: SLIDING_RENEWAL_MONTHLY_KRW * ANNUAL_PAID_MONTHS, inPromoWindow: false };
-  }
-  return { amountKrw: SLIDING_RENEWAL_MONTHLY_KRW, inPromoWindow: false };
+  return { amountKrw: promoAmount, inPromoWindow: true };
 }
 
 export function benefitMonthIndexAfterCharge(accumulatedBefore: number, monthsAdded: number): number {

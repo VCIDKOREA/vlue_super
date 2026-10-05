@@ -94,7 +94,8 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
           <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-3" style={{ letterSpacing: '-0.035em' }}>V1 멤버십 · 요금제</h1>
           <p className="text-gray-500 text-base max-w-lg mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
             블루 쇼케이스·디지털 인증명함·가족보호 중심의 V1 요금제입니다.<br />
-            유료 월 9,900원(정가 28,300원 65% 특별 할인, 종료 시까지) · 연 99,000원(2개월 추가 무료).
+            유료 월 14,100원(정가 28,300원 · 모바일 이벤트) · 연 141,000원(2개월 추가 무료).
+            최초 가입+추천인 코드 시 월 9,900원 / 연 99,000원(본인인증 CI 기준 1회).
           </p>
           <p className="mt-4 text-sm font-semibold text-primary-700 max-w-xl mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
             가입과 결제는 VLUÉ 앱을 다운로드하여 진행해 주세요. (웹 결제는 지원하지 않습니다)
@@ -379,10 +380,10 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
                 </div>
               </div>
               <p className="text-white/70 text-sm leading-relaxed mb-4" style={{ wordBreak: 'keep-all' }}>
-                대표자·직원 회선 단위로 풀 쇼케이스·디지털 인증명함을 제공합니다. SOHO 영업 송출 옵션(+4,200원)으로 추가번호 쇼케이스도 가능합니다.
+                대표자·직원 회선 단위로 풀 쇼케이스·디지털 인증명함을 제공합니다. 내선·대표번호 추가는 개당 월 5,200원(추천인 할인 불가)입니다.
               </p>
               <ul className="grid grid-cols-2 gap-2">
-                {['회선 단위 풀 쇼케이스', '디지털 인증명함', '직원 이벤트 요금', '추가번호 송출 옵션'].map((f) => (
+                {['회선 단위 풀 쇼케이스', '디지털 인증명함', '직원 이벤트 5,200원', '내선·대표번호 추가'].map((f) => (
                   <li key={f} className="flex items-center gap-1.5 text-xs text-white/80">
                     <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
                     {f}

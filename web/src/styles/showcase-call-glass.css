@@ -2537,6 +2537,16 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar
   padding-right: 52px;
 }
 
+/* 팔로우/검색 피어 미리보기 — live-bar·메타가 시스템 상태바에 가리지 않게 */
+.lettering-showcase-fs--history-embed .lettering-ongoing--fullscreen-tent > .lettering-live-bar,
+.lettering-showcase-fs--history-embed .lettering-ongoing--mycase-feed > .lettering-live-bar {
+  padding-top: max(12px, var(--vlue-safe-top, env(safe-area-inset-top, 0px)));
+}
+
+.lettering-showcase-fs--history-embed .showcase-call-carousel__meta {
+  padding-top: max(4px, min(8px, var(--vlue-safe-top, 0px)));
+}
+
 @keyframes lettering-preview-guide-in {
   from {
     opacity: 0;

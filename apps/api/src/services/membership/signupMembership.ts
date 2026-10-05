@@ -9,8 +9,9 @@ import { resolveProfileGrade, isVluerPromoActiveGrade } from "../vluer/tierEngin
 import type { B2BBillingCycle } from "../vluer/pricingConstants.js";
 import {
   type PaidBillingCycle,
-  paidChargeAmountKrw,
   paidListAmountKrw,
+  paidChargeAmountKrw,
+  quotePaidCharge,
   REFERRAL_LOCK_MONTHS
 } from "./membershipBmConstants.js";
 
@@ -139,8 +140,24 @@ export async function createPaidSubscriptionForUser(
   referralCodeUsed: string | null,
   sponsorUserId: string | null
 ) {
-  const listPrice = paidListAmountKrw(billingCycle);
-  const amount = paidChargeAmountKrw(billingCycle, true);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isFirstJoin: true, referrerCode: true }
+  });
+  const isFirstJoin = user?.isFirstJoin !== false;
+  const code =
+    String(referralCodeUsed || user?.referrerCode || "").trim() || null;
+  /* 재가입이면 추천 코드 무시 */
+  const effectiveCode = isFirstJoin ? code : null;
+  const effectiveSponsor = isFirstJoin ? sponsorUserId : null;
+
+  const quote = quotePaidCharge({
+    cycle: billingCycle,
+    isFirstJoin,
+    hasReferrerCode: Boolean(effectiveCode && effectiveSponsor)
+  });
+  const listPrice = quote.listPriceKrw;
+  const amount = quote.amountKrw;
   const now = new Date();
   const cycleEnd = billingCycle === "annual" ? addMonths(now, 12) : addMonths(now, 1);
 
@@ -151,10 +168,9 @@ export async function createPaidSubscriptionForUser(
       status: "pending_payment",
       amountKrw: amount,
       listPriceKrw: listPrice,
-      /** V1 출시가(9,900) — 추천 여부와 무관 */
-      isDiscounted: true,
-      referralCodeUsed,
-      sponsorVluerUserId: sponsorUserId,
+      isDiscounted: quote.referralDiscountApplied || quote.tier === "mobile_promo",
+      referralCodeUsed: effectiveCode,
+      sponsorVluerUserId: effectiveSponsor,
       cycleStartAt: now,
       cycleEndAt: cycleEnd,
       nextChargeAt: cycleEnd

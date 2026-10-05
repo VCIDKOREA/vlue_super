@@ -1,5 +1,5 @@
 /**
- * 앱 멤버십 BM(membershipBm · membershipBenefits)과 동일한 무료 / 유료 / 기업(B2B) 요금제 — V1
+ * 웹 마케팅 요금제 — 무료 / 유료(모바일 이벤트·추천인) / 내선·대표번호 / B2B
  */
 import {
   MEMBERSHIP_BENEFIT_ROWS,
@@ -11,6 +11,8 @@ import {
   PAID_LIST_PRICE_MONTHLY_KRW,
   PAID_EVENT_MONTHLY_KRW,
   PAID_EVENT_ANNUAL_KRW,
+  PAID_REFERRAL_MONTHLY_KRW,
+  PAID_REFERRAL_ANNUAL_KRW,
   PAID_LAUNCH_DISCOUNT_NOTE,
   PAID_ANNUAL_BENEFIT_NOTE,
   PAID_MEMBERSHIP_SUBLINE,
@@ -18,13 +20,13 @@ import {
   B2B_STAFF_LIST_MONTHLY_KRW,
   B2B_STAFF_EVENT_MONTHLY_KRW,
   B2B_EVENT_NOTE,
-  SOHO_BROADCAST_MONTHLY_KRW,
-  SOHO_BROADCAST_NO_DISCOUNT_NOTE,
+  EXTENSION_LINE_MONTHLY_KRW,
+  EXTENSION_LINE_LIST_MONTHLY_KRW,
+  EXTENSION_LINE_NO_REFERRAL_NOTE,
+  EXTENSION_LINE_MEMBERSHIP_SUBLINE,
   MULTI_PROFILE_ADDON_MONTHLY_KRW,
   MULTI_PROFILE_ADDON_FEATURES,
   MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE,
-  broadcastAddonAmountKrw,
-  sohoBroadcastPlanDescription,
   b2bPlanDescription,
 } from '../../../lib/membershipBm.js';
 
@@ -60,7 +62,23 @@ export const MARKETING_PRICING_TIERS = [
     recommended: true,
     features: MEMBERSHIP_PLAN_DETAILS.paid.bullets,
     priceNote: `${PAID_LAUNCH_DISCOUNT_NOTE} / ${PAID_ANNUAL_BENEFIT_NOTE}`,
-    promoBadge: 'V1 65% 할인',
+    promoBadge: '모바일 이벤트',
+  },
+  {
+    id: 'extension_line',
+    name: '내선·대표번호 추가',
+    price: EXTENSION_LINE_MONTHLY_KRW,
+    listPrice: EXTENSION_LINE_LIST_MONTHLY_KRW,
+    period: '회선/월',
+    description: EXTENSION_LINE_MEMBERSHIP_SUBLINE,
+    color: 'purple' as const,
+    features: [
+      '대표자 모바일 기본 플랜(월 28,300원 정가 경로) 결제 후 추가 발급',
+      `개당 월 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString('ko-KR')}원`,
+      EXTENSION_LINE_NO_REFERRAL_NOTE,
+      '휴대·대표·내선 회선 쇼케이스·인증명함 연동',
+    ],
+    priceNote: `정가 ${EXTENSION_LINE_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 대비 할인가 · ${EXTENSION_LINE_NO_REFERRAL_NOTE}`,
   },
   {
     id: 'b2b',
@@ -74,39 +92,12 @@ export const MARKETING_PRICING_TIERS = [
     priceNote: `대표자 계정 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 + 직원 회선 정가 ${B2B_STAFF_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 → 이벤트 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString('ko-KR')}원(${B2B_EVENT_NOTE}) · ${B2B_ENTERPRISE_SUMMARY_SHORT}`,
     promoBadge: B2B_EVENT_NOTE,
   },
-  {
-    id: 'soho_broadcast',
-    name: 'SOHO 영업 송출 옵션',
-    price: broadcastAddonAmountKrw('monthly'),
-    listPrice: null as number | null,
-    period: '추가/월',
-    description: sohoBroadcastPlanDescription(),
-    color: 'purple' as const,
-    features: [
-      '대표자 계정 외 추가번호에만 적용',
-      '쇼케이스만 제공되는 기능',
-      `월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE})`,
-      '유료·B2B 본 요금과 별도 SKU',
-    ],
-    priceNote: `할인 미적용 · 월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원 고정`,
-  },
-  {
-    id: 'multi_profile',
-    name: '멀티 프로필+',
-    price: MULTI_PROFILE_ADDON_MONTHLY_KRW,
-    listPrice: null as number | null,
-    period: '추가 슬롯/월',
-    description: MULTI_PROFILE_ADDON_MEMBERSHIP_SUBLINE,
-    color: 'purple' as const,
-    features: [...MULTI_PROFILE_ADDON_FEATURES],
-    priceNote: `할인 미적용 · 월 ${MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString('ko-KR')}원 고정 · SOHO 송출과 동일 단가`,
-  },
 ];
 
-/** @deprecated V1 미운영 — 빈 배열 유지(구 import 호환) */
+/** @deprecated 구 import 호환 */
 export const VLUER_REFERRAL_GRADES = [] as const;
 
-/** 서비스소개 — 요금제 아코디언 (V1) */
+/** 서비스소개 — 요금제 아코디언 */
 export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
   {
     id: 'plan-free',
@@ -121,7 +112,18 @@ export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
     detail: [
       ...MEMBERSHIP_PLAN_DETAILS.paid.bullets,
       `가족보호: ${FAMILY_PROTECTION_SUMMARY_SHORT}`,
-      `연간 구독: ${PAID_EVENT_ANNUAL_KRW.toLocaleString('ko-KR')}원 · ${PAID_ANNUAL_BENEFIT_NOTE}`,
+      `연간 구독: 이벤트 ${PAID_EVENT_ANNUAL_KRW.toLocaleString('ko-KR')}원 · 추천인 ${PAID_REFERRAL_ANNUAL_KRW.toLocaleString('ko-KR')}원 · ${PAID_ANNUAL_BENEFIT_NOTE}`,
+      `최초 가입+추천인 코드: 월 ${PAID_REFERRAL_MONTHLY_KRW.toLocaleString('ko-KR')}원(본인인증 CI 기준 1회)`,
+    ],
+  },
+  {
+    id: 'plan-extension',
+    title: '내선·대표번호 추가',
+    summary: EXTENSION_LINE_MEMBERSHIP_SUBLINE,
+    detail: [
+      '대표자 모바일 기본 플랜 결제 상태에서만 추가 발급 가능',
+      `개당 월 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString('ko-KR')}원(정가 ${EXTENSION_LINE_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 대비)`,
+      EXTENSION_LINE_NO_REFERRAL_NOTE,
     ],
   },
   {
@@ -129,16 +131,6 @@ export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
     title: '비즈니스 / B2B 풀 패키지',
     summary: MEMBERSHIP_PLAN_DETAILS.b2b.headline,
     detail: MEMBERSHIP_PLAN_DETAILS.b2b.bullets,
-  },
-  {
-    id: 'plan-broadcast',
-    title: 'SOHO 영업 송출 옵션',
-    summary: sohoBroadcastPlanDescription(),
-    detail: [
-      '대표자 계정 외 추가번호 쇼케이스만 제공',
-      `월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString('ko-KR')}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE})`,
-      '유료·B2B 출시 할인과 별개 — 할인 미적용',
-    ],
   },
   {
     id: 'plan-multi-profile',

@@ -23,7 +23,11 @@ import {
   readCallHistoryPeerCache,
   writeCallHistoryPeerCache
 } from "../lib/callHistoryPeerCache.js";
-import { peerHasDccOrShowcaseContent, peerShowcaseBroadcastOn } from "../lib/peerShowcaseContent.js";
+import {
+  peerHasDccOrShowcaseContent,
+  peerMayOpenShowcase,
+  peerShowcaseBroadcastOff
+} from "../lib/peerShowcaseContent.js";
 import VlueAuthMemberPopup from "./VlueAuthMemberPopup.jsx";
 import { normalizePhotoFocus } from "../lib/letteringBizcardStorage.js";
 import LetteringIncomingNotification from "./LetteringIncomingNotification.jsx";
@@ -136,17 +140,19 @@ async function enrichOverlayPeerBundle(peerUserId, nextCard) {
       fetchPeerLiveStylePublic(id, { force: false, number: peerNumber }),
       enrichPeerCardFromProfile(id, nextCard)
     ]);
-    /* live 없음 = 미설정 → 인증 팝업. live.includeDigitalCard===true 만 송출 ON */
+    /* live 없음 = 미설정 → 인증 팝업. 명시 false만 OFF · 키 누락+콘텐츠=ON (네이티브 동일) */
     const style =
       live && typeof live === "object" ? live : createPeerAuthOnlyShowcaseStyle();
-    const broadcastOn = peerShowcaseBroadcastOn(style);
+    const broadcastOn = peerMayOpenShowcase(enriched, style);
     return {
       card: {
         ...enriched,
         /* 통화기록 스냅샷용 — 송출 OFF여도 실제 등급 유지 */
         membershipTier: enriched.membershipTier || nextCard?.membershipTier || "free"
       },
-      style: broadcastOn ? style : { ...style, includeDigitalCard: false },
+      style: broadcastOn
+        ? { ...style, includeDigitalCard: !peerShowcaseBroadcastOff(style) }
+        : { ...style, includeDigitalCard: false },
       broadcastOn
     };
   })();
@@ -1278,8 +1284,7 @@ function LetteringOverlayHostInner() {
             const canOpenFull =
               !isSafeCare &&
               (isResolvedUnverifiedOverlayCard(liveCard, false) ||
-                (peerShowcaseBroadcastOn(liveStyle) &&
-                  peerHasDccOrShowcaseContent(liveCard, liveStyle)));
+                peerMayOpenShowcase(liveCard, liveStyle));
             if (!canOpenFull) {
               autoExpandedOnceRef.current = false;
               userChoseMiniRef.current = true;
@@ -1312,8 +1317,7 @@ function LetteringOverlayHostInner() {
             if (
               !alreadyExpandedByNative &&
               !unverifiedOk &&
-              (!peerShowcaseBroadcastOn(liveStyle) ||
-                !peerHasDccOrShowcaseContent(styledCardRef.current, liveStyle))
+              !peerMayOpenShowcase(styledCardRef.current, liveStyle)
             ) {
               autoExpandedOnceRef.current = false;
               setExpanded(false);
@@ -1476,11 +1480,7 @@ function LetteringOverlayHostInner() {
       return;
     }
     const unverifiedOk = isResolvedUnverifiedOverlayCard(styledCard, verified);
-    if (
-      expanded &&
-      !unverifiedOk &&
-      (!peerShowcaseBroadcastOn(style) || !peerHasDccOrShowcaseContent(styledCard, style))
-    ) {
+    if (expanded && !unverifiedOk && !peerMayOpenShowcase(styledCard, style)) {
       setExpanded(false);
       return;
     }
@@ -1488,8 +1488,7 @@ function LetteringOverlayHostInner() {
       !expanded &&
       !autoExpandedOnceRef.current &&
       identityReady &&
-      (unverifiedOk ||
-        (peerShowcaseBroadcastOn(style) && peerHasDccOrShowcaseContent(styledCard, style)))
+      (unverifiedOk || peerMayOpenShowcase(styledCard, style))
     ) {
       autoExpandedOnceRef.current = true;
       setExpanded(true);
@@ -1539,7 +1538,7 @@ function LetteringOverlayHostInner() {
       setExpanded(true);
       return;
     }
-    if (!peerShowcaseBroadcastOn(style) || !peerHasDccOrShowcaseContent(styledCard, style)) {
+    if (!peerMayOpenShowcase(styledCard, style)) {
       setExpanded(false);
       return;
     }
@@ -1732,7 +1731,7 @@ function LetteringOverlayHostInner() {
   const callPhase = onCall ? "connected" : direction === "outgoing" ? "outgoing" : "ringing";
   const miniCollapsed = onCall && !expanded;
   const peerLiveStyle = styledCard?.showcaseStyle || showcaseStyle;
-  const peerBroadcastOn = peerShowcaseBroadcastOn(peerLiveStyle);
+  const peerBroadcastOn = peerMayOpenShowcase(styledCard, peerLiveStyle);
   const authPopupOnlyUi = Boolean(peerAuthPopupOnly && authMemberPopupOpen && !native);
   const peerIncludeDccSlide = Boolean(
     verified &&

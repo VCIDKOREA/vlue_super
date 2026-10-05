@@ -771,9 +771,9 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
               const border =
                 marketing.id === 'paid'
                   ? 'border-t-primary-500'
-                  : marketing.id === 'b2b'
+                    : marketing.id === 'b2b'
                     ? 'border-t-indigo-600'
-                    : marketing.id === 'soho_broadcast'
+                    : marketing.id === 'extension_line' || marketing.id === 'multi_profile'
                       ? 'border-t-violet-600'
                       : 'border-t-slate-400';
               return (

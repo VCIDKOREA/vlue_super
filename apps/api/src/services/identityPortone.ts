@@ -290,6 +290,27 @@ export async function completePortoneIdentity(params: {
       );
     }
     try {
+      const { archiveAbusingProtectionOnAccountDelete, hashIdentityForAbuseLog } = await import(
+        "./auth/abusingProtectionService.js"
+      );
+      await archiveAbusingProtectionOnAccountDelete(existingRow.id);
+      const hashedIdentity = hashIdentityForAbuseLog({ ciHash: ciHashBuf });
+      if (hashedIdentity) {
+        await prisma.abusingProtectionLog.upsert({
+          where: { hashedIdentity },
+          create: {
+            hashedIdentity,
+            accumulatedUsingMonths: 0,
+            lastReferralCode: null,
+            deletedAt: new Date()
+          },
+          update: { deletedAt: new Date() }
+        });
+      }
+    } catch (e) {
+      console.warn("[identityPortone] abuse archive before CI clear failed", existingRow.id, e);
+    }
+    try {
       await prisma.user.update({
         where: { id: existingRow.id },
         data: { ciHash: null }

@@ -173,6 +173,23 @@ class CallUiPhasePolicyTest {
     }
 
     @Test
+    fun afterAnswer_broadcastContent_winsOverContactPromote() {
+        /* 주소록에 저장된 VLUE 회원 + 쇼케이스 송출 ON → 안심팝업이 아니라 FULL_SHOWCASE */
+        assertEquals(
+            CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+            CallUiPhasePolicy.decideAfterAnswer(
+                CallUiPhasePolicy.AnswerInput(
+                    alreadyMiniOrAuthConfirmed = false,
+                    isContactSafeCare = false,
+                    isAuthMemberOnly = false,
+                    hasBroadcastShowcaseContent = true,
+                    canPromoteContactSafeCare = true
+                )
+            )
+        )
+    }
+
+    @Test
     fun afterAnswer_pathAbnormal_blocksShowcase_evenWithBroadcast() {
         assertEquals(
             CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,

@@ -8,8 +8,10 @@ import {
   B2B_STAFF_LIST_MONTHLY_KRW,
   B2B_STAFF_EVENT_MONTHLY_KRW,
   B2B_EVENT_NOTE,
-  SOHO_BROADCAST_MONTHLY_KRW,
-  SOHO_BROADCAST_NO_DISCOUNT_NOTE
+  EXTENSION_LINE_MONTHLY_KRW,
+  EXTENSION_LINE_NO_REFERRAL_NOTE,
+  MULTI_PROFILE_ADDON_MONTHLY_KRW,
+  MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE
 } from "./membershipBm.js";
 
 /** 유료 전용 — 가족보호 1:3 (유료 1계정=4인, 2계정=8인) */
@@ -20,7 +22,8 @@ export const FAMILY_PROTECTION_B2B_NOTE =
   "기업 회선은 업무 전용입니다. 가족보호는 기업 계정에 해당하지 않으며, 별도 개인(유료) 계정으로 이용할 수 있습니다.";
 
 /** @deprecated V1 미운영 */
-export const VLUER_REFERRAL_B2B_NOTE = "V1에서는 추천인·리워드 프로그램을 운영하지 않습니다.";
+export const VLUER_REFERRAL_B2B_NOTE =
+  "추천인 할인·파트너 수수료는 본인인증 CI 기준 최초 1회 신규 가입에만 적용됩니다. 내선·대표번호 추가(월 5,200원)에는 추천 할인이 적용되지 않습니다.";
 
 /** 기업(B2B) — V1 풀 패키지 */
 export const B2B_ENTERPRISE_SUMMARY_SHORT = `대표 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 직원 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}(${B2B_EVENT_NOTE})`;
@@ -96,16 +99,16 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
     b2b: "—"
   },
   {
-    label: "추가번호 쇼케이스 송출",
+    label: "내선·대표번호 추가",
     free: "—",
-    paid: `02·053·1588 등 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(010 별도 9,900원)`,
-    b2b: "대표 외 추가번호"
+    paid: `개당 월 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원(${EXTENSION_LINE_NO_REFERRAL_NOTE})`,
+    b2b: `직원·내선·대표 회선 월 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원`
   },
   {
     label: "멀티 프로필+",
     free: "—",
-    paid: `기본 1 + 추가 슬롯당 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원`,
-    b2b: `추가 슬롯당 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원`
+    paid: `기본 1 + 추가 슬롯당 +${MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString("ko-KR")}원`,
+    b2b: `추가 슬롯당 +${MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString("ko-KR")}원`
   },
   {
     label: "구독 요금",
@@ -140,10 +143,10 @@ export const MEMBERSHIP_PLAN_DETAILS = {
       "수신 화면 발신자 신원 확인 + 디지털 인증명함·쇼케이스 배너(최대 5) 풀 송출을 제공합니다.",
       "쇼케이스 스타일·소셜 링크·메뉴 등 유료 설정을 이용합니다.",
       FAMILY_PROTECTION_SUMMARY,
-      `정가 월 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)} → 판매가 월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}. ${PAID_LAUNCH_DISCOUNT_NOTE}`,
+      `정가 월 ${formatKrw(PAID_LIST_PRICE_MONTHLY_KRW)} → 모바일 이벤트 월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}. ${PAID_LAUNCH_DISCOUNT_NOTE}`,
       PAID_ANNUAL_BENEFIT_NOTE,
-      `SOHO 영업 송출 옵션: 대표자 계정 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`,
-      `멀티 프로필+: 기본 1프로필 포함, 추가 프로필당 월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}). 프로필마다 DCC·쇼케이스·BGM 독립.`
+      `내선·대표번호 추가: 대표자 기본 플랜 결제 후 개당 월 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원(${EXTENSION_LINE_NO_REFERRAL_NOTE}).`,
+      `멀티 프로필+: 기본 1프로필 포함, 추가 프로필당 월 +${MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString("ko-KR")}원(${MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE}). 프로필마다 DCC·쇼케이스·BGM 독립.`
     ]
   },
   b2b: {
@@ -157,8 +160,8 @@ export const MEMBERSHIP_PLAN_DETAILS = {
       "유료와 동일한 블루 쇼케이스·디지털 인증명함을 회선 단위로 제공합니다.",
       "기업 CI/BI·회사 대표번호 연동 디지털 인증명함을 지원합니다.",
       FAMILY_PROTECTION_B2B_NOTE,
-      `SOHO 영업 송출 옵션: 대표자 외 추가번호 쇼케이스만 +월 ${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`,
-      `멀티 프로필+: 추가 프로필당 월 +${SOHO_BROADCAST_MONTHLY_KRW.toLocaleString("ko-KR")}원(${SOHO_BROADCAST_NO_DISCOUNT_NOTE}).`
+      `직원·내선·대표번호 회선: 각 월 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원(${B2B_EVENT_NOTE}).`,
+      `멀티 프로필+: 추가 프로필당 월 +${MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString("ko-KR")}원(${MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE}).`
     ]
   }
 };

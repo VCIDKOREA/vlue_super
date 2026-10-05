@@ -1392,12 +1392,10 @@ class CallOverlayService : Service() {
                 return
             }
             CallUiPhasePolicy.Phase.FULL_SHOWCASE -> {
-                if (!currentOutgoing &&
-                    !isContactSafeCare(pendingCardJson) &&
-                    promoteIncomingContactSafeCareAndPopup("${source}_before_showcase")
-                ) {
-                    return
-                }
+                /*
+                 * 계약 §3a: 회원 송출 쇼케이스가 확정되면 주소록 안심케어로 덮지 않는다.
+                 * (이전 _before_showcase promote 가 저장 연락처 회원 통화를 안심팝업으로 빼앗김)
+                 */
                 /* fall through to fullscreen showcase layout */
             }
         }
@@ -3263,7 +3261,7 @@ class CallOverlayService : Service() {
 
     /**
      * 수신 · 기기 주소록 저장 번호 → 안심케어 정상 팝업.
-     * API unmatched/미인증 확정보다 우선 (저장 연락처 UX).
+     * 조회 pending/blank 일 때만. 회원 송출·인증 카드는 덮지 않음 (계약 §3a).
      */
     private fun promoteIncomingContactSafeCareAndPopup(source: String): Boolean {
         if (currentOutgoing || dismissing) return false
@@ -3278,6 +3276,24 @@ class CallOverlayService : Service() {
         if (isContactSafeCare(pendingCardJson)) {
             presentCenterSafePopup(source = source, authMember = false)
             return dcpPopupView?.isAttachedToWindow == true
+        }
+        /* 회원 쇼케이스/인증 확정 카드는 주소록 이름만으로 안심팝업으로 강등 금지 */
+        if (VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(pendingCardJson)) {
+            VlueBigPushTrace.lifecycle(
+                "INCOMING_PROMOTE_SKIP_BROADCAST",
+                "source=$source — keep member showcase"
+            )
+            return false
+        }
+        val verifiedMember = pendingVerified || parseIsVerified(pendingCardJson)
+        val pendingLookup =
+            pendingCardJson.isNullOrBlank() || isLookupPendingCard(pendingCardJson)
+        if (verifiedMember && !pendingLookup) {
+            VlueBigPushTrace.lifecycle(
+                "INCOMING_PROMOTE_SKIP_VERIFIED",
+                "source=$source — keep auth/member path"
+            )
+            return false
         }
         val name = DeviceContactsReader.resolveDisplayNameForSafeCare(this, currentPhone)?.trim().orEmpty()
         if (name.isBlank()) return false
