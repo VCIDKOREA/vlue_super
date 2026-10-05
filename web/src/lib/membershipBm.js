@@ -10,7 +10,6 @@ export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 4700;
 export const B2B_STAFF_PERSONAL_010_MONTHLY_KRW = 4700;
 export const PERSONAL_COMBO_ADDON_ANNUAL_KRW = 51000;
 export const B2B_SUBORDINATE_MONTHLY_KRW = 14700;
-export const B2B_STAFF_EVENT_MONTHLY_KRW = 9900;
 export const SOHO_BROADCAST_MONTHLY_KRW = 4200;
 export const SOHO_BROADCAST_ANNUAL_KRW = 42000;
 /** 내선·대표번호 추가 (추천인 할인 불가) — 웹 요금 안내 */
@@ -40,6 +39,13 @@ export const PAID_EVENT_ANNUAL_KRW = 141000;
 /** 최초 가입 + 추천인 코드 */
 export const PAID_REFERRAL_MONTHLY_KRW = 9900;
 export const PAID_REFERRAL_ANNUAL_KRW = 99000;
+/** B2B 모바일 회선 — 개인 유료와 동일 */
+export const B2B_STAFF_EVENT_MONTHLY_KRW = PAID_EVENT_MONTHLY_KRW;
+export const B2B_STAFF_REFERRAL_MONTHLY_KRW = PAID_REFERRAL_MONTHLY_KRW;
+export const B2B_STAFF_EVENT_ANNUAL_KRW = PAID_EVENT_ANNUAL_KRW;
+export const B2B_STAFF_REFERRAL_ANNUAL_KRW = PAID_REFERRAL_ANNUAL_KRW;
+export const B2B_MOBILE_LINE_PRICING_NOTE =
+  "모바일 회선(직원·개인 무관) 월 14,100원 · 최초 가입(CI)+추천인 코드 시 월 9,900원";
 export const PAID_LAUNCH_DISCOUNT_NOTE =
   "모바일 이벤트가 월 14,100원(정가 28,300원) · 최초 가입+추천인 시 월 9,900원";
 export const PAID_ANNUAL_BENEFIT_NOTE =
@@ -76,7 +82,7 @@ export const B2B_REP_LIST_MONTHLY_KRW = 28300;
 export const B2B_STAFF_LIST_MONTHLY_KRW = 14700;
 export const B2B_EVENT_NOTE = "이벤트가격 (종료시까지)";
 
-export const B2B_MEMBERSHIP_SUBLINE = `대표자 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원 + 모바일 회선 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 내선·대표번호 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원`;
+export const B2B_MEMBERSHIP_SUBLINE = `대표자 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원 + ${B2B_MOBILE_LINE_PRICING_NOTE} · 내선·대표번호 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원`;
 
 export const SOHO_BROADCAST_MEMBERSHIP_SUBLINE =
   "대표자 계정 외 추가번호 쇼케이스만 제공 · 월 +4,200원(할인 적용 안 됨)";

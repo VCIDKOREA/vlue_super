@@ -10,11 +10,11 @@ const DEFAULT = {
     b2b_full_package: {
       sku: "b2b_full_package",
       label: "B2B 풀 패키지",
-      monthlyKrw: 9900,
-      annualKrw: 99000,
+      monthlyKrw: 14100,
+      annualKrw: 141000,
       listMonthlyKrw: 14700,
       description:
-        "비즈니스 / B2B 풀 패키지. 대표자 계정 28,300원 + 모바일 회선(직원·개인 무관) 월 9,900원. 내선·대표번호 추가 월 5,200원(추천인 할인 불가). 회선 단위 블루 쇼케이스·디지털 인증명함."
+        "비즈니스 / B2B 풀 패키지. 대표자 계정 28,300원 + 모바일 회선(직원·개인 무관) 월 14,100원(최초+추천인 CI 시 9,900원). 내선·대표번호 추가 월 5,200원(추천인 할인 불가). 회선 단위 블루 쇼케이스·디지털 인증명함."
     },
     soho_activity: {
       sku: "soho_activity",

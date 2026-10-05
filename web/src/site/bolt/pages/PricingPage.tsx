@@ -376,14 +376,14 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-lg">B2B 기업 맞춤 요금제</h3>
-                  <p className="text-white/60 text-xs">모바일 회선 월 9,900원 · 내선·대표번호 5,200원</p>
+                  <p className="text-white/60 text-xs">모바일 14,100원 · 추천인+CI 9,900원 · 내선 5,200원</p>
                 </div>
               </div>
               <p className="text-white/70 text-sm leading-relaxed mb-4" style={{ wordBreak: 'keep-all' }}>
-                대표자·회선 단위로 풀 쇼케이스·디지털 인증명함을 제공합니다. 모바일 기기(직원·개인 무관)는 월 9,900원, 내선·대표번호 추가는 개당 월 5,200원(추천인 할인 불가)입니다.
+                대표자·회선 단위로 풀 쇼케이스·디지털 인증명함을 제공합니다. 모바일 기기(직원·개인 무관)는 월 14,100원이며, 최초 가입(CI)+추천인 코드 시 9,900원입니다. 내선·대표번호 추가는 개당 월 5,200원(추천인 할인 불가)입니다.
               </p>
               <ul className="grid grid-cols-2 gap-2">
-                {['회선 단위 풀 쇼케이스', '디지털 인증명함', '모바일 9,900원', '내선·대표번호 5,200원'].map((f) => (
+                {['회선 단위 풀 쇼케이스', '디지털 인증명함', '모바일 14,100원', '추천인 시 9,900원'].map((f) => (
                   <li key={f} className="flex items-center gap-1.5 text-xs text-white/80">
                     <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
                     {f}

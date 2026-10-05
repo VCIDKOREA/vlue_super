@@ -13,6 +13,7 @@ import {
   B2B_REP_LIST_MONTHLY_KRW,
   B2B_STAFF_LIST_MONTHLY_KRW,
   B2B_STAFF_EVENT_MONTHLY_KRW,
+  B2B_STAFF_REFERRAL_MONTHLY_KRW,
   B2B_EVENT_NOTE,
   EXTENSION_LINE_MEMBERSHIP_SUBLINE,
   EXTENSION_LINE_MONTHLY_KRW,
@@ -184,7 +185,7 @@ export default function MembershipUpgradeModal({
                         </span>
                       </p>
                       <p className={`text-[12px] font-black ${isDarkMode ? "text-amber-200" : "text-amber-800"}`}>
-                        → 모바일 회선 {B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 (직원·개인 무관)
+                        → 모바일 {B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 (추천인+CI {B2B_STAFF_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원)
                       </p>
                     </div>
                   ) : null}

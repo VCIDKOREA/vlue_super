@@ -19,6 +19,8 @@ import {
   B2B_REP_LIST_MONTHLY_KRW,
   B2B_STAFF_LIST_MONTHLY_KRW,
   B2B_STAFF_EVENT_MONTHLY_KRW,
+  B2B_STAFF_REFERRAL_MONTHLY_KRW,
+  B2B_MOBILE_LINE_PRICING_NOTE,
   B2B_EVENT_NOTE,
   EXTENSION_LINE_MONTHLY_KRW,
   EXTENSION_LINE_LIST_MONTHLY_KRW,
@@ -89,8 +91,8 @@ export const MARKETING_PRICING_TIERS = [
     description: b2bPlanDescription(),
     color: 'gold' as const,
     features: MEMBERSHIP_PLAN_DETAILS.b2b.bullets,
-    priceNote: `대표자 계정 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 + 모바일 회선(직원·개인 무관) ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString('ko-KR')}원 · 내선·대표번호 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString('ko-KR')}원 · ${B2B_ENTERPRISE_SUMMARY_SHORT}`,
-    promoBadge: '모바일 9,900원',
+    priceNote: `대표자 계정 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 + ${B2B_MOBILE_LINE_PRICING_NOTE} · 내선·대표번호 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString('ko-KR')}원 · ${B2B_ENTERPRISE_SUMMARY_SHORT}`,
+    promoBadge: '모바일 14,100원',
   },
 ];
 

@@ -87,7 +87,8 @@ export type B2bBillingOptions = {
 
 export function b2bMasterUnitKrw(cycle: B2BBillingCycle, hasReferral: boolean): number {
   if (hasReferral) {
-    return cycle === "annual" ? b2bAnnualPerLineKrw() : b2bMonthlyPerLineKrw();
+    const n = nums();
+    return cycle === "annual" ? n.REFERRAL_ANNUAL_KRW : n.REFERRAL_MONTHLY_KRW;
   }
   return cycle === "annual" ? premiumListPriceKrw() * ANNUAL_PAID_MONTHS : premiumListPriceKrw();
 }
@@ -105,7 +106,8 @@ export function b2bEnterpriseTotalKrw(
   if (n === 0) return 0;
   const hasReferral = Boolean(opts.hasReferral);
   if (hasReferral) {
-    const unit = cycle === "annual" ? b2bAnnualPerLineKrw() : b2bMonthlyPerLineKrw();
+    const n = nums();
+    const unit = cycle === "annual" ? n.REFERRAL_ANNUAL_KRW : n.REFERRAL_MONTHLY_KRW;
     return floorWon(n * unit);
   }
   const master = b2bMasterUnitKrw(cycle, false);

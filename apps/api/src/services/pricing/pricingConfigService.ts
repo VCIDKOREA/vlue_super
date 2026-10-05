@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PRICING_CONFIG,
   type PricingConfigFile,
+  type PricingConfigLegacy,
   type PricingPlanSku
 } from "./pricingConfigSchema.js";
 
@@ -109,9 +110,15 @@ export async function savePricingConfig(
 
 /** 런타임 pricingConstants 연동용 */
 export function pricingNumbersFromConfig(cfg: PricingConfigFile = getPricingConfigSync()) {
+  const legacy = cfg.legacy as PricingConfigLegacy & {
+    referralMonthlyKrw?: number;
+    referralAnnualKrw?: number;
+  };
   return {
     B2B_MONTHLY_PER_LINE_KRW: cfg.plans.b2b_full_package.monthlyKrw,
     B2B_ANNUAL_PER_LINE_KRW: cfg.plans.b2b_full_package.annualKrw,
+    REFERRAL_MONTHLY_KRW: legacy.referralMonthlyKrw ?? 9900,
+    REFERRAL_ANNUAL_KRW: legacy.referralAnnualKrw ?? 99000,
     SOHO_ACTIVITY_MONTHLY_KRW: cfg.plans.soho_activity.monthlyKrw,
     SOHO_ACTIVITY_ANNUAL_KRW: cfg.plans.soho_activity.annualKrw,
     SOHO_BROADCAST_MONTHLY_KRW: cfg.plans.soho_broadcast_addon.monthlyKrw,
