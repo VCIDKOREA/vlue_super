@@ -184,7 +184,7 @@ export default function MembershipUpgradeModal({
                         </span>
                       </p>
                       <p className={`text-[12px] font-black ${isDarkMode ? "text-amber-200" : "text-amber-800"}`}>
-                        → 직원 회선 {B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 ({B2B_EVENT_NOTE})
+                        → 모바일 회선 {B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 (직원·개인 무관)
                       </p>
                     </div>
                   ) : null}

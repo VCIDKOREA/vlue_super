@@ -85,12 +85,12 @@ export const MARKETING_PRICING_TIERS = [
     name: 'B2B 풀 패키지',
     price: B2B_STAFF_EVENT_MONTHLY_KRW,
     listPrice: B2B_STAFF_LIST_MONTHLY_KRW,
-    period: '직원 회선/월',
+    period: '모바일 회선/월',
     description: b2bPlanDescription(),
     color: 'gold' as const,
     features: MEMBERSHIP_PLAN_DETAILS.b2b.bullets,
-    priceNote: `대표자 계정 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 + 직원 회선 정가 ${B2B_STAFF_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 → 이벤트 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString('ko-KR')}원(${B2B_EVENT_NOTE}) · ${B2B_ENTERPRISE_SUMMARY_SHORT}`,
-    promoBadge: B2B_EVENT_NOTE,
+    priceNote: `대표자 계정 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString('ko-KR')}원 + 모바일 회선(직원·개인 무관) ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString('ko-KR')}원 · 내선·대표번호 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString('ko-KR')}원 · ${B2B_ENTERPRISE_SUMMARY_SHORT}`,
+    promoBadge: '모바일 9,900원',
   },
 ];
 

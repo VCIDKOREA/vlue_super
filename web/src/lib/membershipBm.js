@@ -10,7 +10,7 @@ export const PERSONAL_COMBO_ADDON_MONTHLY_KRW = 4700;
 export const B2B_STAFF_PERSONAL_010_MONTHLY_KRW = 4700;
 export const PERSONAL_COMBO_ADDON_ANNUAL_KRW = 51000;
 export const B2B_SUBORDINATE_MONTHLY_KRW = 14700;
-export const B2B_STAFF_EVENT_MONTHLY_KRW = 5200;
+export const B2B_STAFF_EVENT_MONTHLY_KRW = 9900;
 export const SOHO_BROADCAST_MONTHLY_KRW = 4200;
 export const SOHO_BROADCAST_ANNUAL_KRW = 42000;
 /** 내선·대표번호 추가 (추천인 할인 불가) — 웹 요금 안내 */
@@ -76,7 +76,7 @@ export const B2B_REP_LIST_MONTHLY_KRW = 28300;
 export const B2B_STAFF_LIST_MONTHLY_KRW = 14700;
 export const B2B_EVENT_NOTE = "이벤트가격 (종료시까지)";
 
-export const B2B_MEMBERSHIP_SUBLINE = `대표자 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원 + 직원 회선 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원(${B2B_EVENT_NOTE})`;
+export const B2B_MEMBERSHIP_SUBLINE = `대표자 ${B2B_REP_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원 + 모바일 회선 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 내선·대표번호 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원`;
 
 export const SOHO_BROADCAST_MEMBERSHIP_SUBLINE =
   "대표자 계정 외 추가번호 쇼케이스만 제공 · 월 +4,200원(할인 적용 안 됨)";

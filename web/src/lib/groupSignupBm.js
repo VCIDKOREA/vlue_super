@@ -16,23 +16,22 @@ export function groupAnnualPerLineKrw() {
 }
 
 /** @deprecated — groupMonthlyPerLineKrw() 사용 */
-export const GROUP_MONTHLY_PER_LINE_KRW = 5_200;
+export const GROUP_MONTHLY_PER_LINE_KRW = 9_900;
 export const GROUP_ANNUAL_PER_LINE_KRW = GROUP_MONTHLY_PER_LINE_KRW * 10;
 export const GROUP_SIGNUP_STORAGE_KEY = "vlue_group_signup_draft_v1";
 
 /** 가입 단계에서 「단체 가입」을 선택한 경우 */
 export function groupSignupAtRegistrationNotice() {
   const n = pricingNumbers();
-  const staffList = n.b2bStaffListMonthly ?? 14700;
-  return `B2B 풀 패키지: 대표자 계정 월 ${n.paidListMonthly.toLocaleString("ko-KR")}원 + 직원 회선 정가 ${staffList.toLocaleString("ko-KR")}원 → 이벤트 ${n.b2bMonthly.toLocaleString("ko-KR")}원(종료시까지). 회선 단위 블루 쇼케이스·디지털 인증명함.`;
+  return `B2B 풀 패키지: 대표자 계정 월 ${n.paidListMonthly.toLocaleString("ko-KR")}원 + 모바일 회선(직원·개인 무관) 월 ${n.b2bMonthly.toLocaleString("ko-KR")}원. 내선·대표번호 추가 월 5,200원(추천인 할인 불가). 회선 단위 블루 쇼케이스·디지털 인증명함.`;
 }
 
 export const GROUP_SIGNUP_AT_REGISTRATION_NOTICE =
-  "B2B 풀 패키지: 대표자 계정 월 28,300원 + 직원 회선 정가 14,700원 → 이벤트 5,200원(종료시까지). 회선 단위 블루 쇼케이스·디지털 인증명함.";
+  "B2B 풀 패키지: 대표자 계정 월 28,300원 + 모바일 회선(직원·개인 무관) 월 9,900원. 내선·대표번호 추가 월 5,200원(추천인 할인 불가). 회선 단위 블루 쇼케이스·디지털 인증명함.";
 
 /** 개인 유료 가입 후 단체 전환 안내 */
 export const INDIVIDUAL_TO_GROUP_CONVERSION_NOTICE =
-  "개인 유료(월 14,100원 · 추천인 최초가입 9,900원)로 먼저 가입·이용하신 뒤, 마이페이지에서 B2B 회선을 등록해 단체로 전환할 수 있습니다. 직원 회선 이벤트 요금(5,200원)은 단체 등록 완료 후 익월 결제 주기부터 적용됩니다.";
+  "개인 유료(월 14,100원 · 추천인 최초가입 9,900원)로 먼저 가입·이용하신 뒤, 마이페이지에서 B2B 회선을 등록해 단체로 전환할 수 있습니다. 모바일 회선 요금(9,900원)은 단체 등록 완료 후 익월 결제 주기부터 적용됩니다.";
 
 /** @deprecated — GROUP_SIGNUP_AT_REGISTRATION_NOTICE 사용 */
 export const GROUP_SIGNUP_NOTICE = GROUP_SIGNUP_AT_REGISTRATION_NOTICE;

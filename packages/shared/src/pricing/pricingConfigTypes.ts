@@ -47,14 +47,14 @@ export const DEFAULT_PRICING_CONFIG: PricingConfigFile = {
     b2b_full_package: {
       sku: "b2b_full_package",
       label: "B2B 풀 패키지",
-      monthlyKrw: 5200,
-      annualKrw: 52000,
+      monthlyKrw: 9900,
+      annualKrw: 99000,
       billingUnit: "per_line",
       minLines: 1,
       platforms: ["mobile", "web", "pc"],
       features: ["showcase", "digital_cert_card", "caller_id_overlay"],
       description:
-        "비즈니스 / B2B 풀 패키지. 대표자 계정 28,300원 + 직원 회선 이벤트 5,200원. 회선 단위 블루 쇼케이스·디지털 인증명함."
+        "비즈니스 / B2B 풀 패키지. 대표자 계정 28,300원 + 모바일 회선(직원·개인 무관) 월 9,900원. 내선·대표번호 추가 월 5,200원."
     },
     soho_activity: {
       sku: "soho_activity",

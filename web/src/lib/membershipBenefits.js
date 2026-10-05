@@ -26,9 +26,9 @@ export const VLUER_REFERRAL_B2B_NOTE =
   "추천인 할인·파트너 수수료는 본인인증 CI 기준 최초 1회 신규 가입에만 적용됩니다. 내선·대표번호 추가(월 5,200원)에는 추천 할인이 적용되지 않습니다.";
 
 /** 기업(B2B) — V1 풀 패키지 */
-export const B2B_ENTERPRISE_SUMMARY_SHORT = `대표 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 직원 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}(${B2B_EVENT_NOTE})`;
+export const B2B_ENTERPRISE_SUMMARY_SHORT = `대표 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 모바일 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)} · 내선·대표 ${formatKrw(EXTENSION_LINE_MONTHLY_KRW)}`;
 export const B2B_ENTERPRISE_SUMMARY =
-  `비즈니스 / B2B 풀 패키지: 대표자 계정 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 직원 회선 정가 ${formatKrw(B2B_STAFF_LIST_MONTHLY_KRW)} → 이벤트 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}(${B2B_EVENT_NOTE}). 유료와 동일한 블루 쇼케이스·디지털 인증명함(회선 단위). 가족보호는 개인 유료 계정에서만 이용.`;
+  `비즈니스 / B2B 풀 패키지: 대표자 계정 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 모바일 회선(직원·개인 무관) ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}. 내선·대표번호 추가 ${formatKrw(EXTENSION_LINE_MONTHLY_KRW)}(추천인 할인 불가). 유료와 동일한 블루 쇼케이스·디지털 인증명함(회선 단위). 가족보호는 개인 유료 계정에서만 이용.`;
 
 /** V1 가입 멤버십 — 혜택 비교 (쇼케이스·가족보호 중심) */
 export const MEMBERSHIP_BENEFIT_ROWS = [
@@ -102,7 +102,7 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
     label: "내선·대표번호 추가",
     free: "—",
     paid: `개당 월 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원(${EXTENSION_LINE_NO_REFERRAL_NOTE})`,
-    b2b: `직원·내선·대표 회선 월 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원`
+    b2b: `모바일 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 내선·대표 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원`
   },
   {
     label: "멀티 프로필+",
@@ -114,7 +114,7 @@ export const MEMBERSHIP_BENEFIT_ROWS = [
     label: "구독 요금",
     free: "무료",
     paid: `월 ${formatKrw(PAID_EVENT_MONTHLY_KRW)}`,
-    b2b: `대표 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 직원 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}`
+    b2b: `대표 ${formatKrw(B2B_REP_LIST_MONTHLY_KRW)} + 모바일 ${formatKrw(B2B_STAFF_EVENT_MONTHLY_KRW)}`
   }
 ];
 
@@ -160,7 +160,7 @@ export const MEMBERSHIP_PLAN_DETAILS = {
       "유료와 동일한 블루 쇼케이스·디지털 인증명함을 회선 단위로 제공합니다.",
       "기업 CI/BI·회사 대표번호 연동 디지털 인증명함을 지원합니다.",
       FAMILY_PROTECTION_B2B_NOTE,
-      `직원·내선·대표번호 회선: 각 월 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원(${B2B_EVENT_NOTE}).`,
+      `모바일 회선(직원·개인 무관): 월 ${B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원. 내선·대표번호 추가: 월 ${EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원(${EXTENSION_LINE_NO_REFERRAL_NOTE}).`,
       `멀티 프로필+: 추가 프로필당 월 +${MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString("ko-KR")}원(${MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE}).`
     ]
   }
