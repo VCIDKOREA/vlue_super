@@ -1,5 +1,6 @@
 import { prisma } from "../../db/client.js";
 import { ANNUAL_PAID_MONTHS } from "../vluer/pricingConstants.js";
+import { promoMonthsRemaining } from "@vlue/shared/settlement";
 import {
   PROMO_BENEFIT_MONTHS,
   REJOIN_REFERRAL_PENALTY_MONTHS,

@@ -81,7 +81,7 @@ subscriptionCronRoutes.post("/remote-security-sweep", async (c) => {
   }
   try {
     const summary = await sweepRemoteSecurityHeartbeats();
-    return c.json({ ok: true, ...summary });
+    return c.json(summary);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     return c.json({ error: msg, code: "REMOTE_SECURITY_SWEEP_FAILED" }, 500);

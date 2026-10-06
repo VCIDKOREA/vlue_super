@@ -25,6 +25,7 @@ function stripOAuthFromUrl() {
     "instagram_oauth",
     "instagram_error",
     "social_oauth",
+    "social_link",
     "oauth_provider",
     "oauth_error"
   ].forEach((k) => u.searchParams.delete(k));
@@ -33,6 +34,15 @@ function stripOAuthFromUrl() {
 }
 
 function detectOAuthMode(search, hash) {
+  const socialLink = search.get("social_link") || hash.get("social_link");
+  if (socialLink) {
+    return {
+      mode: socialLink === "success" || socialLink === "linked" ? "linked" : socialLink,
+      provider: search.get("oauth_provider") || hash.get("oauth_provider") || "kakao",
+      error: search.get("oauth_error") || hash.get("oauth_error") || "",
+      linkOnly: true
+    };
+  }
   const social = search.get("social_oauth") || hash.get("social_oauth");
   if (social) {
     return {
@@ -107,13 +117,28 @@ export function consumeSocialOAuthReturn() {
 
   if (detected.mode === "error") {
     const message =
-      detected.error || `${label} 로그인에 실패했습니다. 다시 시도해 주세요.`;
+      detected.error ||
+      (detected.linkOnly
+        ? `${label} 연동에 실패했습니다. 다시 시도해 주세요.`
+        : `${label} 로그인에 실패했습니다. 다시 시도해 주세요.`);
     stripOAuthFromUrl();
     return {
       handled: true,
       success: false,
       provider,
+      linkOnly: Boolean(detected.linkOnly),
       message: decodeURIComponent(message)
+    };
+  }
+
+  if (detected.mode === "linked") {
+    stripOAuthFromUrl();
+    return {
+      handled: true,
+      success: true,
+      provider,
+      linkOnly: true,
+      message: `${label} 계정이 VLUÉ에 연동되었습니다. 다음부터 간편 로그인을 사용할 수 있습니다.`
     };
   }
 

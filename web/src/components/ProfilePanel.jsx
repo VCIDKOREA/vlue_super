@@ -18,6 +18,7 @@ import ShoppingCartHubPanel from "./ShoppingCartHubPanel.jsx";
 import BroadcastLineSetupPanel from "./BroadcastLineSetupPanel.jsx";
 import EnterpriseDccApplyWizard from "./EnterpriseDccApplyWizard.jsx";
 import DccOwnerApprovalInbox from "./DccOwnerApprovalInbox.jsx";
+import SocialAccountLinkPanel from "./auth/SocialAccountLinkPanel.jsx";
 import BackButton from "./common/BackButton";
 import { isBillableMembershipKind, isB2bMembershipKind, isPaidMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import { pricingNumbers } from "../lib/pricingConfig.js";
@@ -960,6 +961,13 @@ function ProfilePanel({
 
         <div ref={mainPanelScrollRef} className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-6 py-6 no-scrollbar">
           <DccOwnerApprovalInbox isDarkMode={isDarkMode} onToast={showSettingNotice} />
+          <div className="mb-4">
+            <SocialAccountLinkPanel
+              onToast={showSettingNotice}
+              isDarkMode={isDarkMode}
+              placement="profile"
+            />
+          </div>
           {isCorporateAccount ? (
             <button
               type="button"

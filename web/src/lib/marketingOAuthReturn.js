@@ -33,6 +33,14 @@ export function consumeMarketingOAuthReturn() {
   const social = consumeSocialOAuthReturn();
   if (!social.handled) return null;
 
+  if (social.success && social.linkOnly) {
+    return {
+      kind: "social-link",
+      success: true,
+      message: social.message || "소셜 계정이 연동되었습니다."
+    };
+  }
+
   if (social.success && social.session) {
     const user = persistVlueAuthSession({
       userId: social.session.userId,
@@ -71,7 +79,7 @@ export function relayAppOAuthToMarketing() {
   const path = window.location.pathname || "";
   if (path !== "/app" && !path.startsWith("/app/")) return false;
   const search = window.location.search || "";
-  if (!/(kakao_oauth|instagram_oauth|social_oauth|google_oauth|naver_oauth)=/.test(search)) {
+  if (!/(kakao_oauth|instagram_oauth|social_oauth|social_link|google_oauth|naver_oauth)=/.test(search)) {
     return false;
   }
   const origin = window.location.origin.replace(/\/$/, "");

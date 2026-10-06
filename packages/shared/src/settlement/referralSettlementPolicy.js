@@ -1,35 +1,30 @@
 import { roundWon } from "../money/moneyKrw.js";
 import { ANNUAL_PAID_MONTHS, WITHHOLDING_TAX_RATE } from "./settlementConstants.js";
 import { effectiveSettlementChannel, FRIEND_SPONSOR_RATE_MONTHS_1_12, PROMO_SPONSOR_RATE_MONTHS_13_PLUS, PROMO_SPONSOR_RATE_MONTHS_1_12 } from "../referral/referralChannelPolicy.js";
-import { PAID_ANNUAL_DISCOUNTED_KRW, PAID_LIST_PRICE_ANNUAL_KRW, PAID_LIST_PRICE_MONTHLY_KRW, PAID_MONTHLY_DISCOUNTED_KRW, PROMO_BENEFIT_MONTHS, PROMO_SUPPLY_MONTHLY_KRW, SLIDING_RENEWAL_MONTHLY_KRW, SLIDING_RENEWAL_SUPPLY_KRW } from "../membership/membershipBmConstants.js";
+import { PAID_ANNUAL_DISCOUNTED_KRW, PAID_MONTHLY_DISCOUNTED_KRW, PROMO_BENEFIT_MONTHS, PROMO_SUPPLY_MONTHLY_KRW, SLIDING_RENEWAL_SUPPLY_KRW } from "../membership/membershipBmConstants.js";
 export function promoMonthsRemaining(accumulatedBeforeCharge) {
     return Math.max(0, PROMO_BENEFIT_MONTHS - Math.max(0, accumulatedBeforeCharge));
 }
 export function resolveSlidingConsumerChargeKrw(accumulatedBeforeCharge, cycle, opts) {
+    /** 2026-10: 기본 판매 = 모바일 이벤트가. 슬라이딩 정가 복귀 폐지. */
+    const promoAmount = cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW;
     if (!opts.hadPromoEligibility) {
-        return {
-            amountKrw: cycle === "annual" ? PAID_LIST_PRICE_ANNUAL_KRW : PAID_LIST_PRICE_MONTHLY_KRW,
-            inPromoWindow: false
-        };
+        return { amountKrw: promoAmount, inPromoWindow: true };
     }
-    /** 지인 추천 피추천인: 구독 시 30% 할인 유지 (15% 슬라이딩 없음) */
     if (opts.referralChannel === "friend") {
         return {
-            amountKrw: cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW,
+            amountKrw: cycle === "annual" ? 99_000 : 9_900,
             inPromoWindow: true
         };
     }
     const remaining = promoMonthsRemaining(accumulatedBeforeCharge);
-    if (remaining > 0) {
+    if (remaining > 0 && opts.referralChannel === "promo") {
         return {
-            amountKrw: cycle === "annual" ? PAID_ANNUAL_DISCOUNTED_KRW : PAID_MONTHLY_DISCOUNTED_KRW,
+            amountKrw: cycle === "annual" ? 99_000 : 9_900,
             inPromoWindow: true
         };
     }
-    if (cycle === "annual") {
-        return { amountKrw: SLIDING_RENEWAL_MONTHLY_KRW * ANNUAL_PAID_MONTHS, inPromoWindow: false };
-    }
-    return { amountKrw: SLIDING_RENEWAL_MONTHLY_KRW, inPromoWindow: false };
+    return { amountKrw: promoAmount, inPromoWindow: true };
 }
 export function benefitMonthIndexAfterCharge(accumulatedBefore, monthsAdded) {
     return accumulatedBefore + monthsAdded;

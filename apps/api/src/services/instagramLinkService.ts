@@ -7,6 +7,7 @@ import {
   resolveInstagramMediaByIds,
   type InstagramMediaItem
 } from "../integrations/instagram/instagramOAuth.js";
+import { linkSocialAccountToUser } from "./socialAuthService.js";
 
 export async function completeInstagramLinkForUser(userId: string, code: string) {
   const short = await exchangeInstagramCodeForShortLivedToken(code);
@@ -44,6 +45,23 @@ export async function completeInstagramLinkForUser(userId: string, code: string)
       accountType: profile.accountType
     }
   });
+
+  /* 쇼케이스 연동과 함께 간편 로그인 SocialLoginIdentity도 연결 */
+  try {
+    await linkSocialAccountToUser(
+      userId,
+      {
+        provider: "instagram",
+        socialToken: accessToken
+      },
+      { header: () => undefined }
+    );
+  } catch (e) {
+    console.warn(
+      "[instagram] social login link upsert failed:",
+      e instanceof Error ? e.message : e
+    );
+  }
 
   return {
     username: link.username,

@@ -2634,6 +2634,12 @@ function App() {
 
     const result = consumeSocialOAuthReturn();
     if (!result.handled) return;
+    if (result.success && result.linkOnly) {
+      setBottomToast(result.message || "소셜 계정이 연동되었습니다.");
+      setProfileOpen(true);
+      const t = setTimeout(() => setBottomToast(""), 3200);
+      return () => clearTimeout(t);
+    }
     if (result.success && result.session) {
       const nextUid = String(result.session.userId || result.session.id || "").trim();
       clearLocalStorageForLogin(nextUid, { keepRememberLogin: false, keepOnboarding: true });
@@ -5694,7 +5700,9 @@ function App() {
         }}
       />
 
-      {page === "main" && isLoggedIn && !showSplash ? <TodaySafetyPatch isDarkMode={isDarkMode} /> : null}
+      {page === "main" && isLoggedIn && !showSplash && !profileOpen ? (
+        <TodaySafetyPatch isDarkMode={isDarkMode} />
+      ) : null}
 
       <footer
         className={`fixed bottom-0 left-0 right-0 z-[160] ${showBottomNav ? "block" : "hidden"}`}

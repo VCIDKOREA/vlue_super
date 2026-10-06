@@ -106,8 +106,8 @@ export function b2bEnterpriseTotalKrw(
   if (n === 0) return 0;
   const hasReferral = Boolean(opts.hasReferral);
   if (hasReferral) {
-    const n = nums();
-    const unit = cycle === "annual" ? n.REFERRAL_ANNUAL_KRW : n.REFERRAL_MONTHLY_KRW;
+    const price = nums();
+    const unit = cycle === "annual" ? price.REFERRAL_ANNUAL_KRW : price.REFERRAL_MONTHLY_KRW;
     return floorWon(n * unit);
   }
   const master = b2bMasterUnitKrw(cycle, false);

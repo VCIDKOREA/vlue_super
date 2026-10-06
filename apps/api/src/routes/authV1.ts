@@ -25,6 +25,11 @@ import {
   listLinkedInstagramMedia,
   resolveLinkedInstagramMediaUrls
 } from "../services/instagramLinkService.js";
+import {
+  createSocialLoginLinkState,
+  verifySocialLoginLinkState,
+  type SocialLoginLinkProvider
+} from "../integrations/socialLoginLinkState.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import { prisma } from "../db/client.js";
 
@@ -82,6 +87,22 @@ function redirectAuthError(provider: OAuthProvider, message: string): Response {
         : provider === "naver"
           ? { naver_oauth: "error", naver_error: message.slice(0, 240) }
           : { instagram_oauth: "error", instagram_error: message.slice(0, 240) }),
+    oauth_error: message.slice(0, 240)
+  });
+}
+
+function redirectSocialLoginLinkSuccess(provider: SocialLoginLinkProvider): Response {
+  return redirectWebMarketingResponse({
+    social_link: "success",
+    oauth_provider: provider,
+    social_oauth: "linked"
+  });
+}
+
+function redirectSocialLoginLinkError(provider: SocialLoginLinkProvider, message: string): Response {
+  return redirectWebMarketingResponse({
+    social_link: "error",
+    oauth_provider: provider,
     oauth_error: message.slice(0, 240)
   });
 }
@@ -264,6 +285,19 @@ authV1Routes.get("/google", (c) => {
   }
 });
 
+/** Google 간편로그인 사후 연동 시작 */
+authV1Routes.post("/google/link/start", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const state = createSocialLoginLinkState(userId, "google");
+    const url = buildGoogleAuthorizeUrl(state);
+    return c.json({ url });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Google 연동을 시작할 수 없습니다.";
+    return c.json({ error: msg }, 400);
+  }
+});
+
 /** Google OAuth 콜백 — 연동된 계정만 로그인 후 프론트로 리다이렉트 */
 authV1Routes.get("/google/callback", async (c) => {
   const googleErr = c.req.query("error");
@@ -276,14 +310,30 @@ authV1Routes.get("/google/callback", async (c) => {
   }
 
   const state = c.req.query("state") || "";
-  const cookieState = getCookie(c, GOOGLE_STATE_COOKIE) || "";
-  if (!state || !cookieState || state !== cookieState) {
-    return redirectAuthError("google", "로그인 요청이 만료되었거나 위조되었습니다. 다시 시도해 주세요.");
-  }
-
   const code = c.req.query("code");
   if (!code) {
     return redirectAuthError("google", "Google 인가 코드가 없습니다.");
+  }
+
+  const linkState = verifySocialLoginLinkState(state);
+  if (linkState?.provider === "google") {
+    try {
+      const accessToken = await exchangeGoogleCodeForAccessToken(code);
+      await linkSocialAccountToUser(
+        linkState.userId,
+        { provider: "google", socialToken: accessToken },
+        { header: (n) => c.req.header(n) }
+      );
+      return redirectSocialLoginLinkSuccess("google");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Google 연동 처리에 실패했습니다.";
+      return redirectSocialLoginLinkError("google", msg);
+    }
+  }
+
+  const cookieState = getCookie(c, GOOGLE_STATE_COOKIE) || "";
+  if (!state || !cookieState || state !== cookieState) {
+    return redirectAuthError("google", "로그인 요청이 만료되었거나 위조되었습니다. 다시 시도해 주세요.");
   }
 
   try {
@@ -318,6 +368,19 @@ authV1Routes.get("/naver", (c) => {
   }
 });
 
+/** 네이버 간편로그인 사후 연동 시작 */
+authV1Routes.post("/naver/link/start", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const state = createSocialLoginLinkState(userId, "naver");
+    const url = buildNaverAuthorizeUrl(state);
+    return c.json({ url });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "네이버 연동을 시작할 수 없습니다.";
+    return c.json({ error: msg }, 400);
+  }
+});
+
 /** 네이버 OAuth 콜백 — 즉시 가입/로그인 후 프론트로 리다이렉트 */
 authV1Routes.get("/naver/callback", async (c) => {
   const naverErr = c.req.query("error");
@@ -332,6 +395,25 @@ authV1Routes.get("/naver/callback", async (c) => {
   }
 
   const state = c.req.query("state") || "";
+  const code = c.req.query("code");
+  if (!code) return redirectAuthError("naver", "네이버 인가 코드가 없습니다.");
+
+  const linkState = verifySocialLoginLinkState(state);
+  if (linkState?.provider === "naver") {
+    try {
+      const accessToken = await exchangeNaverCodeForAccessToken(code, state);
+      await linkSocialAccountToUser(
+        linkState.userId,
+        { provider: "naver", socialToken: accessToken },
+        { header: (n) => c.req.header(n) }
+      );
+      return redirectSocialLoginLinkSuccess("naver");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "네이버 연동 처리에 실패했습니다.";
+      return redirectSocialLoginLinkError("naver", msg);
+    }
+  }
+
   const cookieState = getCookie(c, NAVER_STATE_COOKIE) || "";
   if (!state || !cookieState || state !== cookieState) {
     return redirectAuthError(
@@ -339,9 +421,6 @@ authV1Routes.get("/naver/callback", async (c) => {
       "로그인 요청이 만료되었거나 위조되었습니다. 다시 시도해 주세요."
     );
   }
-
-  const code = c.req.query("code");
-  if (!code) return redirectAuthError("naver", "네이버 인가 코드가 없습니다.");
 
   try {
     const accessToken = await exchangeNaverCodeForAccessToken(code, state);

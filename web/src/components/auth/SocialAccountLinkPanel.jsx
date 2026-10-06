@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchSocialLinks, linkSocialAccount, readCachedSocialLinks } from "../../lib/socialAccountLinkApi.js";
+import {
+  fetchSocialLinks,
+  linkSocialAccount,
+  readCachedSocialLinks,
+  startSocialOAuthLink
+} from "../../lib/socialAccountLinkApi.js";
 import { getKakaoAccessTokenWithLogin } from "../../lib/kakaoSocialLogin.js";
 
 const PROVIDERS = [
@@ -9,7 +14,19 @@ const PROVIDERS = [
     brandBg: "bg-[#FEE500]",
     brandText: "text-[#191919]",
     badge: "K",
-    badgeBg: "bg-[#191919] text-[#FEE500]"
+    badgeBg: "bg-[#191919] text-[#FEE500]",
+    btnCls: "bg-[#FEE500] text-[rgba(0,0,0,0.85)]",
+    actionLabel: "카카오로 연동하기"
+  },
+  {
+    id: "google",
+    label: "Google",
+    brandBg: "bg-white",
+    brandText: "text-slate-800",
+    badge: "G",
+    badgeBg: "bg-white text-[#4285F4] ring-1 ring-slate-200",
+    btnCls: "border border-slate-200 bg-white text-slate-800",
+    actionLabel: "Google로 연동하기"
   },
   {
     id: "naver",
@@ -17,7 +34,19 @@ const PROVIDERS = [
     brandBg: "bg-[#03C75A]",
     brandText: "text-white",
     badge: "N",
-    badgeBg: "bg-white text-[#03C75A]"
+    badgeBg: "bg-white text-[#03C75A]",
+    btnCls: "bg-[#03C75A] text-white",
+    actionLabel: "네이버로 연동하기"
+  },
+  {
+    id: "instagram",
+    label: "Instagram",
+    brandBg: "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]",
+    brandText: "text-white",
+    badge: "Ig",
+    badgeBg: "bg-white/20 text-white",
+    btnCls: "bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-white",
+    actionLabel: "Instagram으로 연동하기"
   }
 ];
 
@@ -33,22 +62,32 @@ function formatLinkedAt(iso) {
 }
 
 /**
- * 마이페이지 — VLUÉ 순정 가입 후 카카오/네이버 사후 연동
+ * 마이페이지·프로필 — VLUÉ 순정 가입 후 카카오/Google/네이버/Instagram 사후 연동
+ * @param {"default"|"profile"} placement profile이면 상단·강조 스타일
  */
-export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) {
+export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, placement = "default" }) {
   const [links, setLinks] = useState(() => readCachedSocialLinks());
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState("");
   const [error, setError] = useState("");
+  const inProfile = placement === "profile";
 
-  const sectionCls = isDarkMode
-    ? "mt-4 rounded-2xl border border-white/10 bg-[#151821] p-4 shadow-sm"
-    : "mt-4 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-sm";
+  const sectionCls = inProfile
+    ? isDarkMode
+      ? "rounded-2xl border-2 border-amber-400/50 bg-amber-500/10 p-4 shadow-sm ring-1 ring-amber-300/20"
+      : "rounded-2xl border-2 border-amber-300 bg-gradient-to-b from-amber-50 to-white p-4 shadow-md shadow-amber-200/40"
+    : isDarkMode
+      ? "mt-4 rounded-2xl border border-white/10 bg-[#151821] p-4 shadow-sm"
+      : "mt-4 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/80 p-4 shadow-sm";
   const titleCls = isDarkMode ? "text-gray-100" : "text-slate-900";
   const bodyCls = isDarkMode ? "text-gray-400" : "text-slate-600";
-  const badgeCls = isDarkMode
-    ? "shrink-0 rounded-full bg-indigo-500/20 px-2.5 py-1 text-[10px] font-black text-indigo-200"
-    : "shrink-0 rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-black text-indigo-800";
+  const badgeCls = inProfile
+    ? isDarkMode
+      ? "shrink-0 rounded-full bg-amber-400/25 px-2.5 py-1 text-[10px] font-black text-amber-100"
+      : "shrink-0 rounded-full bg-amber-200 px-2.5 py-1 text-[10px] font-black text-amber-950"
+    : isDarkMode
+      ? "shrink-0 rounded-full bg-indigo-500/20 px-2.5 py-1 text-[10px] font-black text-indigo-200"
+      : "shrink-0 rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-black text-indigo-800";
   const stepNumCls = isDarkMode
     ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-[10px] font-black text-indigo-100"
     : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-black text-white";
@@ -103,8 +142,18 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
     }
   };
 
-  const linkNaverPlaceholder = () => {
-    onToast?.("네이버 연동 UI는 준비 중입니다. API는 연동 가능하며, 네이버 로그인 SDK 연결 후 활성화됩니다.");
+  const linkWithOAuthRedirect = async (provider) => {
+    setBusyProvider(provider);
+    setError("");
+    try {
+      const url = await startSocialOAuthLink(provider);
+      window.location.assign(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "소셜 연동을 시작할 수 없습니다.";
+      setError(msg);
+      onToast?.(msg);
+      setBusyProvider("");
+    }
   };
 
   return (
@@ -113,27 +162,38 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
         <div>
           <p className={`text-[14px] font-black ${titleCls}`}>소셜 로그인 연동</p>
           <p className={`mt-1 text-[11px] leading-relaxed [word-break:keep-all] ${bodyCls}`}>
-            VLUÉ는 <b>본인인증 회원가입</b>으로만 계정이 만들어집니다. 가입 후 여기서 카카오·네이버를
-            <b> 1:1로 연결</b>하면 다음부터 간편 로그인할 수 있습니다.
+            {inProfile ? (
+              <>
+                PASS 본인인증 후 여기서 <b>카카오·Google·네이버·Instagram</b>을 연결하면 다음부터 간편
+                로그인할 수 있습니다.
+              </>
+            ) : (
+              <>
+                VLUÉ는 <b>본인인증 회원가입</b>으로만 계정이 만들어집니다. 가입 후 여기서 SNS를
+                <b> 1:1로 연결</b>하면 다음부터 간편 로그인할 수 있습니다.
+              </>
+            )}
           </p>
         </div>
-        <span className={badgeCls}>사후 연동</span>
+        <span className={badgeCls}>{inProfile ? "간편 로그인" : "사후 연동"}</span>
       </div>
 
-      <ol className={`mt-4 space-y-2 text-[11px] leading-relaxed ${bodyCls}`}>
-        <li className="flex gap-2">
-          <span className={stepNumCls}>1</span>
-          <span>VLUÉ 회원가입(본인인증·아이디·비밀번호)으로 마스터 계정을 만듭니다.</span>
-        </li>
-        <li className="flex gap-2">
-          <span className={stepNumCls}>2</span>
-          <span>아래에서 카카오/네이버를 이 계정에 연결합니다.</span>
-        </li>
-        <li className="flex gap-2">
-          <span className={stepNumCls}>3</span>
-          <span>로그인 화면의 「간편 로그인」으로 1초 만에 접속합니다.</span>
-        </li>
-      </ol>
+      {inProfile ? null : (
+        <ol className={`mt-4 space-y-2 text-[11px] leading-relaxed ${bodyCls}`}>
+          <li className="flex gap-2">
+            <span className={stepNumCls}>1</span>
+            <span>VLUÉ 회원가입(본인인증·아이디·비밀번호)으로 마스터 계정을 만듭니다.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className={stepNumCls}>2</span>
+            <span>아래에서 카카오/Google/네이버/Instagram을 이 계정에 연결합니다.</span>
+          </li>
+          <li className="flex gap-2">
+            <span className={stepNumCls}>3</span>
+            <span>로그인 화면의 「간편 로그인」으로 1초 만에 접속합니다.</span>
+          </li>
+        </ol>
+      )}
 
       {error ? (
         <p className={errorCls} role="alert">
@@ -153,7 +213,9 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
             : isDarkMode
               ? "rounded-xl border border-white/10 bg-white/5 px-3 py-3"
               : "rounded-xl border border-slate-200 bg-white px-3 py-3";
-          const providerTitleCls = isDarkMode ? "text-[13px] font-black text-gray-100" : "text-[13px] font-black text-slate-900";
+          const providerTitleCls = isDarkMode
+            ? "text-[13px] font-black text-gray-100"
+            : "text-[13px] font-black text-slate-900";
           const providerSubCls = isDarkMode ? "text-[10px] text-gray-400" : "text-[10px] text-slate-500";
           const unlinkedBadgeCls = isDarkMode
             ? "rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-gray-400"
@@ -166,7 +228,9 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
                   <span
                     className={`flex h-9 w-9 items-center justify-center rounded-lg text-[15px] font-black ${p.brandBg} ${p.brandText}`}
                   >
-                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded text-[11px] font-black ${p.badgeBg}`}>
+                    <span
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded text-[11px] font-black ${p.badgeBg}`}
+                    >
                       {p.badge}
                     </span>
                   </span>
@@ -180,31 +244,24 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false }) 
                   </div>
                 </div>
                 {isLinked ? (
-                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white">연동 완료</span>
+                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white">
+                    연동 완료
+                  </span>
                 ) : (
                   <span className={unlinkedBadgeCls}>미연동</span>
                 )}
               </div>
 
-              {!isLinked && p.id === "kakao" ? (
+              {!isLinked ? (
                 <button
                   type="button"
                   disabled={Boolean(busyProvider)}
-                  onClick={linkWithKakaoSdk}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FEE500] py-2.5 text-[13px] font-semibold text-[rgba(0,0,0,0.85)] disabled:opacity-60"
+                  onClick={() =>
+                    p.id === "kakao" ? linkWithKakaoSdk() : linkWithOAuthRedirect(p.id)
+                  }
+                  className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-semibold disabled:opacity-60 ${p.btnCls}`}
                 >
-                  {isBusy ? "연동 중…" : "카카오로 연동하기"}
-                </button>
-              ) : null}
-
-              {!isLinked && p.id === "naver" ? (
-                <button
-                  type="button"
-                  disabled={Boolean(busyProvider)}
-                  onClick={linkNaverPlaceholder}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#03C75A] py-2.5 text-[13px] font-semibold text-white disabled:opacity-60"
-                >
-                  네이버 연동 (준비 중)
+                  {isBusy ? "연동 중…" : p.actionLabel}
                 </button>
               ) : null}
             </div>

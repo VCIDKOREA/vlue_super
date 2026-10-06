@@ -49,29 +49,35 @@ export function resolveRejoinConsumerDiscount(accumulatedUsingMonths) {
     };
 }
 export function evaluateSignupBranchFromAbuseLog(hashedIdentity, abuseLog, referrerCodeInput) {
+    const rawReferrer = String(referrerCodeInput || "").trim() || null;
     if (!abuseLog) {
         return {
             branch: "brand_new",
             hashedIdentity,
+            isFirstJoin: true,
             currentDiscountRate: DISCOUNT_RATE_PROMO_PCT,
             promoMonthsRemaining: PROMO_BENEFIT_MONTHS,
             accumulatedUsingMonths: 0,
             sponsorPenaltyMonthsLeft: 0,
             lastReferralCode: null,
-            referrerCodeInput: referrerCodeInput ?? null,
-            applyReferralRevenueLock: false
+            referrerCodeInput: rawReferrer,
+            applyReferralRevenueLock: false,
+            referralBlockedReason: null
         };
     }
+    /* CI 재가입 — 추천인 코드·할인·수수료 전부 차단 (명세서 §3) */
     const discount = resolveRejoinConsumerDiscount(abuseLog.accumulatedUsingMonths);
     return {
         branch: "rejoin_from_abuse_log",
         hashedIdentity,
+        isFirstJoin: false,
         currentDiscountRate: discount.currentDiscountRate,
         promoMonthsRemaining: discount.promoMonthsRemaining,
         accumulatedUsingMonths: abuseLog.accumulatedUsingMonths,
         sponsorPenaltyMonthsLeft: REJOIN_REFERRAL_PENALTY_MONTHS,
         lastReferralCode: abuseLog.lastReferralCode,
-        referrerCodeInput: referrerCodeInput ?? null,
-        applyReferralRevenueLock: true
+        referrerCodeInput: null,
+        applyReferralRevenueLock: true,
+        referralBlockedReason: "rejoin_ci_no_referral"
     };
 }
