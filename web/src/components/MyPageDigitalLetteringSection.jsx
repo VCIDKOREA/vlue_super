@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import { ChevronRight, CreditCard, Palette } from "lucide-react";
 import { LETTERING_BIZCARD_CHANGED_EVENT } from "../lib/letteringBizcardStorage.js";
 import { fetchDigitalCardMeta } from "../lib/digitalCardApi.js";
@@ -72,7 +73,7 @@ export default function MyPageDigitalLetteringSection({
     };
   }, [previewTick]);
 
-  const dccBlock = dccBlocked ? (
+  const dccBlock = isVlueKidsApp() ? null : dccBlocked ? (
     <div className="mypage-showcase-card mypage-showcase-card--apply mb-3" data-theme={isDarkMode ? "dark" : "light"}>
       <p className="mypage-showcase-card__apply-copy">
         {dccBlockMessage ||
@@ -116,7 +117,7 @@ export default function MyPageDigitalLetteringSection({
     <section className="w-full">
       {dccBlock}
 
-      {hasDigitalCertCard ? (
+      {hasDigitalCertCard && !isVlueKidsApp() ? (
         <div className="mb-3">
           <MultiDccPersonaBar isDarkMode={isDarkMode} onToast={onToast} compact />
         </div>
@@ -164,7 +165,7 @@ export default function MyPageDigitalLetteringSection({
             <Palette size={14} strokeWidth={2} aria-hidden />
             쇼케이스 설정
           </button>
-          {hasDigitalCertCard ? (
+          {hasDigitalCertCard && !isVlueKidsApp() ? (
             <button
               type="button"
               className="mypage-showcase-card__action"

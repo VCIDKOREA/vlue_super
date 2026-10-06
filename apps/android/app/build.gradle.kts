@@ -62,7 +62,6 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "kr.vlue.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 68
@@ -76,6 +75,23 @@ android {
         buildConfigField("String", "ADMOB_NATIVE_ID", "\"$admobNativeId\"")
         buildConfigField("String", "ADMOB_BANNER_ID", "\"$admobBannerId\"")
         manifestPlaceholders["admobAppId"] = admobAppId
+    }
+
+    flavorDimensions += "audience"
+    productFlavors {
+        create("parent") {
+            dimension = "audience"
+            isDefault = true
+            /* Play·Firebase에 등록된 부모 앱. 만 12세 이상, 결제·광고·전체 기능 */
+            applicationId = "kr.vlue.app"
+            buildConfigField("boolean", "IS_KIDS_APP", "false")
+        }
+        create("kids") {
+            dimension = "audience"
+            /* 전체이용가 라이트 패키지. 결제·명함 생성·슬롯 결제 없음 */
+            applicationId = "com.vlue.kids"
+            buildConfigField("boolean", "IS_KIDS_APP", "true")
+        }
     }
 
     signingConfigs {

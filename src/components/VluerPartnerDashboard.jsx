@@ -381,7 +381,7 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                     >
                       <div className="min-w-0 flex items-center gap-2">
                         {m.churnRisk && (
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] text-white" title="코드 변경 신청">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] text-white" title="이탈 위험">
                             !
                           </span>
                         )}

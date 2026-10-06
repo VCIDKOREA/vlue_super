@@ -755,10 +755,7 @@ class CallOverlayService : Service() {
             domStorageEnabled = true
             /* 오버레이 CSS/JS 캐시로 미니케이스·바가 옛 스타일로 남는 것 방지 */
             cacheMode = WebSettings.LOAD_NO_CACHE
-            val ua = userAgentString.orEmpty()
-            if (!ua.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
-                userAgentString = "$ua ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
-            }
+            userAgentString = VlueLetteringConfig.withAndroidUserAgent(userAgentString.orEmpty())
         }
         wv.setBackgroundColor(Color.TRANSPARENT)
         /*

@@ -37,12 +37,3 @@ export async function simulateVluerRevenue(payload) {
   });
   return parseJson(res);
 }
-
-export async function requestVluerCodeChange(referralCode) {
-  const res = await vlueAuthFetch(apiUrl("/api/vluer/code-change/request"), {
-    method: "POST",
-    headers: vlueAuthHeaders(),
-    body: JSON.stringify({ referralCode: String(referralCode || "").trim() })
-  });
-  return parseJson(res);
-}

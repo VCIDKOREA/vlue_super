@@ -226,6 +226,74 @@ export async function respondBankConsent(linkId, accept) {
   return parseJson(res);
 }
 
+export async function fetchOwnedProtectionGroup() {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/owned-group"), {
+    headers: vlueAuthHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function fetchJoinedProtectionGroups() {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/joined-groups"), {
+    headers: vlueAuthHeaders()
+  });
+  return parseJson(res);
+}
+
+export async function setProtectionLocationSharing(enabled) {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/location-sharing"), {
+    method: "PATCH",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify({ enabled })
+  });
+  return parseJson(res);
+}
+
+export async function purchaseProtectionSlots(count) {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/slots"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify({ count })
+  });
+  return parseJson(res);
+}
+
+export async function sendProtectionSos() {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/sos"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify({})
+  });
+  return parseJson(res);
+}
+
+export async function issueProtectionInvite(guardianConsent) {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/invites"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify({ guardianConsent: guardianConsent === true })
+  });
+  return parseJson(res);
+}
+
+export async function redeemKidsInvite(inviteCode, nickname) {
+  const res = await fetch(apiUrl("/api/family-protection/invites/kids"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ inviteCode, nickname })
+  });
+  return parseJson(res);
+}
+
+export async function redeemElderInvite(inviteCode) {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/invites/elder"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify({ inviteCode, termsAccepted: true })
+  });
+  return parseJson(res);
+}
+
 export async function postChildBankTransaction(payload) {
   const res = await vlueAuthFetch(apiUrl("/api/family-protection/ward/bank-transaction"), {
     method: "POST",

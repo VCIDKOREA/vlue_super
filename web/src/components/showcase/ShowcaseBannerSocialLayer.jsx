@@ -16,6 +16,7 @@ import {
   setCachedShowcaseSocial
 } from "../../lib/showcase/showcaseSocialCache.js";
 import { resolveShowcaseSocialSlideId } from "../../lib/showcase/resolveShowcaseSocialSlideId.js";
+import { blockShowcase, showcaseSubjectKey } from "../../lib/showcase/showcaseSafety.js";
 import { scrapShowcaseToVault } from "../../lib/showcase/scrapShowcaseToVault.js";
 import { shareShowcaseInviteViaKakao } from "../../lib/call/shareShowcaseInviteKakao.js";
 import { useShowcaseBgm } from "../../context/ShowcaseBgmContext.jsx";
@@ -258,6 +259,12 @@ export default function ShowcaseBannerSocialLayer({
     else onToast?.("저장에 실패했습니다.");
   }, [card, style, phone, onToast]);
 
+  const handleBlock = useCallback(() => {
+    const key = showcaseSubjectKey(card, phone);
+    blockShowcase(key);
+    onToast?.("이 쇼케이스를 차단했습니다.");
+  }, [card, phone, onToast]);
+
   const handleReport = useCallback(() => {
     if (typeof onReportProp === "function") {
       onReportProp({ card, phone });
@@ -324,6 +331,7 @@ export default function ShowcaseBannerSocialLayer({
         onClose={() => setMoreOpen(false)}
         onSave={onSave}
         onReport={handleReport}
+        onBlock={handleBlock}
         onToggleBgm={() => bgm.toggleMute?.()}
         bgmMuted={Boolean(bgm.effectiveMuted || bgm.userMuted)}
         canToggleBgm={Boolean(bgm.canToggleMute)}

@@ -25,6 +25,7 @@ import { OPEN_CALENDAR_EVENT_KEY } from "./lib/calendarConstants.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "./lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "./lib/letteringBizcardStorage.js";
 import { OPEN_POS_DASHBOARD_KEY, requestOpenFamilyProtectionTab } from "./lib/posDashboardConstants.js";
+import { isVlueKidsApp } from "./lib/vlueKidsApp.js";
 import { publishCalendarAsRoomNotice } from "./lib/chatRoomNoticeService.js";
 import BetaLaunchGuide from "./components/BetaLaunchGuide.jsx";
 import Subscription from "./components/Subscription.jsx";
@@ -73,6 +74,7 @@ import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
 import LineBillingGraceModal from "./components/LineBillingGraceModal.jsx";
 import ParentalConsentApproveModal from "./components/ParentalConsentApproveModal.jsx";
 import { fetchPendingParentalConsents } from "./lib/parentalConsentApi.js";
+import ProtectionInviteRedeem from "./components/ProtectionInviteRedeem.jsx";
 import { bindFcmForegroundListener, registerFcmWebPushToken } from "./lib/fcmWebPush.js";
 import {
   bindNativeFcmTokenListener,
@@ -4706,6 +4708,14 @@ function App() {
         }}
       />
 
+      <ProtectionInviteRedeem
+        enabled={isLoggedIn}
+        onToast={(text) => {
+          setBottomToast(text);
+          setTimeout(() => setBottomToast(""), 4000);
+        }}
+      />
+
       <ParentalConsentApproveModal
         open={Boolean(parentalConsentRequest)}
         request={parentalConsentRequest}
@@ -5099,6 +5109,9 @@ function App() {
           })}
           onOpenGuideFeature={(featureId) =>
             requireAuth(() => {
+            if (isVlueKidsApp() && (featureId === "pricing" || featureId === "digital-bizcard" || featureId === "lettering")) {
+              return;
+            }
             if (featureId === "pricing") {
               setProfileInitialView("upgrade");
               setProfileOpen(true);

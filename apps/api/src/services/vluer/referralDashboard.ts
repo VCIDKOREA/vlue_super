@@ -84,12 +84,8 @@ export async function buildVluerDashboard(userId: string) {
   const monthly = estimateMonthlyBenefit(tierCode, downlineUsers, enterprises);
   const promoActive = isVluerPromoActiveGrade(tierCode);
 
-  let pendingChurn = 0;
   let activePenalties = 0;
   try {
-    pendingChurn = await referralDb.vluerCodeChangeRequest.count({
-      where: { currentSponsorUserId: userId, status: "pending" }
-    });
     activePenalties = await referralDb.vluerReferralPenalty.count({
       where: {
         sponsorUserId: userId,
@@ -145,7 +141,7 @@ export async function buildVluerDashboard(userId: string) {
       monthlyEstimatedLabel: monthly.label,
       monthlyIsPoints: monthly.isPoints,
       canWithdraw: display.canWithdraw,
-      pendingChurnRequests: pendingChurn,
+      pendingChurnRequests: 0,
       activePenaltyVictims: activePenalties,
       platformRetainedTotalKrw
     },
@@ -162,13 +158,10 @@ export async function buildVluerDashboard(userId: string) {
     },
     vluerUpgrade: upgradeEligibility,
     fear: {
-      lockMonths: 3,
-      penaltyMonths: 6,
+      lockMonths: 0,
+      penaltyMonths: 0,
       penaltyFullPriceKrw: PREMIUM_LIST_PRICE_KRW,
-      message:
-        pendingChurn > 0
-          ? `산하 ${pendingChurn}건 가입코드 변경 신청 대기 — 승인 시 6개월 정가·레퍼럴·리워드 미지급`
-          : "가입코드 변경 승인 시 6개월간 월 28,300원 정가 · 해당 기간 레퍼럴 수익·리워드포인트 미지급"
+      message: "추천인(가입코드)은 회원가입 시점에만 등록되며, 가입 이후에는 변경할 수 없습니다."
     }
   };
 }
@@ -191,15 +184,6 @@ export async function listOrgMap(userId: string) {
     }
   });
 
-  const pendingByMember = new Set(
-    (
-      await referralDb.vluerCodeChangeRequest.findMany({
-        where: { currentSponsorUserId: userId, status: "pending" },
-        select: { memberUserId: true }
-      })
-    ).map((r: { memberUserId: string }) => r.memberUserId)
-  );
-
   const members = downlines.map((d: {
     userId: string;
     attributedAt: Date;
@@ -213,7 +197,7 @@ export async function listOrgMap(userId: string) {
     handle: d.user.publicHandle,
     joinedAt: d.attributedAt,
     lockUntil: d.codeChangeLockedUntil,
-    churnRisk: pendingByMember.has(d.userId),
+    churnRisk: false,
     referralCodeUsed: d.referralCodeUsed
   }));
 

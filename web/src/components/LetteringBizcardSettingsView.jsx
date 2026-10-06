@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import {
   clampLetteringBizcardEmail,
   clampLetteringBizcardIntroFront,
@@ -62,6 +63,14 @@ export default function LetteringBizcardSettingsView({
   onBack,
   onApplied
 }) {
+  if (isVlueKidsApp()) {
+    return (
+      <div className="p-4">
+        <button type="button" className="text-[13px] font-bold" onClick={onBack}>뒤로</button>
+        <p className="mt-3 text-[14px] font-bold">VLUÉ Kids에서는 디지털 명함을 만들지 않습니다.</p>
+      </div>
+    );
+  }
   const [fixed, setFixed] = useState(() => readLetteringFixedIdentity());
   const isPaid = canUseV1PaidDccFeatures(membershipTier);
   const [dccBroadcastOn, setDccBroadcastOn] = useState(() => readDccBroadcastOn());

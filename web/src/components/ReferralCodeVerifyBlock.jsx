@@ -194,7 +194,7 @@ export default function ReferralCodeVerifyBlock({
             </button>
           </div>
           <p className={`mt-1 text-[10px] leading-relaxed ${textSub}`}>
-            추천인 할인 없이 정가로 가입합니다. 나중에 사후 추천인 등록이 가능할 수 있습니다.
+            추천인 할인 없이 정가로 가입합니다. 추천인 코드는 이번 가입에서만 등록되며, 가입 후에는 바꿀 수 없습니다.
           </p>
         </div>
       )}
@@ -306,7 +306,7 @@ export function validateReferralMeta(meta) {
     return { ok: false, message: "추천인 코드를 입력한 뒤 「추천인 인증」을 완료해 주세요." };
   }
   if (!meta.discountAgree) {
-    return { ok: false, message: "추천인 할인·사후 등록 안내에 동의해 주세요." };
+    return { ok: false, message: "추천인 할인은 최초 가입(CI) 1회만 적용된다는 안내에 동의해 주세요." };
   }
   return { ok: true, verifiedCode: meta.codeForApi };
 }

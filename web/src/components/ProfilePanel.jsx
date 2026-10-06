@@ -6,7 +6,6 @@ import LetteringSettingsSection from "./LetteringSettingsSection.jsx";
 import LetteringBizcardSettingsView from "./LetteringBizcardSettingsView.jsx";
 import VluerPartnerSection from "./VluerPartnerSection.jsx";
 import { useB2bMembership } from "../context/B2bMembershipContext.jsx";
-import VluerCodeChangeSidebar from "./VluerCodeChangeSidebar.jsx";
 import ModalCloseButton from "./common/ModalCloseButton";
 import AccountWithdrawalFlow from "./settings/AccountWithdrawalFlow.jsx";
 import VlueSettingsPanel from "./settings/VlueSettingsPanel.jsx";
@@ -45,6 +44,7 @@ import { openNativeAppSettings, ensureCallDetectionForBroadcast } from "../lib/l
 import CallDetectionStatusBanner from "./CallDetectionStatusBanner.jsx";
 import { useDccFeatureAccess } from "../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../lib/dccAccessPolicy.js";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import {
   canUseV1PaidDccFeatures,
   requestV1PaidPackageGate,
@@ -353,6 +353,11 @@ function ProfilePanel({
       setUpgradeOpen(false);
       return;
     }
+    if (isVlueKidsApp() && (initialView === "digitalCardApply" || initialView === "digitalCardEdit" || initialView === "letteringBizcard" || initialView === "upgrade")) {
+      setPanelView("main");
+      setUpgradeOpen(false);
+      return;
+    }
     if (initialView === "digitalCardApply" || initialView === "digitalCardEdit" || initialView === "letteringBizcard") {
       if (dccBlocked) {
         setPanelView("main");
@@ -376,6 +381,10 @@ function ProfilePanel({
       return;
     }
     if (initialView === "broadcastSetup") {
+      if (isVlueKidsApp()) {
+        setPanelView("main");
+        return;
+      }
       setPanelView("broadcastSetup");
       setUpgradeOpen(false);
       return;
@@ -695,6 +704,7 @@ function ProfilePanel({
   );
 
   const openLetteringBizcardHub = useCallback(() => {
+    if (isVlueKidsApp()) return;
     if (dccBlocked) {
       showSettingNotice(dccAccess?.message || "디지털인증명함을 이용할 수 없습니다.");
       return;
@@ -783,7 +793,7 @@ function ProfilePanel({
         </div>
         )}
 
-        {panelView === "digitalCard" ? (
+        {panelView === "digitalCard" && !isVlueKidsApp() ? (
           <DigitalCardEditorView
             mode={digitalCardMode}
             myCard={myCard}
@@ -791,7 +801,7 @@ function ProfilePanel({
             onBack={() => setPanelView("main")}
             onSaved={() => onCardFieldsSaved?.()}
           />
-        ) : panelView === "letteringBizcard" ? (
+        ) : panelView === "letteringBizcard" && !isVlueKidsApp() ? (
           <LetteringBizcardSettingsView
             membershipTier={membershipTier}
             isDarkMode={isDarkMode}
@@ -812,7 +822,7 @@ function ProfilePanel({
             onBack={() => setPanelView("main")}
             onToast={showSettingNotice}
           />
-        ) : panelView === "enterpriseDcc" ? (
+        ) : panelView === "enterpriseDcc" && !isVlueKidsApp() ? (
           <EnterpriseDccApplyWizard
             isDarkMode={isDarkMode}
             onBack={() => setPanelView("main")}
@@ -822,7 +832,7 @@ function ProfilePanel({
               showSettingNotice("승인 완료 · 유료 결제 후 디지털 인증명함이 활성화됩니다.");
             }}
           />
-        ) : panelView === "broadcastSetup" ? (
+        ) : panelView === "broadcastSetup" && !isVlueKidsApp() ? (
           <div className={`flex min-h-0 flex-1 flex-col ${isDarkMode ? "text-gray-100" : ""}`}>
             <div
               className={`flex shrink-0 items-center gap-1 border-b px-3 py-2.5 ${isDarkMode ? "border-white/10" : "border-gray-100"}`}
@@ -1006,7 +1016,7 @@ function ProfilePanel({
             </button>
           ) : null}
 
-          <button
+          {!isVlueKidsApp() ? <button
             type="button"
             onClick={() => setPanelView("enterpriseDcc")}
             className={`relative mb-4 flex w-full items-center justify-between gap-3 rounded-[26px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.98] ${
@@ -1024,9 +1034,9 @@ function ProfilePanel({
             <span className={`shrink-0 text-lg ${subText}`} aria-hidden>
               ›
             </span>
-          </button>
+          </button> : null}
 
-          <button
+          {!isVlueKidsApp() ? <button
             type="button"
             onClick={() => setPanelView("broadcastSetup")}
             className={`relative mb-4 flex w-full items-center justify-between gap-3 rounded-[26px] border-2 p-4 text-left shadow-sm transition-all active:scale-[0.98] ${
@@ -1044,7 +1054,7 @@ function ProfilePanel({
             <span className={`shrink-0 text-lg ${subText}`} aria-hidden>
               ›
             </span>
-          </button>
+          </button> : null}
 
           <MyPageDigitalLetteringSection
             isDarkMode={isDarkMode}
@@ -1308,8 +1318,6 @@ function ProfilePanel({
               </label>
             </div>
           </div>
-
-          {v1AppShell.referralProgram ? <VluerCodeChangeSidebar isDarkMode={isDarkMode} /> : null}
 
           {v1AppShell.chat || !v1AppShell.vaultTabsMinimal ? (
           <div className="mt-4 space-y-2 px-1">

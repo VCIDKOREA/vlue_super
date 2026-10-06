@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { requestGuardianPassImpUid } from "../lib/parentalConsentApi.js";
 import { normalizeMembershipKind } from "../lib/membershipBm.js";
 import { displayFamilyUser, useFamilyProtection } from "../hooks/useFamilyProtection.js";
-import { lookupFamilyInviteCandidates } from "../lib/familyProtectionApi.js";
+import { issueProtectionInvite, lookupFamilyInviteCandidates } from "../lib/familyProtectionApi.js";
+import { protectionInviteShareUrl } from "../lib/protectionInvite.js";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
 import FamilySecurityDashboard from "./FamilySecurityDashboard.jsx";
 import FamilyMembersCircleModal from "./FamilyMembersCircleModal.jsx";
@@ -20,6 +21,9 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
   const [searchHint, setSearchHint] = useState("");
   const [candidates, setCandidates] = useState([]);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [guardianConsent, setGuardianConsent] = useState(false);
+  const [inviteIssued, setInviteIssued] = useState(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   const fp = useFamilyProtection();
 
@@ -467,6 +471,77 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
             >
               가족
             </button>
+          </div>
+
+          <div className={`mt-3 rounded-xl border px-3 py-3 ${isDarkMode ? "border-violet-400/30 bg-violet-500/10" : "border-violet-100 bg-violet-50"}`}>
+            <p className={`text-[12px] font-black ${strong}`}>자녀·부모님 초대 코드</p>
+            <p className={`mt-1 text-[11px] leading-relaxed ${sub}`}>
+              법정대리인 동의 후 6자리 코드가 만들어집니다. 만 14세 미만 자녀는 이 코드를 입력해 가입하고, 부모님은 링크를 연 뒤 본인인증·약관 동의만 하면 자녀 그룹에 연결됩니다.
+            </p>
+            <label className={`mt-2 flex items-start gap-2 text-[11px] font-semibold ${strong}`}>
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={guardianConsent}
+                onChange={(e) => setGuardianConsent(e.target.checked)}
+              />
+              <span>법정대리인으로서 가족 보호 초대를 만들고, 미성년 자녀의 가입에 동의합니다.</span>
+            </label>
+            <button
+              type="button"
+              disabled={inviteBusy || !guardianConsent}
+              onClick={() => {
+                setInviteBusy(true);
+                issueProtectionInvite(true)
+                  .then((data) => {
+                    setInviteIssued(data);
+                    toast(`초대 코드 ${data.inviteCode}`);
+                  })
+                  .catch((e) => toast(e?.message || "초대 코드를 만들지 못했습니다."))
+                  .finally(() => setInviteBusy(false));
+              }}
+              className="mt-2 w-full rounded-xl bg-violet-600 py-2.5 text-[12px] font-black text-white disabled:opacity-50"
+            >
+              {inviteBusy ? "만드는 중…" : "6자리 초대 코드 만들기"}
+            </button>
+            {inviteIssued?.inviteCode ? (
+              <div className="mt-2">
+                <p className="text-center text-[22px] font-black tracking-[0.28em] text-violet-700">{inviteIssued.inviteCode}</p>
+                <p className={`text-center text-[10px] ${sub}`}>
+                  남은 자리 {inviteIssued.slots?.remaining ?? "-"}명
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = protectionInviteShareUrl(inviteIssued.inviteCode);
+                      const text = `VLUÉ 가족보호 초대입니다. 설치 후 본인인증과 약관 동의를 마치면 자동으로 연결됩니다. ${url}`;
+                      if (navigator.share) {
+                        navigator.share({ title: "VLUÉ 가족보호", text, url }).catch(() => {});
+                        return;
+                      }
+                      window.location.href = `sms:?body=${encodeURIComponent(text)}`;
+                    }}
+                    className="flex-1 rounded-lg bg-slate-900 py-2 text-[11px] font-bold text-white"
+                  >
+                    문자·공유
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = protectionInviteShareUrl(inviteIssued.inviteCode);
+                      navigator.clipboard?.writeText(url).then(
+                        () => toast("초대 링크를 복사했습니다."),
+                        () => toast(url)
+                      );
+                    }}
+                    className={`flex-1 rounded-lg border py-2 text-[11px] font-bold ${isDarkMode ? "border-white/15 text-gray-100" : "border-slate-200 text-slate-800"}`}
+                  >
+                    링크 복사
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <label className={`mt-3 block text-[11px] font-bold ${strong}`}>가족 VLUÉ 아이디 · 전화번호</label>

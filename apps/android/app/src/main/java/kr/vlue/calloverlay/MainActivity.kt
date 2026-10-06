@@ -178,10 +178,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         /* PASS·포트원 IMP.certification 이 window.open 사용 — 미설정 시 흰 화면 */
         webView.settings.javaScriptCanOpenWindowsAutomatically = true
         webView.settings.setSupportMultipleWindows(true)
-        val defaultUa = webView.settings.userAgentString.orEmpty()
-        if (!defaultUa.contains(VlueLetteringConfig.ANDROID_APP_UA_TOKEN)) {
-            webView.settings.userAgentString = "$defaultUa ${VlueLetteringConfig.ANDROID_APP_UA_TOKEN}"
-        }
+        webView.settings.userAgentString =
+            VlueLetteringConfig.withAndroidUserAgent(webView.settings.userAgentString.orEmpty())
         webView.addJavascriptInterface(MainJsBridge(this), LetteringJavascriptBridge.INTERFACE_NAME)
         webView.addJavascriptInterface(
             VlueFamilyBridge.NativeInterface(this),

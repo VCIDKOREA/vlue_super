@@ -26,10 +26,6 @@ import {
   listSettlementHistory
 } from "../services/vluer/referralDashboard.js";
 import { runRevenueSimulation } from "../services/vluer/revenueSimulatorEngine.js";
-import {
-  createCodeChangeRequest,
-  approveCodeChangeRequest
-} from "../services/vluer/referralLockEngine.js";
 import { resolveProfileGrade, isVluerPromoActiveGrade, type VluerTierCode } from "../services/vluer/tierEngine.js";
 import type { ReferralChannel } from "@vlue/shared/referral";
 import {
@@ -349,17 +345,6 @@ vluerRoutes.post("/promo/apply", async (c) => {
   });
 });
 
-vluerRoutes.post("/code-change/request", async (c) => {
-  const me = c.get("vlueUserId")!;
-  const body = (await c.req.json().catch(() => ({}))) as { referralCode?: string };
-  try {
-    const req = await createCodeChangeRequest(me, String(body.referralCode ?? ""));
-    return c.json({ request: req, message: "코드 변경 신청이 접수되었습니다. 승인 시 6개월 정가 페널티가 적용됩니다." });
-  } catch (e) {
-    return c.json({ error: e instanceof Error ? e.message : "신청 실패" }, 400);
-  }
-});
-
 vluerRoutes.post("/tier/sync", async (c) => {
   const me = c.get("vlueUserId")!;
   const profile = await syncUserVluerTier(me);
@@ -406,15 +391,4 @@ vluerRoutes.post("/tier/scheduler-run", async (c) => {
   }
   const result = await runVluerTierSchedulerBatch(500);
   return c.json(result);
-});
-
-vluerRoutes.post("/code-change/:id/approve", async (c) => {
-  const secret = c.req.header("x-admin-device-id");
-  if (!secret) return c.json({ error: "admin required" }, 403);
-  try {
-    const out = await approveCodeChangeRequest(c.req.param("id"));
-    return c.json(out);
-  } catch (e) {
-    return c.json({ error: e instanceof Error ? e.message : "승인 실패" }, 400);
-  }
 });

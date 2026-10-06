@@ -4,6 +4,7 @@ import { completeBroadcastCheckout } from "../lib/broadcastLineApi.js";
 import { requestIamportBillingPay } from "../lib/iamportClient.js";
 import { getPortoneUserCode } from "../lib/portoneEnv.js";
 import { clearMembershipAccessCache } from "../lib/membershipAccessGuard.js";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 
 const DEFAULT_REFUND_SUMMARY = "월 15일 이상 사용 시 환불 없음. 15일 미만 사용 시 결제 금액의 50% 환불.";
 
@@ -31,7 +32,7 @@ export default function BroadcastAddonCheckoutModal({
     }
   }, [open]);
 
-  if (!open || !checkout) return null;
+  if (isVlueKidsApp() || !open || !checkout) return null;
 
   const amount = Number(checkout.amountKrw) || 0;
   const billingCycle = checkout.billingCycle === "annual" ? "annual" : "monthly";

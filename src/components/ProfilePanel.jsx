@@ -5,7 +5,6 @@ import LetteringSettingsSection from "./LetteringSettingsSection.jsx";
 import LetteringBizcardSettingsView from "./LetteringBizcardSettingsView.jsx";
 import VluerPartnerSection from "./VluerPartnerSection.jsx";
 import { useB2bMembership } from "../context/B2bMembershipContext.jsx";
-import VluerCodeChangeSidebar from "./VluerCodeChangeSidebar.jsx";
 import ModalCloseButton from "./common/ModalCloseButton";
 import VlueSettingsPanel from "./settings/VlueSettingsPanel.jsx";
 import { applyAppSettingsToDocument } from "../lib/vlueAppSettings.js";
@@ -804,8 +803,6 @@ function ProfilePanel({
               </label>
             </div>
           </div>
-
-          <VluerCodeChangeSidebar isDarkMode={isDarkMode} />
 
           <div className="mt-4 space-y-2 px-1">
             <button

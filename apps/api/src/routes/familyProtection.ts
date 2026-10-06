@@ -26,6 +26,19 @@ import {
 import { mapAgentPayloadToChildBankTransaction } from "../services/familyProtection/bankingAgentAdapter.js";
 import { verifyOpenBankingWebhookSecret } from "../services/familyProtection/openbankingWebhookAuth.js";
 import { getFamilyCircleOverview } from "../services/familyProtection/familyProtectionCircle.js";
+import {
+  getJoinedGroups,
+  getMyOwnedGroup,
+  purchaseExtraSlots,
+  sendProtectionSos,
+  setJoinedLocationSharing
+} from "../services/familyProtection/protectionGroupService.js";
+import {
+  issueProtectionInvite,
+  ProtectionInviteError,
+  redeemElderInvite,
+  redeemKidsInvite
+} from "../services/familyProtection/protectionGroupInviteService.js";
 import { GOVERNMENT_HOTLINES } from "../lib/governmentHotlines.js";
 import { REMOTE_CONTROL_APPS } from "../lib/remoteControlApps.js";
 
@@ -110,6 +123,101 @@ familyProtectionRoutes.post("/links/:linkId/reject", requireUserHeader, async (c
   const result = await rejectProtectionLink(me, linkId);
   if ("error" in result && result.error) return c.json({ error: result.error }, 400);
   return c.json(result);
+});
+
+familyProtectionRoutes.post("/invites", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as { guardianConsent?: boolean };
+    const issued = await issueProtectionInvite(me, body.guardianConsent === true);
+    return c.json(issued);
+  } catch (err) {
+    if (err instanceof ProtectionInviteError) {
+      return c.json({ error: err.message, code: err.code }, err.statusCode as 400);
+    }
+    return handleFamilyProtectionRouteError(c, "/invites", err);
+  }
+});
+
+familyProtectionRoutes.post("/invites/kids", async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as { inviteCode?: string; nickname?: string };
+    const created = await redeemKidsInvite(
+      { inviteCode: String(body.inviteCode || ""), nickname: String(body.nickname || "") },
+      c.req
+    );
+    return c.json(created);
+  } catch (err) {
+    if (err instanceof ProtectionInviteError) {
+      return c.json({ error: err.message, code: err.code }, err.statusCode as 400);
+    }
+    return handleFamilyProtectionRouteError(c, "/invites/kids", err);
+  }
+});
+
+familyProtectionRoutes.post("/invites/elder", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as { inviteCode?: string; termsAccepted?: boolean };
+    const joined = await redeemElderInvite(me, String(body.inviteCode || ""), body.termsAccepted === true);
+    return c.json(joined);
+  } catch (err) {
+    if (err instanceof ProtectionInviteError) {
+      return c.json({ error: err.message, code: err.code }, err.statusCode as 400);
+    }
+    return handleFamilyProtectionRouteError(c, "/invites/elder", err);
+  }
+});
+
+familyProtectionRoutes.patch("/location-sharing", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as { enabled?: boolean };
+    return c.json(await setJoinedLocationSharing(me, body.enabled !== false));
+  } catch (err) {
+    return handleFamilyProtectionRouteError(c, "/location-sharing", err);
+  }
+});
+
+familyProtectionRoutes.post("/slots", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as { count?: number };
+    const result = await purchaseExtraSlots(me, Number(body.count || 1));
+    if ("error" in result && result.error) return c.json(result, 400);
+    return c.json(result);
+  } catch (err) {
+    return handleFamilyProtectionRouteError(c, "/slots", err);
+  }
+});
+
+familyProtectionRoutes.post("/sos", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    const result = await sendProtectionSos(me);
+    if (!result.ok) return c.json(result, 400);
+    return c.json(result);
+  } catch (err) {
+    return handleFamilyProtectionRouteError(c, "/sos", err);
+  }
+});
+
+familyProtectionRoutes.get("/owned-group", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    return c.json({ group: await getMyOwnedGroup(me) });
+  } catch (err) {
+    return handleFamilyProtectionRouteError(c, "/owned-group", err);
+  }
+});
+
+familyProtectionRoutes.get("/joined-groups", requireUserHeader, async (c) => {
+  try {
+    const me = c.get("vlueUserId") as string;
+    return c.json({ groups: await getJoinedGroups(me) });
+  } catch (err) {
+    return handleFamilyProtectionRouteError(c, "/joined-groups", err);
+  }
 });
 
 familyProtectionRoutes.get("/circle", requireUserHeader, async (c) => {

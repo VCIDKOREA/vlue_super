@@ -14,6 +14,7 @@ import {
   hasVlueLoggedInSession,
   VLUE_MEMBERSHIP_REQUIRED_MSG
 } from "../../lib/vlueGuestAuthGate.js";
+import { maskProfanity } from "../../lib/showcase/showcaseSafety.js";
 
 const BASIC_EMOJIS = [
   "😀",
@@ -238,7 +239,7 @@ export default function ShowcaseCommentSheet({
   };
 
   const submit = async () => {
-    const body = draft.trim();
+    const body = maskProfanity(draft.trim());
     if (!body) return;
     const parentId = replyTo?.id || null;
     const hydrate = (row) =>

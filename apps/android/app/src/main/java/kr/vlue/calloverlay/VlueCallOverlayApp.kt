@@ -5,6 +5,7 @@ import android.app.Application
 import android.os.Bundle
 import android.util.Log
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.RequestConfiguration
 import com.google.android.gms.ads.initialization.InitializationStatus
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -73,7 +74,17 @@ class VlueCallOverlayApp : Application() {
 
         fun initMobileAds(reason: String) {
             val app = instance ?: return
-            Log.i(TAG, "MobileAds.initialize request reason=$reason already=${adsInitialized.get()}")
+            if (BuildConfig.IS_KIDS_APP) {
+                MobileAds.setRequestConfiguration(
+                    RequestConfiguration.Builder()
+                        .setTagForChildDirectedTreatment(
+                            RequestConfiguration.TAG_FOR_CHILD_DIRECTED_TREATMENT_TRUE
+                        )
+                        .setMaxAdContentRating(RequestConfiguration.MAX_AD_CONTENT_RATING_G)
+                        .build()
+                )
+            }
+            Log.i(TAG, "MobileAds.initialize request reason=$reason already=${adsInitialized.get()} kids=${BuildConfig.IS_KIDS_APP}")
             MobileAds.initialize(app) { status: InitializationStatus ->
                 val first = adsInitialized.compareAndSet(false, true)
                 Log.i(

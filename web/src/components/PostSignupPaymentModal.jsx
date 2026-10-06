@@ -6,6 +6,7 @@ import { getPortoneUserCode, isPortoneTestMode } from "../lib/portoneEnv.js";
 import { clearPendingPayment } from "../lib/postSignupPayment.js";
 import { requirePinForSensitiveAction } from "../lib/appLockBridge.js";
 import { resolveAuthValidityPeriod, writeMembershipBillingMeta } from "../lib/authValidityPeriod.js";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 
 /**
  * 가입·본인인증 완료 후 첫 구독 결제
@@ -17,7 +18,7 @@ export default function PostSignupPaymentModal({ open, pending, onComplete, onSk
   const [done, setDone] = useState(false);
   const testMode = isPortoneTestMode();
 
-  if (!open || !pending) return null;
+  if (isVlueKidsApp() || !open || !pending) return null;
 
   const isB2b = isB2bMembershipKind(pending.membershipKind);
   const title = isB2b ? "기업 단체 멤버십 결제" : "유료 멤버십 결제";

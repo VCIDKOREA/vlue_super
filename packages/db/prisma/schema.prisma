@@ -20,6 +20,19 @@ enum UserRole {
   admin
 }
 
+/// 가족 계정 역할. 플랫폼 관리자 권한(UserRole)과 분리한다.
+enum FamilyAccountRole {
+  PARENT
+  KIDS
+}
+
+enum GroupMemberType {
+  /// 이 멤버를 그룹 소유자(보호자)가 케어함
+  OWNED_MEMBER
+  /// 이 멤버를 그룹이 케어함 — 조회 시점에는 "나를 케어하는 그룹"
+  CARE_MEMBER
+}
+
 enum AccountStatus {
   /// 본인인증 전
   pending_identity
@@ -261,12 +274,17 @@ model User {
   /// CI 등: 평문 저장 지양. 해시만 보관(법무·보안 정책에 따라 컬럼 제거 가능).
   ciHash Bytes? @map("ci_hash")
 
+  /// 중복 가입·추천 리워드 검증용 CI 키. 평문 CI 금지 — SHA-256 hex 등 해시 문자열만.
+  ci String? @unique @map("ci") @db.VarChar(128)
+
   /// Portone 본인인증 생년월일 YYYYMMDD
   birthDate String? @map("birth_date") @db.VarChar(8)
   /// M / F
   gender    String? @map("gender") @db.VarChar(1)
 
   role          UserRole      @default(user)
+  /// 가족보호 계정 역할. 기본 보호자. Kids 앱 가입만 KIDS.
+  familyRole    FamilyAccountRole @default(PARENT) @map("family_role")
   accountStatus AccountStatus @default(pending_identity) @map("account_status")
 
   /// 매니페스트 status — ACTIVE / INACTIVE / DELETED (탈퇴 시 DELETED + PII 파기)
@@ -283,7 +301,7 @@ model User {
   accountActionBy     String?   @map("account_action_by") @db.VarChar(64)
   accountActionType   String?   @map("account_action_type") @db.VarChar(32)
 
-  /// 매니페스트 referrerCode — 가입 시 입력한 파트너 추천인 코드
+  /// 가입 시 1회만 기록하는 추천인 코드. 값이 있으면 이후 요청으로 바꾸지 않는다.
   referrerCode String? @map("referrer_code") @db.VarChar(24)
 
   /// CI 기준 최초 가입 여부 — false 면 추천 할인·파트너 수수료 제외
@@ -393,6 +411,8 @@ model User {
 
   familyProtectionAsGuardian FamilyProtectionLink[]    @relation("FamilyGuardian")
   familyProtectionAsWard     FamilyProtectionLink[]    @relation("FamilyWard")
+  ownedProtectionGroup       ProtectionGroup?          @relation("ProtectionGroupOwner")
+  protectionMemberships      GroupMember[]             @relation("ProtectionGroupMemberUser")
   familyWardPresence         FamilyWardPresence?
   familyProtectionSettings   FamilyProtectionSettings?
   localAds                   LocalAd[]
@@ -2123,6 +2143,40 @@ enum FamilyBankConsentStatus {
   accepted
   rejected
   revoked
+}
+
+/// 보호자 1명당 하나의 가족 보호 그룹. 기본 4명(본인 포함) + 추가 구매 슬롯.
+model ProtectionGroup {
+  id         String   @id @default(uuid()) @db.Uuid
+  ownerId    String   @unique @map("owner_id") @db.Uuid
+  owner      User     @relation("ProtectionGroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  /// 기본 제공 총 인원. 본인 포함.
+  maxMembers Int      @default(4) @map("max_members")
+  /// 추가 구매한 슬롯 수
+  extraSlots Int      @default(0) @map("extra_slots")
+  /// 6자리 자녀·부모 초대 코드
+  inviteCode String   @unique @map("invite_code") @db.VarChar(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  members    GroupMember[]
+
+  @@map("protection_groups")
+}
+
+model GroupMember {
+  id                String          @id @default(uuid()) @db.Uuid
+  groupId           String          @map("group_id") @db.Uuid
+  group             ProtectionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId            String          @map("user_id") @db.Uuid
+  user              User            @relation("ProtectionGroupMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  memberType        GroupMemberType @map("member_type")
+  isLocationSharing Boolean         @default(true) @map("is_location_sharing")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([groupId, userId])
+  @@index([userId, memberType])
+  @@map("protection_group_members")
 }
 
 model FamilyProtectionSettings {

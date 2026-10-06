@@ -4,6 +4,7 @@ import { fetchLocalAds, mapLocalAdToStoreCard } from "../lib/localAdsApi.js";
 import { isPaidMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import LocalAdRegisterModal from "./LocalAdRegisterModal.jsx";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import ModalCloseButton from "./common/ModalCloseButton";
 import { FAVORITE_SHOPS_CHANGED, isFavoriteShop, toggleFavoriteShop } from "../lib/favoriteShopsStorage.js";
@@ -1042,7 +1043,7 @@ function Home({
               <h3 className="mt-1 text-[16px] font-semibold text-slate-900">VLUÉ 100% 활용법</h3>
               <p className="mt-1 text-[11px] text-slate-500">제목을 탭하면 상세 설명이 열립니다.</p>
               <div className="mt-3 space-y-2">
-                {GUIDE_FEATURES.map((item, idx) => {
+                {GUIDE_FEATURES.filter((item) => !isVlueKidsApp() || (item.id !== "digital-bizcard" && item.id !== "pricing")).map((item, idx) => {
                   const opened = activeGuideIdx === idx;
                   return (
                     <div key={item.id} className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50">

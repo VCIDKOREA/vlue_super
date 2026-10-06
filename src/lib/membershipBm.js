@@ -54,7 +54,7 @@ export const REFERRAL_DISCOUNT_NOTICE = REFERRAL_PROMO_DISCOUNT_NOTICE;
 export const REFERRAL_SPONSOR_REWARD_NOTICE = REFERRAL_PROMO_SPONSOR_NOTICE;
 
 export const REFERRAL_POST_SIGNUP_NOTICE =
-  "※ 추천인 없이 정가로 가입해도 사후 등록이 가능하며, 등록 시점의 가입일·결제 주기에 맞춰 위 할인·적립이 순차 적용됩니다. (예: 12일 정가 가입 후 20일 추천인 등록 → 다음 달 12일 결제부터 30% 구간 시작)";
+  "※ 추천인 코드는 최초 회원가입에서만 입력합니다. 본인인증 CI 기준 1회만 할인이 적용되며, 가입 후 추천인 변경은 불가합니다.";
 
 /** 서비스소개·약관용 — 할인 + 스폰서 + 사후등록 */
 export const REFERRAL_PROGRAM_NOTICES = [

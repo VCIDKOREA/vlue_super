@@ -26,6 +26,9 @@ import {
   prepareLetteringVerifyDocFromFile
 } from "../lib/letteringBizcardVerification.js";
 import ReferralCodeVerifyBlock, { validateReferralMeta } from "./ReferralCodeVerifyBlock.jsx";
+import KidsInviteJoinCard from "./KidsInviteJoinCard.jsx";
+import { redeemElderInvite } from "../lib/familyProtectionApi.js";
+import { captureProtectionInviteFromLocation, clearStoredProtectionInvite } from "../lib/protectionInvite.js";
 import TwoTrackSignupFields from "./TwoTrackSignupFields.jsx";
 import B2bSignupFields, { validateReferralMetaB2b } from "./B2bSignupFields.jsx";
 import MembershipBenefitsCompare from "./MembershipBenefitsCompare.jsx";
@@ -212,6 +215,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [verifyZone, setVerifyZone] = useState(null);
   const [requiresParentalConsent, setRequiresParentalConsent] = useState(false);
   const [parentalConsentDone, setParentalConsentDone] = useState(false);
+  const [kidsJoinOpen, setKidsJoinOpen] = useState(false);
   const [guardianHandle, setGuardianHandle] = useState("");
   const [parentRequestSent, setParentRequestSent] = useState(false);
 
@@ -252,6 +256,10 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     } catch {
       setIdCheck({ status: "invalid", message: "중복 확인 요청에 실패했습니다." });
     }
+  }, []);
+
+  useEffect(() => {
+    captureProtectionInviteFromLocation();
   }, []);
 
   useEffect(() => {
@@ -709,6 +717,18 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             accessToken: data.accessToken,
             refreshToken: data.refreshToken
           });
+        }
+        const elderInvite = captureProtectionInviteFromLocation();
+        if (elderInvite) {
+          try {
+            await redeemElderInvite(elderInvite);
+            clearStoredProtectionInvite();
+          } catch (inviteErr) {
+            setVerifyZone({
+              ok: false,
+              text: inviteErr?.message || "가족 초대 연결에 실패했습니다. 로그인 후 다시 열면 이어서 연결됩니다."
+            });
+          }
         }
         if (data.publicHandle) {
           localStorage.setItem("vlue_member_handle", `@${String(data.publicHandle)}`);
@@ -1344,6 +1364,22 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                 </div>
               )}
 
+              {!isPaidMembershipKind(membershipKind) && !isB2b && v1AppShell.referralProgram ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-[12px] font-black text-slate-900">추천인 코드 (선택)</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                    최초 회원가입에서만 입력합니다. 본인인증 CI 기준 1회만 할인이 적용되고, 가입 후에는 바꿀 수 없습니다.
+                  </p>
+                  <ReferralCodeVerifyBlock
+                    billingCycle={paidBillingCycle}
+                    referralCode={referralCode}
+                    onReferralCodeChange={setReferralCode}
+                    onMetaChange={setReferralMeta}
+                    hidePaymentPreview
+                  />
+                </div>
+              ) : null}
+
               {isB2b && (
                 <B2bSignupFields
                   draft={groupSignupDraft}
@@ -1413,7 +1449,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
                       setVerifyZone({ ok: false, text: gv.message });
                       return;
                     }
-                  } else if (isPaidMembershipKind(membershipKind) && v1AppShell.referralProgram) {
+                  } else if (v1AppShell.referralProgram && (isPaidMembershipKind(membershipKind) || referralMeta?.hasCode)) {
                     const v = validateReferralMeta(referralMeta);
                     if (!v.ok) {
                       setVerifyZone({ ok: false, text: v.message });
@@ -1430,9 +1466,26 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             </section>
           )}
 
-          {step === "terms" && (
+          {step === "terms" && kidsJoinOpen && (
+            <KidsInviteJoinCard
+              onCancel={() => setKidsJoinOpen(false)}
+              onJoined={(payload) => onComplete?.(payload)}
+            />
+          )}
+
+          {step === "terms" && !kidsJoinOpen && (
             <section className={sectionCls}>
               <h2 className="text-[16px] font-black text-slate-900 sm:text-xl">서비스 이용 약관 · 통합 동의</h2>
+              <button
+                type="button"
+                onClick={() => setKidsJoinOpen(true)}
+                className="mt-3 w-full rounded-2xl border border-violet-200 bg-violet-50 px-3 py-3 text-left"
+              >
+                <p className="text-[13px] font-black text-violet-900">만 14세 미만 자녀 가입</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-violet-800">
+                  본인인증 없이 부모 앱의 6자리 초대 코드를 입력합니다.
+                </p>
+              </button>
               <p className="mt-1 text-[12px] leading-relaxed text-slate-500 sm:text-base">
                 <span className="font-bold text-slate-700">약관 동의 및 PASS 본인확인(필수)</span> · 서비스 이용약관 · 개인정보 처리방침
                 {v1AppShell.referralProgram ? (

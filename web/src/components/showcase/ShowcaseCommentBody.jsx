@@ -3,12 +3,13 @@ import {
   dispatchCommentMention,
   parseCommentRichText
 } from "../../lib/showcase/commentRichText.js";
+import { maskProfanity } from "../../lib/showcase/showcaseSafety.js";
 
 /**
  * 댓글 본문 — #해시태그 · @멘션 강조
  */
 export default function ShowcaseCommentBody({ text = "", onHashtag, onMention, className = "" }) {
-  const parts = parseCommentRichText(text);
+  const parts = parseCommentRichText(maskProfanity(text));
 
   return (
     <p className={`showcase-comment-sheet__text${className ? ` ${className}` : ""}`.trim()}>

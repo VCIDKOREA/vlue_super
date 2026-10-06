@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import {
   defaultPortoneV2RedirectUrl,
   requestPortoneV2Payment
@@ -20,6 +21,7 @@ export default function PortoneV2PayButton({
   onError
 }) {
   const [busy, setBusy] = useState(false);
+  if (isVlueKidsApp()) return null;
 
   const onClick = async () => {
     setBusy(true);

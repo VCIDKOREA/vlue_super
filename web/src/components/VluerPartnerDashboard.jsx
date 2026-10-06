@@ -247,7 +247,6 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
   const tierCode = dash?.tierDisplay?.code || "지인";
   const referralChannel = dash?.referralChannel || "friend";
   const promoActive = Boolean(dash?.promoActive);
-  const churnCount = dash?.stats?.pendingChurnRequests ?? 0;
   const downline = dash?.stats?.downlineUsers ?? 0;
   const enterprises = dash?.stats?.enterprises ?? 0;
 
@@ -321,9 +320,6 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
               <span className="font-semibold text-slate-600">
                 {canWithdraw ? "정산 출금 가능" : "리워드 포인트 (출금 불가)"}
               </span>
-              {churnCount > 0 && (
-                <span className="font-black text-red-600">대기 {churnCount}</span>
-              )}
             </div>
 
             {!promoActive ? (
@@ -360,9 +356,6 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                   }`}
                 >
                   {t.label}
-                  {t.id === "org" && churnCount > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" aria-label={`대기 ${churnCount}건`} />
-                  )}
                 </button>
               ))}
             </div>
@@ -380,11 +373,6 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                       className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-2.5 py-2"
                     >
                       <div className="min-w-0 flex items-center gap-2">
-                        {m.churnRisk && (
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] text-white" title="코드 변경 신청">
-                            !
-                          </span>
-                        )}
                         <div className="min-w-0">
                           <p className="truncate text-[12px] font-bold text-slate-900">{m.name}</p>
                           <p className="text-[10px] text-slate-500">@{m.handle || "member"}</p>

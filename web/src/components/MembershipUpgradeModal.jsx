@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import {
   isPaidMembershipKind,
   normalizeMembershipKind,
@@ -71,7 +72,7 @@ export default function MembershipUpgradeModal({
     return () => clearTimeout(t);
   }, [planToast]);
 
-  if (!open) return null;
+  if (!open || isVlueKidsApp()) return null;
 
   const panel = isDarkMode ? "border-white/10 bg-[#151821]" : "border-gray-200 bg-white";
   const textStrong = isDarkMode ? "text-gray-100" : "text-gray-900";

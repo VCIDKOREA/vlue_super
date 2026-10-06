@@ -15,6 +15,7 @@ import {
 import { requestIamportBillingPay } from "../lib/iamportClient.js";
 import { postSubscribeComplete } from "../lib/subscribeCompleteApi.js";
 import { getPortoneUserCode } from "../lib/portoneEnv.js";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 
 const STEPS = ["credentials", "email", "pay"];
 
@@ -63,6 +64,8 @@ export default function PersonalComboPanel({ membershipTier = "free", onToast })
   }, [refresh]);
 
   const preview = useMemo(() => buildPersonalComboPaymentPreview(billingCycle), [billingCycle]);
+
+  if (isVlueKidsApp()) return null;
 
   const hasActiveCombo =
     status?.activeSubscription?.isPersonalCombo || status?.pendingSubscription?.isPersonalCombo;

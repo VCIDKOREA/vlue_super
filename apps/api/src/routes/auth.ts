@@ -1070,23 +1070,14 @@ authRoutes.post("/terms/accept", async (c) => {
 });
 
 /** 가입 화면 — 추천인 코드 확인(인증) · 스폰서 표시 */
-/** 사후 추천인 — 다음 결제 주기부터 30% 할인 예약 */
+/** 추천인 코드는 최초 가입(CI 1회)에서만 등록. 마이페이지 변경 신청은 받지 않는다. */
 authRoutes.post("/referral/apply-post-signup", async (c) => {
-  try {
-    const uid = await resolveRequestUserId(c);
-    if (!uid) return c.json({ error: "인증 필요" }, 401);
-    const body = (await c.req.json<{ referralCode?: string }>().catch(() => ({}))) as {
-      referralCode?: string;
-    };
-    const { schedulePostReferralDiscount } = await import(
-      "../services/membership/postReferralBilling.js"
-    );
-    const result = await schedulePostReferralDiscount(uid, String(body?.referralCode || ""));
-    return c.json(result);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown error";
-    return c.json({ error: msg }, 400);
-  }
+  const uid = await resolveRequestUserId(c);
+  if (!uid) return c.json({ error: "인증 필요" }, 401);
+  return c.json(
+    { error: "추천인 코드는 회원가입 때 한 번만 등록할 수 있습니다.", code: "REFERRER_SIGNUP_ONLY" },
+    400
+  );
 });
 
 authRoutes.get("/referral/verify", async (c) => {

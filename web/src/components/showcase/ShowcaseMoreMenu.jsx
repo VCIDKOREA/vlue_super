@@ -9,6 +9,7 @@ export default function ShowcaseMoreMenu({
   onClose,
   onSave,
   onReport,
+  onBlock,
   onToggleBgm,
   bgmMuted = false,
   canToggleBgm = true
@@ -52,6 +53,17 @@ export default function ShowcaseMoreMenu({
         >
           <Flag size={18} aria-hidden />
           신고
+        </button>
+        <button
+          type="button"
+          className="showcase-more-menu__item showcase-more-menu__item--danger"
+          onClick={() => {
+            onBlock?.();
+            onClose?.();
+          }}
+        >
+          <Flag size={18} aria-hidden />
+          차단
         </button>
         <button type="button" className="showcase-more-menu__cancel" onClick={onClose}>
           닫기

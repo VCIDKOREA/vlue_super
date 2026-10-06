@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AdMobBannerSlot from "../ads/AdMobBannerSlot.jsx";
 import MemberSafetyDetail from "./MemberSafetyDetail.jsx";
 import { reverseGeocodeLatLng } from "../../lib/activeRegion.js";
+import { FamilyFolderPanels, FamilyFolderSwitcher, useFamilyMapFolders } from "./FamilyMapFolders.jsx";
+import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 
 function formatLastSeenLabel(iso) {
   if (!iso) return "시각 미상";
@@ -100,7 +102,7 @@ function localHasCyanBadge() {
 }
 
 function localCanUseFamilyLocation() {
-  return canUseV1PaidFeatures();
+  return canUseV1PaidFeatures() || isVlueKidsApp();
 }
 
 function localIsPaidForAds() {
@@ -396,6 +398,9 @@ export default function LocationPlatform() {
   const [familyNavTarget, setFamilyNavTarget] = useState(null);
   const [familyNavBusy, setFamilyNavBusy] = useState(false);
   const familyNavRef = useRef(null);
+  const familyShareRef = useRef(true);
+  const familyFolders = useFamilyMapFolders(session.open && session.mode === "family");
+  familyShareRef.current = familyFolders.tab === "ward" ? familyFolders.sharing : true;
   const pinDragRef = useRef(null);
   const pinDirtyRef = useRef(false);
   const canvasRef = useRef(null);
@@ -496,7 +501,7 @@ export default function LocationPlatform() {
       } else if (nextMode === "family") {
         /* 탭(가족/V-Map)은 유지. 무료는 토스트만 — 가족 위치 데이터는 아래에서 게이트 */
         patchLocationSession({ mode: "family", open: true, minimized: false });
-        if (familyPaywall || !localCanUseFamilyLocation()) {
+        if (!isVlueKidsApp() && (familyPaywall || !localCanUseFamilyLocation())) {
           window.setTimeout(() => {
             setNotice(FAMILY_PLAN_TOAST);
             window.setTimeout(() => setNotice(""), 2800);
@@ -736,7 +741,7 @@ export default function LocationPlatform() {
       lastPresenceRef.current = { lat, lng, at: nowTs };
 
       if (session.mode === "family") {
-        if (localCanUseFamilyLocation()) {
+        if (localCanUseFamilyLocation() && familyShareRef.current) {
           /* 멤버 목록은 8초 interval이 갱신 — GPS마다 refreshFamily 하지 않음 */
           publishPresence(next).catch(() => {});
         }
@@ -1801,9 +1806,26 @@ export default function LocationPlatform() {
       ? haversineMeters(self.lat, self.lng, familyNavTarget.lat, familyNavTarget.lng)
       : null;
   const people = members.length ? members : self?.lat ? [{ ...self, userId: getLocalVlueUserId(), self: true, displayName: self.displayName || "나", grayscale: !locationOn }] : [];
-  const overseasMembers = session.mode === "family" ? people.filter((member) => isOverseasMember(member)) : [];
+  const myUserId = getLocalVlueUserId();
+  const locationByUserId = new Map(people.map((member) => [member.userId, member]));
+  const withLiveLocation = (userId, name) =>
+    locationByUserId.get(userId) || { userId, displayName: name || "가족", self: userId === myUserId };
+  const selfPerson = people.find((member) => member.self || member.userId === myUserId) || null;
+  const folderPeople = (() => {
+    if (session.mode !== "family" || !familyFolders.ready) return people;
+    if (familyFolders.tab === "owned") {
+      const rows = (familyFolders.owned?.members || [])
+        .filter((member) => member.userId !== myUserId && member.isLocationSharing !== false)
+        .map((member) => withLiveLocation(member.userId, member.name));
+      return selfPerson ? [selfPerson, ...rows] : rows;
+    }
+    const guardians = familyFolders.joined.map((group) => withLiveLocation(group.ownerId, group.ownerName));
+    return familyFolders.sharing && selfPerson ? [selfPerson, ...guardians] : guardians;
+  })();
+  const overseasMembers = session.mode === "family" ? folderPeople.filter((member) => isOverseasMember(member)) : [];
   const domesticMembers =
-    session.mode === "family" ? people.filter((member) => !isOverseasMember(member)) : members;
+    session.mode === "family" ? folderPeople.filter((member) => !isOverseasMember(member)) : members;
+  const hideSharedSelf = session.mode === "family" && familyFolders.tab === "ward" && !familyFolders.sharing;
   const useGoogleMap = session.mode === "family" && isOverseasMember(selected);
   const chatReady =
     session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
@@ -1845,7 +1867,7 @@ export default function LocationPlatform() {
             ref={mapSurfaceRef}
             active={session.open}
             members={overseasMembers}
-            self={isOverseasMember(self) ? self : null}
+            self={hideSharedSelf ? null : isOverseasMember(self) ? self : null}
             flyTo={session.flyTo}
             onSelectMember={focusMember}
             onReady={() => {
@@ -1863,7 +1885,7 @@ export default function LocationPlatform() {
             ref={mapSurfaceRef}
             active={session.open}
             members={session.mode === "family" ? domesticMembers : members}
-            self={session.mode === "family" && isOverseasMember(self) ? null : self}
+            self={hideSharedSelf || (session.mode === "family" && isOverseasMember(self)) ? null : self}
             room={room}
             draftPin={draftPin}
             destPin={
@@ -1904,8 +1926,11 @@ export default function LocationPlatform() {
             <p className="text-[14px] font-semibold text-slate-700">{mapError}</p>
           </div>
         ) : null}
+        {session.mode === "family" ? (
+          <FamilyFolderSwitcher folders={familyFolders} dark={theme === "dark"} onNotice={pushNotice} />
+        ) : null}
         {session.mode === "family" && overseasMembers.length ? (
-          <div className="pointer-events-none absolute inset-x-0 top-[calc(64px+env(safe-area-inset-top))] z-30 flex justify-end px-3">
+          <div className="pointer-events-none absolute inset-x-0 top-[calc(168px+env(safe-area-inset-top))] z-30 flex justify-end px-3">
             <div className={`pointer-events-auto max-w-[min(100%,280px)] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${dark ? "border border-violet-300/30 bg-[#1a1030]/88 text-white" : "border border-violet-200 bg-white/92 text-slate-900"}`}>
               <p className="text-[12px] font-black tracking-tight">✈️ 해외 구성원 ({overseasMembers.length}명)</p>
               <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
@@ -1982,7 +2007,7 @@ export default function LocationPlatform() {
           <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
         {guideOn && cue && (session.mode === "vmap" || familyGuiding) ? (
-          <div className="absolute right-3 top-[calc(64px+env(safe-area-inset-top))] z-30 w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)]">
+          <div className={`absolute right-3 z-30 w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)] ${familyGuiding ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
             <div className="flex items-center justify-center bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] px-2 py-4 text-[42px] font-black leading-none text-[#04121a]">
               {maneuverGlyph(cue.instruction)}
             </div>
@@ -2345,6 +2370,8 @@ export default function LocationPlatform() {
           </div>
         ) : null}
         {session.mode === "family" ? (
+          <>
+          <FamilyFolderPanels folders={familyFolders} dark={dark} members={folderPeople} self={self} glass={glass} />
           <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
             <form
               className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 ${dark ? "border-white/10 bg-white/10" : "border-black/10 bg-slate-100/80"}`}
@@ -2401,6 +2428,7 @@ export default function LocationPlatform() {
               </button>
             </form>
           </div>
+          </>
         ) : null}
         {session.mode === "vmap" && !session.roomId ? (
           <form className={`flex gap-2 rounded-[24px] p-2 ${glass}`} onSubmit={(event) => { event.preventDefault(); void joinRoom(); }}>
@@ -2483,7 +2511,7 @@ export default function LocationPlatform() {
           >
             <p className="text-[15px] font-semibold tracking-tight">함께 있는 사람</p>
             <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">
-              {people.map((member) => (
+              {(session.mode === "family" ? folderPeople : people).map((member) => (
                 <li key={member.userId}>
                   <button
                     type="button"

@@ -13,6 +13,7 @@ import {
   getPortoneV2StoreId
 } from "./portoneV2Env.js";
 import { postPortoneV2Complete } from "./portoneV2CompleteApi.js";
+import { isVlueKidsApp } from "./vlueKidsApp.js";
 
 const PORTONE_V2_CDN = "https://cdn.portone.io/v2/browser-sdk.js";
 
@@ -64,6 +65,7 @@ function loadPortOneV2Sdk() {
  * @returns {Promise<{ paymentId: string, paymentResponse: object, complete?: object }>}
  */
 export async function requestPortoneV2Payment(opts = {}) {
+  if (isVlueKidsApp()) throw new Error("VLUÉ Kids에서는 결제를 사용할 수 없습니다.");
   const storeId = getPortoneV2StoreId();
   const channelKey = getPortoneV2ChannelKey();
   if (!storeId) throw new Error("VITE_PORTONE_V2_STORE_ID 가 필요합니다.");

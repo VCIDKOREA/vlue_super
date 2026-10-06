@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import {
   VLUE_CARD_PROMO_MAX,
   getDefaultMemberVlueEmail,
@@ -47,6 +48,14 @@ function RowReadonly({ label, value, isDarkMode }) {
 }
 
 export default function DigitalCardEditorView({ mode, myCard, isDarkMode = false, onBack, onSaved }) {
+  if (isVlueKidsApp()) {
+    return (
+      <div className="p-4">
+        <button type="button" className="text-[13px] font-bold" onClick={onBack}>뒤로</button>
+        <p className="mt-3 text-[14px] font-bold">VLUÉ Kids에서는 디지털 명함을 만들지 않습니다.</p>
+      </div>
+    );
+  }
   const legalName = getLegalName() || String(myCard?.name || "").trim() || "—";
   const memberHandle = getMemberHandle();
   const companyEmail = useMemo(() => getDefaultMemberVlueEmail(), []);

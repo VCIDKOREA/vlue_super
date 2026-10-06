@@ -1,4 +1,5 @@
 import { getPortoneUserCode } from "./portoneEnv.js";
+import { isVlueKidsApp } from "./vlueKidsApp.js";
 import { hasVlueNativeAppUserAgent, VLUE_ANDROID_APP_UA_TOKEN } from "./vlueClientAccess.js";
 
 const SCRIPT_SRC = "https://cdn.iamport.kr/v1/iamport.js";
@@ -265,6 +266,11 @@ function buildIamportShopPg() {
  * @param {string} opts.name 주문명
  * @param {'card'|'trans'|'vbank'} [opts.payMethod]
  */
+function rejectKidsPayment() {
+  if (!isVlueKidsApp()) return;
+  throw new Error("VLUÉ Kids에서는 결제를 사용할 수 없습니다.");
+}
+
 export async function requestIamportShopPay({
   userCode = getPortoneUserCode(),
   merchantUid,
@@ -275,6 +281,7 @@ export async function requestIamportShopPay({
   buyerTel,
   buyerEmail
 }) {
+  rejectKidsPayment();
   if (!userCode) {
     throw new Error("VITE_PORTONE_USER_CODE를 루트 .env에 설정하세요.");
   }
@@ -333,6 +340,7 @@ export async function requestIamportBillingPay({
   buyerTel,
   buyerEmail
 }) {
+  rejectKidsPayment();
   if (!userCode) {
     throw new Error("VITE_PORTONE_USER_CODE를 루트 .env에 설정하세요.");
   }

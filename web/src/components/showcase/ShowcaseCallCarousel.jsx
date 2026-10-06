@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Phone, Settings, X } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import RenderErrorGuard from "../RenderErrorGuard.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
 import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
+import {
+  getShowcaseBlockSnapshot,
+  isShowcaseBlocked,
+  showcaseSubjectKey,
+  subscribeShowcaseBlocks
+} from "../../lib/showcase/showcaseSafety.js";
+import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 import ShowcaseMediaPage from "./ShowcaseMediaPage.jsx";
 import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
 import { isPaidLetteringTier, peerMayUsePaidCallFeatures } from "../../lib/letteringMembership.js";
@@ -744,6 +751,7 @@ export default function ShowcaseCallCarousel({
   const openSlideSettings = (kind) => (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (kind === "card" && isVlueKidsApp()) return;
     onOpenSlideSettings?.(kind);
   };
 
@@ -767,7 +775,7 @@ export default function ShowcaseCallCarousel({
         <X className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
         닫기
       </button>
-    ) : showOwnerSettings ? (
+    ) : showOwnerSettings && !(kind === "card" && isVlueKidsApp()) ? (
       <button
         type="button"
         className={`showcase-call-carousel__slide-settings${banner ? " showcase-call-carousel__slide-settings--banner" : ""}`}
@@ -872,6 +880,8 @@ export default function ShowcaseCallCarousel({
     return () => window.clearTimeout(t);
   }, [focusContentOrdinal, focusSlideId, slides, cardAtEnd, photoIndexBase]);
 
+  useSyncExternalStore(subscribeShowcaseBlocks, getShowcaseBlockSnapshot, getShowcaseBlockSnapshot);
+  const showcaseBlocked = isShowcaseBlocked(showcaseSubjectKey(card, incomingNumber));
   const cornerName = String(card?.name || card?.displayName || "").trim();
   const cornerOrg = String(card?.organization || "").trim();
   const cornerShowName =
@@ -1054,6 +1064,11 @@ export default function ShowcaseCallCarousel({
                 ) : null}
 
                 {near && (slide.type === "media-page" || slide.type === "banner") ? (
+                  showcaseBlocked ? (
+                    <div className="showcase-call-carousel__banner flex items-center justify-center bg-black/85 px-6 text-center text-[14px] font-bold text-white">
+                      차단한 쇼케이스입니다
+                    </div>
+                  ) : (
                   <div className="showcase-call-carousel__banner">
                     {renderSlideCornerAction("showcase", true)}
                     <ShowcaseMediaPage
@@ -1093,6 +1108,7 @@ export default function ShowcaseCallCarousel({
                       />
                     ) : null}
                   </div>
+                  )
                 ) : null}
 
                 {near && slide.type === "paid-identity" ? (

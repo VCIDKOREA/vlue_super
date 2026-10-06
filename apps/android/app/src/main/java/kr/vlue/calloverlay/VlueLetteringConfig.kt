@@ -7,6 +7,15 @@ package kr.vlue.calloverlay
 object VlueLetteringConfig {
     /** 웹 User-Agent 토큰 — siteMode / vlueClientAccess 가 네이티브 셸로 인식 */
     const val ANDROID_APP_UA_TOKEN = "VLUE-Android-App"
+    /** Kids flavor WebView. 웹이 결제·명함 생성을 숨기는 기준 */
+    const val KIDS_APP_UA_TOKEN = "VLUE-Kids-App"
+
+    fun withAndroidUserAgent(base: String): String {
+        var ua = base.trim()
+        if (!ua.contains(ANDROID_APP_UA_TOKEN)) ua = "$ua $ANDROID_APP_UA_TOKEN".trim()
+        if (BuildConfig.IS_KIDS_APP && !ua.contains(KIDS_APP_UA_TOKEN)) ua = "$ua $KIDS_APP_UA_TOKEN"
+        return ua
+    }
 
     val apiBaseUrl: String
         get() = BuildConfig.API_BASE_URL.trimEnd('/')
