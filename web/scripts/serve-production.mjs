@@ -69,6 +69,7 @@ const LEGAL_STATIC_PAGES = new Map([
   ["/privacy", "privacy/index.html"],
   ["/terms", "terms/index.html"],
   ["/data-deletion", "data-deletion/index.html"],
+  ["/account-deletion", "account-deletion/index.html"],
   ["/refund", "refund/index.html"],
   ["/privacy/legal-article-6", "data-deletion/index.html"]
 ]);
@@ -86,6 +87,8 @@ const LEGAL_STATIC_REWRITES = [
   { source: "/terms/", destination: "/terms/index.html" },
   { source: "/data-deletion", destination: "/data-deletion/index.html" },
   { source: "/data-deletion/", destination: "/data-deletion/index.html" },
+  { source: "/account-deletion", destination: "/account-deletion/index.html" },
+  { source: "/account-deletion/", destination: "/account-deletion/index.html" },
   { source: "/refund", destination: "/refund/index.html" },
   { source: "/refund/", destination: "/refund/index.html" },
   { source: "/privacy/legal-article-6", destination: "/data-deletion/index.html" },

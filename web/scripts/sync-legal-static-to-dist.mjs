@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const webRoot = join(__dirname, "..");
 const publicDir = join(webRoot, "public");
 const distDir = join(webRoot, "dist");
-const LEGAL_DIRS = ["privacy", "terms", "data-deletion", "refund"];
+const LEGAL_DIRS = ["privacy", "terms", "data-deletion", "account-deletion", "refund"];
 
 const strict =
   process.env.REQUIRE_PC_INSTALLER === "1" || Boolean(process.env.RAILWAY_ENVIRONMENT);
