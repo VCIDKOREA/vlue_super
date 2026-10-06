@@ -23,7 +23,8 @@ export type View =
   | "biz"
   | "terms"
   | "privacy"
-  | "refund";
+  | "refund"
+  | "account-deletion";
 
 export interface CertifiedOrg {
   id: string;

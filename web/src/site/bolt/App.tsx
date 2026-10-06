@@ -29,6 +29,7 @@ import CaseBoxPage from './pages/CaseBoxPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import RefundPage from './pages/RefundPage';
+import AccountDeletionPage from './pages/AccountDeletionPage';
 import FamilyProtectionPage, { AFTER_LOGIN_KEY } from './pages/FamilyProtectionPage';
 import PremiumHeroSection from './components/PremiumHeroSection';
 import type { MarketingAuthUser } from './components/AuthModal';
@@ -47,7 +48,7 @@ const VALID_VIEWS: View[] = [
   'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
   'mail', 'mail-settings', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
   'showcase', 'casebox', 'biz',
-  'terms', 'privacy', 'refund',
+  'terms', 'privacy', 'refund', 'account-deletion',
 ];
 
 /** /showcase · /biz · /casebox · 약관 경로 → 해시 라우트로 정규화 */
@@ -63,7 +64,8 @@ function normalizeShowcaseManagePathname() {
 const LEGAL_PATH_VIEWS: Record<string, View> = {
   '/terms': 'terms',
   '/privacy': 'privacy',
-  '/refund': 'refund'
+  '/refund': 'refund',
+  '/account-deletion': 'account-deletion'
 };
 
 function normalizeLegalPathname() {
@@ -438,8 +440,11 @@ export default function App() {
         {view === 'refund' && (
           <RefundPage onBack={() => handleNavigate('home')} scrollToId={legalScrollId} />
         )}
+        {view === 'account-deletion' && (
+          <AccountDeletionPage onBack={() => handleNavigate('home')} />
+        )}
 
-        {view !== 'mypage' && view !== 'terms' && view !== 'privacy' && view !== 'refund' && (
+        {view !== 'mypage' && view !== 'terms' && view !== 'privacy' && view !== 'refund' && view !== 'account-deletion' && (
           <Footer onNavigate={handleNavigate} />
         )}
         </div>

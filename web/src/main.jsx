@@ -39,11 +39,12 @@ function normalizeWwwShowcaseManagePath() {
   window.history.replaceState(null, "", `/${search}#${view}`);
 }
 
-/** /refund · /refund/ · /terms · /privacy → /#refund 등 */
+/** /refund · /refund/ · /terms · /privacy · /account-deletion → /#refund 등 */
 const WWW_LEGAL_PATH_VIEWS = {
   "/terms": "terms",
   "/privacy": "privacy",
-  "/refund": "refund"
+  "/refund": "refund",
+  "/account-deletion": "account-deletion"
 };
 
 function normalizeWwwLegalPathname() {
