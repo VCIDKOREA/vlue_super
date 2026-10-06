@@ -1,15 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-/** Vite `public/` 자산 — 서브경로 배포 시 `import.meta.env.BASE_URL` 반영 */
-function publicAsset(fileName) {
+/**
+ * 스플래시 미디어 URL — 항상 사이트 루트(`/eye2_vlue.mp4`).
+ * `/app` 셸에서 상대경로로 붙으면 SPA HTML(200)이 내려와 video/img가 깨진다.
+ */
+function splashRootAsset(fileName) {
+  const name = String(fileName || "").replace(/^\//, "");
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/${name}`;
+  }
   const base = String(import.meta.env.BASE_URL ?? "/");
-  const root = base.endsWith("/") ? base : `${base}/`;
-  return `${root}${String(fileName).replace(/^\//, "")}`;
+  /* Electron `./` 도 루트 파일명만 쓰도록 정규화 */
+  if (base === "./" || base.startsWith("./")) return `./${name}`;
+  return `/${name}`;
 }
 
 /** `public/eye2_vlue.mp4` — 빌드 시 faststart(moov 앞) 처리됨 */
-const SPLASH_VIDEO_SRC = publicAsset("eye2_vlue.mp4");
-const SPLASH_FALLBACK_IMG = publicAsset("vlue-shield-eye-logo-preview.svg");
+const SPLASH_VIDEO_FILE = "eye2_vlue.mp4";
+/** 캐시 버스팅 — CDN/WebView가 깨진 응답을 붙잡을 때 */
+const SPLASH_ASSET_VER = "20261006a";
 
 /** 인트로 mp4 없을 때 정적 카드 유지 시간(ms) */
 const STATIC_SPLASH_MS = 3600;
@@ -30,7 +39,7 @@ const SPLASH_HOLD_MS_DEFAULT = 5200;
 const SPLASH_FADE_OUT_MS = 520;
 
 /** 영상 준비·재생 실패 안전망(ms) */
-const VIDEO_READY_TIMEOUT_MS = 12000;
+const VIDEO_READY_TIMEOUT_MS = 14000;
 
 /**
  * 트림 시작 시점 기준, 눈이 뜬 뒤 `V L U E`·하단 카피 페이드가 같이 시작할 때까지(초).
@@ -43,6 +52,47 @@ function isIosLike() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   return /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isAndroidWebView() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /Android/i.test(ua) && (/; wv\)/i.test(ua) || /VLUE-Android-App/i.test(ua));
+}
+
+/** 외부 img 의존 없이 항상 그리는 눈 마크 — 깨진 이미지 아이콘 방지 */
+function SplashEyeFallback() {
+  return (
+    <svg
+      className="vlue-splash-video vlue-splash-eye-fallback-pulse"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 128 128"
+      width="128"
+      height="128"
+      aria-hidden
+      focusable="false"
+    >
+      <defs>
+        <linearGradient id="vlueSplashEyeBg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#1d4ed8" />
+          <stop offset="55%" stopColor="#2563eb" />
+          <stop offset="100%" stopColor="#4f46e5" />
+        </linearGradient>
+      </defs>
+      <circle cx="64" cy="64" r="64" fill="url(#vlueSplashEyeBg)" />
+      <g transform="translate(0 -5.2)">
+        <circle cx="64" cy="76.9333" r="21.3333" fill="#ffffff" />
+        <path
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="7.7333"
+          strokeLinecap="butt"
+          strokeLinejoin="round"
+          d="M 22.4 70.267 Q 64 29.733 105.6 70.267"
+        />
+      </g>
+    </svg>
+  );
 }
 
 /**
@@ -61,6 +111,12 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
   const [splashHoldMs, setSplashHoldMs] = useState(SPLASH_HOLD_MS_DEFAULT);
   const [loadProgress, setLoadProgress] = useState(0);
   const segmentRef = useRef(null);
+
+  const splashVideoSrc = useMemo(() => {
+    const root = splashRootAsset(SPLASH_VIDEO_FILE);
+    const join = root.includes("?") ? "&" : "?";
+    return `${root}${join}v=${SPLASH_ASSET_VER}`;
+  }, []);
 
   const enableSplashSound = useCallback(() => {
     if (revealedRef.current) return;
@@ -97,15 +153,42 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
   }, []);
 
   const failVideo = useCallback(() => {
-    if (videoBroken) return;
-    setVideoBroken(true);
+    setVideoBroken((prev) => {
+      if (prev) return prev;
+      return true;
+    });
     setVideoReady(false);
     wiredRef.current = false;
     segmentRef.current = null;
     setSplashHoldMs(2600);
     videoCleanupFnsRef.current.forEach((fn) => fn());
     videoCleanupFnsRef.current = [];
-  }, [videoBroken]);
+    const v = videoRef.current;
+    if (v) {
+      try {
+        v.removeAttribute("src");
+        v.load();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const playSafe = useCallback(
+    (v) =>
+      v
+        .play()
+        .catch(() => {
+          try {
+            v.muted = true;
+          } catch {
+            /* ignore */
+          }
+          setSplashSoundOn(false);
+          return v.play();
+        }),
+    []
+  );
 
   const wireVideo = useCallback(
     (v) => {
@@ -116,14 +199,17 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       videoCleanupFnsRef.current = [];
 
       const dur = v.duration;
-      if (!Number.isFinite(dur) || dur <= TRIM_HEAD_S + TRIM_TAIL_S + 0.05) {
+      if (!Number.isFinite(dur) || dur <= 0.2) {
         failVideo();
         return;
       }
 
-      const segmentStart = TRIM_HEAD_S;
-      const segmentEnd = Math.min(dur - TRIM_TAIL_S, segmentStart + VISIBLE_PLAY_S);
-      const lettersAt = segmentStart + VLUE_LETTERS_AFTER_TRIM_S;
+      const canTrim = dur > TRIM_HEAD_S + TRIM_TAIL_S + 0.05;
+      const segmentStart = canTrim ? TRIM_HEAD_S : 0;
+      const segmentEnd = canTrim
+        ? Math.min(dur - TRIM_TAIL_S, segmentStart + VISIBLE_PLAY_S)
+        : Math.min(dur, VISIBLE_PLAY_S);
+      const lettersAt = segmentStart + Math.min(VLUE_LETTERS_AFTER_TRIM_S, Math.max(0.4, (segmentEnd - segmentStart) * 0.35));
       const playSpanS = Math.max(0.05, segmentEnd - segmentStart);
       segmentRef.current = { segmentStart, segmentEnd, playSpanS, lettersAt };
       setVideoReady(true);
@@ -144,25 +230,30 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       v.addEventListener("timeupdate", onTimeUpdate);
       videoCleanupFnsRef.current.push(() => v.removeEventListener("timeupdate", onTimeUpdate));
 
-      const beginSegment = () => {
+      const beginFrom = (startAt) => {
         let seekFallback = 0;
         const afterSeek = () => {
           window.clearTimeout(seekFallback);
-          v.play().catch(() => {
+          playSafe(v).catch(() => {
+            /* Android WebView: seek 실패 시 0초부터라도 재생 */
             try {
-              v.muted = true;
+              v.currentTime = 0;
             } catch {
               /* ignore */
             }
-            setSplashSoundOn(false);
-            return v.play();
-          }).catch(failVideo);
+            playSafe(v).catch(failVideo);
+          });
         };
-        v.currentTime = segmentStart;
+        try {
+          v.currentTime = startAt;
+        } catch {
+          afterSeek();
+          return;
+        }
         seekFallback = window.setTimeout(() => {
           v.removeEventListener("seeked", afterSeek);
           afterSeek();
-        }, 350);
+        }, isAndroidWebView() ? 600 : 350);
         v.addEventListener("seeked", afterSeek, { once: true });
         videoCleanupFnsRef.current.push(() => window.clearTimeout(seekFallback));
       };
@@ -172,28 +263,26 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
         v.muted = true;
         v.setAttribute("playsinline", "");
         v.setAttribute("webkit-playsinline", "");
+        v.setAttribute("x5-playsinline", "");
       } catch {
         /* ignore */
       }
 
-      /* iOS: seek 전에 한 번 play() 해야 이후 구간 재생이 안정적 */
-      if (isIosLike()) {
-        v.currentTime = 0;
-        v.play()
-          .then(() => beginSegment())
-          .catch(() => {
-            try {
-              v.muted = true;
-            } catch {
-              /* ignore */
-            }
-            v.play().then(() => beginSegment()).catch(failVideo);
-          });
+      /* iOS / 일부 WebView: seek 전에 한 번 play() */
+      if (isIosLike() || isAndroidWebView()) {
+        try {
+          v.currentTime = 0;
+        } catch {
+          /* ignore */
+        }
+        playSafe(v)
+          .then(() => beginFrom(segmentStart))
+          .catch(() => beginFrom(0));
       } else {
-        beginSegment();
+        beginFrom(segmentStart);
       }
     },
-    [failVideo, reveal, videoBroken]
+    [failVideo, playSafe, reveal, videoBroken]
   );
 
   const onVideoReady = useCallback(
@@ -323,20 +412,11 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
                   <div className="vlue-splash-eye-content">
                     {!videoBroken ? (
                       <>
-                        {!videoReady ? (
-                          <img
-                            src={SPLASH_FALLBACK_IMG}
-                            alt=""
-                            className="vlue-splash-video"
-                            draggable={false}
-                            aria-hidden
-                          />
-                        ) : null}
+                        {!videoReady ? <SplashEyeFallback /> : null}
                         <video
                           ref={videoRef}
                           className="vlue-splash-video"
-                          src={SPLASH_VIDEO_SRC}
-                          poster={SPLASH_FALLBACK_IMG}
+                          src={splashVideoSrc}
                           muted
                           defaultMuted
                           autoPlay
@@ -345,19 +425,16 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
                           onLoadedMetadata={onVideoReady}
                           onLoadedData={onVideoReady}
                           onCanPlay={onVideoReady}
-                          onError={failVideo}
+                          onError={() => {
+                            console.warn("[splash] video error", splashVideoSrc);
+                            failVideo();
+                          }}
                           style={videoReady ? undefined : { opacity: 0, pointerEvents: "none" }}
                           aria-hidden
                         />
                       </>
                     ) : (
-                      <img
-                        src={SPLASH_FALLBACK_IMG}
-                        alt=""
-                        className="vlue-splash-video vlue-splash-eye-fallback-pulse"
-                        draggable={false}
-                        aria-hidden
-                      />
+                      <SplashEyeFallback />
                     )}
                     <div className="vlue-splash-vignette" aria-hidden />
                   </div>
