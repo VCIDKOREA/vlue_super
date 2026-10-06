@@ -1,7 +1,7 @@
 # VLUE Play 비공개 테스트 · 출시 일정 (2026-10)
 
 > **기능 추가 전 구간 금지.** Critical 핫픽스·스토어 제출 준비만 허용.  
-> AAB: **versionCode 67 / versionName 1.0.25**  
+> AAB: **versionCode 68 / versionName 1.0.26** (67 이후: 통화 쇼케이스 promote 수정·스플래시는 웹 핫픽스)  
 > 업로드 파일: `apps/android/app/build/outputs/bundle/release/app-release.aab`  
 > (절대경로: `D:\dev\vlue_super\apps\android\app\build\outputs\bundle\release\app-release.aab`)
 
@@ -23,7 +23,7 @@
 
 | 누가 | 무엇을 | 상태 |
 |------|--------|------|
-| **CEO** | AAB **67 / 1.0.25** 업로드 → 비공개 테스트 트랙 저장·출시 | ☐ |
+| **CEO** | AAB **68 / 1.0.26** 업로드 → 비공개 테스트 트랙 저장·출시 (기존 67 대체) | ☐ |
 | **CEO** | 테스터 이메일/그룹에 **이슬기 + 본인 + 가능하면 지인 10명+** 초대 (신규 계정이면 12명·14일 대비) | ☐ |
 | **QA** | 초대 수락 → Play에서 내부/비공개 앱 설치 | ☐ |
 
@@ -37,7 +37,7 @@
 | **CEO** | PortOne **테스트** 결제 1회 → Premium 즉시 반영 | 유료 기능 바로 열림 | ☐ |
 | **QA** | 수신 통화 → 오버레이/명함 → 응답 → 미니/종료 | 삼성 실기기 1회 PASS | ☐ |
 | **QA** | 기본 전화앱(ROLE_DIALER) 지정 후 DTMF·종료 | 끊김·크래시 없음 | ☐ |
-| **Dev** | 막히는 Critical만 핫픽스 → 필요 시 AAB **68** | 당일 재업로드 가능 | ☐ |
+| **Dev** | 막히는 Critical만 핫픽스 → 필요 시 AAB **69** | 당일 재업로드 가능 | ☐ |
 
 ---
 
