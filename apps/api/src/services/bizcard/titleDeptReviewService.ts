@@ -1,4 +1,5 @@
 import { prisma } from "../../db/client.js";
+import { verifyNtsBusinessStatus } from "../onboarding/ntsBusinessVerifyService.js";
 import {
   buildTitleDeptDocUrl,
   getLatestTitleDeptReviewForUser,
@@ -8,11 +9,9 @@ import {
   type TitleDeptReviewSource
 } from "./titleDeptReviewStore.js";
 
-const ALLOWED_DOC_KINDS = new Set([
-  "employment_certificate",
-  "insurance_enrollment",
-  "business_registration"
-]);
+const MANUAL_DOC_KINDS = new Set(["employment_certificate", "insurance_enrollment"]);
+const BUSINESS_OWNER_KINDS = new Set(["business_owner", "business_registration"]);
+const ALLOWED_DOC_KINDS = new Set([...MANUAL_DOC_KINDS, ...BUSINESS_OWNER_KINDS]);
 
 const MAX_DOC_DATA_URL_LEN = 600_000;
 
@@ -108,6 +107,9 @@ export async function submitTitleDeptReview(
     docIssuedAt: string;
     docUrl?: string;
     docDataUrl?: string;
+    businessRegistrationNo?: string;
+    openDate?: string;
+    representativeName?: string;
     source?: TitleDeptReviewSource;
   }
 ) {
@@ -115,6 +117,86 @@ export async function submitTitleDeptReview(
   if (!ALLOWED_DOC_KINDS.has(kind)) {
     throw new Error("INVALID_DOC_KIND");
   }
+
+  if (BUSINESS_OWNER_KINDS.has(kind)) {
+    const nts = await verifyNtsBusinessStatus(
+      {
+        businessRegistrationNo: String(input.businessRegistrationNo || ""),
+        representativeName: String(input.representativeName || ""),
+        openDate: String(input.openDate || "")
+      },
+      { allowSilentMock: false }
+    );
+    if (!nts.ok) {
+      throw new Error(nts.reason || "NTS_REJECTED");
+    }
+    const openDigits = String(input.openDate || "").replace(/\D/g, "");
+    const issuedAt =
+      openDigits.length === 8
+        ? `${openDigits.slice(0, 4)}-${openDigits.slice(4, 6)}-${openDigits.slice(6, 8)}`
+        : new Date().toISOString().slice(0, 10);
+    const card = await prisma.digitalCard.findUnique({
+      where: { userId },
+      select: { id: true }
+    });
+    const title = String(input.title || "").trim().slice(0, 120);
+    const department = String(input.department || "").trim().slice(0, 120);
+    const bno = String(input.businessRegistrationNo || "").replace(/\D/g, "").slice(0, 10);
+    const reviewId = await insertTitleDeptReview({
+      userId,
+      digitalCardId: card?.id || null,
+      source: input.source || "bizcard_settings",
+      pendingTitle: title || undefined,
+      pendingDepartment: department || undefined,
+      docKind: "business_owner",
+      docUrl: "nts-business-status",
+      docDataUrl: null,
+      docFileName: "nts-auto",
+      docIssuedAt: issuedAt,
+      reviewStatus: "APPROVED"
+    });
+    if (reviewId) {
+      await prisma.$executeRawUnsafe(
+        `
+          UPDATE title_dept_verification_reviews
+          SET approved_title = $2, approved_department = $3, updated_at = NOW()
+          WHERE id = $1::uuid
+        `,
+        reviewId,
+        title || null,
+        department || null
+      );
+    }
+    await applyApprovedTitleToDigitalCard(userId, title, department);
+    const companyName = nts.ntsCompanyName || undefined;
+    await prisma.userBusinessProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        isBusiness: true,
+        businessRegistrationNo: bno,
+        companyName,
+        jobTitle: title || undefined
+      },
+      update: {
+        isBusiness: true,
+        businessRegistrationNo: bno,
+        ...(companyName ? { companyName } : {}),
+        ...(title ? { jobTitle: title } : {})
+      }
+    });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { vlueVerifiedBadgeAt: new Date() }
+    });
+    return {
+      reviewId,
+      reviewStatus: "APPROVED" as const,
+      cyanBadge: true,
+      companyName: companyName || ""
+    };
+  }
+
   const issuedAt = parseIssuedDate(input.docIssuedAt);
   if (!issuedAt || !isIssuedWithin31Days(issuedAt)) {
     throw new Error("DOC_ISSUED_AT_INVALID");

@@ -16,8 +16,17 @@ async function resolveForUserRow(
     return { active: false, tier: null, userId: user?.id || null, phoneE164: user?.phoneE164 || null };
   }
   const policy = await resolveUserPolicy(user.id);
+  let active = policy.cyanBadgeActive;
+  if (!active) {
+    const biz = await prisma.userBusinessProfile.findUnique({
+      where: { userId: user.id },
+      select: { isBusiness: true, businessRegistrationNo: true }
+    });
+    const bno = String(biz?.businessRegistrationNo || "").replace(/\D/g, "");
+    active = Boolean(biz?.isBusiness && bno.length === 10);
+  }
   return {
-    active: policy.cyanBadgeActive,
+    active,
     tier: policy.tier,
     userId: user.id,
     phoneE164: user.phoneE164

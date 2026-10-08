@@ -313,6 +313,12 @@ export default function LetteringBizcardQuickBuilder({
   setVerifyDocIssuedAt,
   onVerifyDocPick,
   verifyDocError,
+  bizRegNo = "",
+  setBizRegNo,
+  bizOpenDate = "",
+  setBizOpenDate,
+  bizRepName = "",
+  setBizRepName,
   orgChangeApprovalStatus = "",
   orgChangePendingName = "",
   onOrgChangeSubmitted,
@@ -543,6 +549,12 @@ export default function LetteringBizcardQuickBuilder({
             setVerifyDocIssuedAt={setVerifyDocIssuedAt}
             onDocPick={onVerifyDocPick}
             docError={verifyDocError}
+            bizRegNo={bizRegNo}
+            setBizRegNo={setBizRegNo}
+            bizOpenDate={bizOpenDate}
+            setBizOpenDate={setBizOpenDate}
+            bizRepName={bizRepName}
+            setBizRepName={setBizRepName}
             needsSubmit={titleDeptNeedsSubmit}
           />
         </div>

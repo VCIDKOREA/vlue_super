@@ -33,6 +33,8 @@ import {
 import { fetchTitleDeptStatus, submitTitleDeptReview } from "../lib/titleDeptReviewApi.js";
 import {
   TITLE_DEPT_APPROVAL,
+  isBusinessOwnerVerifyKind,
+  isManualTitleDeptDocKind,
   isTitleDeptChangePending,
   isVerifyDocIssuedWithinLimit,
   prepareLetteringVerifyDocFromFile
@@ -116,6 +118,9 @@ export default function LetteringBizcardSettingsView({
   const [verifyDocName, setVerifyDocName] = useState("");
   const [verifyDocDataUrl, setVerifyDocDataUrl] = useState("");
   const [verifyDocIssuedAt, setVerifyDocIssuedAt] = useState("");
+  const [bizRegNo, setBizRegNo] = useState("");
+  const [bizOpenDate, setBizOpenDate] = useState("");
+  const [bizRepName, setBizRepName] = useState("");
   const [verifyDocError, setVerifyDocError] = useState("");
   const [accountType, setAccountType] = useState("");
   const [bankName, setBankName] = useState("");
@@ -680,19 +685,46 @@ export default function LetteringBizcardSettingsView({
 
     if (titleDeptNeedsSubmit) {
       if (!verifyDocKind) {
-        const msg = "서류 종류를 선택해 주세요.";
+        const msg = "인증 종류를 선택해 주세요.";
         setVerifyDocError(msg);
         focusRequiredSection("dcc-settings-verify-doc", msg);
         return;
       }
-      if (!verifyDocDataUrl || !verifyDocName) {
-        const msg = "직책·부서 확인 서류를 첨부해 주세요. 첨부 없이는 명함 변경이 저장되지 않습니다.";
-        setVerifyDocError(msg);
-        focusRequiredSection("dcc-settings-verify-doc", msg);
-        return;
-      }
-      if (!verifyDocIssuedAt || !isVerifyDocIssuedWithinLimit(verifyDocIssuedAt)) {
-        const msg = "발급일 기준 1개월 이내 서류만 제출할 수 있습니다.";
+      if (isBusinessOwnerVerifyKind(verifyDocKind)) {
+        const bno = String(bizRegNo || "").replace(/\D/g, "");
+        if (bno.length !== 10) {
+          const msg = "사업자등록번호 10자리를 입력해 주세요.";
+          setVerifyDocError(msg);
+          focusRequiredSection("dcc-settings-verify-doc", msg);
+          return;
+        }
+        if (!bizOpenDate) {
+          const msg = "개업연월일을 입력해 주세요.";
+          setVerifyDocError(msg);
+          focusRequiredSection("dcc-settings-verify-doc", msg);
+          return;
+        }
+        if (!String(bizRepName || "").trim()) {
+          const msg = "대표자명을 입력해 주세요.";
+          setVerifyDocError(msg);
+          focusRequiredSection("dcc-settings-verify-doc", msg);
+          return;
+        }
+      } else if (isManualTitleDeptDocKind(verifyDocKind)) {
+        if (!verifyDocDataUrl || !verifyDocName) {
+          const msg = "재직증명서 또는 4대보험 가입명부를 첨부해 주세요.";
+          setVerifyDocError(msg);
+          focusRequiredSection("dcc-settings-verify-doc", msg);
+          return;
+        }
+        if (!verifyDocIssuedAt || !isVerifyDocIssuedWithinLimit(verifyDocIssuedAt)) {
+          const msg = "발급일 기준 1개월 이내 서류만 제출할 수 있습니다.";
+          setVerifyDocError(msg);
+          focusRequiredSection("dcc-settings-verify-doc", msg);
+          return;
+        }
+      } else {
+        const msg = "인증 종류를 다시 선택해 주세요.";
         setVerifyDocError(msg);
         focusRequiredSection("dcc-settings-verify-doc", msg);
         return;
@@ -705,7 +737,7 @@ export default function LetteringBizcardSettingsView({
     const bizGate = readBusinessRegistrationEvidence({
       companyName: String(fixed?.organization || "").trim(),
       hasBizDoc:
-        String(verifyDocKind || "").trim() === "business_registration" &&
+        isBusinessOwnerVerifyKind(verifyDocKind) &&
         (titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.APPROVED ||
           titleDeptApprovalStatus === TITLE_DEPT_APPROVAL.PENDING ||
           titleDeptNeedsSubmit)
@@ -787,22 +819,29 @@ export default function LetteringBizcardSettingsView({
 
     let writeResult;
     if (titleDeptNeedsSubmit) {
+      let reviewStatus = TITLE_DEPT_APPROVAL.PENDING;
       try {
-        await submitTitleDeptReview({
+        const submitted = await submitTitleDeptReview({
           title: trimmedTitle,
           department: trimmedDept,
           docKind: verifyDocKind,
-          docFileName: verifyDocName,
-          docIssuedAt: verifyDocIssuedAt,
-          docDataUrl: verifyDocDataUrl
+          docFileName: isBusinessOwnerVerifyKind(verifyDocKind) ? "" : verifyDocName,
+          docIssuedAt: isBusinessOwnerVerifyKind(verifyDocKind) ? "" : verifyDocIssuedAt,
+          docDataUrl: isBusinessOwnerVerifyKind(verifyDocKind) ? "" : verifyDocDataUrl,
+          businessRegistrationNo: bizRegNo,
+          openDate: bizOpenDate,
+          representativeName: bizRepName
         });
+        if (String(submitted?.reviewStatus || "").toLowerCase() === "approved") {
+          reviewStatus = TITLE_DEPT_APPROVAL.APPROVED;
+        }
       } catch (e) {
-        setVerifyDocError(e?.message || "서류 제출에 실패했습니다.");
+        setVerifyDocError(e?.message || "인증 신청에 실패했습니다.");
         return;
       }
       writeResult = writeLetteringBizcardEditable({
         ...basePatch,
-        titleDeptApprovalStatus: TITLE_DEPT_APPROVAL.PENDING,
+        titleDeptApprovalStatus: reviewStatus,
         titleDeptPendingTitle: trimmedTitle,
         titleDeptPendingDepartment: trimmedDept,
         titleDeptVerifyDocKind: verifyDocKind,
@@ -815,9 +854,13 @@ export default function LetteringBizcardSettingsView({
         showToast(writeResult?.error || "저장에 실패했습니다. 다시 시도해 주세요.");
         return;
       }
-      setTitleDeptApprovalStatus(TITLE_DEPT_APPROVAL.PENDING);
+      setTitleDeptApprovalStatus(reviewStatus);
+      if (reviewStatus === TITLE_DEPT_APPROVAL.APPROVED) {
+        setApprovedTitle(trimmedTitle);
+        setApprovedDepartment(trimmedDept);
+      }
       try {
-        if (String(verifyDocKind || "").trim() === "business_registration") {
+        if (isBusinessOwnerVerifyKind(verifyDocKind)) {
           localStorage.setItem("vlue_signup_doc_kind", "business_registration");
         }
       } catch {
@@ -1126,6 +1169,12 @@ export default function LetteringBizcardSettingsView({
           setVerifyDocIssuedAt={setVerifyDocIssuedAt}
           onVerifyDocPick={handleVerifyDocPick}
           verifyDocError={verifyDocError}
+          bizRegNo={bizRegNo}
+          setBizRegNo={setBizRegNo}
+          bizOpenDate={bizOpenDate}
+          setBizOpenDate={setBizOpenDate}
+          bizRepName={bizRepName}
+          setBizRepName={setBizRepName}
           orgChangeApprovalStatus={orgChangeApprovalStatus}
           orgChangePendingName={orgChangePendingName}
           onOrgChangeSubmitted={reload}

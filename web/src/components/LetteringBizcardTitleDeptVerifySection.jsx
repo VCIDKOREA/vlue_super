@@ -4,8 +4,9 @@ import {
   LETTERING_VERIFY_DOC_ACCEPT,
   LETTERING_VERIFY_DOC_ACCEPT_LABEL,
   LETTERING_VERIFY_DOC_KINDS,
-  LETTERING_VERIFY_DOC_MAX_AGE_DAYS,
   TITLE_DEPT_APPROVAL,
+  isBusinessOwnerVerifyKind,
+  isManualTitleDeptDocKind,
   isVerifyDocIssuedWithinLimit
 } from "../lib/letteringBizcardVerification.js";
 
@@ -36,7 +37,13 @@ export default function LetteringBizcardTitleDeptVerifySection({
   setVerifyDocIssuedAt,
   onDocPick,
   docError = "",
-  needsSubmit = false
+  needsSubmit = false,
+  bizRegNo = "",
+  setBizRegNo,
+  bizOpenDate = "",
+  setBizOpenDate,
+  bizRepName = "",
+  setBizRepName
 }) {
   const inputRef = useRef(null);
   const scrollSnapshot = useRef({ top: 0, el: null });
@@ -93,6 +100,8 @@ export default function LetteringBizcardTitleDeptVerifySection({
           : "text-slate-600";
 
   const issuedOk = verifyDocIssuedAt ? isVerifyDocIssuedWithinLimit(verifyDocIssuedAt) : null;
+  const businessOwner = isBusinessOwnerVerifyKind(verifyDocKind);
+  const manualDoc = isManualTitleDeptDocKind(verifyDocKind);
   const formLocked =
     !needsSubmit &&
     (approvalStatus === TITLE_DEPT_APPROVAL.APPROVED ||
@@ -126,8 +135,8 @@ export default function LetteringBizcardTitleDeptVerifySection({
           ) : (
             <>
               <p className={`mt-1 text-[10px] leading-relaxed ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}>
-                직책과 부서는 서류 확인 후 승인됩니다. 수정 시 <b>최근 1개월 이내 재발급</b> 서류로 다시 제출해
-                주세요. (재직증명서, 4대보험 가입명부 등)
+                대표자·사업자는 사업자등록번호·개업연월일·대표자명으로 국세청 조회 후 즉시 승인됩니다.
+                재직증명서·4대보험 가입명부는 <b>최근 1개월 이내</b> 서류만 첨부할 수 있으며, 관리자 확인 후 승인됩니다.
               </p>
               {approvalStatus === TITLE_DEPT_APPROVAL.PENDING ? (
                 <p className={`mt-1.5 text-[10px] font-bold ${statusCls}`}>
@@ -164,56 +173,94 @@ export default function LetteringBizcardTitleDeptVerifySection({
             </select>
           </Field>
 
-          <Field
-            label="서류 발급일"
-            hint={`발급일 기준 ${LETTERING_VERIFY_DOC_MAX_AGE_DAYS}일 이내 서류만 유효`}
-            isDarkMode={isDarkMode}
-          >
-            <input
-              type="date"
-              value={verifyDocIssuedAt}
-              onChange={(e) => setVerifyDocIssuedAt(e.target.value)}
-              className={inputBase}
-            />
-            {verifyDocIssuedAt && issuedOk === false ? (
-              <p className="mt-1 text-[10px] font-bold text-red-500">
-                발급일이 1개월을 초과했습니다. 재발급 서류를 첨부해 주세요.
+          {businessOwner ? (
+            <>
+              <p className={`text-[10px] leading-relaxed ${isDarkMode ? "text-sky-200" : "text-sky-800"}`}>
+                국세청 사업자등록 상태조회로 계속사업자이면 서류 없이 바로 승인되고, 시안 인증 배지가 발급됩니다.
               </p>
-            ) : null}
-          </Field>
-
-          <Field label="서류 사본 첨부" hint={LETTERING_VERIFY_DOC_ACCEPT_LABEL} isDarkMode={isDarkMode}>
-            <div className="mt-1.5 space-y-2">
-              <button
-                type="button"
-                onClick={openPicker}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold ${
-                  isDarkMode ? "bg-blue-600 text-white" : "bg-slate-900 text-white"
-                }`}
-              >
-                <Upload className="h-3.5 w-3.5" />
-                서류 첨부
-              </button>
-              <input
-                ref={inputRef}
-                type="file"
-                accept={LETTERING_VERIFY_DOC_ACCEPT}
-                onChange={(e) => {
-                  onDocPick(e);
-                  restoreScroll();
-                }}
-                className="lbq-hidden-file-input"
-                tabIndex={-1}
-                aria-hidden
-              />
-              {verifyDocName ? (
-                <p className={`text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}>
-                  첨부됨: {verifyDocName}
-                </p>
-              ) : null}
+              <Field label="사업자등록번호" hint="10자리" isDarkMode={isDarkMode}>
+                <input
+                  inputMode="numeric"
+                  value={bizRegNo}
+                  onChange={(e) => setBizRegNo?.(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  className={inputBase}
+                  placeholder="0000000000"
+                />
+              </Field>
+              <Field label="개업연월일" isDarkMode={isDarkMode}>
+                <input
+                  type="date"
+                  value={bizOpenDate}
+                  onChange={(e) => setBizOpenDate?.(e.target.value)}
+                  className={inputBase}
+                />
+              </Field>
+              <Field label="대표자명" isDarkMode={isDarkMode}>
+                <input
+                  value={bizRepName}
+                  onChange={(e) => setBizRepName?.(e.target.value.slice(0, 40))}
+                  className={inputBase}
+                  placeholder="대표자 성명"
+                />
+              </Field>
               {docError ? <p className="text-[10px] font-bold text-red-500">{docError}</p> : null}
-            </div>
-          </Field>
+            </>
+          ) : null}
+
+          {manualDoc ? (
+            <>
+              <Field
+                label="서류 발급일"
+                hint="최근 1개월 이내 발급 서류만 제출할 수 있습니다."
+                isDarkMode={isDarkMode}
+              >
+                <input
+                  type="date"
+                  value={verifyDocIssuedAt}
+                  onChange={(e) => setVerifyDocIssuedAt(e.target.value)}
+                  className={inputBase}
+                />
+                {verifyDocIssuedAt && issuedOk === false ? (
+                  <p className="mt-1 text-[10px] font-bold text-red-500">
+                    발급일 기준 1개월 이내 서류만 제출할 수 있습니다.
+                  </p>
+                ) : null}
+              </Field>
+
+              <Field label="서류 사본 첨부" hint={LETTERING_VERIFY_DOC_ACCEPT_LABEL} isDarkMode={isDarkMode}>
+                <div className="mt-1.5 space-y-2">
+                  <button
+                    type="button"
+                    onClick={openPicker}
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold ${
+                      isDarkMode ? "bg-blue-600 text-white" : "bg-slate-900 text-white"
+                    }`}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    서류 첨부
+                  </button>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept={LETTERING_VERIFY_DOC_ACCEPT}
+                    onChange={(e) => {
+                      onDocPick(e);
+                      restoreScroll();
+                    }}
+                    className="lbq-hidden-file-input"
+                    tabIndex={-1}
+                    aria-hidden
+                  />
+                  {verifyDocName ? (
+                    <p className={`text-[10px] font-semibold ${isDarkMode ? "text-gray-400" : "text-slate-600"}`}>
+                      첨부됨: {verifyDocName}
+                    </p>
+                  ) : null}
+                  {docError ? <p className="text-[10px] font-bold text-red-500">{docError}</p> : null}
+                </div>
+              </Field>
+            </>
+          ) : null}
         </>
       )}
     </div>

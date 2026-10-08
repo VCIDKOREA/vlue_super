@@ -898,6 +898,9 @@ cardsRoutes.post("/title-dept/submit", requireUserHeader, async (c) => {
     docIssuedAt?: string;
     docDataUrl?: string;
     docUrl?: string;
+    businessRegistrationNo?: string;
+    openDate?: string;
+    representativeName?: string;
   };
   try {
     const result = await submitTitleDeptReview(me, {
@@ -908,6 +911,9 @@ cardsRoutes.post("/title-dept/submit", requireUserHeader, async (c) => {
       docIssuedAt: String(body.docIssuedAt || ""),
       docDataUrl: body.docDataUrl,
       docUrl: body.docUrl,
+      businessRegistrationNo: body.businessRegistrationNo,
+      openDate: body.openDate,
+      representativeName: body.representativeName,
       source: "bizcard_settings"
     });
     return c.json({ ok: true, ...result });
@@ -916,7 +922,18 @@ cardsRoutes.post("/title-dept/submit", requireUserHeader, async (c) => {
     const map: Record<string, string> = {
       INVALID_DOC_KIND: "유효하지 않은 서류 종류입니다.",
       DOC_ISSUED_AT_INVALID: "발급일 기준 1개월 이내 서류만 제출할 수 있습니다.",
-      DOC_REQUIRED: "확인 서류를 첨부해 주세요."
+      DOC_REQUIRED: "확인 서류를 첨부해 주세요.",
+      INVALID_INPUT: "사업자등록번호 10자리, 개업연월일, 대표자명을 확인해 주세요.",
+      INVALID_BIZ_NO: "사업자등록번호 10자리를 입력해 주세요.",
+      NOT_FOUND: "국세청에서 해당 사업자를 찾지 못했습니다.",
+      CLOSED_BUSINESS: "폐업된 사업자번호입니다.",
+      SUSPENDED_BUSINESS: "휴업 중인 사업자번호입니다.",
+      NOT_CONTINUING_BUSINESS: "계속사업자가 아닙니다.",
+      FIELD_MISMATCH: "개업연월일 또는 대표자명이 국세청 정보와 일치하지 않습니다.",
+      NTS_REJECTED: "국세청 사업자 조회에 통과하지 못했습니다.",
+      PUBLIC_DATA_SERVICE_KEY_MISSING: "국세청 조회를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+      NTS_API_EXCEPTION: "국세청 조회에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      NTS_API_HTTP_ERROR: "국세청 API 응답 오류입니다. 잠시 후 다시 시도해 주세요."
     };
     return c.json({ error: map[msg] || msg }, 400);
   }

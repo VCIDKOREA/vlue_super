@@ -8,10 +8,22 @@ export const LETTERING_VERIFY_DOC_ACCEPT_LABEL = "PDF, PNG, JPG, WEBP";
 export const LETTERING_VERIFY_DOC_MAX_AGE_DAYS = 31;
 
 export const LETTERING_VERIFY_DOC_KINDS = [
+  { id: "business_owner", label: "대표자 / 사업자 인증" },
   { id: "employment_certificate", label: "재직증명서" },
-  { id: "insurance_enrollment", label: "4대보험 가입명부" },
-  { id: "business_registration", label: "사업자등록증" }
+  { id: "insurance_enrollment", label: "4대보험 가입명부" }
 ];
+
+/** 국세청 상태조회로 즉시 승인. 서류 첨부 없음. */
+export function isBusinessOwnerVerifyKind(kind) {
+  const k = String(kind || "").trim();
+  return k === "business_owner" || k === "business_registration";
+}
+
+/** 재직증명서·4대보험 — 최근 1개월 서류 첨부 후 수동 승인. */
+export function isManualTitleDeptDocKind(kind) {
+  const k = String(kind || "").trim();
+  return k === "employment_certificate" || k === "insurance_enrollment";
+}
 
 export const LETTERING_SIGNUP_DOC_KINDS = [
   { id: "employment_certificate", label: "재직증명서 사본" },
