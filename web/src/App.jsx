@@ -1018,12 +1018,8 @@ function App() {
     void import("./lib/showcase/showcaseStyleSync.js")
       .then(async (m) => {
         if (cancelled) return null;
-        /* 재설치 후 로컬이 비면 무조건 서버에서 강제 복원 */
-        if (m.needsShowcaseStyleLocalRestore()) {
-          return m.restoreShowcaseStyleFromServer();
-        }
-        m.seedEditorFromLocalLiveIfEmpty?.();
-        return m.hydrateShowcaseStyleFromServer();
+        /* 웹에서 저장한 쇼케이스·활성 프로필을 앱 로컬보다 우선 */
+        return m.syncShowcaseFromServer({ bypassCooldown: true });
       })
       .catch(() => {});
     return () => {
@@ -1095,6 +1091,9 @@ function App() {
       if (isNativeFcmAvailable()) {
         void registerNativeFcmPushToken();
       }
+      void import("./lib/showcase/showcaseStyleSync.js")
+        .then((m) => m.syncShowcaseFromServer())
+        .catch(() => {});
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -2659,13 +2658,8 @@ function App() {
           /* ignore */
         }
         try {
-          const { hydrateShowcaseStyleFromServer, restoreShowcaseStyleFromServer, needsShowcaseStyleLocalRestore } =
-            await import("./lib/showcase/showcaseStyleSync.js");
-          if (needsShowcaseStyleLocalRestore()) {
-            await restoreShowcaseStyleFromServer();
-          } else {
-            await hydrateShowcaseStyleFromServer({ forceServer: true });
-          }
+          const { syncShowcaseFromServer } = await import("./lib/showcase/showcaseStyleSync.js");
+          await syncShowcaseFromServer({ bypassCooldown: true });
         } catch {
           /* ignore */
         }
@@ -2820,16 +2814,8 @@ function App() {
             /* ignore */
           }
           try {
-            const {
-              hydrateShowcaseStyleFromServer,
-              restoreShowcaseStyleFromServer,
-              needsShowcaseStyleLocalRestore
-            } = await import("./lib/showcase/showcaseStyleSync.js");
-            if (needsShowcaseStyleLocalRestore()) {
-              await restoreShowcaseStyleFromServer();
-            } else {
-              await hydrateShowcaseStyleFromServer({ forceServer: true });
-            }
+            const { syncShowcaseFromServer } = await import("./lib/showcase/showcaseStyleSync.js");
+            await syncShowcaseFromServer({ bypassCooldown: true });
           } catch {
             /* ignore */
           }
@@ -2993,13 +2979,8 @@ function App() {
         /* ignore */
       }
       try {
-        const { hydrateShowcaseStyleFromServer, restoreShowcaseStyleFromServer, needsShowcaseStyleLocalRestore } =
-          await import("./lib/showcase/showcaseStyleSync.js");
-        if (needsShowcaseStyleLocalRestore()) {
-          await restoreShowcaseStyleFromServer();
-        } else {
-          await hydrateShowcaseStyleFromServer({ forceServer: true });
-        }
+        const { syncShowcaseFromServer } = await import("./lib/showcase/showcaseStyleSync.js");
+        await syncShowcaseFromServer({ bypassCooldown: true });
       } catch {
         /* ignore */
       }
@@ -3522,9 +3503,7 @@ function App() {
           /* ignore */
         }
         const showcase = await import("./lib/showcase/showcaseStyleSync.js");
-        if (showcase.needsShowcaseStyleLocalRestore()) {
-          await showcase.restoreShowcaseStyleFromServer();
-        }
+        await showcase.syncShowcaseFromServer({ bypassCooldown: true });
         if (!cancelled) {
           setCardFieldsTick((n) => n + 1);
           try {

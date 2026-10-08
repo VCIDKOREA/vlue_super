@@ -202,7 +202,7 @@ function WebBizcardHubInner({
       const [access] = await Promise.all([
         probeEnterpriseSidebarAccess(result.membershipTier),
         import('../../../lib/showcase/showcaseStyleSync.js')
-          .then((sync) => sync.hydrateShowcaseStyleFromServer({ forceServer: true }))
+          .then((sync) => sync.syncShowcaseFromServer({ bypassCooldown: true }))
           .catch(() => null),
       ]);
       setEnterpriseAccess({

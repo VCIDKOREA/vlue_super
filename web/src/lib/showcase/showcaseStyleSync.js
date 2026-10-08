@@ -112,7 +112,7 @@ export function needsShowcaseStyleLocalRestore() {
   );
 }
 
-function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } = {}) {
+export function applyServerBundle(bundle, { reason = "hydrate", clearMissing = false } = {}) {
   const editor =
     bundle.editor && typeof bundle.editor === "object" ? bundle.editor : null;
   const live = bundle.live && typeof bundle.live === "object" ? bundle.live : null;
@@ -263,8 +263,9 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
       } catch {
         /* ignore */
       }
-      /* 화면은 GET 반영 즉시. 서버 재저장은 뒤에서 — 웹 진입이 PUT까지 기다리지 않게 */
+      /* skipPush: 다른 기기 복원 직후 옛 로컬을 서버에 다시 쓰지 않음 */
       if (
+        !opts.skipPush &&
         !isIndependentDccLine() &&
         (applied?.seededEditorFromLive || showcaseStyleHasContent(readShowcaseStyle()))
       ) {
@@ -349,4 +350,78 @@ export function seedEditorFromLocalLiveIfEmpty() {
 export async function restoreShowcaseStyleFromServer() {
   lastHydrateOkAt = 0;
   return hydrateShowcaseStyleFromServer({ forceServer: true });
+}
+
+let deviceSyncInFlight = null;
+let lastDeviceSyncAt = 0;
+/** 앱 복귀 연타 시 Pooler 중복 방지. 로그인·설정 진입은 bypass */
+const DEVICE_SYNC_COOLDOWN_MS = 15_000;
+
+function emitShowcaseStyleApplied() {
+  try {
+    window.dispatchEvent(new CustomEvent("vlue-showcase-style-changed"));
+    window.dispatchEvent(new CustomEvent("vlue-showcase-live-style-changed"));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 웹에서 저장한 쇼케이스를 앱(다른 기기)에 반영.
+ * 활성 멀티 프로필 번들이 더 최신이면 그 쇼케이스를, 아니면 계정 마스터 쇼케이스를 쓴다.
+ * 기기에 남은 localStorage 가 서버보다 새 것처럼 보여도 여기서는 서버를 덮어쓰지 않는다.
+ */
+export async function syncShowcaseFromServer(opts = {}) {
+  const bypass = Boolean(opts.bypassCooldown);
+  if (!bypass && lastDeviceSyncAt && Date.now() - lastDeviceSyncAt < DEVICE_SYNC_COOLDOWN_MS) {
+    return { ok: true, applied: false, skipped: true, recent: true };
+  }
+  if (deviceSyncInFlight) return deviceSyncInFlight;
+  const run = (async () => {
+    const userBundle = await fetchShowcaseStyleBundle({ force: true, userOnly: true });
+    const userHas =
+      Boolean(userBundle?.ok) &&
+      (showcaseStyleHasContent(userBundle.editor) || showcaseStyleHasContent(userBundle.live));
+    const userMs = Date.parse(userBundle?.updatedAt || "") || 0;
+
+    try {
+      const { fetchDccAgentProfiles, fetchDccProfileBundle } = await import("../dccAgentProfilesApi.js");
+      const { switchToMultiDccProfile } = await import("../multiDccSwitch.js");
+      const listed = await fetchDccAgentProfiles();
+      const profiles = Array.isArray(listed?.profiles) ? listed.profiles : [];
+      const active =
+        profiles.find((p) => p?.id && p.id === listed?.activeId) ||
+        profiles.find((p) => p?.isActive) ||
+        null;
+      if (active?.id) {
+        const bundle = await fetchDccProfileBundle(active.id);
+        const editor = bundle?.showcase?.editor;
+        const live = bundle?.showcase?.live;
+        const profileHas = showcaseStyleHasContent(editor) || showcaseStyleHasContent(live);
+        const profileMs = Date.parse(bundle?.showcase?.updatedAt || "") || 0;
+        if (profileHas && (!userHas || profileMs >= userMs - 500)) {
+          await switchToMultiDccProfile(active, {
+            preferredLineId: active.assignedLineIds?.[0] || ""
+          });
+          lastHydrateOkAt = Date.now();
+          return { ok: true, applied: true, source: "profile", profileId: active.id };
+        }
+      }
+    } catch {
+      /* 프로필 조회 실패 시 계정 쇼케이스로 폴백 */
+    }
+
+    if (!userBundle?.ok) {
+      return { ok: false, error: userBundle?.error || "fetch_failed" };
+    }
+    applyServerBundle(userBundle, { reason: "device-sync", clearMissing: false });
+    lastHydrateOkAt = Date.now();
+    emitShowcaseStyleApplied();
+    return { ok: true, applied: true, source: "user" };
+  })();
+  deviceSyncInFlight = run.finally(() => {
+    deviceSyncInFlight = null;
+    lastDeviceSyncAt = Date.now();
+  });
+  return deviceSyncInFlight;
 }

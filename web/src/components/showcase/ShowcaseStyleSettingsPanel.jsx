@@ -441,13 +441,9 @@ export default function ShowcaseStyleSettingsPanel({
     };
     void import("../../lib/showcase/showcaseStyleSync.js")
       .then(async (m) => {
-        if (m.needsShowcaseStyleLocalRestore()) {
-          await m.restoreShowcaseStyleFromServer();
-        } else {
-          m.seedEditorFromLocalLiveIfEmpty?.();
-          /* 웹 PC는 앱과 같은 서버본을 강제 적용 (브라우저에 남은 예전 localStorage 우선 방지) */
-          await m.hydrateShowcaseStyleFromServer({ forceServer: Boolean(isWebDesk) });
-        }
+        m.seedEditorFromLocalLiveIfEmpty?.();
+        /* 웹·앱 모두 서버본 우선 — 다른 기기에 남은 localStorage 가 최신 설정을 가리지 않게 */
+        await m.syncShowcaseFromServer({ bypassCooldown: true });
         applyLocal();
         setStyleReady(true);
       })

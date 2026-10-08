@@ -6,8 +6,9 @@ import { normalizePhoneDigits } from "../letteringPhoneMatch.js";
 
 /** GET /api/lettering/showcase/style — 조건부 hydrate (If-None-Match) */
 export async function fetchShowcaseStyleBundle(opts = {}) {
-  const lineId = String(opts.lineId || readSelectedDccLineId() || "").trim();
-  const certified = Boolean(readDccLinePreview()?.isCertified);
+  /* userOnly: 계정 마스터 쇼케이스. 세션에 남은 다른 회선 번들을 읽지 않음 */
+  const lineId = opts.userOnly ? "" : String(opts.lineId || readSelectedDccLineId() || "").trim();
+  const certified = opts.userOnly ? true : Boolean(readDccLinePreview()?.isCertified);
   if (lineId && !certified) {
     try {
       const data = await fetchDccLineShowcase(lineId);
