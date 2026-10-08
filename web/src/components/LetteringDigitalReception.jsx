@@ -36,6 +36,7 @@ import {
 } from "../lib/showcase/showcaseContactActions.js";
 import VluePushAuthSeal from "./VluePushAuthSeal.jsx";
 import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
+import { cardHasOfficialCyanBadge } from "../lib/vlueVerifiedBadgeApi.js";
 import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import InCallDtmfPad from "./call/InCallDtmfPad.jsx";
 import { resolveAuthValidityPeriod } from "../lib/authValidityPeriod.js";
@@ -455,7 +456,8 @@ function BackPanelHero({ card }) {
   );
 }
 
-function ProfileHero({ card, verified, incomingNumber = "" }) {
+function ProfileHero({ card, incomingNumber = "" }) {
+  const cyanBadge = cardHasOfficialCyanBadge(card);
   const [imgBroken, setImgBroken] = useState(false);
   const photoUrl = resolveDccTitlePhotoUrl(card);
   const logoUrl = resolveCardLogoUrl(card);
@@ -505,7 +507,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
           )}
         </div>
         <div className="ldr-hero__copy ldr-hero__copy--watermark">
-          {verified ? (
+          {cyanBadge ? (
             <span className="ldr-hero__badge ldr-hero__badge--inline">
               <VlueCyanVerifiedSeal size={14} />
               VLUÉ 인증
@@ -535,7 +537,7 @@ function ProfileHero({ card, verified, incomingNumber = "" }) {
         )}
         <div className="ldr-hero__shade" />
         {hasLogo ? <CompanyLogoBadge card={card} className="ldr-company-logo-badge--hero" /> : null}
-        {verified ? (
+        {cyanBadge ? (
           <span className="ldr-hero__badge">
             <VlueCyanVerifiedSeal size={14} />
             VLUÉ 인증
@@ -829,7 +831,7 @@ function FrontPanel({
   return (
     <div className={`ldr-panel ldr-panel--front${embeddedInPush ? " ldr-panel--push" : ""}`}>
       <CompanyLogoWatermark card={card} />
-      {embeddedInPush ? null : <ProfileHero card={card} verified={verified} />}
+      {embeddedInPush ? null : <ProfileHero card={card} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${resolveDccTitlePhotoUrl(card) && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
         {resolveCardLogoUrl(card) ? (
@@ -862,11 +864,11 @@ function FrontPanel({
                 }
                 return <h3 className="ldr-back-title">{primary}</h3>;
               })()}
-              {showSnsCert || verified ? (
+              {showSnsCert || cardHasOfficialCyanBadge(card) ? (
                 <ShowcaseIdentityCertMark
                   showSnsCert={showSnsCert}
                   onOpenSnsCert={onOpenSnsCert}
-                  verified={verified}
+                  verified={cardHasOfficialCyanBadge(card)}
                   size={16}
                 />
               ) : null}

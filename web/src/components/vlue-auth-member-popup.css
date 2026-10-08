@@ -47,6 +47,10 @@
 }
 
 .vlue-auth-member-popup__name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 800;

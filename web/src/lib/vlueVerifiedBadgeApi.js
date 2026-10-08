@@ -44,6 +44,12 @@ export function writeVlueBadgeLocal({ vlueVerifiedBadge, showcaseShareCount } = 
  * - allowLocalFallback: 기본 true — **본인** 쇼케이스/미리보기만.
  *   상대(피어) 통화·빅푸시에서는 false 로 두고, 카드의 명시적 배지만 본다.
  */
+/** 카드에 서버가 실어 준 유료·가족 시안 배지. 본인인증 플래그는 보지 않는다. */
+export function cardHasOfficialCyanBadge(card) {
+  if (!card || typeof card !== "object") return false;
+  return card.vlueVerifiedBadge === true || card.vlue_verified_badge === true;
+}
+
 export function shouldShowVlueVerifiedSeal(ctx = {}) {
   if (ctx.vlueVerifiedBadge === true) return true;
   if (ctx.vlueVerifiedBadge === false) return false;
@@ -54,8 +60,9 @@ export function shouldShowVlueVerifiedSeal(ctx = {}) {
 }
 
 /**
- * 상대 통화·빅푸시·피어 오버레이용.
- * 수신자 localStorage 배지를 절대 쓰지 않음. VLUÉ 회원(verified) + 상대 카드 배지만.
+ * 상대 통화·빅푸시·쇼케이스·미니·탭로고·비즈니스 회선용.
+ * 유료 회원 또는 유료 회원의 가족 구성원만 (서버 cyanBadgeActive → vlueVerifiedBadge).
+ * 본인인증(verified)만으로는 배지를 붙이지 않는다. 수신자 localStorage 금지.
  */
 export function shouldShowPeerVlueVerifiedSeal({
   verified = false,

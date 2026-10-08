@@ -16,6 +16,7 @@ import {
 import { openShowcaseSocialItem } from "../../lib/showcase/openShowcaseSocialItem.js";
 import { resolveShowcaseProfileBarLabel } from "../../lib/letteringPaidIdentityDisplay.js";
 import ShowcaseIdentityCertMark from "./ShowcaseIdentityCertMark.jsx";
+import { cardHasOfficialCyanBadge } from "../../lib/vlueVerifiedBadgeApi.js";
 import "../follow/follow-action.css";
 
 function firstText(...values) {
@@ -241,7 +242,7 @@ export default function ShowcaseSlideChrome({
                 <ShowcaseIdentityCertMark
                   showSnsCert={showSnsCert}
                   onOpenSnsCert={onOpenSnsCert}
-                  verified={verified}
+                  verified={cardHasOfficialCyanBadge(card)}
                   size={16}
                 />
               </span>

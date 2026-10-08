@@ -178,7 +178,7 @@ export async function redeemKidsInvite(
 ) {
   const nickname = String(input.nickname || "").trim().slice(0, 20);
   if (nickname.length < 1) {
-    throw new ProtectionInviteError("자녀 이름을 입력해 주세요.", 400, "KIDS_NAME_REQUIRED");
+    throw new ProtectionInviteError("닉네임을 입력해 주세요.", 400, "KIDS_NAME_REQUIRED");
   }
   const code = normalizeInviteCode(input.inviteCode);
   const preview = await prisma.protectionGroup.findUnique({

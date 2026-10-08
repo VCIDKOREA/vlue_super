@@ -165,6 +165,8 @@ class CallOverlayService : Service() {
     private var showcaseHoldUntilElapsed: Long = 0L
     /** Mini→풀 직후 고스트 click 용 짧은 가드 (의도적 통화화면 보기는 막지 않음) */
     private var restoreGhostGuardUntilElapsed: Long = 0L
+    /** 풀스크린 레이아웃이 커밋된 뒤에만 웹 쇼케이스를 연다. 작은 창에서 먼저 펼치면 잘린 먹통이 된다. */
+    private var showcaseWebExpandPending: Boolean = false
     /** 발신: 상대 응답(STATE_ACTIVE / notifyConnected) 후에만 true — 다이얼 OFFHOOK 만으로는 Showcase 금지 */
     private var remoteConnected: Boolean = false
     /**
@@ -182,7 +184,7 @@ class CallOverlayService : Service() {
      */
     private var unregisteredReportRequested: Boolean = false
     /** 발신 중앙 로고 오버레이 창 한 변 (dp) — 전체화면 금지 */
-    private val outgoingLogoWindowDp: Int = 120
+    private val outgoingLogoWindowDp: Int = 156
     /** BigPush 가장자리 피크 (MiniCase 패리티) — OverlayState 는 BIG_PUSH 유지 */
     private var bigPushPeeking: Boolean = false
     private var overlayModal: Boolean = false
@@ -289,7 +291,14 @@ class CallOverlayService : Service() {
             "overlayInstanceId=$instanceId fgsStartAt=${OverlayDiagTracker.foregroundStartedAtMs}"
         )
         createNotificationChannel()
-        VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
+        if (!VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())) {
+            android.util.Log.e(
+                "CallOverlayService",
+                "foreground start denied — stop without killing the process"
+            )
+            stopSelf()
+            return
+        }
         activeInstance = this
         OverlayDiagTracker.setOemDeviceInfo(OemDeviceProbe.collect(this))
         OverlayDiagTracker.refreshSecurityAuditReport()
@@ -1423,6 +1432,7 @@ class CallOverlayService : Service() {
         /* Answer 후 ContextWatch 가 OTHER_APP 으로 오판해 빅푸시로 되돌리지 않도록 충분히 유지 */
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         /* 네이티브 창 성장을 먼저 시작해 작은 바 안에서 풀 UI가 잘리는 첫 프레임을 없앤다. */
+        showcaseWebExpandPending = true
         val showcaseOpen =
             if (rootContainer?.isAttachedToWindow == true) {
                 enterShowcaseLayout(source = source)
@@ -1437,10 +1447,10 @@ class CallOverlayService : Service() {
                 )
                 enterShowcaseLayout(source = source)
             }
-        if (!showcaseOpen) return
-        notifyWebExpandShowcase()
-        /* 탭/자동 동일 — restore_showcase 없으면 웹이 바 상태로 남는 경우가 있음 */
-        notifyWebCallState("restore_showcase")
+        if (!showcaseOpen) {
+            showcaseWebExpandPending = false
+            return
+        }
         syncOverlayChromeForState(source = source)
         syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
         CompanionRuntimeStabilityDiag.mark("SHOWCASE_LAYOUT_APPLIED", source)
@@ -1716,6 +1726,7 @@ class CallOverlayService : Service() {
      * 빈 FULLSCREEN 거부 — 팝업 또는 컴팩트 BigPush 로 되돌리고 터치 차단 해제.
      */
     private fun refuseEmptyFullscreen(source: String) {
+        showcaseWebExpandPending = false
         VlueBigPushTrace.lifecycle(
             "REFUSE_EMPTY_FULLSCREEN",
             "source=$source state=${companion.state.name} — contract KEEP_BIG_PUSH/popup"
@@ -1798,11 +1809,10 @@ class CallOverlayService : Service() {
                 refuseEmptyFullscreen("$source:late_gate")
                 return@Runnable
             }
-            val doAnimate = when {
-                animate == false || shouldForceInstantFullscreen(source) -> false
-                animate == true -> true
-                else -> shouldAnimateToFullscreen(params, view)
-            }
+            /* 수신 바·발신 로고·미니 복원 모두 같은 경로.
+             * 프레임마다 창을 키우면 쇼케이스 WebView가 전환 중에 화면을 덮은 채 멈춘다.
+             * 안심팝업은 이 애니를 타지 않는다. */
+            val doAnimate = false
             if (!doAnimate) {
                 cancelFullscreenExpandAnimator()
                 commitFullscreenLayoutImmediate(source)
@@ -1864,7 +1874,8 @@ class CallOverlayService : Service() {
 
                     override fun onAnimationCancel(animation: android.animation.Animator) {
                         fullscreenExpandAnimator = null
-                        commitFullscreenLayoutImmediate(source)
+                        /* 취소는 다음 레이아웃이 이어받는다. 여기서 웹을 펼치면 작은 창에 쇼케이스가 붙는다. */
+                        commitFullscreenLayoutImmediate(source, notifyWeb = false)
                     }
                 })
                 start()
@@ -1877,7 +1888,7 @@ class CallOverlayService : Service() {
         }
     }
 
-    private fun commitFullscreenLayoutImmediate(source: String) {
+    private fun commitFullscreenLayoutImmediate(source: String, notifyWeb: Boolean = true) {
         if (!mayCommitFullscreenShowcase()) {
             refuseEmptyFullscreen("immediate_$source")
             return
@@ -1894,7 +1905,9 @@ class CallOverlayService : Service() {
             return
         }
         view.animate().cancel()
-        view.alpha = 1f
+        /* 쇼케이스 펼침은 내용이 그려진 뒤에만 보이게 해서 빈 다크 화면이 끊겨 보이지 않게 한다. */
+        val revealAfterPaint = notifyWeb && showcaseWebExpandPending
+        view.alpha = if (revealAfterPaint) 0f else 1f
         view.translationY = 0f
         view.visibility = android.view.View.VISIBLE
         userMinimized = false
@@ -1918,6 +1931,7 @@ class CallOverlayService : Service() {
             }
             OverlayDiagTracker.markShowcaseFullscreenCommit()
             OverlayDiagTracker.markLayoutApplied("FULLSCREEN", OverlayPosition.FULLSCREEN.name)
+            if (notifyWeb) flushShowcaseWebExpand(view)
             VlueBigPushTrace.milestone(
                 "OVERLAY_ATTACHED",
                 "Overlay Attached",
@@ -1934,8 +1948,54 @@ class CallOverlayService : Service() {
                 "SHOWCASE_LAYOUT_FAIL",
                 "${e.javaClass.simpleName}: ${e.message} ($source)"
             )
+            if (notifyWeb) showcaseWebExpandPending = false
         }
         publishCompanion(OverlayTriggerEvent.INTERNAL)
+    }
+
+    /**
+     * 창이 MATCH_PARENT 로 잡힌 다음 프레임에만 웹 쇼케이스를 연다.
+     * 로고·미니 높이에서 setExpanded 하면 풀 UI가 잘리고, 그 창이 화면을 덮어 먹통이 된다.
+     */
+    private fun revealShowcaseWindow(anchor: android.view.View) {
+        anchor.animate().cancel()
+        anchor.animate().alpha(1f).setDuration(220L).start()
+    }
+
+    private fun flushShowcaseWebExpand(anchor: android.view.View) {
+        if (!showcaseWebExpandPending || companion.position != OverlayPosition.FULLSCREEN) {
+            anchor.alpha = 1f
+            return
+        }
+        showcaseWebExpandPending = false
+        anchor.alpha = 0f
+        anchor.post {
+            if (dismissing || companion.state != OverlayState.SHOWCASE ||
+                companion.position != OverlayPosition.FULLSCREEN
+            ) {
+                anchor.alpha = 1f
+                return@post
+            }
+            val wv = webView
+            if (wv == null) {
+                anchor.alpha = 1f
+                return@post
+            }
+            wv.requestLayout()
+            wv.post {
+                if (dismissing || companion.state != OverlayState.SHOWCASE) {
+                    anchor.alpha = 1f
+                    return@post
+                }
+                notifyWebExpandShowcase()
+                notifyWebCallState("restore_showcase")
+                wv.evaluateJavascript(
+                    "try{window.dispatchEvent(new Event('resize'));}catch(e){}",
+                    null
+                )
+                wv.post { revealShowcaseWindow(anchor) }
+            }
+        }
     }
 
     /** 링잉 BigPush ▾ 펼침 — 삭제됨. 바 탭 → Showcase */
@@ -2876,6 +2936,17 @@ class CallOverlayService : Service() {
         companion.onCallEnd()
     }
 
+    /** 서버가 실어 준 유료·가족 시안 배지. 본인인증만으로는 켜지지 않는다. */
+    private fun cardHasOfficialCyanBadge(cardJson: String?): Boolean {
+        if (cardJson.isNullOrBlank()) return false
+        return try {
+            val o = org.json.JSONObject(cardJson)
+            o.optBoolean("vlue_verified_badge", false) || o.optBoolean("vlueVerifiedBadge", false)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun syncDcpRoutePopup(cardJson: String?, dcpRoute: String) {
         if (parseProfileKind(cardJson) == "expired_line") {
             if (dismissing) {
@@ -2964,7 +3035,8 @@ class CallOverlayService : Service() {
                 shortNumber = parseDcpPhone(cardJson).ifBlank { currentPhone },
                 officialWebsite = "",
                 fromMock = dcpPopupOnly,
-                vlueAuthMember = true
+                vlueAuthMember = true,
+                cyanBadge = cardHasOfficialCyanBadge(cardJson)
             )
             attachDcpPopupWindow(spec)
             return
@@ -3787,6 +3859,7 @@ class CallOverlayService : Service() {
             return
         }
         authPopupOnlyMode = false
+        showcaseWebExpandPending = false
         /* 신고 패널에서 닫으면(X) 미니로 — 이후 미니 탭은 미등록 안심팝업을 다시 띄운다 */
         unregisteredReportRequested = false
         companion.onMinimize(
@@ -3895,7 +3968,8 @@ class CallOverlayService : Service() {
         nativeBanner?.visibility = android.view.View.GONE
         webView?.visibility = android.view.View.VISIBLE
         rootContainer?.setBackgroundColor(Color.parseColor("#0B101B"))
-        /* Mini 창을 먼저 성장시킨 뒤 웹 콘텐츠를 펼쳐 잘린 풀 UI 노출을 방지한다. */
+        /* Mini 창을 먼저 키운 뒤 웹을 펼친다. 먼저 펼치면 미니 높이 안에 쇼케이스가 잘려 버튼이 안 먹는다. */
+        showcaseWebExpandPending = true
         val showcaseOpen =
             if (rootContainer?.isAttachedToWindow == true) {
                 enterShowcaseLayout(source = source)
@@ -3909,9 +3983,10 @@ class CallOverlayService : Service() {
                 )
                 enterShowcaseLayout(source = source)
             }
-        if (!showcaseOpen) return
-        notifyWebExpandShowcase()
-        notifyWebCallState("restore_showcase")
+        if (!showcaseOpen) {
+            showcaseWebExpandPending = false
+            return
+        }
         syncOverlayChromeForState(source = source)
         VlueBigPushTrace.lifecycle(
             "RESTORE_SHOWCASE",
@@ -4044,7 +4119,25 @@ class CallOverlayService : Service() {
                     ensureOutgoingLogoWindowLayout()
                     notifyCompactCallChrome()
                 } else if (currentOutgoing && outgoingExpandRequestedByUser) {
-                    /* 탭 이후 ContextWatch 가 BIG_PUSH 로 접어도 120dp 로고 창으로 되돌리지 않는다. */
+                    /*
+                     * 탭 이후 ContextWatch 가 BIG_PUSH 로 접을 때:
+                     * - 팝업이 떠 있으면 크롬만 숨김
+                     * - 창이 아직 120dp 로고 크기면 로고 UI 로 고정
+                     *   (미니/풀 HTML 이 정사각형으로 잘리는 것 방지)
+                     * - 이미 커진 창은 다시 120dp 로 줄이지 않음
+                     */
+                    if (authPopupOnlyMode || dcpPopupView?.isAttachedToWindow == true) {
+                        softHideCompanionOverlayChrome()
+                    } else if (companion.state == OverlayState.BIG_PUSH && isOutgoingLogoWindowSized()) {
+                        ensureOutgoingLogoWindowLayout(force = true)
+                        notifyWebCallState("outgoing_logo")
+                        if (remoteConnected) notifyWebCallState("outgoing_connected")
+                        webView?.evaluateJavascript(
+                            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                                "window.VlueLettering.setExpanded(false);}catch(e){}",
+                            null
+                        )
+                    }
                 } else {
                     applyCompactRingingWindow()
                 }
@@ -4602,6 +4695,15 @@ class CallOverlayService : Service() {
         }
     }
 
+    /** 발신 중앙 로고 창(≈120dp)인지 — 미니 HTML 잘림 가드용 */
+    private fun isOutgoingLogoWindowSized(): Boolean {
+        val params = layoutParams ?: return false
+        val logo = dp(outgoingLogoWindowDp)
+        val slack = dp(16)
+        return params.width in (logo - slack)..(logo + slack) &&
+            params.height in (logo - slack)..(logo + slack)
+    }
+
     /**
      * 발신 로고 단계 — 중앙 작은 창만 (전체화면이면 종료 버튼 터치 불가).
      * 사용자가 로고를 탭한 뒤에는 이 창을 다시 씌우지 않는다. force 는 로고로 되돌릴 때만.
@@ -4695,6 +4797,7 @@ class CallOverlayService : Service() {
     fun dismissOverlay() {
         if (dismissing) return
         dismissing = true
+        showcaseWebExpandPending = false
         cancelFullscreenExpandAnimator()
         cancelBigPushSettle()
         cancelAnswerUiResume()

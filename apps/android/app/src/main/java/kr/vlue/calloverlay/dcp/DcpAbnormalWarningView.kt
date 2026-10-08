@@ -12,8 +12,10 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import kr.vlue.calloverlay.R
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
@@ -52,6 +54,8 @@ object DcpAbnormalWarningView {
         val vlueNonMember: Boolean = false,
         /** VLUÉ 인증 회원 · 공개 DCC/쇼케이스 없음 */
         val vlueAuthMember: Boolean = false,
+        /** 유료 회원·유료 가족 — 상호/이름 옆 시안 인증배지 */
+        val cyanBadge: Boolean = false,
         val showShareShowcase: Boolean = false,
         val reasonLine: String = "",
         val pathVerify: Boolean = false,
@@ -148,16 +152,32 @@ object DcpAbnormalWarningView {
             }
         )
         if (spec.agencyName.isNotBlank()) {
-            card.addView(
+            val nameRow = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(0, dp(ctx, 10), 0, 0)
+            }
+            nameRow.addView(
                 TextView(ctx).apply {
                     text = spec.agencyName
                     setTextColor(Color.WHITE)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
-                    setPadding(0, dp(ctx, 10), 0, 0)
                 }
             )
+            if (spec.cyanBadge) {
+                nameRow.addView(
+                    ImageView(ctx).apply {
+                        setImageResource(R.drawable.vlue_cyan_verified_seal)
+                        contentDescription = "VLUÉ 인증"
+                        layoutParams = LinearLayout.LayoutParams(dp(ctx, 16), dp(ctx, 16)).apply {
+                            marginStart = dp(ctx, 4)
+                        }
+                    }
+                )
+            }
+            card.addView(nameRow)
         }
         if (spec.shortNumber.isNotBlank()) {
             card.addView(

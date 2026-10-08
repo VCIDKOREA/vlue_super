@@ -33,7 +33,7 @@
 | Outgoing dialing / connecting | `OUTGOING_LOGO` only — **skip peer BigPush / identity fetch UI** |
 | Audio `MODE_IN_CALL` while still dialing | **Ignore** — must not open popup/showcase |
 | Logo / bar tap while outgoing unanswered | **Honored (v2 one-touch)** — opens best memory entry from `CallPrefetchCache` instantly (member → showcase / safe popup; otherwise 미등록 안심팝업). Never waits, never shows a spinner. |
-| Outgoing logo label | Text sits **above** the logo (nothing below it; `연결중...` is deleted). VLUÉ DB 상호/이름 → that name · saved contact → saved name/상호 · VLUÉ 미등록/unknown/lookup pending → `탭하여 정보확인`. Connection state no longer changes the text (`CallUiPhasePolicy.outgoingBubbleLabel`, web `resolveOutgoingLogoLabel`). |
+| Outgoing logo label | Text sits **above** the logo (nothing below it; `연결중...` is deleted). VLUÉ DB 상호/이름 → that name · saved contact → saved name/상호 · VLUÉ 미등록/unknown/lookup pending → `탭하여 정보확인`. A paid member or a family member of a paid member (server `vlueVerifiedBadge`, not mere identity verification) also shows the cyan seal beside the org or person name (`outgoingLogoShowsMemberBadge`). Connection state no longer changes the text (`CallUiPhasePolicy.outgoingBubbleLabel`, web `resolveOutgoingLogoLabel`). |
 | Card lookup / Safe Care payload arrives while unanswered | Incoming: paint BigPush only. Outgoing: keep logo — **no center popup** |
 
 `remoteConnected` may become true **only** after a real answer path (`enterShowcaseFromAnswer` / InCall `STATE_ACTIVE` after dialing/connecting). Audio `MODE_IN_CALL` alone must **never** open popup/showcase (OEM false positive while still ringing).

@@ -654,7 +654,8 @@ export default function LetteringIncomingNotification({
      * (예전 버튼은 expandOnTap 게이트 없이 onExpand 직행)
      */
     if (hadFullShowcaseThisCall) return true;
-    if (showcaseOffPreview) return false;
+    /* 안심팝업만 있는 통화도 카드 탭으로 같은 팝업을 다시 연다. */
+    if (showcaseOffPreview) return true;
     if (peerHasDccOrShowcaseContent(c, c?.showcaseStyle)) return true;
     return Boolean(verified && (isPaidMember || isFreeMember));
   }, [
@@ -1082,8 +1083,13 @@ export default function LetteringIncomingNotification({
   const expandShowcaseFromMiniCase = useCallback(() => {
     /* pointerup 직후 남는 click 이 새 live-bar 에 떨어져 toggle→접힘 되는 것 차단 */
     expandFromMiniGuardUntilRef.current = Date.now() + 700;
-    setExpanded(true);
-    setHadFullShowcaseThisCall(true);
+    const restorePopupOnly = Boolean(
+      showcaseOffPreview || isContactSafeCare || isDcp || isExpiredLine
+    );
+    if (!restorePopupOnly) {
+      setExpanded(true);
+      setHadFullShowcaseThisCall(true);
+    }
     try {
       window.Android?.logBigPushTrace?.(
         "MINI_TAP_EXPAND",
@@ -1099,7 +1105,15 @@ export default function LetteringIncomingNotification({
         /* ignore */
       }
     }
-  }, [setExpanded, canRestoreFromMiniCase, expandedProp]);
+  }, [
+    setExpanded,
+    canRestoreFromMiniCase,
+    expandedProp,
+    showcaseOffPreview,
+    isContactSafeCare,
+    isDcp,
+    isExpiredLine
+  ]);
 
   const openSamsungCallOptions = useCallback(() => {
     if (previewMode) {
@@ -1357,6 +1371,7 @@ export default function LetteringIncomingNotification({
           statusLabel={isExpiredLine ? "인증 만료" : isUnverified ? "미인증" : verified ? "인증" : "미인증"}
           durationLabel={companionDurationLabel}
           verified={Boolean(verified && !isUnverified && !isExpiredLine)}
+          cyanBadge={officialBadgeActive}
           onExpand={expandShowcaseFromMiniCase}
           expandOnTap={canRestoreFromMiniCase}
         />
@@ -1797,6 +1812,7 @@ export default function LetteringIncomingNotification({
         name={authPopupIdentity.name}
         phone={incoming}
         handle={authPopupIdentity.handle}
+        cyanBadge={officialBadgeActive}
         onClose={() => setAuthMemberPopupOpen(false)}
       />
       <ShareShowcaseChannelSheet

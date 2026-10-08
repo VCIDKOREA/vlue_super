@@ -177,7 +177,7 @@ export default function MyCaseGrid({
     }
     return shouldShowVlueVerifiedSeal({
       vlueVerifiedBadge: remoteProfile?.vlueVerifiedBadge,
-      digitalCardIssued: remoteProfile?.digitalCardIssued
+      allowLocalFallback: false
     });
   }, [isMine, hasDigitalCard, remoteProfile, badgeTick]);
 

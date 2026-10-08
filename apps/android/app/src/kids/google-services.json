@@ -7,9 +7,28 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:330913603576:android:efad97b32b98719809c00d",
+        "mobilesdk_app_id": "1:330913603576:android:0392e9d5095ec77209c00d",
         "android_client_info": {
           "package_name": "com.vlue.kids"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChTn5Qsr7EKrC6yYzzNqqzBVYNu5JDZyI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:330913603576:android:efad97b32b98719809c00d",
+        "android_client_info": {
+          "package_name": "kr.vlue.app"
         }
       },
       "oauth_client": [],

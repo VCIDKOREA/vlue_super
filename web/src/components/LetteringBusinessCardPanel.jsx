@@ -237,7 +237,8 @@ export default function LetteringBusinessCardPanel({
   const [flipped, setFlipped] = useState(false);
   const displayCard = displayCardProp || card;
   const officialBadgeActive = shouldShowVlueVerifiedSeal({
-    vlueVerifiedBadge: displayCard?.vlueVerifiedBadge ?? displayCard?.vlue_verified_badge
+    vlueVerifiedBadge: displayCard?.vlueVerifiedBadge ?? displayCard?.vlue_verified_badge,
+    allowLocalFallback: false
   });
   const brandingStyle = useMemo(
     () => corporateBrandingStyleVars(displayCard),

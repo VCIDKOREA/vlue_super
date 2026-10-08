@@ -15,15 +15,19 @@ import androidx.core.app.ServiceCompat
 object VlueForegroundHelper {
     private const val TAG = "VlueForeground"
 
+    /**
+     * @return false 면 백그라운드 FGS 제한으로 승격이 거절된 것.
+     * 예외를 올리면 프로세스가 죽고, 삼성 배터리 기록이 「오류 10회 이상」으로 남는다.
+     */
     fun start(
         service: Service,
         notificationId: Int,
         notification: Notification
-    ) {
+    ): Boolean {
         val type = preferredType()
         try {
             ServiceCompat.startForeground(service, notificationId, notification, type)
-            return
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "startForeground type=$type failed, fallback dataSync", e)
         }
@@ -35,13 +39,19 @@ object VlueForegroundHelper {
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                 )
-                return
+                return true
             }
         } catch (e: Exception) {
             Log.e(TAG, "startForeground dataSync failed, legacy", e)
         }
-        @Suppress("DEPRECATION")
-        service.startForeground(notificationId, notification)
+        return try {
+            @Suppress("DEPRECATION")
+            service.startForeground(notificationId, notification)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground denied — keep process alive", e)
+            false
+        }
     }
 
     fun preferredType(): Int {

@@ -4237,10 +4237,13 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar
 
 .companion-mini-case__name {
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.companion-mini-case__cyan {
+  flex: 0 0 auto;
 }
 
 .companion-mini-case__live {
@@ -4262,6 +4265,7 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar
 }
 
 .companion-mini-case__duration {
+  margin-left: auto;
   font-size: 13px;
   font-weight: 700;
   color: #86efac;
@@ -5152,11 +5156,13 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
-  /* 로고 창(~120dp) 안에 들어가도록 */
-  max-width: 116px;
+  /* 로고 창 안에 이름 + 시안 배지 */
+  max-width: 148px;
   overflow: hidden;
-  text-overflow: ellipsis;
   padding: 2px 8px;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.72);
@@ -5165,4 +5171,12 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar
   letter-spacing: -0.01em;
   color: #f1f5f9;
   pointer-events: none;
+}
+.outgoing-call-logo__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.outgoing-call-logo__badge {
+  flex: 0 0 auto;
 }

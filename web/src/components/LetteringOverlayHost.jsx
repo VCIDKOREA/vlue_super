@@ -36,7 +36,8 @@ import LetteringCertModal from "./LetteringCertModal.jsx";
 import RenderErrorGuard from "./RenderErrorGuard.jsx";
 import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import OutgoingCallLogo from "./call/OutgoingCallLogo.jsx";
-import { resolveOutgoingLogoLabel } from "../lib/call/outgoingLogoLabel.js";
+import { outgoingLogoShowsMemberBadge, resolveOutgoingLogoLabel } from "../lib/call/outgoingLogoLabel.js";
+import { cardHasOfficialCyanBadge } from "../lib/vlueVerifiedBadgeApi.js";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
@@ -1473,6 +1474,8 @@ function LetteringOverlayHostInner() {
 
   /* API enrich 후 송출 OFF 확정 — 풀/DCC 잔존 접기 */
   useEffect(() => {
+    /* 발신 로고 창(≈120dp) 안에서 쇼케이스/미니를 그리면 정사각형으로 잘린다. 탭 전까지 금지. */
+    if (direction === "outgoing" && outgoingLogoMode) return;
     if (callState !== CALL_STATES.CONNECTED || userChoseMiniRef.current) return;
     const style = styledCard?.showcaseStyle || showcaseStyle;
     if (peerAuthPopupOnly) {
@@ -1500,11 +1503,16 @@ function LetteringOverlayHostInner() {
     styledCard,
     showcaseStyle,
     identityReady,
-    verified
+    verified,
+    direction,
+    outgoingLogoMode
   ]);
 
     useEffect(() => {
     if (callState !== CALL_STATES.CONNECTED || !identityReady) return;
+    /* 발신 탭로고 단계 — connected 만으로 미니/풀을 열지 않는다. */
+    if (direction === "outgoing" && outgoingLogoMode) return;
+    if (userChoseMiniRef.current) return;
     if (autoExpandedOnceRef.current) return;
     autoExpandedOnceRef.current = true;
     forceShowcaseBarRef.current = false;
@@ -1543,7 +1551,7 @@ function LetteringOverlayHostInner() {
       return;
     }
     setExpanded(true);
-  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle, urlMiniCase, native, notifyNativeAuthMemberReady, verified]);
+  }, [callState, identityReady, peerAuthPopupOnly, incoming, styledCard, showcaseStyle, urlMiniCase, native, notifyNativeAuthMemberReady, verified, direction, outgoingLogoMode]);
 
   /* 수신 중(빅푸시)에는 인증 팝업을 열지 않음 — 카드 조회 완료(~수 초) 후에도 유지 */
 
@@ -1769,7 +1777,11 @@ function LetteringOverlayHostInner() {
         data-mini="false"
       >
         {/* 로고 모드는 네이티브 expand 성공 후 해제 — 탭 직후 지우면 쇼케이스/팝업이 안 뜸 */}
-        <OutgoingCallLogo connected={onCall} label={resolveOutgoingLogoLabel(styledCard)} />
+        <OutgoingCallLogo
+          connected={onCall}
+          label={resolveOutgoingLogoLabel(styledCard)}
+          memberBadge={outgoingLogoShowsMemberBadge(styledCard, verified)}
+        />
         {toast ? (
           <p className="lettering-overlay-toast" role="status">
             {toast}
@@ -1815,29 +1827,24 @@ function LetteringOverlayHostInner() {
           forceShowcaseBar={forceShowcaseBar}
           onExpandedChange={(next) => {
             if (next) {
-              if (peerAuthPopupOnly) {
-                openPeerAuthPopup();
-                return;
-              }
               const style = styledCard?.showcaseStyle || showcaseStyle;
               const allowUnverified = isResolvedUnverifiedOverlayCard(styledCard, verified);
-              /* 텅 빈 쇼케이스 펼침 방지 — 미인증 신고 패널은 예외 */
-              if (!allowUnverified && !peerHasDccOrShowcaseContent(styledCard, style)) return;
-              /*
-               * Mini 탭 복원: userChoseMini 를 먼저 해제하지 않으면
-               * 직후 connected 재주입이 setExpanded(false) 로 다시 접어 깜빡임.
-               */
-              userChoseMiniRef.current = false;
-              restoreHoldUntilRef.current = Date.now() + 4500;
-              /*
-               * 네이티브가 창을 키운 뒤에만 펼친다.
-               * 먼저 setExpanded 하면 120dp 로고·미니 높이 안에 쇼케이스가 잘려 멈춘다.
-               * restore_showcase 가 창 확장 후에 setExpanded(true) 를 한다.
-               */
+              const hasShowcase =
+                !isSafeCareProfile &&
+                !peerAuthPopupOnly &&
+                (allowUnverified || peerHasDccOrShowcaseContent(styledCard, style));
               const nativeRestore =
                 window.VlueLettering?.restoreShowcaseOverlay ||
                 window.Android?.restoreShowcaseOverlay;
+              /*
+               * 미니케이스 「쇼케이스 보기」는 항상 같은 버튼.
+               * 쇼케이스 통화는 쇼케이스를, 안심팝업 통화는 같은 팝업을 다시 연다.
+               */
               if (typeof nativeRestore === "function") {
+                if (hasShowcase) {
+                  userChoseMiniRef.current = false;
+                  restoreHoldUntilRef.current = Date.now() + 4500;
+                }
                 try {
                   nativeRestore();
                 } catch {
@@ -1845,6 +1852,15 @@ function LetteringOverlayHostInner() {
                 }
                 return;
               }
+              if (peerAuthPopupOnly || isSafeCareProfile) {
+                openPeerAuthPopup();
+                return;
+              }
+              /* 텅 빈 쇼케이스 펼침 방지 — 미인증 신고 패널은 예외 */
+              if (!allowUnverified && !peerHasDccOrShowcaseContent(styledCard, style)) return;
+              /* 웹 미리보기 — 네이티브 창이 없을 때만 바로 펼친다. */
+              userChoseMiniRef.current = false;
+              restoreHoldUntilRef.current = Date.now() + 4500;
               setExpanded(true);
               setForceShowcaseBar(false);
               return;
@@ -1901,6 +1917,7 @@ function LetteringOverlayHostInner() {
         name={styledCard?.name || styledCard?.displayName || ""}
         phone={incoming}
         handle={styledCard?.publicHandle || ""}
+        cyanBadge={cardHasOfficialCyanBadge(styledCard)}
         onClose={confirmPeerAuthPopup}
       />
     </div>

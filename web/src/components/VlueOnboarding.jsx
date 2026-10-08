@@ -27,6 +27,7 @@ import {
 } from "../lib/letteringBizcardVerification.js";
 import ReferralCodeVerifyBlock, { validateReferralMeta } from "./ReferralCodeVerifyBlock.jsx";
 import KidsInviteJoinCard from "./KidsInviteJoinCard.jsx";
+import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
 import { redeemElderInvite } from "../lib/familyProtectionApi.js";
 import { captureProtectionInviteFromLocation, clearStoredProtectionInvite } from "../lib/protectionInvite.js";
 import TwoTrackSignupFields from "./TwoTrackSignupFields.jsx";
@@ -141,7 +142,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const contentWrap = isWeb ? "vlue-onb-content-max mx-auto w-full space-y-4 pb-10" : "mx-auto max-w-md space-y-3 pb-28";
   const progressWrap = isWeb ? "vlue-onb-content-max mx-auto w-full" : "mx-auto max-w-md";
   const sectionCls = isWeb ? "vlue-onb-section rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm";
-  const [step, setStep] = useState("tier");
+  const [step, setStep] = useState(() => (isVlueKidsApp() ? "terms" : "tier"));
   const [busy, setBusy] = useState(false);
   const [agreedById, setAgreedById] = useState(() =>
     TERMS_CHECKLIST_IDS.reduce((acc, id) => {
@@ -215,7 +216,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
   const [verifyZone, setVerifyZone] = useState(null);
   const [requiresParentalConsent, setRequiresParentalConsent] = useState(false);
   const [parentalConsentDone, setParentalConsentDone] = useState(false);
-  const [kidsJoinOpen, setKidsJoinOpen] = useState(false);
+  const [kidsJoinOpen, setKidsJoinOpen] = useState(() => isVlueKidsApp());
   const [guardianHandle, setGuardianHandle] = useState("");
   const [parentRequestSent, setParentRequestSent] = useState(false);
 
@@ -1468,7 +1469,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
 
           {step === "terms" && kidsJoinOpen && (
             <KidsInviteJoinCard
-              onCancel={() => setKidsJoinOpen(false)}
+              onCancel={isVlueKidsApp() ? undefined : () => setKidsJoinOpen(false)}
               onJoined={(payload) => onComplete?.(payload)}
             />
           )}

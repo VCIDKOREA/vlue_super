@@ -32,16 +32,20 @@ class LetteringCallMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        running = true
         VlueBigPushTrace.bind(this)
         createChannel()
-        VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())
+        if (!VlueForegroundHelper.start(this, NOTIFICATION_ID, buildNotification())) {
+            Log.e(TAG, "foreground start denied — stop without killing the process")
+            stopSelf()
+            return
+        }
+        running = true
         registerCallCallback()
         Log.i(TAG, "monitor started lettering=${LetteringPrefs.isLetteringEnabled(this)}")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!LetteringPrefs.isLetteringEnabled(this)) {
+        if (!running || !LetteringPrefs.isLetteringEnabled(this)) {
             stopSelf()
             return START_NOT_STICKY
         }

@@ -14,6 +14,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import kr.vlue.calloverlay.MainActivity
 import kr.vlue.calloverlay.R
+import kr.vlue.calloverlay.VlueForegroundHelper
 
 /**
  * 가족 보호 백그라운드 유지 —
@@ -46,14 +47,24 @@ class FamilyCareForegroundService : Service() {
         }
     }
 
+    private var foregroundOk = false
+
     override fun onCreate() {
         super.onCreate()
         ensureChannel()
-        startForeground(NOTIF_ID, buildNotification())
+        foregroundOk = VlueForegroundHelper.start(this, NOTIF_ID, buildNotification())
+        if (!foregroundOk) {
+            stopSelf()
+            return
+        }
         handler.post(tick)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!foregroundOk) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 

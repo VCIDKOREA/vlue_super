@@ -54,3 +54,22 @@ export function resolveOutgoingLogoLabel(card) {
 
   return name || OUTGOING_LOGO_TAP_HINT;
 }
+
+/** 발신 탭로고 — 유료 회원·유료 가족 구성원 이름 옆 시안 배지. */
+export function outgoingLogoShowsMemberBadge(card, verified) {
+  const flag = card?.vlueVerifiedBadge ?? card?.vlue_verified_badge;
+  if (flag !== true) return false;
+  const kind = String(card?.profileKind || "").trim();
+  if (
+    kind === "contact_safe_care" ||
+    kind === "public_directory_safe" ||
+    kind === "unverified" ||
+    kind === "lookup_pending" ||
+    kind === "expired_line"
+  ) {
+    return false;
+  }
+  if (!verified && card?.matched === false) return false;
+  const label = resolveOutgoingLogoLabel(card);
+  return Boolean(label) && label !== OUTGOING_LOGO_TAP_HINT;
+}

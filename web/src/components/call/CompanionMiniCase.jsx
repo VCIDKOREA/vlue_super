@@ -7,6 +7,7 @@ import {
   nativeUpdateMiniOverlayFrame
 } from "../../lib/call/nativeCallControl.js";
 import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
+import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
 
 /** 통화 세션 동안 Mini Case 위치 유지 — 통화 종료 시 reset (앱 종료 아님) */
 let sessionMiniCasePos = null;
@@ -99,7 +100,7 @@ function revealPosFromPeek(pos, cardW, vw) {
  *
  * Position(MINI_CASE)과 Visibility(VISIBLE|EDGE_HIDDEN)는 분리.
  * 좌표: updateMiniOverlayFrame / Visibility: setMiniCaseVisibility.
- * 「쇼케이스 돌아가기」버튼 없음 — expandOnTap 이면 카드 탭으로 풀쇼케이스 복원.
+ * 복원 버튼 없음. 카드 짧은 탭이 직전 쇼케이스 또는 안심팝업으로 돌아간다.
  */
 export default function CompanionMiniCase({
   displayName = "",
@@ -107,6 +108,8 @@ export default function CompanionMiniCase({
   statusLabel = "",
   durationLabel = "0:00",
   verified = false,
+  /** 유료 회원·유료 가족 시안 배지. 본인인증 문구와 분리. */
+  cyanBadge = false,
   onExpand,
   customBody = null,
   /** true: DCC/쇼케이스 유저만 — 카드 탭으로 풀쇼케이스 복원. 안심팝업-only 는 false */
@@ -377,11 +380,15 @@ export default function CompanionMiniCase({
             <div className="companion-mini-case__card">
               <p className="companion-mini-case__line1">
                 <span className="companion-mini-case__name">{displayName || "—"}</span>
-                <span
-                  className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
-                >
-                  {statusLabel || (verified ? "인증" : "미인증")}
-                </span>
+                {cyanBadge ? (
+                  <VlueCyanVerifiedSeal size={14} className="companion-mini-case__cyan" title="VLUÉ 인증" />
+                ) : statusLabel && statusLabel !== "인증" ? (
+                  <span
+                    className={`companion-mini-case__badge${verified ? " is-verified" : " is-unverified"}`}
+                  >
+                    {statusLabel}
+                  </span>
+                ) : null}
                 <span className="companion-mini-case__live" aria-hidden>
                   <span className="companion-mini-case__live-dot" />
                 </span>
@@ -395,32 +402,6 @@ export default function CompanionMiniCase({
               </p>
             </div>
           )}
-          {typeof onExpand === "function" ? (
-            <button
-              type="button"
-              className="companion-mini-case__expand"
-              aria-label="쇼케이스 전체화면"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                try {
-                  window.Android?.logBigPushTrace?.("MINI_CASE_EXPAND_BTN", "click");
-                } catch {
-                  /* ignore */
-                }
-                onExpand();
-              }}
-            >
-              <span className="companion-mini-case__expand-shine" aria-hidden />
-              <span className="companion-mini-case__expand-icon" aria-hidden>
-                ⌃
-              </span>
-              <span className="companion-mini-case__expand-label">쇼케이스 보기</span>
-            </button>
-          ) : null}
         </>
       )}
     </div>

@@ -3,6 +3,7 @@ import { Phone } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import AdMobBannerSlot from "./ads/AdMobBannerSlot.jsx";
 import { AD_SLOT, ADMOB_TEST } from "../lib/ads/adMobUnitIds.js";
+import VlueCyanVerifiedSeal from "./VlueCyanVerifiedSeal.jsx";
 import "./vlue-auth-member-popup.css";
 
 /**
@@ -14,6 +15,7 @@ export default function VlueAuthMemberPopup({
   name = "",
   phone = "",
   handle = "",
+  cyanBadge = false,
   onClose
 }) {
   if (!open || typeof document === "undefined") return null;
@@ -40,7 +42,8 @@ export default function VlueAuthMemberPopup({
             VLUÉ 인증 회원으로 확인되었습니다. 공개 설정된 디지털인증명함·쇼케이스가 없습니다.
           </p>
           <h1 id="vlue-auth-member-popup-title" className="vlue-auth-member-popup__name">
-            {title}
+            <span>{title}</span>
+            {cyanBadge ? <VlueCyanVerifiedSeal size={16} title="VLUÉ 인증" /> : null}
           </h1>
           <p className="vlue-auth-member-popup__phone">
             <Phone size={16} aria-hidden />
