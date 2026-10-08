@@ -3,6 +3,7 @@ import { Phone, Settings, X } from "lucide-react";
 import LetteringDigitalReception from "../LetteringDigitalReception.jsx";
 import RenderErrorGuard from "../RenderErrorGuard.jsx";
 import ShowcaseIdentityCorner from "./ShowcaseIdentityCorner.jsx";
+import { cardHasOfficialCyanBadge } from "../../lib/vlueVerifiedBadgeApi.js";
 import ShowcaseBannerSocialLayer from "./ShowcaseBannerSocialLayer.jsx";
 import {
   getShowcaseBlockSnapshot,
@@ -883,7 +884,9 @@ export default function ShowcaseCallCarousel({
   useSyncExternalStore(subscribeShowcaseBlocks, getShowcaseBlockSnapshot, getShowcaseBlockSnapshot);
   const showcaseBlocked = isShowcaseBlocked(showcaseSubjectKey(card, incomingNumber));
   const cornerName = String(card?.name || card?.displayName || "").trim();
-  const cornerOrg = String(card?.organization || "").trim();
+  const cornerOrg = String(card?.organization || card?.companyName || "").trim();
+  const cornerTitle = String(card?.title || card?.jobTitle || "").trim();
+  const cornerDept = String(card?.department || "").trim();
   const cornerShowName =
     card?.showcaseStyle?.showBroadcastName !== false && !card?.hideBroadcastName;
 
@@ -1157,8 +1160,10 @@ export default function ShowcaseCallCarousel({
             <ShowcaseIdentityCorner
               name={cornerName}
               organization={cornerOrg}
+              title={cornerTitle}
+              department={cornerDept}
               phone={incomingNumber || card?.phone || ""}
-              verified={verified}
+              cyanBadge={cardHasOfficialCyanBadge(card)}
               showName={cornerShowName}
             />
           ) : null}

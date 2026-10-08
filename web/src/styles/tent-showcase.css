@@ -1292,6 +1292,11 @@
   color: rgba(191, 219, 254, 0.75);
 }
 
+.tent-vlue__org .lettering-identity-sep {
+  color: #00d2ff;
+  font-weight: 700;
+}
+
 .tent-vlue__phone {
   margin: 4px 0 0;
   font-size: 14px;

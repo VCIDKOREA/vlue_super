@@ -2329,6 +2329,12 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .lettering-live-bar
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
 }
 
+.showcase-identity-corner__org .lettering-identity-sep {
+  color: #00d2ff;
+  font-weight: 700;
+  text-shadow: none;
+}
+
 .showcase-identity-corner__phone {
   margin: 0;
   font-size: 18px;

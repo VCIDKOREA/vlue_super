@@ -89,7 +89,7 @@ export function resolveSavedShowcasePersonLine(card = {}, opts = {}) {
 
 /**
  * DCC 앞면 Digital ID 헤드라인 2줄
- * - 상호 있음: 1줄 상호 / 2줄 이름(＋직책·부서)
+ * - 상호 있음: 1줄 회사명 / 2줄 이름 | 직급
  * - 상호 없음·직책 있음: 1줄 이름 / 2줄 직책·부서
  * - 상호·직책 없음: 1줄 이름 / 2줄 Verified Member
  */
@@ -103,7 +103,9 @@ export function resolveDccFrontIdentityLines(card = {}) {
   const roleLine = roleParts.join(" ｜ ");
 
   if (org) {
-    const secondary = [name, ...roleParts].filter(Boolean).join(" ｜ ");
+    /* 사업자명 회원: 1줄 회사명 / 2줄 이름 | 직급 */
+    const role = title || department;
+    const secondary = [name, role].filter(Boolean).join(" | ");
     return { primary: org, secondary };
   }
 
@@ -144,13 +146,13 @@ export function formatLetteringPaidIdentity(card = {}) {
 /**
  * 빅푸시·접힘 바·Mini·미리보기·공유 쇼케이스 공통 2줄
  * 1줄: 상호 있으면 상호 / 없으면 이름
- * 2줄: 상호 있으면 「이름 | 전화번호」 / 없으면 전화번호만
- * (직책·부서는 DCC·풀 쇼케이스 본문에만 — 여기 넣지 않음)
+ * 2줄: 상호 있으면 「이름 | 직급」(직급 없으면 이름 | 전화) / 없으면 전화번호만
  */
 export function resolveCallOverlayIdentityLines(card = {}, { incomingNumber = "" } = {}) {
   const identity = formatLetteringPaidIdentity(card);
   const org = identity.organization;
   const name = identity.name;
+  const role = String(identity.title || card.department || "").trim();
   const liveIncoming = isUnknownPhoneToken(incomingNumber) ? "" : String(incomingNumber || "").trim();
   const cardPhone = isUnknownPhoneToken(card.phone) ? "" : String(card.phone || "").trim();
   const phoneRaw = liveIncoming || cardPhone;
@@ -161,7 +163,9 @@ export function resolveCallOverlayIdentityLines(card = {}, { incomingNumber = ""
    */
   const primary = org || name || phone || "번호 확인 중…";
   const secondary = org
-    ? [name, phone].filter(Boolean).join(" | ")
+    ? name && role
+      ? `${name} | ${role}`
+      : [name, phone].filter(Boolean).join(" | ")
     : name && phone
       ? phone
       : "";
