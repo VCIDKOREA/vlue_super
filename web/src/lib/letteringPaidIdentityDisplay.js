@@ -145,14 +145,13 @@ export function formatLetteringPaidIdentity(card = {}) {
 
 /**
  * 빅푸시·접힘 바·Mini·미리보기·공유 쇼케이스 공통 2줄
- * 1줄: 상호 있으면 상호 / 없으면 이름
- * 2줄: 상호 있으면 「이름 | 직급」(직급 없으면 이름 | 전화) / 없으면 전화번호만
+ * 1줄: 회사명(없으면 이름)
+ * 2줄: 회사명이 있으면 「이름 | 전화번호」, 없으면 전화번호만
  */
 export function resolveCallOverlayIdentityLines(card = {}, { incomingNumber = "" } = {}) {
   const identity = formatLetteringPaidIdentity(card);
   const org = identity.organization;
   const name = identity.name;
-  const role = String(identity.title || card.department || "").trim();
   const liveIncoming = isUnknownPhoneToken(incomingNumber) ? "" : String(incomingNumber || "").trim();
   const cardPhone = isUnknownPhoneToken(card.phone) ? "" : String(card.phone || "").trim();
   const phoneRaw = liveIncoming || cardPhone;
@@ -162,10 +161,9 @@ export function resolveCallOverlayIdentityLines(card = {}, { incomingNumber = ""
    * 조회 중·필드 누락 시 번호 / 「번호 확인 중…」.
    */
   const primary = org || name || phone || "번호 확인 중…";
+  /* 빅푸시 2줄은 직급이 아니라 이름 | 전화번호 */
   const secondary = org
-    ? name && role
-      ? `${name} | ${role}`
-      : [name, phone].filter(Boolean).join(" | ")
+    ? [name, phone].filter(Boolean).join(" | ")
     : name && phone
       ? phone
       : "";

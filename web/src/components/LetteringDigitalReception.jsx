@@ -834,13 +834,23 @@ function FrontPanel({
       {embeddedInPush ? null : <ProfileHero card={card} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${resolveDccTitlePhotoUrl(card) && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
-        {resolveRenderableMediaUrl(card.photoUrl || card.image_url || card.imageUrl || "") ? (
-          <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
-        ) : resolveCardLogoUrl(card) ? (
-          <CompanyLogoBadge card={card} className="ldr-company-logo-badge--dcc-head" />
-        ) : (
-          <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
-        )}
+        {(() => {
+          const personPhoto = resolveRenderableMediaUrl(
+            card.photoUrl || card.image_url || card.imageUrl || ""
+          );
+          const logoUrl = resolveCardLogoUrl(card);
+          const photoIsLogo =
+            !personPhoto ||
+            (logoUrl && personPhoto === logoUrl) ||
+            /vlue-shield-logo|vlue-brand-logo|vlue-shield-eye|vlue-eye|eye-watermark/i.test(personPhoto);
+          if (!photoIsLogo) {
+            return <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />;
+          }
+          if (logoUrl) {
+            return <CompanyLogoBadge card={card} className="ldr-company-logo-badge--dcc-head" />;
+          }
+          return <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />;
+        })()}
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">

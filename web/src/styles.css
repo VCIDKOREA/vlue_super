@@ -7908,8 +7908,8 @@ html.vlue-safety-patch .home-kakao-stack {
   display: inline-flex;
   flex-shrink: 0;
   align-self: flex-start;
-  padding: 2px;
-  border-radius: 14px;
+  padding: 3px;
+  border-radius: 16px;
   background: #ffffff;
   box-sizing: border-box;
   line-height: 0;
@@ -7922,8 +7922,8 @@ html.vlue-safety-patch .home-kakao-stack {
   border-radius: 12px;
   box-sizing: border-box;
   background: #1d4ed8 !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border: 3px solid #ffffff !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55) !important;
   overflow: hidden;
 }
 
