@@ -320,11 +320,11 @@ function isCeoOwnerCard(card) {
  * - 그 외: 업로드 로고 (프로필·워터마크 동일 소스)
  */
 function resolveCardLogoUrl(card) {
+  const uploaded = resolveRenderableMediaUrl(card?.logoUrl || card?.logo_url || "");
+  /* CEO는 로고 없음이어도 공식 로고를 넣고 흰 테두리를 유지한다 */
+  if (isCeoOwnerCard(card)) return uploaded || CEO_WATERMARK_SRC;
   if (card?.noCompanyLogo) return "";
-  const logo = resolveRenderableMediaUrl(card?.logoUrl || card?.logo_url || "");
-  if (logo) return logo;
-  if (isCeoOwnerCard(card)) return CEO_WATERMARK_SRC;
-  return "";
+  return uploaded || "";
 }
 
 /**
@@ -376,14 +376,6 @@ function CompanyLogoBadge({ card, className = "" }) {
       <img src={logoUrl} alt="" className="ldr-company-logo-badge__img" onError={() => setImgBroken(true)} />
     </span>
   );
-  /* DCC DIGITAL ID — 흰 테두리는 shadow가 아니라 래퍼 배경으로 고정 (덮어쓰기 방지) */
-  if (isDccHead) {
-    return (
-      <span className="ldr-dcc-logo-ring" aria-label="회사 로고">
-        {badge}
-      </span>
-    );
-  }
   return badge;
 }
 
@@ -441,6 +433,35 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
         </span>
       )}
     </div>
+  );
+}
+
+function DccHeadMark({ card }) {
+  const personPhoto = resolveRenderableMediaUrl(
+    card.photoUrl || card.image_url || card.imageUrl || ""
+  );
+  const logoUrl = resolveCardLogoUrl(card);
+  const photoIsLogo =
+    !personPhoto ||
+    (logoUrl && personPhoto === logoUrl) ||
+    /vlue-shield-logo|vlue-brand-logo|vlue-shield-eye|vlue-eye|eye-watermark/i.test(personPhoto);
+  const initial = String(card.organization || card.name || "V").trim().slice(0, 1) || "V";
+  let inner;
+  if (!photoIsLogo) {
+    inner = <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media ldr-profile-media--in-ring" />;
+  } else if (logoUrl) {
+    inner = <CompanyLogoBadge card={card} className="ldr-company-logo-badge--dcc-head" />;
+  } else {
+    inner = (
+      <span className="ldr-dcc-logo-empty" aria-hidden>
+        {initial}
+      </span>
+    );
+  }
+  return (
+    <span className="ldr-dcc-logo-ring" aria-label={logoUrl && photoIsLogo ? "회사 로고" : "프로필"}>
+      {inner}
+    </span>
   );
 }
 
@@ -834,23 +855,7 @@ function FrontPanel({
       {embeddedInPush ? null : <ProfileHero card={card} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${resolveDccTitlePhotoUrl(card) && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
-        {(() => {
-          const personPhoto = resolveRenderableMediaUrl(
-            card.photoUrl || card.image_url || card.imageUrl || ""
-          );
-          const logoUrl = resolveCardLogoUrl(card);
-          const photoIsLogo =
-            !personPhoto ||
-            (logoUrl && personPhoto === logoUrl) ||
-            /vlue-shield-logo|vlue-brand-logo|vlue-shield-eye|vlue-eye|eye-watermark/i.test(personPhoto);
-          if (!photoIsLogo) {
-            return <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />;
-          }
-          if (logoUrl) {
-            return <CompanyLogoBadge card={card} className="ldr-company-logo-badge--dcc-head" />;
-          }
-          return <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />;
-        })()}
+        <DccHeadMark card={card} />
         <div className="ldr-back-head__copy">
           <p className="ldr-back-kicker">Digital ID · Profile</p>
           <div className="ldr-back-title-row">

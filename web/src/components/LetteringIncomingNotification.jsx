@@ -134,7 +134,7 @@ function LetteringProfileThumb({ card, verified, size = "sm" }) {
 
   return (
     <span
-      className={`lettering-profile-thumb relative inline-flex shrink-0 items-center justify-center overflow-hidden border border-[#c5d4e8] bg-slate-200 shadow-sm ${dim}`}
+      className={`lettering-profile-thumb relative inline-flex shrink-0 items-center justify-center overflow-hidden border-2 border-white bg-slate-200 shadow-sm ${dim}`}
     >
       {showImg ? (
         <img
