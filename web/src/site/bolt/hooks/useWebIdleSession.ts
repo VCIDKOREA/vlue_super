@@ -4,8 +4,10 @@ import {
   bumpWebIdleActivity,
   clearWebIdleSession,
   formatIdleMmSs,
+  readWebIdleLastAt,
   remainingWebIdleMs
 } from "../../../lib/webIdleSession.js";
+import { isNativeVlueClient } from "../../../lib/siteMode.js";
 
 type Opts = {
   enabled: boolean;
@@ -13,10 +15,13 @@ type Opts = {
 };
 
 /**
- * 웹 로그인 세션 유휴 타이머.
+ * 브라우저(www) 로그인만 30분 유휴 로그아웃.
+ * 앱(Android·iOS·PC 설치형)은 이 타이머를 쓰지 않고 로그인을 유지한다.
  * 클릭·키·터치·해시 이동 시 30분 연장. 남은 4:59부터 표시.
  */
 export function useWebIdleSession({ enabled, onTimeout }: Opts) {
+  const nativeApp = isNativeVlueClient();
+  const active = enabled && !nativeApp;
   const [remainingMs, setRemainingMs] = useState(() => remainingWebIdleMs());
   const onTimeoutRef = useRef(onTimeout);
   const armedRef = useRef(false);
@@ -24,12 +29,17 @@ export function useWebIdleSession({ enabled, onTimeout }: Opts) {
   onTimeoutRef.current = onTimeout;
 
   const bump = useCallback(() => {
-    if (!enabled) return;
+    if (!active) return;
     bumpWebIdleActivity();
     setRemainingMs(remainingWebIdleMs());
-  }, [enabled]);
+  }, [active]);
 
   useEffect(() => {
+    if (nativeApp) {
+      armedRef.current = false;
+      timedOutRef.current = false;
+      return undefined;
+    }
     if (!enabled) {
       armedRef.current = false;
       timedOutRef.current = false;
@@ -41,6 +51,16 @@ export function useWebIdleSession({ enabled, onTimeout }: Opts) {
     timedOutRef.current = false;
 
     if (!armedRef.current) {
+      /* 다시 열 때 먼저 연장하면 어제 시각이 지워져 30분이 처음부터 다시 센다 */
+      const last = readWebIdleLastAt();
+      if (last > 0 && remainingWebIdleMs() <= 0) {
+        timedOutRef.current = true;
+        armedRef.current = false;
+        clearWebIdleSession();
+        setRemainingMs(0);
+        void onTimeoutRef.current();
+        return undefined;
+      }
       bumpWebIdleActivity();
       armedRef.current = true;
     }
@@ -97,9 +117,9 @@ export function useWebIdleSession({ enabled, onTimeout }: Opts) {
       window.removeEventListener("pageshow", onVisible);
       window.clearInterval(id);
     };
-  }, [enabled]);
+  }, [enabled, nativeApp]);
 
-  const warning = enabled && remainingMs > 0 && remainingMs <= WEB_IDLE_WARN_MS;
+  const warning = active && remainingMs > 0 && remainingMs <= WEB_IDLE_WARN_MS;
   const label = formatIdleMmSs(remainingMs);
 
   return { remainingMs, warning, label, bump };

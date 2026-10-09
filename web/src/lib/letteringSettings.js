@@ -117,6 +117,50 @@ export function openNativeAppSettings() {
   return { ok: false };
 }
 
+/** 시스템 위치 권한 창. 브리지가 없으면 앱 설정으로 보낸다. */
+export function requestNativeLocationPermission() {
+  if (typeof window === "undefined") return { ok: false };
+  try {
+    if (window.VlueLettering?.requestLocationPermission) {
+      window.VlueLettering.requestLocationPermission();
+      return { ok: true, channel: "VlueLettering" };
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (window.Android?.requestLocationPermission) {
+      window.Android.requestLocationPermission();
+      return { ok: true, channel: "Android" };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { ok: false };
+}
+
+/** 휴대폰 위치(GPS) 스위치 화면 */
+export function openNativeLocationSettings() {
+  if (typeof window === "undefined") return { ok: false };
+  try {
+    if (window.VlueLettering?.openLocationSettings) {
+      window.VlueLettering.openLocationSettings();
+      return { ok: true, channel: "VlueLettering" };
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (window.Android?.openLocationSettings) {
+      window.Android.openLocationSettings();
+      return { ok: true, channel: "Android" };
+    }
+  } catch {
+    /* ignore */
+  }
+  return openNativeAppSettings();
+}
+
 /** 네이티브 권한 허용 상태 JSON (없으면 null) */
 export function readLetteringPermissionStatus() {
   try {

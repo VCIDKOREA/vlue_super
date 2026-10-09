@@ -122,7 +122,7 @@ export async function switchToMultiDccProfile(profile, opts = {}) {
     applyDccAgentBundleToLocalCard(
       { ...profile, title: "", department: "", photoUrl: null },
       { dcc: emptyDccSnapshot(sharedName), showcase: { editor: null, live: null } },
-      { replaceAccount: true }
+      { replaceAccount: true, clearPhoto: true }
     );
     const empty = createDefaultShowcaseStyle();
     writeShowcaseStyle(empty, { replace: true, skipSync: true });
@@ -136,7 +136,7 @@ export async function switchToMultiDccProfile(profile, opts = {}) {
       applyDccAgentBundleToLocalCard(
         { ...profile, title: "", department: "", photoUrl: null },
         { dcc: emptyDccSnapshot(sharedName), showcase: { editor: null, live: null } },
-        { replaceAccount: true }
+        { replaceAccount: true, clearPhoto: true }
       );
       const empty = createDefaultShowcaseStyle();
       writeShowcaseStyle(empty, { replace: true, skipSync: true });

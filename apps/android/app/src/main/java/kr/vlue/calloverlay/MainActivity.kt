@@ -253,11 +253,20 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 val allow = LetteringPermissionHelper.hasLocation(this@MainActivity)
                 callback?.invoke(origin, allow, false)
                 if (!allow) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "위치 권한이 필요합니다. 설정에서 허용해 주세요.",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    android.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("위치 권한이 필요합니다")
+                        .setMessage(
+                            "가족 지도는 내 위치를 알아야 열립니다.\n\n" +
+                                "1. 「허용」을 누릅니다.\n" +
+                                "2. 위치 → 앱 사용 중에만 허용\n" +
+                                "3. 그래도 안 되면 휴대폰 위치(GPS)를 켭니다."
+                        )
+                        .setPositiveButton("허용") { _, _ -> requestLocationPermission() }
+                        .setNeutralButton("설정") { _, _ ->
+                            LetteringPermissionHelper.openAppSettings(this@MainActivity)
+                        }
+                        .setNegativeButton("닫기", null)
+                        .show()
                 }
             }
 
@@ -1226,6 +1235,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 },
                 openAppSettings:function(){
                   try{if(window.Android&&window.Android.openAppSettings)window.Android.openAppSettings();}catch(e){}
+                },
+                requestLocationPermission:function(){
+                  try{if(window.Android&&window.Android.requestLocationPermission)window.Android.requestLocationPermission();}catch(e){}
+                },
+                openLocationSettings:function(){
+                  try{if(window.Android&&window.Android.openLocationSettings)window.Android.openLocationSettings();}catch(e){}
                 }
               });
             })();
@@ -1278,6 +1293,18 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             .show()
     }
 
+    fun requestLocationPermission() {
+        if (LetteringPermissionHelper.hasLocation(this)) return
+        androidx.core.app.ActivityCompat.requestPermissions(
+            this,
+            arrayOf(
+                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ),
+            REQ_LOCATION
+        )
+    }
+
     /** 웹「허용하고 계속」— 시스템 권한 다이얼로그를 즉시 요청 */
     fun requestLetteringOsPermissionsDirect() {
         if (!LetteringPermissionHelper.hasCallDetectPermissions(this)) {
@@ -1318,6 +1345,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             val granted = grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
             dispatchWebCustomEvent(
                 "vlue-sms-permission",
+                JSONObject().put("granted", granted).toString()
+            )
+            return
+        }
+        if (requestCode == REQ_LOCATION) {
+            val granted = LetteringPermissionHelper.hasLocation(this)
+            Toast.makeText(
+                this,
+                if (granted) "위치가 허용되었습니다. 위치 메뉴를 다시 열어 주세요."
+                else "위치가 거부되었습니다. 설정에서 허용할 수 있습니다.",
+                Toast.LENGTH_LONG
+            ).show()
+            if (!granted) LetteringPermissionHelper.openAppSettings(this)
+            dispatchWebCustomEvent(
+                "vlue-location-permission",
                 JSONObject().put("granted", granted).toString()
             )
             return
@@ -1942,6 +1984,18 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             activity.runOnUiThread { LetteringPermissionHelper.openAppSettings(activity) }
         }
 
+        @android.webkit.JavascriptInterface
+        fun requestLocationPermission() {
+            activity.runOnUiThread { activity.requestLocationPermission() }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openLocationSettings() {
+            activity.runOnUiThread {
+                activity.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
+        }
+
         /**
          * 쿠팡 제휴 딥링크를 연 뒤 VLUÉ로 복귀해 24시간 정산 세션만 남긴다.
          * host 는 link.coupang.com / coupang.com 만 허용한다.
@@ -2085,6 +2139,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         private const val REQ_PHONE = 4102
         private const val REQ_SMS = 4104
         private const val REQ_FAMILY = 4103
+        private const val REQ_LOCATION = 4105
         private const val TAG = "VlueMainActivity"
     }
 }

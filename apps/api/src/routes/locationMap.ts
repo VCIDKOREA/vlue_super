@@ -347,6 +347,36 @@ locationMapRoutes.post("/presence", requireUserHeader, async (c) => {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return c.json({ error: "좌표가 없습니다." }, 400);
   await ensureLocationPresenceOverseasSchema();
   await ensureFamilyRemoteSecuritySchema();
+  const demoUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { publicHandle: true, email: true }
+  });
+  const pinnedDemo =
+    String(demoUser?.email || "").endsWith("@vlue.demo") || demoUser?.publicHandle === "honggildong1";
+  if (pinnedDemo) {
+    const existing = await prisma.locationPresence.findUnique({ where: { userId } });
+    if (existing?.lat != null && existing.lng != null) {
+      const row = await prisma.locationPresence.update({
+        where: { userId },
+        data: {
+          online: true,
+          batteryPct: body.batteryPct == null ? existing.batteryPct : Math.max(0, Math.min(100, Math.round(num(body.batteryPct)))),
+          lastSeenAt: new Date(),
+          connectionStatus: "CONNECTED"
+        }
+      });
+      return c.json({
+        ok: true,
+        pinnedDemo: true,
+        presence: {
+          ...row,
+          is_overseas: row.isOverseas,
+          country_name: row.countryName,
+          city_name: row.cityName
+        }
+      });
+    }
+  }
   const geo = await reverseGeocodeGoogle(lat, lng);
   const addressLabel = clip(geo?.addressLabel || body.addressLabel, 240);
   const batteryPct = body.batteryPct == null ? null : Math.max(0, Math.min(100, Math.round(num(body.batteryPct))));
@@ -414,16 +444,18 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
       guardianUserId: true,
       wardUserId: true,
       familyRelation: true,
-      guardianUser: { select: { id: true, legalName: true, publicHandle: true } },
-      wardUser: { select: { id: true, legalName: true, publicHandle: true } }
+      guardianUser: { select: { id: true, legalName: true, publicHandle: true, email: true } },
+      wardUser: { select: { id: true, legalName: true, publicHandle: true, email: true } }
     }
   });
   const ids = new Set<string>([userId]);
   const names = new Map<string, string>();
+  const pinnedDemoIds = new Set<string>();
   for (const link of links) {
     for (const person of [link.guardianUser, link.wardUser]) {
       ids.add(person.id);
       names.set(person.id, person.legalName || person.publicHandle || "가족");
+      if (String(person.email || "").endsWith("@vlue.demo")) pinnedDemoIds.add(person.id);
     }
   }
   const photos = await profilePhotos([...ids]);
@@ -472,7 +504,8 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
     const preservedLat = within24h ? last?.last_lat ?? row?.lat ?? null : row?.lat ?? null;
     const preservedLng = within24h ? last?.last_lng ?? row?.lng ?? null : row?.lng ?? null;
     const connectionStatus = last?.connection_status || "CONNECTED";
-    const stale = !row || Date.now() - row.updatedAt.getTime() > 3 * 60 * 1000;
+    const pinnedDemo = Boolean(row) && pinnedDemoIds.has(id);
+    const stale = !row || (!pinnedDemo && Date.now() - row.updatedAt.getTime() > 3 * 60 * 1000);
     const dead =
       !row ||
       row.online === false ||

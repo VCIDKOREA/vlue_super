@@ -1,6 +1,7 @@
 import {
   LETTERING_BIZCARD_CHANGED_EVENT,
   writeLetteringBizcardEditable,
+  readLetteringBizcardEditable,
   readLetteringFixedIdentity
 } from "./letteringBizcardStorage.js";
 import { TITLE_DEPT_APPROVAL } from "./letteringBizcardVerification.js";
@@ -44,10 +45,17 @@ export function applyDccAgentBundleToLocalCard(profile, bundle = null, opts = {}
   const title = str(profile.title ?? dcc?.title);
   const department = str(profile.department ?? dcc?.department);
   /* 번들 DCC 사진이 있으면 컬럼(stale)보다 우선 — 예전 사진으로 덮어쓰는 버그 방지 */
-  const photoUrl =
+  const bundlePhoto =
     hasBundle && dcc && Object.prototype.hasOwnProperty.call(dcc, "photoUrl")
       ? str(dcc.photoUrl)
       : str(profile.photoUrl || dcc?.photoUrl);
+  const explicitNoPhoto = Boolean(opts.clearPhoto) || Boolean(dcc?.noProfilePhoto);
+  let photoUrl = bundlePhoto;
+  /* 빈 번들로 방금 넣은 프로필 사진을 지우지 않음. 명시적 없음·프로필 초기화만 비운다 */
+  if (!photoUrl && !explicitNoPhoto) {
+    const ed = readLetteringBizcardEditable();
+    photoUrl = str(ed.photoDataUrl || ed.photoUrl);
+  }
   const photoFocus = str(profile.photoFocus || dcc?.photoFocus || "center") || "center";
 
   try {

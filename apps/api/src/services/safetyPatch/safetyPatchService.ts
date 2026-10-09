@@ -229,7 +229,7 @@ async function loadSnapshot(targetId: string, roomId: string): Promise<Snapshot>
   const [user, presence, member] = await Promise.all([
     prisma.user.findUnique({
       where: { id: targetId },
-      select: { legalName: true, publicHandle: true }
+      select: { legalName: true, publicHandle: true, email: true }
     }),
     prisma.locationPresence.findUnique({ where: { userId: targetId } }),
     isUuid(roomId)
@@ -238,14 +238,19 @@ async function loadSnapshot(targetId: string, roomId: string): Promise<Snapshot>
   ]);
   const lat = member?.lat ?? presence?.lat ?? null;
   const lng = member?.lng ?? presence?.lng ?? null;
+  const pinnedDemo = String(user?.email || "").endsWith("@vlue.demo");
   let address = String(presence?.addressLabel || "").trim();
-  if (lat != null && lng != null) {
+  if (lat != null && lng != null && !presence?.isOverseas && !pinnedDemo) {
     const detailed = await reverseGeocodeKakao(lat, lng);
     if (detailed) address = detailed;
   }
   const updatedAt = member?.updatedAt || presence?.updatedAt || null;
-  const fresh = Boolean(updatedAt && Date.now() - updatedAt.getTime() < 15 * 60 * 1000);
-  const online = member ? member.online !== false && fresh : Boolean(presence?.online) && fresh;
+  const fresh = pinnedDemo || Boolean(updatedAt && Date.now() - updatedAt.getTime() < 15 * 60 * 1000);
+  const online = pinnedDemo
+    ? presence?.online !== false
+    : member
+      ? member.online !== false && fresh
+      : Boolean(presence?.online) && fresh;
   return {
     displayName: presence?.displayName || user?.legalName || user?.publicHandle || member?.displayName || "가족",
     lat,

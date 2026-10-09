@@ -41,6 +41,7 @@ import {
   resolveActiveRegion
 } from "../lib/activeRegion.js";
 import { openNativeAppSettings, ensureCallDetectionForBroadcast } from "../lib/letteringSettings.js";
+import LocationPermissionSheet, { nativeLocationDenied } from "./location/LocationPermissionSheet.jsx";
 import CallDetectionStatusBanner from "./CallDetectionStatusBanner.jsx";
 import { useDccFeatureAccess } from "../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../lib/dccAccessPolicy.js";
@@ -192,6 +193,7 @@ function ProfilePanel({
   );
   const [activeRegionBusy, setActiveRegionBusy] = useState(false);
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
+  const [locationPermissionOpen, setLocationPermissionOpen] = useState(false);
   const { access: dccAccess } = useDccFeatureAccess();
   const dccBlocked = isDccSettingsDisabled(dccAccess);
 
@@ -1246,7 +1248,13 @@ function ProfilePanel({
           <div className="mt-6 px-1">
             <button
               type="button"
-              onClick={() => setLocationMenuOpen(true)}
+              onClick={() => {
+                if (nativeLocationDenied()) {
+                  setLocationPermissionOpen(true);
+                  return;
+                }
+                setLocationMenuOpen(true);
+              }}
               className="flex w-full items-center gap-3 rounded-[28px] bg-blue-600 p-4 text-left text-white shadow-lg shadow-blue-600/30 transition active:scale-[0.98]"
             >
               <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-[26px] shadow-sm">
@@ -1546,6 +1554,10 @@ function ProfilePanel({
                       isB2bMembershipKind(membershipKind) ||
                       isPaidMembershipKind(membershipKind);
                     setLocationMenuOpen(false);
+                    if (nativeLocationDenied()) {
+                      setLocationPermissionOpen(true);
+                      return;
+                    }
                     /* 지도·가족/V-Map 탭은 그대로 열고, 무료는 토스트(+결제 유도)만 */
                     window.dispatchEvent(
                       new CustomEvent("vlue-open-location", {
@@ -1570,6 +1582,10 @@ function ProfilePanel({
                   className={`mb-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left ${isDarkMode ? "bg-white/10" : "bg-slate-50"}`}
                   onClick={() => {
                     setLocationMenuOpen(false);
+                    if (nativeLocationDenied()) {
+                      setLocationPermissionOpen(true);
+                      return;
+                    }
                     onClose?.();
                     window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "vmap" } }));
                   }}
@@ -1583,6 +1599,23 @@ function ProfilePanel({
                 <button type="button" className={`mt-1 w-full py-2 text-[13px] font-bold ${isDarkMode ? "text-white/50" : "text-slate-400"}`} onClick={() => setLocationMenuOpen(false)}>
                   닫기
                 </button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+      {locationPermissionOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-[640] flex items-end justify-center bg-black/45" onClick={() => setLocationPermissionOpen(false)}>
+              <div
+                className={`max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-3xl ${isDarkMode ? "bg-[#0c1220]" : "bg-white"}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <LocationPermissionSheet
+                  dark={isDarkMode}
+                  onClose={() => setLocationPermissionOpen(false)}
+                  onGranted={() => setLocationPermissionOpen(false)}
+                />
               </div>
             </div>,
             document.body

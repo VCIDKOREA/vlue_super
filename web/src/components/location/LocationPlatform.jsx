@@ -82,6 +82,7 @@ import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readLastGeo, writeLastGeo } from "../../lib/lastGeoCache.js";
 import { isOverseasMember } from "../../lib/overseasLocation.js";
+import LocationPermissionSheet, { nativeLocationDenied } from "./LocationPermissionSheet.jsx";
 import VmapNaverSurface from "./VmapNaverSurface.jsx";
 import VmapGoogleSurface from "./VmapGoogleSurface.jsx";
 import VmapFriendInviteSheet from "./VmapFriendInviteSheet.jsx";
@@ -350,6 +351,7 @@ function drawPlacePin(ctx, x, y, ready) {
 
 export default function LocationPlatform() {
   const [session, setSession] = useState(getLocationSession);
+  const [locationBlocked, setLocationBlocked] = useState(nativeLocationDenied);
   const [members, setMembers] = useState([]);
   const [room, setRoom] = useState(null);
   const [self, setSelf] = useState(() => {
@@ -531,9 +533,23 @@ export default function LocationPlatform() {
     };
   }, []);
 
+  useEffect(() => {
+    const refresh = () => setLocationBlocked(nativeLocationDenied());
+    refresh();
+    const onVis = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("vlue-location-permission", refresh);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("vlue-location-permission", refresh);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [session.open]);
+
   const theme = resolveMapTheme(session.theme, self?.lat, self?.lng);
   const visible = session.open || session.minimized;
-  const tracking = session.open || (session.mode === "vmap" && Boolean(session.roomId));
+  const tracking = (session.open || (session.mode === "vmap" && Boolean(session.roomId))) && !locationBlocked;
 
   const pushNotice = (text) => {
     setNotice(text);
@@ -1686,6 +1702,21 @@ export default function LocationPlatform() {
   };
 
   if (!visible) return null;
+
+  if (session.open && locationBlocked) {
+    return (
+      <section
+        className={`fixed inset-0 z-[530] ${theme === "dark" ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
+        style={{ bottom: keyboardInset }}
+      >
+        <LocationPermissionSheet
+          dark={theme === "dark"}
+          onClose={dismissLocation}
+          onGranted={() => setLocationBlocked(false)}
+        />
+      </section>
+    );
+  }
 
   if (session.minimized && !session.open) {
     if (nativeMini) return null;
