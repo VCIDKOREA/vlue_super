@@ -2854,6 +2854,23 @@ html.vlue-safety-patch .home-kakao-stack {
   display: block;
   object-fit: cover;
   object-position: 50% 50%;
+  background: transparent;
+}
+
+.vlue-splash-video::-webkit-media-controls,
+.vlue-splash-video::-webkit-media-controls-panel,
+.vlue-splash-video::-webkit-media-controls-start-playback-button,
+.vlue-splash-video::-webkit-media-controls-overlay-play-button,
+.vlue-splash-video::-webkit-media-controls-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+  opacity: 0 !important;
+  pointer-events: none;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.vlue-splash-video {
   /* ??? ?? .vlue-splash-eye-content(? + overflow:hidden)?? ?? = ??? ?? ?? 1:1 */
   -webkit-mask-image: none;
   mask-image: none;

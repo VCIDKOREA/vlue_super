@@ -195,7 +195,7 @@ export function FamilyFolderPanels({
   const profiles = members.length ? members : [];
   const chipLimit = 4;
   const overflow = profiles.length > chipLimit;
-  const visibleProfiles = overflow ? profiles.slice(0, chipLimit - 1) : profiles;
+  const visibleProfiles = profiles.slice(0, chipLimit);
   const goToMember = (member) => {
     setRosterOpen(false);
     onNavigateMember?.(member);
@@ -206,10 +206,10 @@ export function FamilyFolderPanels({
         {visibleProfiles.map((member) => {
           const active = guidingUserId && guidingUserId === member.userId;
           return (
-            <li key={member.userId || member.id} className="min-w-0 shrink">
+            <li key={member.userId || member.id} className="min-w-0 flex-1">
               <button
                 type="button"
-                className={`max-w-[7.5rem] truncate rounded-2xl px-3 py-2 text-[11px] font-bold ${active ? chipOn : quiet}`}
+                className={`w-full truncate rounded-2xl px-2 py-2 text-[11px] font-bold ${active ? chipOn : quiet}`}
                 onClick={() => goToMember(member)}
               >
                 {member.displayName || member.name || "가족"}
@@ -217,18 +217,16 @@ export function FamilyFolderPanels({
             </li>
           );
         })}
-        {overflow ? (
-          <li className="shrink-0">
-            <button
-              type="button"
-              className={`rounded-2xl px-3 py-2 text-[11px] font-black ${quiet}`}
-              onClick={() => setRosterOpen(true)}
-            >
-              전체 {profiles.length}
-            </button>
-          </li>
-        ) : null}
       </ul>
+      {overflow ? (
+        <button
+          type="button"
+          className={`w-full rounded-2xl px-3 py-2 text-[11px] font-black ${quiet}`}
+          onClick={() => setRosterOpen(true)}
+        >
+          전체 {profiles.length}명
+        </button>
+      ) : null}
       {guidingUserId ? (
         <button
           type="button"
@@ -242,13 +240,14 @@ export function FamilyFolderPanels({
         ? createPortal(
             <div className="fixed inset-0 z-[720] flex items-end bg-black/55" onClick={() => setRosterOpen(false)}>
               <div
-                className={`max-h-[70vh] w-full overflow-y-auto rounded-t-[28px] px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 ${dark ? "bg-[#0c1220] text-white" : "bg-white text-slate-900"}`}
+                className={`max-h-[70vh] w-full overflow-y-auto rounded-t-[28px] px-4 pt-3 ${dark ? "bg-[#0c1220] text-white" : "bg-white text-slate-900"}`}
+                style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom))" }}
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${dark ? "bg-white/20" : "bg-slate-200"}`} />
                 <p className="text-[16px] font-black">가족 구성원</p>
                 <p className={`mt-1 text-[12px] ${dark ? "text-white/60" : "text-slate-500"}`}>
-                  이름을 누르면 그 위치로 이동합니다.
+                  이름을 누르면 지도가 그 위치로 이동하고 상세가 열립니다.
                 </p>
                 <ul className="mt-3 space-y-2">
                   {profiles.map((member) => {
@@ -262,7 +261,7 @@ export function FamilyFolderPanels({
                         >
                           <span className="font-black">{member.displayName || member.name || "가족"}</span>
                           <span className="text-[11px] font-bold opacity-80">
-                            {active ? "이동 중" : member.self ? "내 위치" : "이동"}
+                            {active ? "이동 중" : member.self ? "내 위치" : "보기"}
                           </span>
                         </button>
                       </li>

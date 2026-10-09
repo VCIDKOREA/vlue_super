@@ -161,8 +161,12 @@ export default function VMapChatOverlay({
         }}
         className="pointer-events-auto overflow-hidden transition-[height] duration-250 ease-out"
         style={{
-          background: "transparent",
-          height: mode === "collapsed" ? 28 : mode === "peek" ? PEEK_H : EXPANDED_H
+          background: "rgba(72, 78, 88, 0.72)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          borderRadius: 16,
+          padding: mode === "collapsed" ? "0 10px" : undefined,
+          height: mode === "collapsed" ? 36 : mode === "peek" ? PEEK_H : EXPANDED_H
         }}
       >
         {mode === "collapsed" ? (

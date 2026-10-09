@@ -1863,9 +1863,9 @@ export default function LocationPlatform() {
   const chatReady =
     session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
 
-  const focusMember = (member) => {
+  const focusMember = (member, options = {}) => {
     setSelected(member || null);
-    setDetailOpen(false);
+    setDetailOpen(Boolean(options?.detail));
     if (member?.lat != null && member?.lng != null) {
       userZoomedRef.current = true;
       markGesture();
@@ -1977,9 +1977,10 @@ export default function LocationPlatform() {
             onExpandedChange={setFamilyBarOpen}
           />
         ) : null}
+        <div className={`pointer-events-none absolute right-3 z-30 flex w-[min(280px,calc(100%-5.5rem))] flex-col items-end gap-2 ${familyBarOpen ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
         {session.mode === "family" && overseasMembers.length ? (
-          <div className={`pointer-events-none absolute inset-x-0 z-30 flex justify-end px-3 ${familyBarOpen ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(108px+env(safe-area-inset-top))]"}`}>
-            <div className={`pointer-events-auto max-w-[min(100%,280px)] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${dark ? "border border-violet-300/30 bg-[#1a1030]/88 text-white" : "border border-violet-200 bg-white/92 text-slate-900"}`}>
+          <div className="pointer-events-none flex w-full justify-end">
+            <div className={`pointer-events-auto w-full max-w-[280px] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${dark ? "border border-violet-300/30 bg-[#1a1030]/88 text-white" : "border border-violet-200 bg-white/92 text-slate-900"}`}>
               <p className="text-[12px] font-black tracking-tight">✈️ 해외 구성원 ({overseasMembers.length}명)</p>
               <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
                 {overseasMembers.map((member) => (
@@ -1993,7 +1994,7 @@ export default function LocationPlatform() {
                             ? "bg-white/10"
                             : "bg-violet-50 text-violet-900"
                       }`}
-                      onClick={() => focusMember(member)}
+                      onClick={() => focusMember(member, { detail: true })}
                     >
                       <span className="block truncate">{member.displayName}</span>
                       <span className="block truncate opacity-80">
@@ -2015,6 +2016,38 @@ export default function LocationPlatform() {
             </div>
           </div>
         ) : null}
+        {guideOn && cue && (session.mode === "vmap" || familyGuiding) ? (
+          <div className="pointer-events-auto relative w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)]">
+            <div className="flex items-center justify-center bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] px-2 py-4 text-[42px] font-black leading-none text-[#04121a]">
+              {maneuverGlyph(cue.instruction)}
+            </div>
+            <div className="px-3 py-3 text-center">
+              <p className="text-[22px] font-black tracking-tight text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</p>
+              <p className="mt-1 text-[13px] font-bold leading-snug text-white">{cue.instruction}</p>
+              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#00D2FF]/80">
+                {familyGuiding
+                  ? familyEtaMin != null
+                    ? `약 ${familyEtaMin}분`
+                    : "가족 이동"
+                  : routeMode === "free"
+                    ? "무료도로"
+                    : routeMode === "highway"
+                      ? "고속도로"
+                      : "추천경로"}
+              </p>
+              {familyGuiding ? (
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-full bg-white py-2 text-[12px] font-black text-[#04121a]"
+                  onClick={stopFamilyNavigate}
+                >
+                  이동 종료
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        </div>
         <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pt-[max(12px,env(safe-area-inset-top))]">
           <button type="button" onClick={dismissLocation} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="닫기">×</button>
           <div className={`flex min-w-0 flex-1 rounded-full p-1 backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-700"}`}>
@@ -2053,37 +2086,6 @@ export default function LocationPlatform() {
           ) : null}
           <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
-        {guideOn && cue && (session.mode === "vmap" || familyGuiding) ? (
-          <div className={`absolute z-20 w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)] ${overseasMembers.length ? "left-3" : "right-3"} ${familyGuiding ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
-            <div className="flex items-center justify-center bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] px-2 py-4 text-[42px] font-black leading-none text-[#04121a]">
-              {maneuverGlyph(cue.instruction)}
-            </div>
-            <div className="px-3 py-3 text-center">
-              <p className="text-[22px] font-black tracking-tight text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</p>
-              <p className="mt-1 text-[13px] font-bold leading-snug text-white">{cue.instruction}</p>
-              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#00D2FF]/80">
-                {familyGuiding
-                  ? familyEtaMin != null
-                    ? `약 ${familyEtaMin}분`
-                    : "가족 이동"
-                  : routeMode === "free"
-                    ? "무료도로"
-                    : routeMode === "highway"
-                      ? "고속도로"
-                      : "추천경로"}
-              </p>
-              {familyGuiding ? (
-                <button
-                  type="button"
-                  className="mt-3 w-full rounded-full bg-white py-2 text-[12px] font-black text-[#04121a]"
-                  onClick={stopFamilyNavigate}
-                >
-                  이동 종료
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
         {!keyboardInset ? (
           <div className={`absolute bottom-3 right-3 z-20 flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
             <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
@@ -2469,12 +2471,7 @@ export default function LocationPlatform() {
             glass={glass}
             guidingUserId={familyGuiding ? familyNavTarget?.userId || "" : ""}
             onNavigateMember={(member) => {
-              const mine = getLocalVlueUserId();
-              if (!member || member.self || member.userId === mine) {
-                focusMember(member);
-                return;
-              }
-              void startFamilyMove(member);
+              focusMember(member, { detail: true });
             }}
             onStopGuide={stopFamilyNavigate}
           />

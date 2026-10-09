@@ -212,7 +212,6 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       const lettersAt = segmentStart + Math.min(VLUE_LETTERS_AFTER_TRIM_S, Math.max(0.4, (segmentEnd - segmentStart) * 0.35));
       const playSpanS = Math.max(0.05, segmentEnd - segmentStart);
       segmentRef.current = { segmentStart, segmentEnd, playSpanS, lettersAt };
-      setVideoReady(true);
       setLoadProgress(0);
       setSplashHoldMs(Math.min(9200, Math.max(2800, Math.round(playSpanS * 1000) + 200)));
 
@@ -228,7 +227,13 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       };
 
       v.addEventListener("timeupdate", onTimeUpdate);
-      videoCleanupFnsRef.current.push(() => v.removeEventListener("timeupdate", onTimeUpdate));
+      const onPlaying = () => setVideoReady(true);
+      v.addEventListener("playing", onPlaying);
+      if (!v.paused) setVideoReady(true);
+      videoCleanupFnsRef.current.push(() => {
+        v.removeEventListener("timeupdate", onTimeUpdate);
+        v.removeEventListener("playing", onPlaying);
+      });
 
       const beginFrom = (startAt) => {
         let seekFallback = 0;
@@ -422,6 +427,9 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
                           autoPlay
                           playsInline
                           preload="auto"
+                          controls={false}
+                          disablePictureInPicture
+                          disableRemotePlayback
                           onLoadedMetadata={onVideoReady}
                           onLoadedData={onVideoReady}
                           onCanPlay={onVideoReady}
