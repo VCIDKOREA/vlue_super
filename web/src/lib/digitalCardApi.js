@@ -316,7 +316,11 @@ export async function restoreDigitalCardFromServer(opts = {}) {
       const org = String(
         meta.exportSnapshot.organization || meta.exportSnapshot.companyName || ""
       ).trim();
-      if (org) localStorage.setItem("myCardOrganization", org);
+      if (org) {
+        localStorage.setItem("myCardOrganization", org);
+        localStorage.setItem("vlue_company_locked", org);
+        localStorage.setItem("vlue_company_from_server", "1");
+      }
       const phone = String(meta.exportSnapshot.phone || "").trim();
       if (phone) localStorage.setItem("myCardPhone", phone);
     } catch {

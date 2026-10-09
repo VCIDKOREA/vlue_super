@@ -437,11 +437,29 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
         id: true,
         issuedAt: true,
         designTemplateSnapshot: true,
-        membershipTierSnapshot: true
+        membershipTierSnapshot: true,
+        organization: true
       }
+    });
+    const biz = await prisma.userBusinessProfile.findUnique({
+      where: { userId: me },
+      select: { companyName: true }
     });
     if (!row) {
       return c.json({ issued: false, cardId: null, designTemplate: null, exportSnapshot: null, lite: true });
+    }
+    let companyName = String(biz?.companyName || row.organization || "").trim();
+    if (!companyName) {
+      const snap = await prisma.$queryRaw<Array<{ org: string | null }>>`
+        SELECT COALESCE(
+          NULLIF(TRIM(export_snapshot_json->>'organization'), ''),
+          NULLIF(TRIM(export_snapshot_json->>'companyName'), '')
+        ) AS org
+        FROM digital_cards
+        WHERE user_id = ${me}::uuid
+        LIMIT 1
+      `;
+      companyName = String(snap[0]?.org || "").trim();
     }
     return c.json({
       issued: true,
@@ -449,6 +467,7 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
       issuedAt: row.issuedAt,
       designTemplate: row.designTemplateSnapshot,
       membershipTierSnapshot: row.membershipTierSnapshot,
+      companyName: companyName || null,
       exportSnapshot: null,
       lite: true,
       subscription: await digitalCardSubscription(me)
@@ -505,8 +524,26 @@ cardsRoutes.get("/my-digital-card", requireUserHeader, async (c) => {
       NULLIF(TRIM(export_snapshot_json->>'logoUrl'), '') AS logo_url,
       NULLIF(TRIM(export_snapshot_json->>'name'), '') AS name,
       NULLIF(TRIM(export_snapshot_json->>'displayName'), '') AS display_name,
-      NULLIF(TRIM(export_snapshot_json->>'organization'), '') AS organization,
-      NULLIF(TRIM(export_snapshot_json->>'companyName'), '') AS company_name,
+      COALESCE(
+        NULLIF(TRIM(organization), ''),
+        NULLIF(TRIM(export_snapshot_json->>'organization'), ''),
+        NULLIF(TRIM(export_snapshot_json->>'companyName'), ''),
+        (
+          SELECT NULLIF(TRIM(company_name), '')
+          FROM user_business_profiles
+          WHERE user_id = digital_cards.user_id
+        )
+      ) AS organization,
+      COALESCE(
+        NULLIF(TRIM(export_snapshot_json->>'companyName'), ''),
+        NULLIF(TRIM(organization), ''),
+        NULLIF(TRIM(export_snapshot_json->>'organization'), ''),
+        (
+          SELECT NULLIF(TRIM(company_name), '')
+          FROM user_business_profiles
+          WHERE user_id = digital_cards.user_id
+        )
+      ) AS company_name,
       NULLIF(TRIM(export_snapshot_json->>'title'), '') AS title,
       NULLIF(TRIM(export_snapshot_json->>'department'), '') AS department,
       NULLIF(TRIM(export_snapshot_json->>'phone'), '') AS phone,

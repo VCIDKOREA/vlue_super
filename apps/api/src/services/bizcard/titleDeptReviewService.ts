@@ -33,7 +33,8 @@ function isIssuedWithin31Days(issuedAt: string): boolean {
 async function applyApprovedTitleToDigitalCard(
   userId: string,
   title: string,
-  department: string
+  department: string,
+  companyName?: string | null
 ) {
   const card = await prisma.digitalCard.findUnique({
     where: { userId },
@@ -44,13 +45,16 @@ async function applyApprovedTitleToDigitalCard(
     card.exportSnapshotJson && typeof card.exportSnapshotJson === "object"
       ? (card.exportSnapshotJson as Record<string, unknown>)
       : {};
+  const org = String(companyName || "").trim();
   await prisma.digitalCard.update({
     where: { userId },
     data: {
+      ...(org ? { organization: org } : {}),
       exportSnapshotJson: {
         ...prev,
         title: title || "",
-        department: department || ""
+        department: department || "",
+        ...(org ? { organization: org, companyName: org } : {})
       }
     }
   });
@@ -167,8 +171,8 @@ export async function submitTitleDeptReview(
         department || null
       );
     }
-    await applyApprovedTitleToDigitalCard(userId, title, department);
     const companyName = nts.ntsCompanyName || undefined;
+    await applyApprovedTitleToDigitalCard(userId, title, department, companyName);
     await prisma.userBusinessProfile.upsert({
       where: { userId },
       create: {
@@ -264,10 +268,15 @@ export async function resolveTitleDeptReviewForAdmin(input: {
 }) {
   const result = await resolveTitleDeptReview(input);
   if (input.action === "approve") {
+    const biz = await prisma.userBusinessProfile.findUnique({
+      where: { userId: result.userId },
+      select: { companyName: true }
+    });
     await applyApprovedTitleToDigitalCard(
       result.userId,
       result.approvedTitle,
-      result.approvedDepartment
+      result.approvedDepartment,
+      biz?.companyName
     );
   }
   return result;

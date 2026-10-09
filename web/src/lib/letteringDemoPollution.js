@@ -34,6 +34,20 @@ const POLLUTED_COPY_RE = [
   /모르는 번호에 속지 마라/i
 ];
 
+function verifiedCompanyShouldStay() {
+  try {
+    if (localStorage.getItem("vlue_company_from_server") === "1") return true;
+    if (localStorage.getItem("vlue_business_member") === "1") return true;
+    const raw = localStorage.getItem("vlue_lettering_bizcard_v1");
+    if (!raw) return false;
+    const ed = JSON.parse(raw);
+    const status = String(ed?.titleDeptApprovalStatus || "").toLowerCase();
+    return status === "approved";
+  } catch {
+    return false;
+  }
+}
+
 function isPlatformCeoHandle() {
   try {
     return (
@@ -98,7 +112,8 @@ export function scrubLetteringDemoPollution(card = {}, opts = {}) {
   if (POLLUTED_WEBSITES.has(website)) next.website = "";
 
   const org = String(next.organization || next.companyName || "").trim();
-  if (POLLUTED_ORGS.has(org)) {
+  /* 사업자·직장 인증으로 서버에 저장된 상호는 데모 오염이 아니다. */
+  if (POLLUTED_ORGS.has(org) && !verifiedCompanyShouldStay()) {
     next.organization = "";
     next.companyName = "";
   }

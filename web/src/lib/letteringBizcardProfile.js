@@ -111,7 +111,8 @@ function readUserId() {
 function purgePollutedLocalIdentity() {
   try {
     const org = String(localStorage.getItem("vlue_company_locked") || "").trim();
-    if (org === "VCID KOREA" || org === "�궪�꽦�깮紐�") {
+    const keepServerCompany = localStorage.getItem("vlue_company_from_server") === "1";
+    if (!keepServerCompany && (org === "VCID KOREA" || org === "삼성생명")) {
       localStorage.removeItem("vlue_company_locked");
       if (String(localStorage.getItem("myCardOrganization") || "").trim() === org) {
         localStorage.removeItem("myCardOrganization");

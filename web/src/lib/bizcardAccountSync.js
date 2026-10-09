@@ -223,10 +223,12 @@ export async function syncBizcardAccountFromApi(opts = {}) {
           }))
   ]);
 
-  if (ctx?.company?.company_name) {
+  const company = String(ctx?.company?.company_name || meta?.companyName || "").trim();
+  if (company) {
     try {
-      localStorage.setItem("vlue_company_locked", ctx.company.company_name);
-      localStorage.setItem("myCardOrganization", ctx.company.company_name);
+      localStorage.setItem("vlue_company_locked", company);
+      localStorage.setItem("myCardOrganization", company);
+      localStorage.setItem("vlue_company_from_server", "1");
     } catch {
       /* ignore */
     }

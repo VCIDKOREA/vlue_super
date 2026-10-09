@@ -142,6 +142,11 @@ function scrubDemoOrganization(org, isCeo) {
   const v = String(org || "").trim();
   if (!v) return "";
   if (isCeo) return v;
+  try {
+    if (localStorage.getItem("vlue_company_from_server") === "1") return v;
+  } catch {
+    /* ignore */
+  }
   if (DEMO_ORG_POLLUTION.has(v)) return "";
   return v;
 }
@@ -186,8 +191,16 @@ export function applyShowcasePreviewExampleIdentity(card = {}) {
     name = organization || name || VLUE_PREVIEW_EXAMPLE_BRAND;
   } else {
     name = displayName;
-    /* 일반회원 접힘 헤더는 실명 우선 — 오염된 상호는 숨김 */
-    if (!configuredRole) organization = "";
+    try {
+      if (
+        !configuredRole &&
+        localStorage.getItem("vlue_company_from_server") !== "1"
+      ) {
+        organization = "";
+      }
+    } catch {
+      if (!configuredRole) organization = "";
+    }
   }
 
   const showTitleDeptPlaceholder = !isCeo && (!title || (!configuredRole && !department));
