@@ -399,12 +399,27 @@ export async function syncShowcaseFromServer(opts = {}) {
         const live = bundle?.showcase?.live;
         const profileHas = showcaseStyleHasContent(editor) || showcaseStyleHasContent(live);
         const profileMs = Date.parse(bundle?.showcase?.updatedAt || "") || 0;
-        if (profileHas && (!userHas || profileMs >= userMs - 500)) {
+        /* 웹에서 저장한 계정 쇼케이스가 더 최신이면 프로필 옛 번들로 되돌리지 않는다 */
+        const profileNewer = profileHas && profileMs > userMs + 500;
+        if (profileNewer) {
           await switchToMultiDccProfile(active, {
             preferredLineId: active.assignedLineIds?.[0] || ""
           });
           lastHydrateOkAt = Date.now();
           return { ok: true, applied: true, source: "profile", profileId: active.id };
+        }
+        if (userHas && userMs > profileMs + 500) {
+          try {
+            const { putDccProfileBundle } = await import("../dccAgentProfilesApi.js");
+            await putDccProfileBundle(active.id, {
+              showcase: {
+                editor: userBundle.editor,
+                live: userBundle.live || userBundle.editor
+              }
+            });
+          } catch {
+            /* 계정 쇼케이스는 아래에서 적용 */
+          }
         }
       }
     } catch {

@@ -9,22 +9,6 @@ import {
 } from "../../lib/familyProtectionApi.js";
 
 export const SLOT_PRICE_KRW = 2500;
-const ZONE_KEY = "vlue_family_safe_zones_v1";
-const ZONES = [
-  ["home", "집"],
-  ["school", "학교"],
-  ["hospital", "병원"]
-];
-
-function readZones() {
-  try {
-    const raw = localStorage.getItem(ZONE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
 
 export function useFamilyMapFolders(enabled) {
   const [tab, setTab] = useState("owned");
@@ -71,7 +55,7 @@ export function useFamilyMapFolders(enabled) {
   return { tab, setTab, owned, joined, sharing, setSharing, ready, visibleIds, reload };
 }
 
-export function FamilyFolderSwitcher({ folders, dark, onNotice }) {
+export function FamilyFolderSwitcher({ folders, dark, onNotice, expanded = false, onExpandedChange }) {
   const [payOpen, setPayOpen] = useState(false);
   const [count, setCount] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -102,9 +86,26 @@ export function FamilyFolderSwitcher({ folders, dark, onNotice }) {
     }
   };
 
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        className={`pointer-events-auto absolute left-3 top-[calc(64px+env(safe-area-inset-top))] z-30 rounded-full px-3 py-1.5 text-[11px] font-black backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/80 text-white" : "border border-black/5 bg-white/90 text-slate-800"}`}
+        onClick={() => onExpandedChange?.(true)}
+      >
+        가족 {folders.owned ? `${used}/${capacity}` : ""}
+      </button>
+    );
+  }
+
   return (
     <>
       <div className={`pointer-events-auto absolute inset-x-3 top-[calc(64px+env(safe-area-inset-top))] z-30 rounded-[22px] p-1.5 backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/80" : "border border-black/5 bg-white/90"}`}>
+        <div className="mb-1 flex justify-end px-1">
+          <button type="button" className={`text-[11px] font-bold ${dark ? "text-white/70" : "text-slate-500"}`} onClick={() => onExpandedChange?.(false)}>
+            접기
+          </button>
+        </div>
         <div className={`flex rounded-full p-0.5 ${dark ? "bg-white/5" : "bg-slate-100"}`}>
           <button type="button" className={tabBtn("owned", "")} onClick={() => folders.setTab("owned")}>
             📁 내가 보호하는 가족
@@ -154,22 +155,9 @@ export function FamilyFolderSwitcher({ folders, dark, onNotice }) {
   );
 }
 
-export function FamilyFolderPanels({ folders, dark, members, self, glass }) {
-  const [panel, setPanel] = useState("");
-  const [zones, setZones] = useState(readZones);
+export function FamilyFolderPanels({ folders, dark, members, glass }) {
   const [sosBusy, setSosBusy] = useState(false);
   const quiet = dark ? "bg-white/10 text-white" : "bg-slate-100 text-slate-800";
-
-  const saveZone = (id) => {
-    if (self?.lat == null || self?.lng == null) return;
-    const next = { ...zones, [id]: { lat: self.lat, lng: self.lng, at: new Date().toISOString() } };
-    setZones(next);
-    try {
-      localStorage.setItem(ZONE_KEY, JSON.stringify(next));
-    } catch {
-      /* ignore */
-    }
-  };
 
   const toggleShare = async () => {
     const next = !folders.sharing;
@@ -209,36 +197,6 @@ export function FamilyFolderPanels({ folders, dark, members, self, glass }) {
     return (
       <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
         {profileRow}
-        <div className="flex gap-1.5">
-          <button type="button" className={`flex-1 rounded-full px-2 py-2 text-[11px] font-bold ${panel === "zone" ? "bg-[#00D2FF] text-[#04121a]" : quiet}`} onClick={() => setPanel(panel === "zone" ? "" : "zone")}>안심존</button>
-          <button type="button" className={`flex-1 rounded-full px-2 py-2 text-[11px] font-bold ${panel === "timeline" ? "bg-[#00D2FF] text-[#04121a]" : quiet}`} onClick={() => setPanel(panel === "timeline" ? "" : "timeline")}>위치 타임라인</button>
-        </div>
-        {panel === "zone" ? (
-          <div className="grid grid-cols-3 gap-1.5">
-            {ZONES.map(([id, label]) => (
-              <button key={id} type="button" className={`rounded-2xl px-2 py-2 text-[11px] font-bold ${zones[id] ? "bg-[#00D2FF] text-[#04121a]" : quiet}`} onClick={() => saveZone(id)}>
-                {label}
-                <span className="mt-0.5 block text-[9px] font-semibold opacity-70">{zones[id] ? "저장됨" : "현재 위치"}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {panel === "timeline" ? (
-          <ul className="max-h-28 space-y-1 overflow-y-auto">
-            {(members.length ? members : rows).map((member) => (
-              <li key={member.userId || member.id} className={`rounded-xl px-2 py-1.5 text-[11px] ${quiet}`}>
-                <span className="font-bold">{member.displayName || member.name}</span>
-                <span className="ml-1 opacity-70">
-                  {member.last_seen_at || member.updatedAt
-                    ? new Date(member.last_seen_at || member.updatedAt).toLocaleString("ko-KR", { hour: "numeric", minute: "2-digit" })
-                    : member.lat != null
-                      ? "실시간"
-                      : "위치 없음"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
         {!rows.length ? <p className="px-1 text-[11px] opacity-70">보호 중인 가족이 없습니다. 가족보호에서 초대 코드를 만들어 주세요.</p> : null}
       </div>
     );

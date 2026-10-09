@@ -21,6 +21,25 @@ function component(
   return String((preferShort ? hit.short_name : hit.long_name) || hit.long_name || hit.short_name || "").trim();
 }
 
+/** 시·국가만 있는 문구는 상세 위치가 아니다. 번지·도로명이 있어야 한다. */
+export function addressLooksDetailed(label: string) {
+  const text = String(label || "").trim();
+  if (!text) return false;
+  if (/\d/.test(text)) return true;
+  return /(로|길|대로|street|st\.|avenue|ave|boulevard|blvd|drive|dr|road|rd|way|plaza|lane)\b/i.test(text);
+}
+
+function pickDetailedResult(
+  results: Array<{ formatted_address?: string; types?: string[] }>
+) {
+  const rank = ["street_address", "premise", "subpremise", "route", "intersection"];
+  for (const type of rank) {
+    const hit = results.find((row) => Array.isArray(row.types) && row.types.includes(type) && row.formatted_address);
+    if (hit) return hit;
+  }
+  return results.find((row) => addressLooksDetailed(String(row.formatted_address || ""))) || results[0];
+}
+
 /** 좌표 → 국가/도시. country_code !== KR 이면 해외. */
 export async function reverseGeocodeGoogle(lat: number, lng: number): Promise<GooglePlaceMeta | null> {
   const key = googleMapsKey();
@@ -39,7 +58,7 @@ export async function reverseGeocodeGoogle(lat: number, lng: number): Promise<Go
       }>;
     };
     if (data.status !== "OK" || !data.results?.length) return null;
-    const first = data.results[0];
+    const first = pickDetailedResult(data.results) || data.results[0];
     const parts = first.address_components || [];
     const countryCode = component(parts, "country", true).toUpperCase();
     const countryName = component(parts, "country") || (countryCode === "KR" ? "대한민국" : countryCode);

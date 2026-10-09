@@ -3,6 +3,13 @@ import { reverseGeocodeLatLng } from "../../lib/activeRegion.js";
 import { formatLocalTime, isOverseasMember, overseasPlaceLabel } from "../../lib/overseasLocation.js";
 import { fetchFamilySafetyReport } from "../../lib/safetyPatch.js";
 
+function addressLooksDetailed(label) {
+  const text = String(label || "").trim();
+  if (!text) return false;
+  if (/\d/.test(text)) return true;
+  return /(로|길|대로|street|avenue|blvd|drive|road|way|plaza|lane)\b/i.test(text);
+}
+
 export default function MemberSafetyDetail({ member, roomId = "", dark = false }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -35,8 +42,7 @@ export default function MemberSafetyDetail({ member, roomId = "", dark = false }
   }, [member?.userId, roomId]);
 
   useEffect(() => {
-    const known = report?.addressLabel || member?.addressLabel || overseasPlaceLabel(member);
-    if (known || member?.lat == null || member?.lng == null) {
+    if (member?.lat == null || member?.lng == null) {
       setLocalAddress("");
       return undefined;
     }
@@ -51,7 +57,7 @@ export default function MemberSafetyDetail({ member, roomId = "", dark = false }
     return () => {
       cancelled = true;
     };
-  }, [member?.userId, member?.lat, member?.lng, member?.addressLabel, report?.addressLabel]);
+  }, [member?.userId, member?.lat, member?.lng]);
 
   useEffect(() => {
     if (!overseas || !member?.timeZoneId) return undefined;
@@ -60,11 +66,12 @@ export default function MemberSafetyDetail({ member, roomId = "", dark = false }
   }, [overseas, member?.timeZoneId]);
 
   const place = overseasPlaceLabel(member);
-  const address =
-    place ||
-    report?.addressLabel ||
-    member?.addressLabel ||
-    localAddress;
+  const stored = report?.addressLabel || member?.addressLabel || "";
+  const address = addressLooksDetailed(localAddress)
+    ? localAddress
+    : addressLooksDetailed(stored)
+      ? stored
+      : localAddress || stored;
   const battery = report?.batteryPct ?? member?.batteryPct;
   const localTime = overseas ? formatLocalTime(member?.timeZoneId, new Date(clock)) : "";
   const muted = dark ? "text-white/75" : "text-slate-600";
@@ -79,6 +86,9 @@ export default function MemberSafetyDetail({ member, roomId = "", dark = false }
       <p className={`text-[12px] font-medium leading-snug ${muted}`}>
         {address || "도로명 주소를 확인 중입니다."}
       </p>
+      {overseas && place && address && !address.includes(place) ? (
+        <p className={`text-[11px] font-semibold ${muted}`}>{place}</p>
+      ) : null}
       {localTime ? (
         <p className="text-[12px] font-semibold">🕒 현지 시각 {localTime}</p>
       ) : null}

@@ -352,6 +352,8 @@ function drawPlacePin(ctx, x, y, ready) {
 export default function LocationPlatform() {
   const [session, setSession] = useState(getLocationSession);
   const [locationBlocked, setLocationBlocked] = useState(nativeLocationDenied);
+  const [familyBarOpen, setFamilyBarOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [members, setMembers] = useState([]);
   const [room, setRoom] = useState(null);
   const [self, setSelf] = useState(() => {
@@ -1863,11 +1865,20 @@ export default function LocationPlatform() {
 
   const focusMember = (member) => {
     setSelected(member || null);
+    setDetailOpen(false);
     if (member?.lat != null && member?.lng != null) {
       userZoomedRef.current = true;
       markGesture();
       patchLocationSession({ flyTo: { lat: member.lat, lng: member.lng, at: Date.now() } });
     }
+  };
+
+  const backToFamilyMap = () => {
+    setSelected(null);
+    setDetailOpen(false);
+    setFamilyNavTarget(null);
+    setRoutes({});
+    setGuideOn(false);
   };
 
   const dark = theme === "dark";
@@ -1958,10 +1969,16 @@ export default function LocationPlatform() {
           </div>
         ) : null}
         {session.mode === "family" ? (
-          <FamilyFolderSwitcher folders={familyFolders} dark={theme === "dark"} onNotice={pushNotice} />
+          <FamilyFolderSwitcher
+            folders={familyFolders}
+            dark={theme === "dark"}
+            onNotice={pushNotice}
+            expanded={familyBarOpen}
+            onExpandedChange={setFamilyBarOpen}
+          />
         ) : null}
         {session.mode === "family" && overseasMembers.length ? (
-          <div className="pointer-events-none absolute inset-x-0 top-[calc(168px+env(safe-area-inset-top))] z-30 flex justify-end px-3">
+          <div className={`pointer-events-none absolute inset-x-0 z-30 flex justify-end px-3 ${familyBarOpen ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(108px+env(safe-area-inset-top))]"}`}>
             <div className={`pointer-events-auto max-w-[min(100%,280px)] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${dark ? "border border-violet-300/30 bg-[#1a1030]/88 text-white" : "border border-violet-200 bg-white/92 text-slate-900"}`}>
               <p className="text-[12px] font-black tracking-tight">✈️ 해외 구성원 ({overseasMembers.length}명)</p>
               <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
@@ -1989,7 +2006,9 @@ export default function LocationPlatform() {
                 ))}
               </ul>
               {useGoogleMap ? (
-                <p className="mt-1.5 text-[10px] font-medium opacity-70">Google Maps · 해외 모드</p>
+                <button type="button" className="mt-1.5 w-full rounded-full bg-[#03C75A] px-2 py-1 text-[11px] font-black text-white" onClick={backToFamilyMap}>
+                  네이버 가족 지도
+                </button>
               ) : (
                 <p className="mt-1.5 text-[10px] font-medium opacity-70">프로필을 누르면 Google Maps로 전환</p>
               )}
@@ -2003,10 +2022,7 @@ export default function LocationPlatform() {
               type="button"
               className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "family" ? tabOn : ""}`}
               onClick={() => {
-                setSelected(null);
-                setFamilyNavTarget(null);
-                setRoutes({});
-                setGuideOn(false);
+                backToFamilyMap();
                 setMembers([]);
                 patchLocationSession({ mode: "family" });
                 if (!localCanUseFamilyLocation()) {
@@ -2160,8 +2176,37 @@ export default function LocationPlatform() {
       </div>
 
       <div className="relative z-30 shrink-0 space-y-2 px-3 pb-1 pt-2">
-        {selected ? (
-          <article className={`rounded-[24px] px-4 py-3 ${glass}`}>
+        {selected && session.mode === "family" && !detailOpen ? (
+          <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${glass}`}>
+            <button type="button" className="min-w-0 flex-1 truncate text-left text-[13px] font-black" onClick={() => setDetailOpen(true)}>
+              {selected.displayName}
+              <span className={`ml-2 text-[11px] font-semibold ${dark ? "text-white/60" : "text-slate-500"}`}>안심패치 올리기</span>
+            </button>
+            {!selected.self && selected.userId !== getLocalVlueUserId() && selected.lat != null && selected.lng != null ? (
+              <button
+                type="button"
+                className={`${accentBtn} shrink-0 !px-2.5 !py-1 text-[11px]`}
+                disabled={familyNavBusy}
+                onClick={() => void startFamilyMove(selected)}
+              >
+                {familyNavTarget?.userId === selected.userId && guideOn ? "안내중" : "이동"}
+              </button>
+            ) : null}
+            {useGoogleMap ? (
+              <button type="button" className={`${quietBtn} shrink-0 !px-2.5 !py-1 text-[11px]`} onClick={backToFamilyMap}>
+                가족 지도
+              </button>
+            ) : (
+              <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-lg" onClick={() => setSelected(null)} aria-label="닫기">×</button>
+            )}
+          </div>
+        ) : selected ? (
+          <article className={`${session.mode === "family" ? "max-h-[38vh] overflow-y-auto" : ""} rounded-[24px] px-4 py-3 ${glass}`}>
+            {session.mode === "family" ? (
+              <button type="button" className="mb-2 flex w-full justify-center" onClick={() => setDetailOpen(false)} aria-label="상세 내리기">
+                <span className={`h-1 w-10 rounded-full ${dark ? "bg-white/30" : "bg-slate-300"}`} />
+              </button>
+            ) : null}
             <div className="flex items-start justify-between gap-3">
               {session.mode === "family" ? (
                 <div className="min-w-0 flex-1">
@@ -2242,7 +2287,13 @@ export default function LocationPlatform() {
                   </p>
                 </div>
               )}
-              <button type="button" onClick={() => setSelected(null)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg" aria-label="닫기">×</button>
+              <button type="button" onClick={() => {
+                if (session.mode === "family") {
+                  setDetailOpen(false);
+                  return;
+                }
+                setSelected(null);
+              }} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-lg" aria-label="상세 내리기">×</button>
             </div>
           </article>
         ) : null}
@@ -2402,7 +2453,7 @@ export default function LocationPlatform() {
         ) : null}
         {session.mode === "family" ? (
           <>
-          <FamilyFolderPanels folders={familyFolders} dark={dark} members={folderPeople} self={self} glass={glass} />
+          <FamilyFolderPanels folders={familyFolders} dark={dark} members={folderPeople} glass={glass} />
           <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
             <form
               className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 ${dark ? "border-white/10 bg-white/10" : "border-black/10 bg-slate-100/80"}`}

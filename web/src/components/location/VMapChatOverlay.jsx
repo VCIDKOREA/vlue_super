@@ -87,10 +87,11 @@ export default function VMapChatOverlay({
   const visibleRows = expanded || peeking ? sorted.slice(-40) : latest ? [latest] : [];
 
   /* 인라인 색 — WebView에서 Tailwind/투명 blur 대비 깨짐 방지 */
-  const panelBg = dark ? "#04121a" : "#ffffff";
-  const bodyColor = dark ? "#f8fafc" : "#0f172a";
-  const metaColor = dark ? "rgba(248,250,252,0.55)" : "rgba(15,23,42,0.5)";
-  const borderColor = dark ? "rgba(255,255,255,0.22)" : "rgba(15,23,42,0.12)";
+  const bodyColor = dark ? "#f8fafc" : "#04121a";
+  const metaColor = dark ? "rgba(248,250,252,0.8)" : "rgba(15,23,42,0.75)";
+  const textShadow = dark
+    ? "0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7)"
+    : "0 0 8px #fff, 0 1px 2px #fff";
 
   if (!sorted.length && !expanded) return null;
 
@@ -129,7 +130,7 @@ export default function VMapChatOverlay({
     return (
       <span
         className={`min-w-0 flex-1 font-semibold ${compact ? "truncate" : "break-words"}`}
-        style={{ color: bodyColor, opacity: row.kind === "system" ? 0.75 : 1 }}
+        style={{ color: bodyColor, opacity: row.kind === "system" ? 0.75 : 1, textShadow }}
       >
         {compact ? previewText(row).slice(0, 72) : previewText(row)}
       </span>
@@ -158,16 +159,15 @@ export default function VMapChatOverlay({
             setPeeking(false);
           }
         }}
-        className="pointer-events-auto overflow-hidden rounded-[20px] shadow-[0_12px_36px_rgba(0,0,0,0.35)] transition-[height] duration-250 ease-out"
+        className="pointer-events-auto overflow-hidden transition-[height] duration-250 ease-out"
         style={{
-          background: panelBg,
-          border: `1px solid ${borderColor}`,
-          height: mode === "collapsed" ? 48 : mode === "peek" ? PEEK_H : EXPANDED_H
+          background: "transparent",
+          height: mode === "collapsed" ? 28 : mode === "peek" ? PEEK_H : EXPANDED_H
         }}
       >
         {mode === "collapsed" ? (
           /* 단일 행 — 헤더/본문 분리로 생기던 세로 잘림 제거 */
-          <div className="flex h-full items-center gap-2 px-3">
+            <div className="flex h-full items-center gap-2" style={{ textShadow }}>
             <div className="flex min-w-0 flex-1 items-center gap-1 text-[13px] leading-none">
               {latest ? (
                 <>
@@ -209,7 +209,7 @@ export default function VMapChatOverlay({
               ) : (
                 <ul className="flex flex-col justify-end gap-2 py-1">
                   {visibleRows.map((row) => (
-                    <li key={row.id} className="flex min-w-0 items-start gap-1 text-[13px] leading-5">
+                    <li key={row.id} className="flex min-w-0 items-start gap-1 text-[13px] leading-5" style={{ textShadow }}>
                       {renderAuthor(row)}
                       {renderBody(row, false)}
                     </li>

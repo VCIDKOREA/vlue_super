@@ -1,5 +1,7 @@
 import { prisma } from "../../db/client.js";
 import { reverseGeocodeKakao } from "../../integrations/kakao/kakaoReverseGeocode.js";
+import { reverseGeocodeGoogle, addressLooksDetailed } from "../../integrations/google/googleMapsGeocode.js";
+import { reverseGeocodeNominatim } from "../../integrations/geo/nominatimReverse.js";
 import { sendOfficePushToUser } from "../fcmNotificationService.js";
 import { ensureSafetyPatchSchema } from "./safetyPatchSchema.js";
 
@@ -240,9 +242,18 @@ async function loadSnapshot(targetId: string, roomId: string): Promise<Snapshot>
   const lng = member?.lng ?? presence?.lng ?? null;
   const pinnedDemo = String(user?.email || "").endsWith("@vlue.demo");
   let address = String(presence?.addressLabel || "").trim();
-  if (lat != null && lng != null && !presence?.isOverseas && !pinnedDemo) {
-    const detailed = await reverseGeocodeKakao(lat, lng);
-    if (detailed) address = detailed;
+  if (lat != null && lng != null && !addressLooksDetailed(address)) {
+    const geo = await reverseGeocodeGoogle(lat, lng);
+    if (geo?.addressLabel && addressLooksDetailed(geo.addressLabel)) {
+      address = geo.addressLabel;
+    } else if (!presence?.isOverseas) {
+      const detailed = await reverseGeocodeKakao(lat, lng);
+      if (detailed) address = detailed;
+    }
+    if (!addressLooksDetailed(address)) {
+      const named = await reverseGeocodeNominatim(lat, lng);
+      if (addressLooksDetailed(named)) address = named;
+    }
   }
   const updatedAt = member?.updatedAt || presence?.updatedAt || null;
   const fresh = pinnedDemo || Boolean(updatedAt && Date.now() - updatedAt.getTime() < 15 * 60 * 1000);

@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { fetchKakaoCarDirections } from "../integrations/kakao/kakaoMobilityDirections.js";
 import { searchKakaoLocalList } from "../integrations/kakao/kakaoLocalSearch.js";
-import { reverseGeocodeGoogle } from "../integrations/google/googleMapsGeocode.js";
+import { addressLooksDetailed, reverseGeocodeGoogle } from "../integrations/google/googleMapsGeocode.js";
+import { reverseGeocodeNominatim } from "../integrations/geo/nominatimReverse.js";
 import { requireUserHeader } from "../middleware/cardGate.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { sendShowcaseSocialPushToUser } from "../services/fcmNotificationService.js";
@@ -480,18 +481,21 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
   const members = [];
   for (const id of ids) {
     let row = byId.get(id) || null;
-    if (row && row.lat != null && row.lng != null && !row.countryCode) {
+    if (row && row.lat != null && row.lng != null && (!row.countryCode || !addressLooksDetailed(row.addressLabel || ""))) {
       const geo = await reverseGeocodeGoogle(row.lat, row.lng);
-      if (geo) {
+      const named = addressLooksDetailed(geo?.addressLabel || "")
+        ? geo?.addressLabel || ""
+        : await reverseGeocodeNominatim(row.lat, row.lng);
+      if (named && addressLooksDetailed(named)) {
         row = await prisma.locationPresence.update({
           where: { userId: id },
           data: {
-            addressLabel: geo.addressLabel || row.addressLabel,
-            isOverseas: geo.isOverseas,
-            countryCode: geo.countryCode,
-            countryName: geo.countryName,
-            cityName: geo.cityName,
-            timeZoneId: geo.timeZoneId
+            addressLabel: named,
+            isOverseas: geo?.isOverseas ?? row.isOverseas,
+            countryCode: geo?.countryCode || row.countryCode,
+            countryName: geo?.countryName || row.countryName,
+            cityName: geo?.cityName || row.cityName,
+            timeZoneId: geo?.timeZoneId || row.timeZoneId
           }
         });
         byId.set(id, row);
