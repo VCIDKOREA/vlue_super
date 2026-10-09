@@ -398,7 +398,9 @@ export async function syncShowcaseFromServer(opts = {}) {
         const editor = bundle?.showcase?.editor;
         const live = bundle?.showcase?.live;
         const profileHas = showcaseStyleHasContent(editor) || showcaseStyleHasContent(live);
-        const profileMs = Date.parse(bundle?.showcase?.updatedAt || "") || 0;
+        const stampMs = (style) =>
+          Date.parse(style?.savedAt || style?.clientUpdatedAt || "") || 0;
+        const profileMs = Math.max(stampMs(editor), stampMs(live));
         /* 웹에서 저장한 계정 쇼케이스가 더 최신이면 프로필 옛 번들로 되돌리지 않는다 */
         const profileNewer = profileHas && profileMs > userMs + 500;
         if (profileNewer) {

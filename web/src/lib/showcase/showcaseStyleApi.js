@@ -70,24 +70,7 @@ export async function putShowcaseStyleBundle({
   const certified = Boolean(readDccLinePreview()?.isCertified);
   if (lineId && !certified) {
     try {
-      const data = await putDccLineShowcase(lineId, { editor, live, liveSource, clientUpdatedAt });
-      try {
-        const preview = readDccLinePreview() || {};
-        let editingProfileId = "";
-        try {
-          editingProfileId = String(localStorage.getItem("vlue_multi_dcc_editing_profile_id") || "").trim();
-        } catch {
-          /* ignore */
-        }
-        const agentId = String(preview.agentId || editingProfileId || "").trim();
-        if (agentId) {
-          const { putDccProfileBundle } = await import("../dccAgentProfilesApi.js");
-          await putDccProfileBundle(agentId, { showcase: { editor, live } });
-        }
-      } catch {
-        /* ignore */
-      }
-      return { ok: true, updatedAt: data.updatedAt ?? null };
+      await putDccLineShowcase(lineId, { editor, live, liveSource, clientUpdatedAt });
     } catch (e) {
       return { ok: false, error: e?.message || "save_failed" };
     }
@@ -129,7 +112,12 @@ export async function putShowcaseStyleBundle({
       const agentId = String(preview.agentId || editingProfileId || "").trim();
       if (agentId) {
         const { putDccProfileBundle } = await import("../dccAgentProfilesApi.js");
-        await putDccProfileBundle(agentId, { showcase: { editor, live } });
+        const savedAt = new Date().toISOString();
+        const stamp = (style) =>
+          style && typeof style === "object" ? { ...style, savedAt } : style;
+        await putDccProfileBundle(agentId, {
+          showcase: { editor: stamp(editor), live: stamp(live) }
+        });
       }
     } catch {
       /* ignore */

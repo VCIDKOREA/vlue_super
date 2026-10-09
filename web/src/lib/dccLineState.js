@@ -85,7 +85,7 @@ export function writeDccLinePreviewFromBundle(bundle, opts = {}) {
       keepSameLine ? prev?.department : ""
     ),
     photoUrl,
-    noProfilePhoto: !photoUrl,
+    noProfilePhoto: dcc.noProfilePhoto === true,
     titlePhotoUrl: pick(
       opts.replaceMedia ? dcc.titlePhotoUrl : "",
       dcc.titlePhotoUrl,

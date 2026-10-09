@@ -459,7 +459,7 @@ export default function LetteringBizcardQuickBuilder({
             />
           ) : (
             <p className={`text-[11px] font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              프로필 사진은 설정 → 프로필 관리에서 변경합니다.
+              프로필 사진은 위쪽 「이 번호 프로필 사진」에서 저장합니다. 여기서는 바꾸지 않습니다.
             </p>
           )}
           {photoFileName && !noProfilePhoto && typeof onPhotoPick === "function" ? (

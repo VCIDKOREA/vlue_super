@@ -605,7 +605,7 @@ export async function getLineShowcasePublicByPhone(
       lineShowcaseStyleJson: true,
       lineShowcaseLiveSourceJson: true,
       lineShowcaseUpdatedAt: true,
-      user: { select: { phoneE164: true } }
+      user: { select: { phoneE164: true, showcaseStyleUpdatedAt: true } }
     }
   });
   if (!card) return null;
@@ -635,13 +635,22 @@ export async function getLineShowcasePublicByPhone(
           })
         : resolved?.profile || (await getRepresentativeProfile(card.userId));
     const profileLive = agent?.showcaseLiveStyleJson || agent?.showcaseStyleJson;
-    if (profileLive != null && showcaseHasContent(profileLive)) {
+    const userMs = card.user?.showcaseStyleUpdatedAt
+      ? card.user.showcaseStyleUpdatedAt.getTime()
+      : 0;
+    const lineMs = card.lineShowcaseUpdatedAt ? card.lineShowcaseUpdatedAt.getTime() : 0;
+    const agentUpdatedAt =
+      agent && "updatedAt" in agent
+        ? ((agent as { updatedAt?: Date | null }).updatedAt ?? null)
+        : null;
+    const agentMs = agentUpdatedAt ? agentUpdatedAt.getTime() : 0;
+    /* 웹에서 방금 적용한 계정 쇼케이스가 예전 담당자 프로필보다 최신이면 계정 값을 쓴다. */
+    if (userMs > 0 && userMs >= lineMs && userMs >= agentMs) {
+      return null;
+    }
+    if (profileLive != null && showcaseHasContent(profileLive) && agentMs >= lineMs) {
       live = profileLive;
       liveSource = null;
-      const agentUpdatedAt =
-        agent && "updatedAt" in agent
-          ? ((agent as { updatedAt?: Date | null }).updatedAt ?? null)
-          : null;
       updatedAt = agentUpdatedAt || null;
     } else if (!showcaseHasContent(live) && certified) {
       return null;

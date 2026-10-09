@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2, Settings2 } from "lucide-react";
 import { compressAndUploadMediaImageOrThrow } from "../../lib/mediaImageUpload.js";
+import { writeProfilePhoto } from "../../lib/vlueAvatar.js";
 import { DCC_PROFILE_PHOTO_IMAGE_GUIDE } from "../../lib/fitImageFile.js";
 import { agentOptionLabel } from "../../lib/dccAgentProfileState.js";
 import {
@@ -155,6 +156,7 @@ export default function DccLineSwitcher({
   const [agentId, setAgentId] = useState("");
   const [maxCount, setMaxCount] = useState(20);
   const [photoUrl, setPhotoUrl] = useState("");
+  const [photoSavedName, setPhotoSavedName] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -365,12 +367,24 @@ export default function DccLineSwitcher({
     try {
       const uploaded = await compressAndUploadMediaImageOrThrow(file, "photo");
       const url = String(uploaded?.url || "").trim();
-      if (!url) throw new Error("사진 업로드에 실패했습니다.");
+      if (!url.startsWith("https://") && !url.startsWith("http://")) {
+        throw new Error("사진을 서버에 올리지 못했습니다. 네트워크를 확인한 뒤 다시 선택해 주세요.");
+      }
       const res = await putDccLineDcc(lineId, { photoUrl: url, noProfilePhoto: false });
-      const next = res.line?.photoUrl || url;
+      const next = String(res.line?.photoUrl || "").trim();
+      if (!next.startsWith("https://") && !next.startsWith("http://")) {
+        throw new Error("저장한 사진 주소를 확인하지 못했습니다. 다시 선택해 주세요.");
+      }
       setPhotoUrl(next);
-      writeDccLinePreview({ ...(readDccLinePreview() || {}), id: lineId, photoUrl: next });
-      onToast?.("이 번호의 프로필 사진을 저장했습니다.");
+      setPhotoSavedName(file.name || "저장됨");
+      writeDccLinePreview({
+        ...(readDccLinePreview() || {}),
+        id: lineId,
+        photoUrl: next,
+        noProfilePhoto: false
+      });
+      writeProfilePhoto(next);
+      onToast?.("이 번호의 프로필 사진을 저장했습니다. 쇼케이스와 앱에 같이 적용됩니다.");
     } catch (e) {
       onToast?.(e instanceof Error ? e.message : "사진 저장에 실패했습니다.");
     } finally {
@@ -486,6 +500,13 @@ export default function DccLineSwitcher({
         />
       </label>
       <p className="dcc-agent-form__photo-hint">{DCC_PROFILE_PHOTO_IMAGE_GUIDE.uploadHint}</p>
+      <p className="dcc-agent-form__photo-hint">
+        {photoSavedName
+          ? `저장됨 · ${photoSavedName}`
+          : photoUrl
+            ? "저장된 사진이 있습니다. 파일 칸이 비어 보여도 사진은 유지됩니다."
+            : "아직 저장된 사진이 없습니다."}
+      </p>
     </div>
   ) : null;
 

@@ -26,7 +26,7 @@ export function applyDccLinePreviewOverlay(card = {}) {
   const name = String(line.displayName || "").trim();
   const phone = formatLetteringPhoneDisplay(line.displayPhone) || String(line.displayPhone || "").trim();
   const photo = String(line.photoUrl || "").trim();
-  const lineClearsPhoto = Boolean(line.noProfilePhoto) || ("photoUrl" in line && !photo);
+  const lineClearsPhoto = line.noProfilePhoto === true;
   const resolvedPhoto = lineClearsPhoto ? "" : photo || card.photoUrl;
   const title = String(line.title || "").trim();
   const department = String(line.department || "").trim();

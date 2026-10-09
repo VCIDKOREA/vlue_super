@@ -953,7 +953,7 @@ export default function ShowcaseStyleSettingsPanel({
 
     if (dccCarouselEnabled && !hasProfilePhoto) {
       const msg =
-        "프로필 사진은 「디지털인증명함 → 설정하러가기」에서 등록·저장해야 미리보기에 나옵니다.";
+        "프로필 사진은 이 화면 위쪽 「이 번호 프로필 사진」에서 저장합니다. 저장하면 쇼케이스와 앱에 함께 쓰입니다.";
       focusShowcaseSection("showcase-settings-dcc", msg);
       notify(`쇼케이스 설정은 저장됐습니다. ${msg}`);
       setApplyDoneOpen(true);
