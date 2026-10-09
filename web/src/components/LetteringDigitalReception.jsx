@@ -28,6 +28,7 @@ import {
   readLetteringBizcardEditable
 } from "../lib/letteringBizcardStorage.js";
 import { normalizeLetteringCard, resolveDccTitlePhotoUrl } from "../lib/letteringCardNormalize.js";
+import { resolveRenderableMediaUrl } from "../lib/renderableMediaUrl.js";
 import {
   openEmailLink,
   openWebsiteLink,
@@ -319,14 +320,11 @@ function isCeoOwnerCard(card) {
  * - 그 외: 업로드 로고 (프로필·워터마크 동일 소스)
  */
 function resolveCardLogoUrl(card) {
-  if (isCeoOwnerCard(card)) return CEO_WATERMARK_SRC;
   if (card?.noCompanyLogo) return "";
-  const logo = String(card?.logoUrl || card?.logo_url || "").trim();
-  if (!logo) return "";
-  if (/lettering-demo|icons8\.com/i.test(logo)) return "";
-  if (/data:image\/svg\+xml/i.test(logo) && /2563eb/i.test(logo)) return "";
-  if (/\/assets\/vlue-shield-logo\.svg/i.test(logo)) return "";
-  return logo;
+  const logo = resolveRenderableMediaUrl(card?.logoUrl || card?.logo_url || "");
+  if (logo) return logo;
+  if (isCeoOwnerCard(card)) return CEO_WATERMARK_SRC;
+  return "";
 }
 
 /**
@@ -393,7 +391,9 @@ function ProfileMedia({ card, className = "", variant = "avatar" }) {
   const [imgBroken, setImgBroken] = useState(false);
   const titlePhotoUrl = resolveDccTitlePhotoUrl(card);
   const logoUrl = resolveCardLogoUrl(card);
-  const profileUrl = String(card.photoUrl || card.image_url || card.imageUrl || "").trim();
+  const profileUrl = resolveRenderableMediaUrl(
+    card.photoUrl || card.image_url || card.imageUrl || ""
+  );
   /* avatar = 프로필 사진 우선(없으면 로고). logo = 회사 로고만. hero = 타이틀 사진 */
   const isLogoOnly = variant === "logo";
   const isAvatar = variant === "avatar";
@@ -834,7 +834,9 @@ function FrontPanel({
       {embeddedInPush ? null : <ProfileHero card={card} />}
       {embeddedInPush ? <BackPanelHero card={card} /> : null}
       <div className={`ldr-back-head${resolveDccTitlePhotoUrl(card) && embeddedInPush ? " ldr-back-head--with-hero" : ""}`}>
-        {resolveCardLogoUrl(card) ? (
+        {resolveRenderableMediaUrl(card.photoUrl || card.image_url || card.imageUrl || "") ? (
+          <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />
+        ) : resolveCardLogoUrl(card) ? (
           <CompanyLogoBadge card={card} className="ldr-company-logo-badge--dcc-head" />
         ) : (
           <ProfileMedia card={card} variant="avatar" className="ldr-back-head__media" />

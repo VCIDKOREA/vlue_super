@@ -2,12 +2,14 @@
  * 통화 쇼케이스 신원 마크 — 상대 프로필 사진 / CEO VLUÉ 로고 / 카톡형 실루엣
  */
 
+import { resolveRenderableMediaUrl } from "../renderableMediaUrl.js";
+
 const PERSON_SILHOUETTE = "/avatar-person-silhouette.svg";
 const CEO_BRAND_LOGO = "/vlue-brand-logo.svg";
 
 function firstNonEmpty(...values) {
   for (const v of values) {
-    const s = String(v || "").trim();
+    const s = resolveRenderableMediaUrl(v);
     if (s) return s;
   }
   return "";
@@ -69,6 +71,8 @@ export function resolveShowcasePeerAvatar({
       card?.showcaseStyle?.platformFeed?.avatarUrl
     );
     if (photo) return { type: "image", url: photo };
+    const ceoLogo = firstNonEmpty(card?.logoUrl, card?.logo_url);
+    if (ceoLogo) return { type: "image", url: ceoLogo };
     return { type: "brand", url: brandLogoUrl || CEO_BRAND_LOGO };
   }
 
@@ -91,8 +95,11 @@ export function resolveShowcasePeerAvatar({
       card?.profileImageUrl
     );
   }
+  /* 사람 사진이 없으면 DCC에 넣은 회사 로고를 빅푸시 아바타에 쓴다 */
+  if (!url) {
+    url = firstNonEmpty(card?.logoUrl, card?.logo_url, style?.logoUrl);
+  }
 
-  /* 회사 로고·VLUÉ 눈으로 빈 프로필을 채우지 않음 */
   if (url) return { type: "image", url };
 
   return {

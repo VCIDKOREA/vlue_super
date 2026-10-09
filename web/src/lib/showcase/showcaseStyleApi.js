@@ -67,8 +67,12 @@ export async function putShowcaseStyleBundle({
   lineId: lineIdOpt
 } = {}) {
   const lineId = String(lineIdOpt || readSelectedDccLineId() || "").trim();
-  const certified = Boolean(readDccLinePreview()?.isCertified);
-  if (lineId && !certified) {
+  /*
+   * 인증번호도 회선 JSON에 같이 쓴다.
+   * 예전에는 인증번호만 계정 테이블에 넣고 회선은 비워 둬서
+   * 앱·통화 조회가 옛 회선/프로필 번들을 읽어 쇼케이스와 BGM이 빠졌다.
+   */
+  if (lineId) {
     try {
       await putDccLineShowcase(lineId, { editor, live, liveSource, clientUpdatedAt });
     } catch (e) {

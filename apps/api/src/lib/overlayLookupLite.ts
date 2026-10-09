@@ -24,6 +24,7 @@ export async function loadOverlayShowcaseStyleLite(
       has_pages: boolean | null;
       has_gallery: boolean | null;
       has_bgm: boolean | null;
+      bgm: unknown;
     }>
   >`
     SELECT
@@ -91,7 +92,24 @@ export async function loadOverlayShowcaseStyleLite(
           ),
           ''
         ) IS NOT NULL
-      ) AS has_bgm
+        OR (
+          jsonb_typeof(
+            COALESCE(
+              showcase_live_style_json->'bgm'->'playlist',
+              showcase_style_json->'bgm'->'playlist',
+              '[]'::jsonb
+            )
+          ) = 'array'
+          AND jsonb_array_length(
+            COALESCE(
+              showcase_live_style_json->'bgm'->'playlist',
+              showcase_style_json->'bgm'->'playlist',
+              '[]'::jsonb
+            )
+          ) > 0
+        )
+      ) AS has_bgm,
+      COALESCE(showcase_live_style_json->'bgm', showcase_style_json->'bgm') AS bgm
     FROM users
     WHERE id = ${id}::uuid
     LIMIT 1
@@ -109,6 +127,9 @@ export async function loadOverlayShowcaseStyleLite(
    */
   if (row.has_pages || row.has_gallery || row.has_bgm) {
     style.pages = [{ type: "image" }];
+  }
+  if (row.bgm && typeof row.bgm === "object" && !Array.isArray(row.bgm)) {
+    style.bgm = row.bgm;
   }
   return style;
 }

@@ -26,15 +26,55 @@ export function isHttpMediaUrl(value: unknown): boolean {
   return typeof value === "string" && HTTP_URL_RE.test(value.trim());
 }
 
+const R2_OBJECT_KEY_RE =
+  /^(bizcard|showcase|avatars|covers|images|chat|store|marketing|docs)\//i;
+
+function isBrandAssetPath(value: string): boolean {
+  const low = value.toLowerCase();
+  return (
+    low.includes("vlue-shield-logo") ||
+    low.includes("vlue-brand-logo") ||
+    low.includes("vlue-shield-eye") ||
+    low.includes("/assets/vlue-")
+  );
+}
+
+/**
+ * 저장·조회 공통.
+ * `/bizcard/...` 처럼 호스트가 빠진 R2 키는 공개 URL로 붙인다.
+ * 번들 자산 경로(`/assets/vlue-…`)는 프로필·회사 로고가 아니므로 버린다.
+ */
+export function absolutizeMediaUrl(value: unknown): string {
+  const s = String(value ?? "").trim();
+  if (!s || isDataUrl(s) || isBlobUrl(s) || isBrandAssetPath(s)) return "";
+  if (isHttpMediaUrl(s)) {
+    try {
+      const host = new URL(s).hostname.toLowerCase();
+      if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return "";
+    } catch {
+      return "";
+    }
+    return s;
+  }
+  const key = s.replace(/^\/+/, "");
+  if (!R2_OBJECT_KEY_RE.test(key)) return "";
+  const base = String(process.env.R2_PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
+  if (!base) return "";
+  return `${base}/${key}`;
+}
+
 /** data:/blob: 이면 이전 https URL 유지, 없으면 null */
 export function sanitizeMediaUrl(value: unknown, previous?: unknown): string | null {
   const next = String(value ?? "").trim();
   if (!next) return null;
   if (isDataUrl(next) || isBlobUrl(next)) {
-    const prev = String(previous ?? "").trim();
-    return isHttpMediaUrl(prev) ? prev : null;
+    const prev = absolutizeMediaUrl(previous);
+    return prev || null;
   }
-  return next;
+  const abs = absolutizeMediaUrl(next);
+  if (abs) return abs;
+  const prev = absolutizeMediaUrl(previous);
+  return prev || null;
 }
 
 export function assertNoDataMediaUrl(value: unknown, fieldLabel: string): void {

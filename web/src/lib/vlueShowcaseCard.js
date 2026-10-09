@@ -1,3 +1,4 @@
+import { resolveRenderableMediaUrl } from "./renderableMediaUrl.js";
 import { buildUserLetteringCard, withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.js";
 import { isPaidLetteringTier, normalizeMembershipKind } from "./letteringMembership.js";
 import { applyShowcasePreviewExampleIdentity } from "./vlueShowcasePreviewIdentity.js";
@@ -25,9 +26,9 @@ export function applyDccLinePreviewOverlay(card = {}) {
   if (!line?.id) return card;
   const name = String(line.displayName || "").trim();
   const phone = formatLetteringPhoneDisplay(line.displayPhone) || String(line.displayPhone || "").trim();
-  const photo = String(line.photoUrl || "").trim();
+  const photo = resolveRenderableMediaUrl(line.photoUrl);
   const lineClearsPhoto = line.noProfilePhoto === true;
-  const resolvedPhoto = lineClearsPhoto ? "" : photo || card.photoUrl;
+  const resolvedPhoto = lineClearsPhoto ? "" : photo || resolveRenderableMediaUrl(card.photoUrl);
   const title = String(line.title || "").trim();
   const department = String(line.department || "").trim();
   const email = String(line.email || "").trim();
@@ -35,7 +36,8 @@ export function applyDccLinePreviewOverlay(card = {}) {
   const website = String(line.website || "").trim();
   const fax = String(line.fax || "").trim();
   const organization = String(line.organization || "").trim();
-  const logoUrl = String(line.logoUrl || "").trim();
+  const logoUrl =
+    resolveRenderableMediaUrl(line.logoUrl) || resolveRenderableMediaUrl(card.logoUrl);
   const companyIntro = String(line.companyIntro || "").trim();
   const customBackText = String(line.customBackText || "").trim();
   const contactPatch = {
@@ -44,7 +46,7 @@ export function applyDccLinePreviewOverlay(card = {}) {
     website: website || card.website,
     fax: fax || card.fax,
     organization: organization || card.organization,
-    logoUrl: logoUrl || card.logoUrl,
+    logoUrl,
     companyIntro: companyIntro || card.companyIntro,
     customBackText: customBackText || card.customBackText,
     accountType: card.accountType,

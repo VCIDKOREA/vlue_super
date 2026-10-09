@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 import {
   fetchJoinedProtectionGroups,
@@ -155,9 +156,19 @@ export function FamilyFolderSwitcher({ folders, dark, onNotice, expanded = false
   );
 }
 
-export function FamilyFolderPanels({ folders, dark, members, glass }) {
+export function FamilyFolderPanels({
+  folders,
+  dark,
+  members,
+  glass,
+  guidingUserId = "",
+  onNavigateMember,
+  onStopGuide
+}) {
   const [sosBusy, setSosBusy] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(false);
   const quiet = dark ? "bg-white/10 text-white" : "bg-slate-100 text-slate-800";
+  const chipOn = "bg-[#00D2FF] text-[#04121a]";
 
   const toggleShare = async () => {
     const next = !folders.sharing;
@@ -182,14 +193,100 @@ export function FamilyFolderPanels({ folders, dark, members, glass }) {
   };
 
   const profiles = members.length ? members : [];
+  const chipLimit = 4;
+  const overflow = profiles.length > chipLimit;
+  const visibleProfiles = overflow ? profiles.slice(0, chipLimit - 1) : profiles;
+  const goToMember = (member) => {
+    setRosterOpen(false);
+    onNavigateMember?.(member);
+  };
   const profileRow = (
-    <ul className="flex gap-2 overflow-x-auto pb-1">
-      {profiles.map((member) => (
-        <li key={member.userId || member.id} className={`shrink-0 rounded-2xl px-3 py-2 text-[11px] font-bold ${quiet}`}>
-          {member.displayName || member.name || "가족"}
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-2">
+      <ul className="flex gap-2 overflow-hidden pb-1">
+        {visibleProfiles.map((member) => {
+          const active = guidingUserId && guidingUserId === member.userId;
+          return (
+            <li key={member.userId || member.id} className="min-w-0 shrink">
+              <button
+                type="button"
+                className={`max-w-[7.5rem] truncate rounded-2xl px-3 py-2 text-[11px] font-bold ${active ? chipOn : quiet}`}
+                onClick={() => goToMember(member)}
+              >
+                {member.displayName || member.name || "가족"}
+              </button>
+            </li>
+          );
+        })}
+        {overflow ? (
+          <li className="shrink-0">
+            <button
+              type="button"
+              className={`rounded-2xl px-3 py-2 text-[11px] font-black ${quiet}`}
+              onClick={() => setRosterOpen(true)}
+            >
+              전체 {profiles.length}
+            </button>
+          </li>
+        ) : null}
+      </ul>
+      {guidingUserId ? (
+        <button
+          type="button"
+          className="w-full rounded-2xl bg-[#04121a] py-2.5 text-[13px] font-black text-white"
+          onClick={() => onStopGuide?.()}
+        >
+          이동 종료
+        </button>
+      ) : null}
+      {rosterOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[720] flex items-end bg-black/55" onClick={() => setRosterOpen(false)}>
+              <div
+                className={`max-h-[70vh] w-full overflow-y-auto rounded-t-[28px] px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 ${dark ? "bg-[#0c1220] text-white" : "bg-white text-slate-900"}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${dark ? "bg-white/20" : "bg-slate-200"}`} />
+                <p className="text-[16px] font-black">가족 구성원</p>
+                <p className={`mt-1 text-[12px] ${dark ? "text-white/60" : "text-slate-500"}`}>
+                  이름을 누르면 그 위치로 이동합니다.
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {profiles.map((member) => {
+                    const active = guidingUserId && guidingUserId === member.userId;
+                    return (
+                      <li key={member.userId || member.id}>
+                        <button
+                          type="button"
+                          className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left ${active ? chipOn : quiet}`}
+                          onClick={() => goToMember(member)}
+                        >
+                          <span className="font-black">{member.displayName || member.name || "가족"}</span>
+                          <span className="text-[11px] font-bold opacity-80">
+                            {active ? "이동 중" : member.self ? "내 위치" : "이동"}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {guidingUserId ? (
+                  <button
+                    type="button"
+                    className="mt-3 w-full rounded-2xl bg-[#04121a] py-3 text-[14px] font-black text-white"
+                    onClick={() => {
+                      setRosterOpen(false);
+                      onStopGuide?.();
+                    }}
+                  >
+                    이동 종료
+                  </button>
+                ) : null}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
   );
 
   if (folders.tab === "owned") {

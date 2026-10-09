@@ -100,23 +100,38 @@ object BigPushShowcaseBar {
         val isCeo = handle == "ceo" ||
             firstNonBlank(json?.optString("phoneE164"), card?.optString("phoneE164"), phone)
                 ?.let { normalizeDigits(it) } == "821080144666"
-        /* 프로필 사진만 — 회사 로고·VLUÉ 눈을 빈 자리에 넣지 않음 */
-        val photo = firstNonBlank(
-            json?.optString("image_url"),
-            card?.optString("image_url"),
-            card?.optString("photoUrl"),
-            card?.optString("avatarUrl"),
-            card?.optString("imageUrl"),
-            json?.optString("avatarUrl"),
-            json?.optString("photoUrl"),
-            profile?.optString("image_url"),
-            profile?.optString("imageUrl"),
-            profile?.optString("photo_url"),
-            profile?.optString("photoUrl"),
-            profile?.optString("portrait_url")
+        /* 사람 사진 → DCC 회사 로고 → (CEO만) VLUÉ 마크 → 실루엣 */
+        val photo = absolutizeMedia(
+            firstNonBlank(
+                json?.optString("image_url"),
+                card?.optString("image_url"),
+                card?.optString("photoUrl"),
+                card?.optString("avatarUrl"),
+                card?.optString("imageUrl"),
+                json?.optString("avatarUrl"),
+                json?.optString("photoUrl"),
+                profile?.optString("image_url"),
+                profile?.optString("imageUrl"),
+                profile?.optString("photo_url"),
+                profile?.optString("photoUrl"),
+                profile?.optString("portrait_url")
+            )
+        )
+        val companyLogo = absolutizeMedia(
+            firstNonBlank(
+                card?.optString("logoUrl"),
+                card?.optString("logo_url"),
+                json?.optString("logoUrl"),
+                json?.optString("logo_url"),
+                profile?.optString("logoUrl"),
+                profile?.optString("logo_url"),
+                card?.optJSONObject("exportSnapshot")?.optString("logoUrl"),
+                json?.optJSONObject("exportSnapshot")?.optString("logoUrl")
+            )
         )
         val (avatarKind, avatar) = when {
             !photo.isNullOrBlank() -> AvatarKind.PHOTO to photo
+            !companyLogo.isNullOrBlank() -> AvatarKind.PHOTO to companyLogo
             isCeo -> AvatarKind.CEO_BRAND to null
             else -> AvatarKind.SILHOUETTE to null
         }
@@ -468,8 +483,32 @@ object BigPushShowcaseBar {
         return raw.takeIf { it.isNotBlank() && it != "unknown" }.orEmpty()
     }
 
+    private const val R2_PUBLIC_BASE =
+        "https://pub-72e517bccb944c179098686c5c22a73a.r2.dev"
+
     private fun firstNonBlank(vararg values: String?): String? =
         values.firstOrNull { !it.isNullOrBlank() && it != "null" }
+
+    private fun isBrandAsset(raw: String): Boolean {
+        val low = raw.lowercase()
+        return low.contains("vlue-shield-logo") ||
+            low.contains("vlue-brand-logo") ||
+            low.contains("vlue-shield-eye") ||
+            low.contains("/assets/vlue-")
+    }
+
+    /** https 는 그대로, `/bizcard/…` 키는 R2 공개 주소로. 번들 마크 경로는 버림. */
+    private fun absolutizeMedia(raw: String?): String? {
+        val s = raw?.trim().orEmpty()
+        if (s.isEmpty() || s == "null" || s.startsWith("data:") || s.startsWith("blob:")) return null
+        if (isBrandAsset(s)) return null
+        if (s.startsWith("https://") || s.startsWith("http://")) return s
+        val key = s.trimStart('/')
+        val ok = key.startsWith("bizcard/") || key.startsWith("showcase/") ||
+            key.startsWith("avatars/") || key.startsWith("covers/") ||
+            key.startsWith("images/")
+        return if (ok) "$R2_PUBLIC_BASE/$key" else null
+    }
 
     /** 「이름 | 번호」에서 파이프(|)만 DCC 시안 */
     private fun styleSecondaryWithCyanPipe(line: String): CharSequence {

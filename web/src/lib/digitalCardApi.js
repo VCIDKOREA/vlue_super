@@ -1,3 +1,4 @@
+import { resolveRenderableMediaUrl } from "./renderableMediaUrl.js";
 import { apiUrl } from "./apiBase.js";
 import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 import { normalizeLetteringBizcardTemplate } from "./letteringBizcardTemplates.js";
@@ -94,14 +95,14 @@ export function hydrateLetteringEditableFromSnapshot(snap, opts = {}) {
       preferSnap: force || !String(local.customBackText || "").trim()
     }),
     logoDataUrl: (() => {
-      const fromSnap = String(snap.logoUrl || "").trim();
-      const localLogo = String(local.logoDataUrl || local.logoUrl || "").trim();
+      const fromSnap = resolveRenderableMediaUrl(snap.logoUrl);
+      const localLogo = resolveRenderableMediaUrl(local.logoDataUrl || local.logoUrl);
       if (force) return fromSnap || localLogo;
       return localLogo ? localLogo : fromSnap;
     })(),
     photoDataUrl: (() => {
-      const fromSnap = String(snap.photoUrl || "").trim();
-      const localPhoto = String(local.photoDataUrl || local.photoUrl || "").trim();
+      const fromSnap = resolveRenderableMediaUrl(snap.photoUrl);
+      const localPhoto = resolveRenderableMediaUrl(local.photoDataUrl || local.photoUrl);
       if (force) return fromSnap || localPhoto;
       return localPhoto ? localPhoto : fromSnap;
     })(),

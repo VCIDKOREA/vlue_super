@@ -2054,7 +2054,7 @@ export default function LocationPlatform() {
           <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
         {guideOn && cue && (session.mode === "vmap" || familyGuiding) ? (
-          <div className={`absolute right-3 z-30 w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)] ${familyGuiding ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
+          <div className={`absolute z-20 w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)] ${overseasMembers.length ? "left-3" : "right-3"} ${familyGuiding ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
             <div className="flex items-center justify-center bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] px-2 py-4 text-[42px] font-black leading-none text-[#04121a]">
               {maneuverGlyph(cue.instruction)}
             </div>
@@ -2072,6 +2072,15 @@ export default function LocationPlatform() {
                       ? "고속도로"
                       : "추천경로"}
               </p>
+              {familyGuiding ? (
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-full bg-white py-2 text-[12px] font-black text-[#04121a]"
+                  onClick={stopFamilyNavigate}
+                >
+                  이동 종료
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -2453,7 +2462,22 @@ export default function LocationPlatform() {
         ) : null}
         {session.mode === "family" ? (
           <>
-          <FamilyFolderPanels folders={familyFolders} dark={dark} members={folderPeople} glass={glass} />
+          <FamilyFolderPanels
+            folders={familyFolders}
+            dark={dark}
+            members={folderPeople}
+            glass={glass}
+            guidingUserId={familyGuiding ? familyNavTarget?.userId || "" : ""}
+            onNavigateMember={(member) => {
+              const mine = getLocalVlueUserId();
+              if (!member || member.self || member.userId === mine) {
+                focusMember(member);
+                return;
+              }
+              void startFamilyMove(member);
+            }}
+            onStopGuide={stopFamilyNavigate}
+          />
           <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
             <form
               className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 ${dark ? "border-white/10 bg-white/10" : "border-black/10 bg-slate-100/80"}`}

@@ -1,4 +1,5 @@
 import { prisma } from "../db/client.js";
+import { absolutizeMediaUrl } from "../lib/mediaUrlGuard.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
 import { isPlatformCeoHandle } from "./admin/platformAccountRoles.js";
 import { getVluePublicOrigin } from "./bizcard/bizcardPublicUrls.js";
@@ -207,9 +208,7 @@ async function resolveOverlayCompanyName(opts: {
 }
 
 function httpOnlyUrl(v: unknown): string {
-  const t = String(v || "").trim();
-  if (!t || /^\s*data:/i.test(t) || /^\s*blob:/i.test(t)) return "";
-  return t;
+  return absolutizeMediaUrl(v);
 }
 
 type ExportSnapLite = {

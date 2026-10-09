@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { slimExportSnapshot } from "../../lib/digitalCardSlim.js";
-import { isDataUrl, isHttpMediaUrl, mergeExportSnapshotMedia, stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
+import { isDataUrl, absolutizeMediaUrl, mergeExportSnapshotMedia, stripDataUrlsFromJson } from "../../lib/mediaUrlGuard.js";
 import {
   assertShowcaseStyleWithinLimit,
   slimShowcaseStyleForPersist,
@@ -173,10 +173,8 @@ function agentDto(agent: {
 }
 
 function httpPhoto(v: unknown): string | null {
-  const s = String(v ?? "").trim();
-  if (!s || isDataUrl(s)) return null;
-  if (isHttpMediaUrl(s) || s.startsWith("/")) return s;
-  return null;
+  const abs = absolutizeMediaUrl(v);
+  return abs || null;
 }
 
 function toLineDto(

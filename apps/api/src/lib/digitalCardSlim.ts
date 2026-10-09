@@ -3,7 +3,7 @@
  * full exportSnapshotJson 통째 전송 대체
  */
 
-import { isDataUrl, isBlobUrl, isHttpMediaUrl } from "./mediaUrlGuard.js";
+import { isDataUrl, absolutizeMediaUrl } from "./mediaUrlGuard.js";
 
 export type DigitalCardSlimMeta = {
   photoUrl: string | null;
@@ -18,10 +18,8 @@ export type DigitalCardSlimMeta = {
 };
 
 function httpOnly(v: unknown): string | null {
-  const s = String(v ?? "").trim();
-  if (!s || isDataUrl(s) || isBlobUrl(s)) return null;
-  if (!isHttpMediaUrl(s) && !s.startsWith("/")) return null;
-  return s;
+  const abs = absolutizeMediaUrl(v);
+  return abs || null;
 }
 
 function text(v: unknown, max = 200): string | null {

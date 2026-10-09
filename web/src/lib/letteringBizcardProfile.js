@@ -1,3 +1,4 @@
+import { resolveRenderableMediaUrl } from "./renderableMediaUrl.js";
 import { normalizeLetteringCard } from "./letteringCardNormalize.js";
 import { readProfilePhotoAvatar } from "./vlueAvatar.js";
 import {
@@ -205,11 +206,15 @@ export function buildUserLetteringCard({ membershipTier = "free" } = {}) {
       accountHolder: ed.accountHolder || "",
       isGroupVerified: Boolean(ed.isGroupVerified),
       accountGroupDocName: ed.accountGroupDocName || "",
-      logoUrl: ed.noCompanyLogo ? "" : String(ed.logoDataUrl || ed.logoUrl || "").trim(),
+      logoUrl: ed.noCompanyLogo
+        ? ""
+        : resolveRenderableMediaUrl(ed.logoDataUrl || ed.logoUrl || ""),
       logoFileName: ed.noCompanyLogo ? "" : String(ed.logoFileName || "").trim(),
       photoUrl: ed.noProfilePhoto
         ? ""
-        : String(ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || "").trim(),
+        : resolveRenderableMediaUrl(
+            ed.photoDataUrl || ed.photoUrl || readProfilePhotoAvatar() || ""
+          ),
       titlePhotoUrl:
         ed.noTitlePhoto && !String(ed.titlePhotoDataUrl || ed.titlePhotoUrl || "").trim()
           ? ""

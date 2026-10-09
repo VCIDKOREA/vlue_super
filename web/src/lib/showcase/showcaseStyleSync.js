@@ -401,16 +401,19 @@ export async function syncShowcaseFromServer(opts = {}) {
         const stampMs = (style) =>
           Date.parse(style?.savedAt || style?.clientUpdatedAt || "") || 0;
         const profileMs = Math.max(stampMs(editor), stampMs(live));
-        /* 웹에서 저장한 계정 쇼케이스가 더 최신이면 프로필 옛 번들로 되돌리지 않는다 */
-        const profileNewer = profileHas && profileMs > userMs + 500;
-        if (profileNewer) {
+        /*
+         * 계정 저장 직후 프로필 savedAt 을 클라이언트 시계로 다시 찍으면
+         * 항상 프로필이 더 최신처럼 보여 앱이 옛 번들로 덮어썼다.
+         * 계정 쇼케이스에 내용이 있으면 그 값을 송출 원본으로 쓴다.
+         */
+        if (!userHas && profileHas && profileMs >= userMs) {
           await switchToMultiDccProfile(active, {
             preferredLineId: active.assignedLineIds?.[0] || ""
           });
           lastHydrateOkAt = Date.now();
           return { ok: true, applied: true, source: "profile", profileId: active.id };
         }
-        if (userHas && userMs > profileMs + 500) {
+        if (userHas) {
           try {
             const { putDccProfileBundle } = await import("../dccAgentProfilesApi.js");
             await putDccProfileBundle(active.id, {
