@@ -29,9 +29,13 @@ export function addressLooksDetailed(label: string) {
   return /(로|길|대로|street|st\.|avenue|ave|boulevard|blvd|drive|dr|road|rd|way|plaza|lane)\b/i.test(text);
 }
 
-function pickDetailedResult(
-  results: Array<{ formatted_address?: string; types?: string[] }>
-) {
+type GeocodeResult = {
+  formatted_address?: string;
+  types?: string[];
+  address_components?: Array<{ long_name?: string; short_name?: string; types?: string[] }>;
+};
+
+function pickDetailedResult(results: GeocodeResult[]) {
   const rank = ["street_address", "premise", "subpremise", "route", "intersection"];
   for (const type of rank) {
     const hit = results.find((row) => Array.isArray(row.types) && row.types.includes(type) && row.formatted_address);
@@ -52,10 +56,7 @@ export async function reverseGeocodeGoogle(lat: number, lng: number): Promise<Go
     const res = await fetch(url.toString());
     const data = (await res.json().catch(() => ({}))) as {
       status?: string;
-      results?: Array<{
-        formatted_address?: string;
-        address_components?: Array<{ long_name?: string; short_name?: string; types?: string[] }>;
-      }>;
+      results?: GeocodeResult[];
     };
     if (data.status !== "OK" || !data.results?.length) return null;
     const first = pickDetailedResult(data.results) || data.results[0];
