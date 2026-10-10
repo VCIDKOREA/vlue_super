@@ -76,6 +76,12 @@ Contact promote: if lookup pending/blank **and** device contact name exists → 
 
 A lower tier may bind first (first paint) but never overwrites a higher tier; a later higher-tier result upgrades an already-visible 미등록 popup in place.
 
+**Commit once (no second decider):**
+- The first automatic phase after answer is committed for that call. `CallUiPhasePolicy.mayReplaceCommittedPhase` is the only upgrade rule.
+- Allowed upgrades: 미등록/안심 팝업 → 인증 팝업 → 풀 쇼케이스. 경로 비정상은 쇼케이스보다 우선해 안심 팝업으로 바꿀 수 있다.
+- Forbidden: 풀 쇼케이스 → 안심/인증 팝업, 인증 팝업 → 안심 팝업, 사용자 Mini → 어떤 자동 전환. 늦은 조회·주소록 이름·웹 `notifyVlueAuthMemberReady` 가 이 금지를 깨지 못한다.
+- The overlay WebView does **not** choose the phase. `connected` only marks the call timer. Expand/collapse comes from native `restore_showcase` / `minimize_showcase` / `big_push_bar`.
+
 **Public directory:** 학교·우체국·공공기관 등 DB 전화 매칭 → `public_directory_safe` 안심팝업.
 
 **BigPush bar tap (after answer):** same decision table. Resolved unverified opens the 미등록 안심팝업 (not fullscreen).

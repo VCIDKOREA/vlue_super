@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchSocialLinks,
-  linkSocialAccount,
   readCachedSocialLinks,
   startSocialOAuthLink
 } from "../../lib/socialAccountLinkApi.js";
-import { getKakaoAccessTokenWithLogin } from "../../lib/kakaoSocialLogin.js";
 
 const PROVIDERS = [
   {
@@ -66,6 +64,7 @@ function formatLinkedAt(iso) {
  * @param {"default"|"profile"} placement profile이면 상단·강조 스타일
  */
 export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, placement = "default" }) {
+  const [open, setOpen] = useState(false);
   const [links, setLinks] = useState(() => readCachedSocialLinks());
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState("");
@@ -125,23 +124,6 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, pl
     return m;
   }, [links]);
 
-  const linkWithKakaoSdk = async () => {
-    setBusyProvider("kakao");
-    setError("");
-    try {
-      const token = await getKakaoAccessTokenWithLogin();
-      await linkSocialAccount({ provider: "kakao", socialToken: token });
-      onToast?.("카카오 계정이 VLUÉ 마스터 계정에 연동되었습니다.");
-      await refresh();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "카카오 연동에 실패했습니다.";
-      setError(msg);
-      onToast?.(msg);
-    } finally {
-      setBusyProvider("");
-    }
-  };
-
   const linkWithOAuthRedirect = async (provider) => {
     setBusyProvider(provider);
     setError("");
@@ -158,26 +140,32 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, pl
 
   return (
     <section className={sectionCls}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <button
+        type="button"
+        className="flex w-full items-start justify-between gap-3 text-left"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div className="min-w-0">
           <p className={`text-[14px] font-black ${titleCls}`}>소셜 로그인 연동</p>
           <p className={`mt-1 text-[11px] leading-relaxed [word-break:keep-all] ${bodyCls}`}>
-            {inProfile ? (
-              <>
-                PASS 본인인증 후 여기서 <b>카카오·Google·네이버·Instagram</b>을 연결하면 다음부터 간편
-                로그인할 수 있습니다.
-              </>
-            ) : (
-              <>
-                VLUÉ는 <b>본인인증 회원가입</b>으로만 계정이 만들어집니다. 가입 후 여기서 SNS를
-                <b> 1:1로 연결</b>하면 다음부터 간편 로그인할 수 있습니다.
-              </>
-            )}
+            {open
+              ? inProfile
+                ? "PASS 본인인증 후 카카오·Google·네이버·Instagram을 연결하면 다음부터 간편 로그인할 수 있습니다."
+                : "가입 후 SNS를 1:1로 연결하면 다음부터 간편 로그인할 수 있습니다."
+              : `카카오 · Google · 네이버 · Instagram · 연동 ${links.length}개`}
           </p>
         </div>
-        <span className={badgeCls}>{inProfile ? "간편 로그인" : "사후 연동"}</span>
-      </div>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className={badgeCls}>{inProfile ? "간편 로그인" : "사후 연동"}</span>
+          <span className={`text-[12px] font-black ${titleCls}`} aria-hidden>
+            {open ? "접기" : "펼치기"}
+          </span>
+        </span>
+      </button>
 
+      {open ? (
+      <>
       {inProfile ? null : (
         <ol className={`mt-4 space-y-2 text-[11px] leading-relaxed ${bodyCls}`}>
           <li className="flex gap-2">
@@ -256,9 +244,7 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, pl
                 <button
                   type="button"
                   disabled={Boolean(busyProvider)}
-                  onClick={() =>
-                    p.id === "kakao" ? linkWithKakaoSdk() : linkWithOAuthRedirect(p.id)
-                  }
+                  onClick={() => linkWithOAuthRedirect(p.id)}
                   className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-semibold disabled:opacity-60 ${p.btnCls}`}
                 >
                   {isBusy ? "연동 중…" : p.actionLabel}
@@ -275,6 +261,8 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, pl
         </button>
         <p className={footnoteCls}>소셜로 신규 가입은 되지 않습니다</p>
       </div>
+      </>
+      ) : null}
     </section>
   );
 }

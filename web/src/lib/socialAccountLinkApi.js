@@ -55,7 +55,9 @@ export async function linkSocialAccount({ provider, socialToken }) {
 export async function startSocialOAuthLink(provider) {
   const p = String(provider || "").toLowerCase();
   const path =
-    p === "google"
+    p === "kakao"
+      ? "/api/v1/auth/kakao/link/start"
+      : p === "google"
       ? "/api/v1/auth/google/link/start"
       : p === "naver"
         ? "/api/v1/auth/naver/link/start"

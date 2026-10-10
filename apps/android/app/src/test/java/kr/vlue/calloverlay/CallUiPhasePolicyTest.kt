@@ -115,6 +115,71 @@ class CallUiPhasePolicyTest {
     }
 
     @Test
+    fun committedShowcase_isNotReplacedByLaterPopup() {
+        assertFalse(
+            CallUiPhasePolicy.mayReplaceCommittedPhase(
+                CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+                CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+                nextIsPathAbnormal = false
+            )
+        )
+        assertFalse(
+            CallUiPhasePolicy.mayReplaceCommittedPhase(
+                CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+                CallUiPhasePolicy.Phase.CENTER_AUTH_POPUP,
+                nextIsPathAbnormal = false
+            )
+        )
+    }
+
+    @Test
+    fun pathAbnormal_mayReplaceShowcaseWithSafePopup() {
+        assertTrue(
+            CallUiPhasePolicy.mayReplaceCommittedPhase(
+                CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+                CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+                nextIsPathAbnormal = true
+            )
+        )
+    }
+
+    @Test
+    fun lowerPopup_mayUpgrade_butNotDowngrade() {
+        assertTrue(
+            CallUiPhasePolicy.mayReplaceCommittedPhase(
+                CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+                CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+                nextIsPathAbnormal = false
+            )
+        )
+        assertTrue(
+            CallUiPhasePolicy.mayReplaceCommittedPhase(
+                CallUiPhasePolicy.Phase.CENTER_AUTH_POPUP,
+                CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+                nextIsPathAbnormal = false
+            )
+        )
+        assertFalse(
+            CallUiPhasePolicy.mayReplaceCommittedPhase(
+                CallUiPhasePolicy.Phase.CENTER_AUTH_POPUP,
+                CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP,
+                nextIsPathAbnormal = false
+            )
+        )
+    }
+
+    @Test
+    fun userMini_blocksAutomaticPhaseChange() {
+        assertFalse(
+            CallUiPhasePolicy.mayReplaceCommittedPhase(
+                CallUiPhasePolicy.Phase.MINI_CASE,
+                CallUiPhasePolicy.Phase.FULL_SHOWCASE,
+                nextIsPathAbnormal = true
+            )
+        )
+    }
+
+    @Test
     fun incoming_autoExpand_alwaysAllowed() {
         assertTrue(
             CallUiPhasePolicy.mayAutoExpandAfterAnswer(

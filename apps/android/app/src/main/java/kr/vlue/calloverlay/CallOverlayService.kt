@@ -167,6 +167,11 @@ class CallOverlayService : Service() {
     private var restoreGhostGuardUntilElapsed: Long = 0L
     /** 풀스크린 레이아웃이 커밋된 뒤에만 웹 쇼케이스를 연다. 작은 창에서 먼저 펼치면 잘린 먹통이 된다. */
     private var showcaseWebExpandPending: Boolean = false
+    /**
+     * 이 통화에서 자동으로 고른 화면. 늦은 조회가 더 낮은 화면으로 바꾸지 못한다.
+     * 규격 §3 commit once / [CallUiPhasePolicy.mayReplaceCommittedPhase].
+     */
+    private var committedAnswerPhase: CallUiPhasePolicy.Phase = CallUiPhasePolicy.Phase.BIG_PUSH
     /** 발신: 상대 응답(STATE_ACTIVE / notifyConnected) 후에만 true — 다이얼 OFFHOOK 만으로는 Showcase 금지 */
     private var remoteConnected: Boolean = false
     /**
@@ -1426,6 +1431,7 @@ class CallOverlayService : Service() {
         nativeBanner?.visibility = android.view.View.GONE
         webView?.visibility = android.view.View.VISIBLE
         rootContainer?.setBackgroundColor(Color.parseColor("#0B101B"))
+        committedAnswerPhase = CallUiPhasePolicy.Phase.FULL_SHOWCASE
         companion.onAnswer(OverlayContext.IN_CALL)
         publishCompanion(OverlayTriggerEvent.ANSWER)
         userMinimized = false
@@ -2183,6 +2189,25 @@ class CallOverlayService : Service() {
             )
             return
         }
+        val nextPhase = if (authMember) {
+            CallUiPhasePolicy.Phase.CENTER_AUTH_POPUP
+        } else {
+            CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP
+        }
+        if (!allowFromMiniRestore &&
+            !CallUiPhasePolicy.mayReplaceCommittedPhase(
+                committedAnswerPhase,
+                nextPhase,
+                nextIsPathAbnormal = isCurrentPathAbnormal(pendingCardJson)
+            )
+        ) {
+            VlueBigPushTrace.lifecycle(
+                "CENTER_SAFE_POPUP_HOLD_COMMIT",
+                "source=$source committed=${committedAnswerPhase.name} next=${nextPhase.name}"
+            )
+            return
+        }
+        committedAnswerPhase = nextPhase
         /*
          * Samsung에서 Receiver/Telecom/InCall 경로가 같은 수화를 연속 통지한다.
          * 이미 전환 완료된 팝업을 remove/add 하면 BigPush가 순간 재노출되거나
@@ -2291,6 +2316,7 @@ class CallOverlayService : Service() {
         /* 가드를 먼저 — 팝업 remove 직후 ContextWatch 가 BigPush 로 접지 못하게 */
         authPopupConfirmedToMini = true
         userMinimized = true
+        committedAnswerPhase = CallUiPhasePolicy.Phase.MINI_CASE
         authPopupOnlyMode = false
         showcaseHoldUntilElapsed = android.os.SystemClock.elapsedRealtime() + 120_000L
         removeDcpPopupWindow()
@@ -2689,11 +2715,54 @@ class CallOverlayService : Service() {
                     return@post
                 }
             }
+            if (phoneChanged) {
+                committedAnswerPhase = CallUiPhasePolicy.Phase.BIG_PUSH
+            }
+            /*
+             * 이미 쇼케이스/상위 팝업이 확정된 통화에 안심·인증·미등록 카드가 늦게 오면
+             * 화면을 뒤집지 않는다. 카드 JSON 도 갈아끼우지 않는다.
+             */
+            val incomingPhase = when {
+                cardJson.isNullOrBlank() -> CallUiPhasePolicy.Phase.KEEP_BIG_PUSH
+                isCurrentPathAbnormal(cardJson) -> CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP
+                isContactSafeCare(cardJson) -> CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP
+                VlueAuthMemberPopupPolicy.isAuthMemberOnly(cardJson, verified) ->
+                    CallUiPhasePolicy.Phase.CENTER_AUTH_POPUP
+                VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(cardJson) ->
+                    CallUiPhasePolicy.Phase.FULL_SHOWCASE
+                VlueAuthMemberPopupPolicy.isUnverifiedResolved(cardJson) ->
+                    CallUiPhasePolicy.Phase.CENTER_SAFE_POPUP
+                else -> CallUiPhasePolicy.Phase.KEEP_BIG_PUSH
+            }
+            if (!phoneChanged &&
+                incomingPhase != committedAnswerPhase &&
+                !CallUiPhasePolicy.mayReplaceCommittedPhase(
+                    committedAnswerPhase,
+                    incomingPhase,
+                    nextIsPathAbnormal = isCurrentPathAbnormal(cardJson)
+                )
+            ) {
+                VlueBigPushTrace.lifecycle(
+                    "CALL_INFO_SKIP_PHASE_DOWNGRADE",
+                    "committed=${committedAnswerPhase.name} phone=${ReleaseDebugGate.maskPhoneForLog(phone)}"
+                )
+                LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                return@post
+            }
             currentPhone = phone
             currentOutgoing = outgoing
             pendingCardJson = cardJson
             pendingVerified = verified
             bindDcpRoute(phone, dcpRoute, cardJson)
+            if (incomingPhase == CallUiPhasePolicy.Phase.FULL_SHOWCASE &&
+                committedAnswerPhase != CallUiPhasePolicy.Phase.FULL_SHOWCASE &&
+                isCallAlreadyAnswered() &&
+                !(currentOutgoing && !remoteConnected && !outgoingExpandRequestedByUser)
+            ) {
+                enterShowcaseFromAnswer(source = "applyCallInfoUpdate_upgrade")
+                LetteringPrefs.setLastCallEvent(this, "overlay_updated:$phone")
+                return@post
+            }
             /*
              * 미등록 팝업이 떠 있는 상태에서 더 높은 티어(회원·공공DB·비정상 경로)가 늦게 도착 —
              * 제자리 업그레이드. 낮은 티어/동일 미등록 재전송은 무시(깜박임 방지).
@@ -3860,6 +3929,7 @@ class CallOverlayService : Service() {
         }
         authPopupOnlyMode = false
         showcaseWebExpandPending = false
+        committedAnswerPhase = CallUiPhasePolicy.Phase.MINI_CASE
         /* 신고 패널에서 닫으면(X) 미니로 — 이후 미니 탭은 미등록 안심팝업을 다시 띄운다 */
         unregisteredReportRequested = false
         companion.onMinimize(
@@ -4810,6 +4880,7 @@ class CallOverlayService : Service() {
         outgoingExpandRequestedByUser = false
         unregisteredPopupShown = false
         unregisteredReportRequested = false
+        committedAnswerPhase = CallUiPhasePolicy.Phase.BIG_PUSH
         lastLoadedOutgoing = null
         answerUiResumeAttempt = 0
         userMinimized = false

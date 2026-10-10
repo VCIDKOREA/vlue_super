@@ -120,6 +120,29 @@ object CallUiPhasePolicy {
     }
 
     /**
+     * 한 통화에서 자동으로 고른 화면은 아래로 내리지 않는다.
+     * 업그레이드만 허용. 경로 비정상 안심팝업만 쇼케이스를 덮을 수 있다.
+     * 사용자 Mini 는 자동 전환으로 바꾸지 않는다.
+     */
+    fun mayReplaceCommittedPhase(
+        committed: Phase,
+        next: Phase,
+        nextIsPathAbnormal: Boolean
+    ): Boolean {
+        if (committed == Phase.MINI_CASE) return false
+        if (nextIsPathAbnormal && next == Phase.CENTER_SAFE_POPUP) return true
+        if (committed == Phase.BIG_PUSH || committed == Phase.KEEP_BIG_PUSH) return true
+        if (committed == next) return false
+        return when (committed) {
+            Phase.CENTER_SAFE_POPUP ->
+                next == Phase.CENTER_AUTH_POPUP || next == Phase.FULL_SHOWCASE
+            Phase.CENTER_AUTH_POPUP -> next == Phase.FULL_SHOWCASE
+            Phase.FULL_SHOWCASE -> false
+            else -> true
+        }
+    }
+
+    /**
      * 발신 탭로고(미니버블) **상단** 라벨.
      * - VLUÉ DB 상호/이름 또는 저장된 연락처 이름/상호 → 그대로
      * - 미등록·모르는 번호(이름 없음) → 「탭하여 정보확인」

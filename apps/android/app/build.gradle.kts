@@ -77,6 +77,13 @@ android {
         manifestPlaceholders["admobAppId"] = admobAppId
     }
 
+    /* AAB/APK 파일명에 버전명·버전코드를 넣어 스토어 업로드본이 섞이지 않게 한다. */
+    base {
+        archivesName.set(
+            "vlue-${defaultConfig.versionName}-${defaultConfig.versionCode}"
+        )
+    }
+
     flavorDimensions += "audience"
     productFlavors {
         create("parent") {

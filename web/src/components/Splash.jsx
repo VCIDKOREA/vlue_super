@@ -48,12 +48,6 @@ const VLUE_LETTERS_AFTER_TRIM_S = 1.12;
 
 const SPLASH_VIDEO_VOLUME = 1;
 
-function isIosLike() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-
 function isAndroidWebView() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
@@ -227,7 +221,11 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
       };
 
       v.addEventListener("timeupdate", onTimeUpdate);
-      const onPlaying = () => setVideoReady(true);
+      const onPlaying = () => {
+        const seg = segmentRef.current;
+        if (seg && v.currentTime < seg.segmentStart - 0.05) return;
+        setVideoReady(true);
+      };
       v.addEventListener("playing", onPlaying);
       if (!v.paused) setVideoReady(true);
       videoCleanupFnsRef.current.push(() => {
@@ -273,19 +271,9 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
         /* ignore */
       }
 
-      /* iOS / 일부 WebView: seek 전에 한 번 play() */
-      if (isIosLike() || isAndroidWebView()) {
-        try {
-          v.currentTime = 0;
-        } catch {
-          /* ignore */
-        }
-        playSafe(v)
-          .then(() => beginFrom(segmentStart))
-          .catch(() => beginFrom(0));
-      } else {
-        beginFrom(segmentStart);
-      }
+      /* iOS/WebView도 0초부터 재생하지 않는다.
+       * 영상 앞부분에 앱 아이콘 프레임이 있어, 먼저 재생하면 그 화면이 보인 뒤 점프한다. */
+      beginFrom(segmentStart);
     },
     [failVideo, playSafe, reveal, videoBroken]
   );
@@ -424,7 +412,6 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
                           src={splashVideoSrc}
                           muted
                           defaultMuted
-                          autoPlay
                           playsInline
                           preload="auto"
                           controls={false}

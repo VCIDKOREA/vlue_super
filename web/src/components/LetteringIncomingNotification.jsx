@@ -739,7 +739,8 @@ export default function LetteringIncomingNotification({
   const tipBroadcastLabel = String(activeTipSummary?.topLabel || "").trim();
   const tipBroadcastCount = Number(activeTipSummary?.topCount || activeTipSummary?.tipCount || 0);
 
-  const isExpandedView = expanded && canExpand && expandContent !== false;
+  const isExpandedView =
+    expanded && expandContent !== false && (canExpand || hadFullShowcaseThisCall);
   const showExpandedLayout = isExpandedView || keepExpandedLayout;
   const prevExpandedViewRef = useRef(isExpandedView);
 
