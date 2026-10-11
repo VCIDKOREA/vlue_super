@@ -64,6 +64,7 @@ export async function putShowcaseStyleBundle({
   live,
   liveSource,
   clientUpdatedAt,
+  baseUpdatedAt,
   lineId: lineIdOpt
 } = {}) {
   const lineId = String(lineIdOpt || readSelectedDccLineId() || "").trim();
@@ -88,14 +89,16 @@ export async function putShowcaseStyleBundle({
         editor,
         live,
         liveSource,
-        clientUpdatedAt
+        clientUpdatedAt,
+        baseUpdatedAt
       })
     });
     const data = await res.json().catch(() => ({}));
-    if (res.status === 409) {
+    if (res.status === 409 || data.preserved) {
       return {
-        ok: false,
-        conflict: true,
+        ok: res.status !== 409,
+        conflict: res.status === 409,
+        preserved: Boolean(data.preserved),
         editor: data.editor ?? null,
         live: data.live ?? null,
         liveSource: data.liveSource ?? null,

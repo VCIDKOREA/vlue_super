@@ -8,6 +8,8 @@ import {
   slimShowcaseStyleForPublic
 } from "../../lib/slimShowcaseStyle.js";
 import { defaultAgentLabel, normalizePhotoFocus } from "./dccAgentProfileService.js";
+import { showcaseRecordHasContent } from "../../lib/showcaseRecordHasContent.js";
+import { archiveContentRevision } from "../content/contentRevisionStore.js";
 
 export type DccLineKind = "mobile" | "extension" | "rep_number";
 
@@ -535,22 +537,60 @@ export async function putDccLineShowcase(
   const data: Prisma.BusinessCardUpdateInput = {};
   if (input.editor !== undefined) {
     const obj = input.editor && typeof input.editor === "object" ? (input.editor as Record<string, unknown>) : null;
-    if (obj && showcaseHasContent(obj)) {
+    if (obj && showcaseRecordHasContent(obj)) {
+      if (showcaseRecordHasContent(row.lineShowcaseStyleJson)) {
+        void archiveContentRevision({
+          userId,
+          scope: "line_showcase",
+          recordKey: cardId,
+          fieldName: "editor",
+          event: "superseded",
+          snapshot: row.lineShowcaseStyleJson
+        });
+      }
       const slim = slimShowcaseStyleForPersist(stripDataUrlsFromJson(obj)) as Record<string, unknown>;
       slim.v = 2;
       assertShowcaseStyleWithinLimit(slim, "showcase style");
       data.lineShowcaseStyleJson = slim as Prisma.InputJsonValue;
+    } else if (obj && showcaseRecordHasContent(row.lineShowcaseStyleJson)) {
+      void archiveContentRevision({
+        userId,
+        scope: "line_showcase",
+        recordKey: cardId,
+        fieldName: "editor",
+        event: "rejected_empty",
+        snapshot: obj
+      });
     } else if (!obj && !existingHas && !certified) {
       data.lineShowcaseStyleJson = Prisma.JsonNull;
     }
   }
   if (input.live !== undefined) {
     const obj = input.live && typeof input.live === "object" ? (input.live as Record<string, unknown>) : null;
-    if (obj && showcaseHasContent(obj)) {
+    if (obj && showcaseRecordHasContent(obj)) {
+      if (showcaseRecordHasContent(row.lineShowcaseLiveStyleJson)) {
+        void archiveContentRevision({
+          userId,
+          scope: "line_showcase",
+          recordKey: cardId,
+          fieldName: "live",
+          event: "superseded",
+          snapshot: row.lineShowcaseLiveStyleJson
+        });
+      }
       const slim = slimShowcaseStyleForPersist(stripDataUrlsFromJson(obj)) as Record<string, unknown>;
       slim.v = 2;
       assertShowcaseStyleWithinLimit(slim, "showcase style");
       data.lineShowcaseLiveStyleJson = slim as Prisma.InputJsonValue;
+    } else if (obj && showcaseRecordHasContent(row.lineShowcaseLiveStyleJson)) {
+      void archiveContentRevision({
+        userId,
+        scope: "line_showcase",
+        recordKey: cardId,
+        fieldName: "live",
+        event: "rejected_empty",
+        snapshot: obj
+      });
     } else if (!obj && !existingHas && !certified) {
       data.lineShowcaseLiveStyleJson = Prisma.JsonNull;
     }

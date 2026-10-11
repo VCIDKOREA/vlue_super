@@ -45,7 +45,8 @@ try {
 class OverlayErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, nonce: 0 };
+    this.retries = 0;
   }
 
   static getDerivedStateFromError(error) {
@@ -53,12 +54,23 @@ class OverlayErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    const text = `${error?.stack || error} ${info?.componentStack || ""}`;
     console.error("[VLUÉ overlay]", error, info);
+    try {
+      window.Android?.logJsError?.(`overlay-boundary ${text}`);
+    } catch {
+      /* ignore */
+    }
+    /* 한 번은 같은 문서를 다시 붙인다. 경계를 null 로 두면 전화 UI만 남는다. */
+    if (this.retries < 1) {
+      this.retries += 1;
+      this.setState({ error: null, nonce: this.state.nonce + 1 });
+    }
   }
 
   render() {
     if (this.state.error) return null;
-    return this.props.children;
+    return <React.Fragment key={this.state.nonce}>{this.props.children}</React.Fragment>;
   }
 }
 

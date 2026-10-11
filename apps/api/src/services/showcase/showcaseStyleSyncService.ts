@@ -12,6 +12,8 @@ import {
   slimShowcaseStyleForPersist,
   slimShowcaseStyleForPublic
 } from "../../lib/slimShowcaseStyle.js";
+import { showcaseRecordHasContent } from "../../lib/showcaseRecordHasContent.js";
+import { archiveContentRevision } from "../content/contentRevisionStore.js";
 
 export type ShowcaseLiveSource = { source: "editor" | "mycase"; at: number };
 
@@ -171,10 +173,11 @@ export async function putUserShowcaseStyleBundle(
     live?: unknown;
     liveSource?: unknown;
     clientUpdatedAt?: string | null;
+    baseUpdatedAt?: string | null;
     rewardedGrantId?: string | null;
   }
 ): Promise<
-  | { ok: true; updatedAt: string }
+  | { ok: true; updatedAt: string; preserved?: boolean; bundle?: ShowcaseStyleBundle }
   | { ok: false; conflict: true; bundle: ShowcaseStyleBundle }
 > {
   const metaRows = await prisma.$queryRaw<
@@ -183,29 +186,50 @@ export async function putUserShowcaseStyleBundle(
       has_editor: boolean;
       has_live: boolean;
       showcase_style_json: unknown | null;
+      showcase_live_style_json: unknown | null;
     }>
   >(Prisma.sql`
     SELECT
       showcase_style_updated_at,
       (showcase_style_json IS NOT NULL) AS has_editor,
       (showcase_live_style_json IS NOT NULL) AS has_live,
-      showcase_style_json
+      showcase_style_json,
+      showcase_live_style_json
     FROM users
     WHERE id = ${userId}::uuid
     LIMIT 1
   `);
   const meta = metaRows[0];
   const clientAtMs = input.clientUpdatedAt ? Date.parse(String(input.clientUpdatedAt)) : NaN;
+  const baseAtMs = input.baseUpdatedAt ? Date.parse(String(input.baseUpdatedAt)) : NaN;
   const serverAtMs = meta?.showcase_style_updated_at
     ? meta.showcase_style_updated_at.getTime()
     : 0;
   const hasExisting = Boolean(meta?.has_editor || meta?.has_live);
+  const existingEditorHas = showcaseRecordHasContent(meta?.showcase_style_json);
+  const existingLiveHas = showcaseRecordHasContent(meta?.showcase_live_style_json);
+
+  /*
+   * 기기가 마지막으로 받은 서버 시각과 지금 서버 시각이 다르면 그 쓰기는 옛 본이다.
+   * 재설치가 찍은 '지금' 시각은 base 가 아니므로 여기서 최신 본을 이기지 못한다.
+   */
+  if (
+    hasExisting &&
+    (existingEditorHas || existingLiveHas) &&
+    Number.isFinite(baseAtMs) &&
+    serverAtMs > 0 &&
+    Math.abs(baseAtMs - serverAtMs) > 1500
+  ) {
+    const bundle = await getUserShowcaseStyleBundle(userId);
+    return { ok: false, conflict: true, bundle };
+  }
 
   if (
     Number.isFinite(clientAtMs) &&
     serverAtMs > 0 &&
     clientAtMs + 1500 < serverAtMs &&
-    hasExisting
+    hasExisting &&
+    !Number.isFinite(baseAtMs)
   ) {
     const bundle = await getUserShowcaseStyleBundle(userId);
     return { ok: false, conflict: true, bundle };
@@ -219,9 +243,28 @@ export async function putUserShowcaseStyleBundle(
     showcaseStyleUpdatedAt: nextUpdatedAt
   };
 
+  let preservedExisting = false;
+
   if (input.editor !== undefined) {
     const editor = prepareStyleForDb(input.editor);
-    if (editor) {
+    if (editor && !showcaseRecordHasContent(editor) && existingEditorHas) {
+      /* 재설치·토글이 올린 빈 스타일은 저장된 편집본을 유지한다. */
+      preservedExisting = true;
+      console.info(
+        "[showcase-preserve] skip empty editor",
+        userId,
+        "serverAt",
+        meta?.showcase_style_updated_at?.toISOString() || ""
+      );
+      void archiveContentRevision({
+        userId,
+        scope: "account_showcase",
+        recordKey: userId,
+        fieldName: "editor",
+        event: "rejected_empty",
+        snapshot: editor
+      });
+    } else if (editor) {
       const previousPages = asObjectOrNull(meta?.showcase_style_json)?.pages ?? [];
       const nextPages = editor.pages ?? [];
       const pagesChanged = JSON.stringify(previousPages) !== JSON.stringify(nextPages);
@@ -239,15 +282,62 @@ export async function putUserShowcaseStyleBundle(
             });
           }
       }
+      if (existingEditorHas) {
+        void archiveContentRevision({
+          userId,
+          scope: "account_showcase",
+          recordKey: userId,
+          fieldName: "editor",
+          event: "superseded",
+          snapshot: meta?.showcase_style_json
+        });
+      }
       data.showcaseStyleJson = editor as Prisma.InputJsonValue;
     }
   }
   if (input.live !== undefined && input.live !== null) {
     /* live: null 로 서버 송출본을 지우지 않음 — 재설치 직후 빈 로컬 푸시 레이스 방지 */
     const live = prepareStyleForDb(input.live);
-    if (live) {
+    if (live && !showcaseRecordHasContent(live) && existingLiveHas) {
+      preservedExisting = true;
+      console.info(
+        "[showcase-preserve] skip empty live",
+        userId,
+        "serverAt",
+        meta?.showcase_style_updated_at?.toISOString() || ""
+      );
+      void archiveContentRevision({
+        userId,
+        scope: "account_showcase",
+        recordKey: userId,
+        fieldName: "live",
+        event: "rejected_empty",
+        snapshot: live
+      });
+    } else if (live) {
+      if (existingLiveHas) {
+        void archiveContentRevision({
+          userId,
+          scope: "account_showcase",
+          recordKey: userId,
+          fieldName: "live",
+          event: "superseded",
+          snapshot: meta?.showcase_live_style_json
+        });
+      }
       data.showcaseLiveStyleJson = live as Prisma.InputJsonValue;
     }
+  }
+  const styleWrite =
+    data.showcaseStyleJson !== undefined || data.showcaseLiveStyleJson !== undefined;
+  if (!styleWrite && preservedExisting) {
+    const bundle = await getUserShowcaseStyleBundle(userId);
+    return {
+      ok: true,
+      preserved: true,
+      updatedAt: bundle.updatedAt || new Date(serverAtMs || Date.now()).toISOString(),
+      bundle
+    };
   }
   if (input.liveSource !== undefined) {
     const src = normalizeLiveSource(input.liveSource);

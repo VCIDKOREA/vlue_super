@@ -28,6 +28,7 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.view.animation.DecelerateInterpolator
 import kotlin.math.abs
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -36,6 +37,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import kr.vlue.calloverlay.companion.CompanionOverlayController
+import kr.vlue.calloverlay.companion.CompanionOverlaySession
 import kr.vlue.calloverlay.companion.MiniCaseVisibility
 import kr.vlue.calloverlay.companion.BigPushShowcaseBar
 import kr.vlue.calloverlay.companion.OutgoingShowcaseGate
@@ -106,6 +108,8 @@ class CallOverlayService : Service() {
      * React 트리가 죽고 DCC 가 빈 화면으로 다시 부팅된다.
      */
     private var liveOverlayDocumentKey: String? = null
+    /** 문서 로드 / 데이터 갱신 / 렌더러 복구를 한 통화 기준으로 가른다. */
+    private val overlaySession = CompanionOverlaySession()
     /** 마지막으로 웹에 넣은 카드 JSON — 동일 페이로드 재주입으로 enrich 를 다시 열지 않음 */
     private var lastInjectedCardJson: String? = null
     private var currentDcpRoute: String = ""
@@ -810,133 +814,9 @@ class CallOverlayService : Service() {
         if (asBigPush && !outgoing) {
             attachBigPushDragGestures(wv)
         }
-        wv.webChromeClient = object : android.webkit.WebChromeClient() {
-            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
-                val msg = consoleMessage?.message().orEmpty()
-                val level = consoleMessage?.messageLevel()?.name ?: "UNKNOWN"
-                OverlayDebugLog.console(
-                    level,
-                    msg,
-                    consoleMessage?.sourceId().orEmpty(),
-                    consoleMessage?.lineNumber() ?: -1
-                )
-                if (msg.contains("VlueBigPushTrace") || msg.contains("Showcase")) {
-                    VlueBigPushTrace.step(0, "JS", msg)
-                }
-                return super.onConsoleMessage(consoleMessage)
-            }
-        }
+        wv.webChromeClient = overlayChromeClient()
         OverlayDebugLog.auditBundledAssets(this)
-        wv.webViewClient = object : WebViewClient() {
-            /* 오버레이 번들(/vlue-overlay/ 하위) 은 APK assets 에서 즉시 — 서버 404/오프라인 무관 */
-            override fun shouldInterceptRequest(
-                view: WebView?,
-                request: android.webkit.WebResourceRequest?
-            ): android.webkit.WebResourceResponse? =
-                OverlayAssetServer.intercept(this@CallOverlayService, request)
-                    ?: super.shouldInterceptRequest(view, request)
-
-            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                /* 새 문서 로드 시작 — 실패 플래그 리셋 (실패면 곧 onReceived*Error 가 다시 세운다) */
-                overlayLoadFailed = false
-                /* 직전 문서에 넣은 통화 상태는 새 문서가 받지 못했다. 다음 notify 한 번은 통과. */
-                lastDeliveredWebCallState = ""
-                OverlayDebugLog.page("onPageStarted url=$url cacheMode=${view?.settings?.cacheMode}")
-                injectLetteringFlag(view)
-                installJsErrorHook(view)
-            }
-
-            /* 서버(Railway) 404/5xx — "Not Found" 본문이 투명 오버레이에 그려져 아무것도 안 보이던 문제 */
-            override fun onReceivedHttpError(
-                view: WebView?,
-                request: android.webkit.WebResourceRequest?,
-                errorResponse: android.webkit.WebResourceResponse?
-            ) {
-                super.onReceivedHttpError(view, request, errorResponse)
-                val code = errorResponse?.statusCode ?: 0
-                if (request?.isForMainFrame == true && code >= 400) {
-                    onOverlayWebLoadFailed("http_$code")
-                }
-            }
-
-            override fun onReceivedError(
-                view: WebView?,
-                request: android.webkit.WebResourceRequest?,
-                error: android.webkit.WebResourceError?
-            ) {
-                super.onReceivedError(view, request, error)
-                if (request?.isForMainFrame == true) {
-                    onOverlayWebLoadFailed("err_${error?.errorCode ?: 0}")
-                }
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                OverlayDebugLog.page(
-                    "onPageFinished url=$url progress=${view?.progress} title=${view?.title}"
-                )
-                /* 로드 중에 넣은 상태는 리스너 등록 전일 수 있다. 준비된 문서에 한 번 다시 넣는다. */
-                lastDeliveredWebCallState = ""
-                if (!overlayLoadFailed) {
-                    overlayLoadFailCount = 0
-                    hideOverlayNativeFallback()
-                }
-                CompanionPerfTracker.noteWebViewReady()
-                injectLetteringFlag(view)
-                if (dismissing || companion.state == OverlayState.IDLE ||
-                    !CompanionRuntimeStabilityDiag.isCallSessionActive()
-                ) {
-                    CompanionRuntimeStabilityDiag.noteStaleEvent(
-                        "WEB_PAGE_FINISHED",
-                        "onPageFinished",
-                        detail = "state=${companion.state.name}"
-                    )
-                    return
-                }
-                syncOverlayChromeForState(source = "onPageFinished")
-                syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
-                /*
-                 * Showcase 레이아웃은 Answer Event에서 이미 commit됨.
-                 * onPageFinished는 Web 알림·레이아웃 재확인만 — Showcase 표시를 지연시키지 않는다.
-                 */
-                when (companion.state) {
-                    OverlayState.SHOWCASE -> {
-                        if (companion.position == OverlayPosition.FULLSCREEN) {
-                            commitFullscreenLayout(source = "onPageFinished_reaffirm")
-                        }
-                        /* Web Content Ready — state 전이 아님 (이미 Answer에서 connected 알림) */
-                        notifyWebCallState("connected")
-                    }
-                    OverlayState.MINI_CASE -> {
-                        /*
-                         * 팝업 확인 후 새 WebView 는 링잉 BigPush 로 부팅됨.
-                         * loadUrl 직후 notify 는 리스너 전에 사라져 사진1 바가 고착된다.
-                         * 페이지 준비 후 MiniCase(사진2) 상태로 재주입.
-                         */
-                        commitMiniCaseLayout(source = "onPageFinished_mini")
-                        notifyWebCallState("minimize_showcase")
-                        notifyWebCallState("connected")
-                        webView?.evaluateJavascript(
-                            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
-                                "window.VlueLettering.setExpanded(false);}catch(e){}",
-                            null
-                        )
-                    }
-                    OverlayState.BIG_PUSH -> {
-                        /*
-                         * 발신 로고 단계 — compact TOP(156dp) 로 줄이면
-                         * 중앙 로고가 상단에 잘려 보이고 BigPush 바로 바뀐 것처럼 보인다.
-                         */
-                        if (currentOutgoing && !outgoingExpandRequestedByUser) {
-                            ensureOutgoingLogoWindowLayout()
-                            notifyCompactCallChrome()
-                        } else {
-                            applyCompactRingingWindow()
-                        }
-                    }
-                    OverlayState.IDLE -> Unit
-                }
-            }
-        }
+        wv.webViewClient = overlayWebViewClient()
         container.addView(
             wv,
             FrameLayout.LayoutParams(
@@ -1971,9 +1851,11 @@ class CallOverlayService : Service() {
         fullscreenHeightLockAttempts = 0
         fullscreenChromePublished = false
         lastChromeSignature = ""
-        /* 쇼케이스 펼침은 내용이 그려진 뒤에만 보이게 해서 빈 다크 화면이 끊겨 보이지 않게 한다. */
-        val revealAfterPaint = notifyWeb && showcaseWebExpandPending
-        view.alpha = if (revealAfterPaint) 0f else 1f
+        /*
+         * 창을 alpha 0 으로 숨기면 측정이 끝나기 전에 삼성 전화 UI만 남는다.
+         * 미리보기와 같이 문서는 보이는 상태에서 높이만 확정한다.
+         */
+        view.alpha = 1f
         view.translationY = 0f
         view.visibility = android.view.View.VISIBLE
         userMinimized = false
@@ -1998,6 +1880,9 @@ class CallOverlayService : Service() {
             OverlayDiagTracker.markShowcaseFullscreenCommit()
             OverlayDiagTracker.markLayoutApplied("FULLSCREEN", OverlayPosition.FULLSCREEN.name)
             if (!notifyWeb) showcaseWebExpandPending = false
+            /* connected 로 웹이 펼쳐지기 전에 화면 높이를 넣는다. 컴팩트 높이가 남으면 본문이 잘린다. */
+            lastChromeSignature = ""
+            writeOverlaySafeInsetsNow(webView)
             scheduleFullscreenSettle()
             VlueBigPushTrace.milestone(
                 "OVERLAY_ATTACHED",
@@ -2035,7 +1920,7 @@ class CallOverlayService : Service() {
             return
         }
         showcaseWebExpandPending = false
-        anchor.alpha = 0f
+        anchor.alpha = 1f
         anchor.post {
             if (dismissing || companion.state != OverlayState.SHOWCASE ||
                 companion.position != OverlayPosition.FULLSCREEN
@@ -3817,20 +3702,19 @@ class CallOverlayService : Service() {
          * url 이 아직 비어 있으면 첫 loadUrl 이 진행 중이다. 여기서 다시 loadUrl 하면
          * 그 문서가 죽고 빈 DCC 로 다시 부팅된다.
          */
-        val alreadyLive = !forceDoc &&
-            liveOverlayDocumentKey == docKey &&
-            (urlNow.isEmpty() ||
-                urlNow.contains("lettering-overlay") ||
-                urlNow.contains("vlue-overlay"))
         lastLoadedOutgoing = outgoing
-        if (alreadyLive) {
+        val navigate = overlaySession.shouldLoadDocument(docKey, urlNow, forceDoc)
+        liveOverlayDocumentKey = overlaySession.documentKey
+        if (!navigate) {
             OverlayDebugLog.page(
                 "loadOverlayDocument KEEP url=$urlNow key=$docKey forceDoc=$forceDoc cardChanged=${cardJson != lastInjectedCardJson}"
             )
             bindCardJsonIfChanged(wv, cardJson)
             return false
         }
-        liveOverlayDocumentKey = docKey
+        OverlayDebugLog.page(
+            "loadOverlayDocument NAVIGATE reason=session key=$docKey prev=$urlNow forceDoc=$forceDoc"
+        )
         lastInjectedCardJson = cardJson
         val nonce = if (forceDoc) System.currentTimeMillis() else 0L
         /*
@@ -3879,10 +3763,227 @@ class CallOverlayService : Service() {
         return "$digits|${if (outgoing) "out" else "in"}"
     }
 
-    private fun forgetLiveOverlayDocument() {
+    private fun forgetLiveOverlayDocument(keepRendererBudget: Boolean = false) {
         lastLoadedOutgoing = null
         liveOverlayDocumentKey = null
         lastInjectedCardJson = null
+        if (keepRendererBudget) overlaySession.resetDocument("forgetLiveOverlayDocument")
+        else overlaySession.reset("forgetLiveOverlayDocument")
+    }
+
+    private fun overlayChromeClient(): android.webkit.WebChromeClient =
+        object : android.webkit.WebChromeClient() {
+            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                val msg = consoleMessage?.message().orEmpty()
+                val level = consoleMessage?.messageLevel()?.name ?: "UNKNOWN"
+                OverlayDebugLog.console(
+                    level,
+                    msg,
+                    consoleMessage?.sourceId().orEmpty(),
+                    consoleMessage?.lineNumber() ?: -1
+                )
+                if (msg.contains("VlueBigPushTrace") || msg.contains("Showcase")) {
+                    VlueBigPushTrace.step(0, "JS", msg)
+                }
+                return super.onConsoleMessage(consoleMessage)
+            }
+        }
+
+    private fun overlayWebViewClient(): WebViewClient = object : WebViewClient() {
+            /* 오버레이 번들(/vlue-overlay/ 하위) 은 APK assets 에서 즉시 — 서버 404/오프라인 무관 */
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?
+            ): android.webkit.WebResourceResponse? =
+                OverlayAssetServer.intercept(this@CallOverlayService, request)
+                    ?: super.shouldInterceptRequest(view, request)
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                /* 새 문서 로드 시작 — 실패 플래그 리셋 (실패면 곧 onReceived*Error 가 다시 세운다) */
+                overlayLoadFailed = false
+                /* 직전 문서에 넣은 통화 상태는 새 문서가 받지 못했다. 다음 notify 한 번은 통과. */
+                lastDeliveredWebCallState = ""
+                OverlayDebugLog.page("onPageStarted url=$url cacheMode=${view?.settings?.cacheMode}")
+                injectLetteringFlag(view)
+                installJsErrorHook(view)
+            }
+
+            /* 서버(Railway) 404/5xx — "Not Found" 본문이 투명 오버레이에 그려져 아무것도 안 보이던 문제 */
+            override fun onReceivedHttpError(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?,
+                errorResponse: android.webkit.WebResourceResponse?
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                val code = errorResponse?.statusCode ?: 0
+                if (request?.isForMainFrame == true && code >= 400) {
+                    onOverlayWebLoadFailed("http_$code")
+                }
+            }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?,
+                error: android.webkit.WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame == true) {
+                    onOverlayWebLoadFailed("err_${error?.errorCode ?: 0}")
+                }
+            }
+
+            override fun onRenderProcessGone(
+                view: WebView?,
+                detail: RenderProcessGoneDetail?
+            ): Boolean {
+                val info =
+                    "didCrash=${detail?.didCrash()} priority=${detail?.rendererPriorityAtExit()} " +
+                        "url=${view?.url.orEmpty()}"
+                OverlayDebugLog.page("RENDERER_GONE $info")
+                VlueBigPushTrace.lifecycle("WEBVIEW_RENDERER_GONE", info)
+                val recover = overlaySession.allowRendererRecovery(info)
+                if (recover && !dismissing) {
+                    mainHandler.post { replaceOverlayWebView("renderer_gone") }
+                }
+                return true
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                OverlayDebugLog.page(
+                    "onPageFinished url=$url progress=${view?.progress} title=${view?.title}"
+                )
+                /* 로드 중에 넣은 상태는 리스너 등록 전일 수 있다. 준비된 문서에 한 번 다시 넣는다. */
+                lastDeliveredWebCallState = ""
+                if (!overlayLoadFailed) {
+                    overlayLoadFailCount = 0
+                    hideOverlayNativeFallback()
+                }
+                CompanionPerfTracker.noteWebViewReady()
+                injectLetteringFlag(view)
+                if (dismissing || companion.state == OverlayState.IDLE ||
+                    !CompanionRuntimeStabilityDiag.isCallSessionActive()
+                ) {
+                    CompanionRuntimeStabilityDiag.noteStaleEvent(
+                        "WEB_PAGE_FINISHED",
+                        "onPageFinished",
+                        detail = "state=${companion.state.name}"
+                    )
+                    return
+                }
+                syncOverlayChromeForState(source = "onPageFinished")
+                syncDcpRoutePopup(pendingCardJson, currentDcpRoute)
+                /*
+                 * Showcase 레이아웃은 Answer Event에서 이미 commit됨.
+                 * onPageFinished는 Web 알림·레이아웃 재확인만 — Showcase 표시를 지연시키지 않는다.
+                 */
+                when (companion.state) {
+                    OverlayState.SHOWCASE -> {
+                        if (companion.position == OverlayPosition.FULLSCREEN) {
+                            commitFullscreenLayout(source = "onPageFinished_reaffirm")
+                        }
+                        /* Web Content Ready — state 전이 아님 (이미 Answer에서 connected 알림) */
+                        notifyWebCallState("connected")
+                    }
+                    OverlayState.MINI_CASE -> {
+                        /*
+                         * 팝업 확인 후 새 WebView 는 링잉 BigPush 로 부팅됨.
+                         * loadUrl 직후 notify 는 리스너 전에 사라져 사진1 바가 고착된다.
+                         * 페이지 준비 후 MiniCase(사진2) 상태로 재주입.
+                         */
+                        commitMiniCaseLayout(source = "onPageFinished_mini")
+                        notifyWebCallState("minimize_showcase")
+                        notifyWebCallState("connected")
+                        webView?.evaluateJavascript(
+                            "try{window.VlueLettering&&window.VlueLettering.setExpanded&&" +
+                                "window.VlueLettering.setExpanded(false);}catch(e){}",
+                            null
+                        )
+                    }
+                    OverlayState.BIG_PUSH -> {
+                        /*
+                         * 발신 로고 단계 — compact TOP(156dp) 로 줄이면
+                         * 중앙 로고가 상단에 잘려 보이고 BigPush 바로 바뀐 것처럼 보인다.
+                         */
+                        if (currentOutgoing && !outgoingExpandRequestedByUser) {
+                            ensureOutgoingLogoWindowLayout()
+                            notifyCompactCallChrome()
+                        } else {
+                            applyCompactRingingWindow()
+                        }
+                    }
+                    OverlayState.IDLE -> Unit
+                }
+            }
+    }
+
+    /**
+     * 렌더러가 죽은 WebView 는 다시 loadUrl 할 수 없다.
+     * 창 크기·통화 상태는 유지하고 WebView 만 바꾼 뒤 같은 카드를 다시 넣는다.
+     */
+    private fun replaceOverlayWebView(reason: String) {
+        val container = rootContainer
+        val dead = webView
+        if (dismissing || container == null) return
+        OverlayDebugLog.page(
+            "replaceOverlayWebView reason=$reason phone=${ReleaseDebugGate.maskPhoneForLog(currentPhone)} " +
+                "state=${companion.state.name}"
+        )
+        VlueBigPushTrace.lifecycle("WEBVIEW_REPLACE", reason)
+        webView = null
+        if (dead != null) {
+            try {
+                container.removeView(dead)
+            } catch (_: Exception) {
+            }
+            try {
+                dead.destroy()
+            } catch (_: Exception) {
+            }
+        }
+        forgetLiveOverlayDocument(keepRendererBudget = true)
+        val wv = WebView(this)
+        LetteringJavascriptBridge.attach(wv, this)
+        wv.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            cacheMode = WebSettings.LOAD_NO_CACHE
+            userAgentString = VlueLetteringConfig.withAndroidUserAgent(userAgentString.orEmpty())
+        }
+        wv.setBackgroundColor(Color.TRANSPARENT)
+        wv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+        wv.visibility = android.view.View.VISIBLE
+        wv.webChromeClient = overlayChromeClient()
+        container.addView(
+            wv,
+            0,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        webView = wv
+        wv.webViewClient = overlayWebViewClient()
+        val mini = companion.state == OverlayState.MINI_CASE || userMinimized || authPopupConfirmedToMini
+        loadOverlayDocument(
+            wv,
+            currentPhone.ifBlank { "unknown" },
+            pendingVerified,
+            currentOutgoing,
+            pendingCardJson,
+            forceNewDocument = true
+        )
+        if (mini) {
+            wv.postDelayed({
+                if (dismissing) return@postDelayed
+                notifyWebCallState("minimize_showcase")
+                notifyWebCallState("connected")
+            }, 200L)
+        } else if (companion.state == OverlayState.SHOWCASE) {
+            wv.postDelayed({
+                if (dismissing) return@postDelayed
+                notifyWebCallState("connected")
+            }, 200L)
+        }
     }
 
     private fun bindCardJsonIfChanged(view: WebView, cardJson: String?) {
@@ -4041,6 +4142,11 @@ class CallOverlayService : Service() {
                 scheduleFullscreenSettle()
                 return
             }
+            VlueBigPushTrace.lifecycle(
+                "FULLSCREEN_HEIGHT_UNSETTLED",
+                "viewH=${view?.height} screen=${screenSizePx().second} attempts=$fullscreenHeightLockAttempts"
+            )
+            view?.alpha = 1f
         }
         fullscreenHeightLock = false
         fullscreenChromePublished = true
@@ -4120,7 +4226,13 @@ class CallOverlayService : Service() {
         val density = resources.displayMetrics.density.coerceAtLeast(1f)
         val sbCss = statusBarHeightPx() / density
         val sbLabel = ((sbCss * 10).toInt() / 10f).toString()
-        val hostPx = overlayHostHeightPx()
+        val measuredPx = overlayHostHeightPx()
+        val hostPx = if (companion.position == OverlayPosition.FULLSCREEN) {
+            overlaySession.fullscreenCssHeightPx(screenSizePx().second, rootContainer?.height ?: 0)
+                ?: measuredPx
+        } else {
+            measuredPx
+        }
         if (hostPx <= 0) return
         val signature = "${companion.position.name}:$hostPx"
         if (signature == lastChromeSignature) return

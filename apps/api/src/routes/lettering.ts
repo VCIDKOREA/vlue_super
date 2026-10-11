@@ -491,10 +491,14 @@ letteringRoutes.put("/showcase/style", requireUserHeader, async (c) => {
       live: body?.live,
       liveSource: body?.liveSource,
       clientUpdatedAt: body?.clientUpdatedAt ?? body?.updatedAt ?? null,
+      baseUpdatedAt: body?.baseUpdatedAt ?? null,
       rewardedGrantId: body?.rewardedGrantId ?? null
     });
     if (!result.ok) {
       return c.json({ ok: false, conflict: true, ...result.bundle }, 409);
+    }
+    if (result.preserved && result.bundle) {
+      return c.json({ ok: true, preserved: true, ...result.bundle });
     }
     return c.json({ ok: true, v: 2, updatedAt: result.updatedAt });
   } catch (e) {

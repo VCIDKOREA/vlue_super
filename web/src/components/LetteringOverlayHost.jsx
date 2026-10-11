@@ -345,9 +345,24 @@ function sameOverlayPeer(prev, next) {
  * live 타임아웃(incomplete)은 이미 그린 DCC 를 유지한다.
  * 얇은 페이로드의 빈 문자열은 채워진 전화·이메일·상호를 지우지 않는다.
  */
+function showcasePageCount(style) {
+  return Array.isArray(style?.pages) ? style.pages.filter(Boolean).length : 0;
+}
+
+/** 늦게 도착한 빈 조회가 이미 그린 DCC·쇼케이스를 지우지 않는다. */
+function latePayloadWouldErase(prev, next) {
+  if (!cardResolvedForLiveCall(prev)) return false;
+  if (!next) return true;
+  const kind = String(next.profileKind || "");
+  if (kind === "lookup_pending" || kind === "unverified") return true;
+  if (next.matched === false && !String(next.userId || next.ownerUserId || "").trim()) return true;
+  return false;
+}
+
 function mergeEnrichIntoCard(prev, pack) {
   const next = pack?.card;
   if (!next) return prev ?? null;
+  if (latePayloadWouldErase(prev, next)) return prev;
   if (pack.incomplete && cardResolvedForLiveCall(prev)) return prev;
   const merged = { ...(prev || {}), ...next };
   if (prev && sameOverlayPeer(prev, next)) {
@@ -363,6 +378,9 @@ function mergeEnrichIntoCard(prev, pack) {
     pack.incomplete && prev?.showcaseStyle?.includeDigitalCard === true
       ? prev.showcaseStyle
       : mergeShowcaseStyle(prev?.showcaseStyle, next);
+  if (showcasePageCount(prev?.showcaseStyle) > 0 && showcasePageCount(merged.showcaseStyle) === 0) {
+    merged.showcaseStyle = prev.showcaseStyle;
+  }
   return merged;
 }
 
@@ -798,6 +816,10 @@ function LetteringOverlayHostInner() {
     if (prevIncomingDigitsRef.current && prevIncomingDigitsRef.current === nextDigits) {
       return;
     }
+    /* 빈 번호 갱신이 이미 그린 같은 통화 카드를 지우지 않는다. */
+    if (prevIncomingDigitsRef.current && !nextDigits) {
+      return;
+    }
     prevIncomingDigitsRef.current = nextDigits;
     matchedRef.current = false;
     autoExpandedOnceRef.current = false;
@@ -899,7 +921,7 @@ function LetteringOverlayHostInner() {
         const detail = ev?.detail || window.__VLUE_CARD_LOOKUP__;
         if (!detail) return;
         if (detail.matched === false && !isLookupMatchedBody(detail)) {
-          if (matchedRef.current) return;
+          if (matchedRef.current || cardResolvedForLiveCall(styledCardRef.current)) return;
           /* URL·네이티브가 인증으로 연 통화는 unmatched 주입으로 미인증 고착 금지 */
           if (urlVerifiedRef.current) {
             setCard({
@@ -1979,6 +2001,7 @@ function LetteringOverlayHostInner() {
 
   const showLoadingChip =
     loading &&
+    !cardResolvedForLiveCall(card) &&
     !(forceShowcaseBar && (styledCard || card || incoming)) &&
     !(identityHold && callState === CALL_STATES.CONNECTED && !expanded);
 

@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { normalizeDesiredPublicHandle } from "../lib/publicHandle.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
+import { dccSnapshotHasContent } from "../lib/showcaseRecordHasContent.js";
+import { archiveContentRevision } from "../services/content/contentRevisionStore.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { lookupCardByRawNumber } from "../services/cardLookup.js";
 import { reportOutgoingCallPath } from "../services/callPathPeerSignal.js";
@@ -758,6 +760,16 @@ cardsRoutes.patch("/my-digital-card", requireUserHeader, async (c) => {
     }
     /* 서버에는 슬림 스냅만 유지 (전체 블롭 금지) */
     const slim = slimExportSnapshot(merged) || {};
+    if (dccSnapshotHasContent(prevSnap)) {
+      void archiveContentRevision({
+        userId: me,
+        scope: "digital_card",
+        recordKey: me,
+        fieldName: "dcc",
+        event: "superseded",
+        snapshot: prevSnap
+      });
+    }
     data.exportSnapshotJson = slim;
     slimMeta = extractDigitalCardSlimMeta(slim);
   }

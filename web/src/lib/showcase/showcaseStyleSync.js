@@ -14,9 +14,13 @@ import {
 import { readDccLinePreview, readSelectedDccLineId } from "../dccLineState.js";
 
 export const SHOWCASE_STYLE_META_KEY = "vlue_showcase_style_meta_v1";
+const SHOWCASE_SERVER_REVISION_KEY = "vlue_showcase_server_revision_v1";
 
 let pushTimer = null;
 let hydrateInFlight = null;
+/** 이번 실행에서 서버 쇼케이스를 한 번 받은 뒤에만 로컬 푸시를 연다. */
+let serverHydrated = false;
+let pendingPushAfterHydrate = false;
 /** 앱 로그인 hydrate 직후 설정 시트가 재요청하지 않도록 */
 let lastHydrateOkAt = 0;
 let poolerCallCount = 0;
@@ -27,6 +31,43 @@ const isDev =
 
 /** 개발: 5분 / 운영: 60초 — 원격 Pooler 낭비 방지 */
 const HYDRATE_COOLDOWN_MS = isDev ? 300_000 : 60_000;
+
+function readShowcaseServerRevision() {
+  try {
+    return String(localStorage.getItem(SHOWCASE_SERVER_REVISION_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function writeShowcaseServerRevision(at) {
+  const value = String(at || "").trim();
+  if (!value) return;
+  try {
+    localStorage.setItem(SHOWCASE_SERVER_REVISION_KEY, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+function noteShowcaseServerReady(ok) {
+  if (
+    ok ||
+    showcaseStyleHasContent(readShowcaseStyle()) ||
+    showcaseStyleHasContent(readLiveShowcaseStyle())
+  ) {
+    serverHydrated = true;
+  }
+  if (serverHydrated && pendingPushAfterHydrate) {
+    pendingPushAfterHydrate = false;
+    scheduleShowcaseStylePush(400);
+  }
+}
+
+function markShowcaseHydrateOk() {
+  lastHydrateOkAt = Date.now();
+  noteShowcaseServerReady(true);
+}
 
 export function readLocalShowcaseStyleUpdatedAt() {
   try {
@@ -73,16 +114,21 @@ function pageHasPhotos(page) {
   return Array.isArray(photos) && photos.some((ph) => String(ph?.url || ph || "").trim());
 }
 
+function pageHasSubstance(page) {
+  if (pageHasPhotos(page)) return true;
+  const text = String(page?.richCustom?.bodyText || page?.caption || page?.title || "").trim();
+  if (text) return true;
+  const link = page?.businessLink;
+  return Boolean(link && typeof link === "object" && String(link.url || link.href || "").trim());
+}
+
 /** 사진·쇼셜링크·본문·BGM·페이지 등 실질 편집 여부 */
 export function showcaseStyleHasContent(style) {
   if (!style || typeof style !== "object") return false;
   const photos = Array.isArray(style.gallery?.photos)
     ? style.gallery.photos.filter((ph) => String(ph?.url || ph || "").trim()).length
     : 0;
-  const pagePhotos = Array.isArray(style.pages) ? style.pages.some(pageHasPhotos) : false;
-  const pageCount = Array.isArray(style.pages)
-    ? style.pages.filter((p) => p && typeof p === "object").length
-    : 0;
+  const pagePhotos = Array.isArray(style.pages) ? style.pages.some(pageHasSubstance) : false;
   const outlinks = style.commercial?.outlinks || {};
   const hasOutlink = Object.values(outlinks).some((v) => String(v || "").trim());
   const links = Array.isArray(style.commercial?.links) ? style.commercial.links.length : 0;
@@ -95,7 +141,6 @@ export function showcaseStyleHasContent(style) {
   return (
     photos > 0 ||
     pagePhotos ||
-    pageCount > 0 ||
     hasOutlink ||
     links > 0 ||
     Boolean(body) ||
@@ -146,7 +191,10 @@ export function applyServerBundle(bundle, { reason = "hydrate", clearMissing = f
     }
   }
 
-  if (bundle.updatedAt) writeLocalShowcaseStyleUpdatedAt(bundle.updatedAt);
+  if (bundle.updatedAt) {
+    writeLocalShowcaseStyleUpdatedAt(bundle.updatedAt);
+    writeShowcaseServerRevision(bundle.updatedAt);
+  }
   else if (clearMissing) writeLocalShowcaseStyleUpdatedAt(new Date(0).toISOString());
   if (bundle.badge && typeof bundle.badge === "object") {
     import("../vlueVerifiedBadgeApi.js")
@@ -182,8 +230,8 @@ export async function pushShowcaseStyleBundle(opts = {}) {
   const editorHas = showcaseStyleHasContent(editorRaw);
   const liveHas = showcaseStyleHasContent(liveRaw);
 
-  /* 재설치 직후 빈 로컬이 서버 라이브본을 덮어쓰지 않도록 차단 (적용 버튼은 force) */
-  if (!force && !editorHas && !liveHas) {
+  /* 재설치·송출 토글의 force 도 빈 로컬을 서버에 올리지 않는다. */
+  if (!editorHas && !liveHas) {
     return { ok: true, skipped: true, reason: "empty_local" };
   }
 
@@ -194,32 +242,45 @@ export async function pushShowcaseStyleBundle(opts = {}) {
 
   notePoolerCall("PUT");
   const payload = {
-    editor: editorHas || force ? editor : liveSlim,
+    editor: editorHas ? editor : liveSlim,
     liveSource,
-    clientUpdatedAt
+    clientUpdatedAt,
+    baseUpdatedAt: readShowcaseServerRevision() || undefined
   };
   if (opts.rewardedGrantId) payload.rewardedGrantId = String(opts.rewardedGrantId);
   /* live 키 없음 = 서버 송출본 유지. null 은 보내지 않음 */
-  if (liveSlim) {
+  if (liveHas && liveSlim) {
     payload.live = liveSlim;
-  } else if (force && payload.editor) {
+  } else if (force && editorHas && payload.editor) {
     payload.live = payload.editor;
   }
   const result = await putShowcaseStyleBundle(payload);
 
-  if (result.conflict) {
-    applyServerBundle(result, { reason: "conflict" });
-    return { ok: false, conflict: true, appliedServer: true };
+  if (result.conflict || result.preserved) {
+    applyServerBundle(result, { reason: result.preserved ? "preserved" : "conflict" });
+    return {
+      ok: !result.conflict,
+      conflict: Boolean(result.conflict),
+      preserved: Boolean(result.preserved),
+      appliedServer: true
+    };
   }
   if (!result.ok) {
     return { ok: false, error: result.error };
   }
-  if (result.updatedAt) writeLocalShowcaseStyleUpdatedAt(result.updatedAt);
+  if (result.updatedAt) {
+    writeLocalShowcaseStyleUpdatedAt(result.updatedAt);
+    writeShowcaseServerRevision(result.updatedAt);
+  }
   return { ok: true };
 }
 
 export function scheduleShowcaseStylePush(delayMs = 900) {
   if (typeof window === "undefined") return;
+  if (!serverHydrated) {
+    pendingPushAfterHydrate = true;
+    return;
+  }
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     pushTimer = null;
@@ -244,19 +305,23 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
       ifNoneMatch: forceServer ? "" : readLocalShowcaseStyleUpdatedAt()
     });
     if (!remote.ok) {
+      noteShowcaseServerReady(false);
       return { ok: false, error: remote.error };
     }
 
     if (remote.unchanged) {
-      lastHydrateOkAt = Date.now();
-      if (remote.updatedAt) writeLocalShowcaseStyleUpdatedAt(remote.updatedAt);
+      markShowcaseHydrateOk();
+      if (remote.updatedAt) {
+        writeLocalShowcaseStyleUpdatedAt(remote.updatedAt);
+        writeShowcaseServerRevision(remote.updatedAt);
+      }
       return { ok: true, applied: false, unchanged: true, pushed: false };
     }
 
     if (forceServer) {
       /* clearMissing 금지 — 빈 서버 응답으로 로컬(또는 방금 복원분)을 날리지 않음 */
       const applied = applyServerBundle(remote, { reason: "forceServer", clearMissing: false });
-      lastHydrateOkAt = Date.now();
+      markShowcaseHydrateOk();
       try {
         window.dispatchEvent(new CustomEvent("vlue-showcase-style-changed"));
         window.dispatchEvent(new CustomEvent("vlue-showcase-live-style-changed"));
@@ -288,17 +353,17 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     if (!remoteHas && localHas) {
       if (isIndependentDccLine()) {
         applyServerBundle(remote, { reason: "empty-line", clearMissing: true });
-        lastHydrateOkAt = Date.now();
+        markShowcaseHydrateOk();
         return { ok: true, applied: true, pushed: false };
       }
       const pushed = await pushShowcaseStyleBundle();
-      lastHydrateOkAt = Date.now();
+      markShowcaseHydrateOk();
       return { ok: true, applied: false, pushed: Boolean(pushed.ok) };
     }
 
     if (remoteHas && (!localHas || serverMs > localMs + 500)) {
       applyServerBundle(remote, { reason: "hydrate" });
-      lastHydrateOkAt = Date.now();
+      markShowcaseHydrateOk();
       try {
         window.dispatchEvent(new CustomEvent("vlue-showcase-style-changed"));
         window.dispatchEvent(new CustomEvent("vlue-showcase-live-style-changed"));
@@ -311,15 +376,15 @@ export async function hydrateShowcaseStyleFromServer(opts = {}) {
     if (localHas && localMs > serverMs + 500) {
       if (isIndependentDccLine() && !remoteHas) {
         applyServerBundle(remote, { reason: "empty-line", clearMissing: true });
-        lastHydrateOkAt = Date.now();
+        markShowcaseHydrateOk();
         return { ok: true, applied: true, pushed: false };
       }
       const pushed = await pushShowcaseStyleBundle();
-      lastHydrateOkAt = Date.now();
+      markShowcaseHydrateOk();
       return { ok: true, applied: false, pushed: Boolean(pushed.ok) };
     }
 
-    lastHydrateOkAt = Date.now();
+    markShowcaseHydrateOk();
     return { ok: true, applied: false, pushed: false, inSync: true };
   })();
 
@@ -410,7 +475,7 @@ export async function syncShowcaseFromServer(opts = {}) {
           await switchToMultiDccProfile(active, {
             preferredLineId: active.assignedLineIds?.[0] || ""
           });
-          lastHydrateOkAt = Date.now();
+          markShowcaseHydrateOk();
           return { ok: true, applied: true, source: "profile", profileId: active.id };
         }
         if (userHas) {
@@ -432,10 +497,11 @@ export async function syncShowcaseFromServer(opts = {}) {
     }
 
     if (!userBundle?.ok) {
+      noteShowcaseServerReady(false);
       return { ok: false, error: userBundle?.error || "fetch_failed" };
     }
     applyServerBundle(userBundle, { reason: "device-sync", clearMissing: false });
-    lastHydrateOkAt = Date.now();
+    markShowcaseHydrateOk();
     emitShowcaseStyleApplied();
     return { ok: true, applied: true, source: "user" };
   })();

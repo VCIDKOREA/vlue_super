@@ -12,7 +12,13 @@ export default class RenderErrorGuard extends Component {
   }
 
   componentDidCatch(error, info) {
+    const text = `${error?.stack || error} ${info?.componentStack || ""}`;
     console.error("[VLUÉ render]", error, info);
+    try {
+      window.Android?.logJsError?.(`render-guard ${text}`);
+    } catch {
+      /* ignore */
+    }
   }
 
   render() {

@@ -131,6 +131,24 @@ export function mergeExportSnapshotMedia(
     "kakaoFeedBgDataUrl"
   ] as const;
   const next: Record<string, unknown> = { ...prev, ...patch };
+  const identityKeys = [
+    "name",
+    "displayName",
+    "organization",
+    "companyName",
+    "title",
+    "email",
+    "phone",
+    "website",
+    "intro",
+    "companyIntro"
+  ] as const;
+  for (const key of identityKeys) {
+    if (!(key in patch)) continue;
+    const nextVal = String(patch[key] ?? "").trim();
+    const prevVal = String(prev[key] ?? "").trim();
+    if (!nextVal && prevVal) next[key] = prev[key];
+  }
   for (const key of mediaKeys) {
     if (!(key in patch)) continue;
     if (key === "kakaoFeedBgDataUrl") {

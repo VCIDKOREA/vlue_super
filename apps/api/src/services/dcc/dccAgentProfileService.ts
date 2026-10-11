@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { isDataUrl, isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
+import { dccSnapshotHasContent, showcaseRecordHasContent } from "../../lib/showcaseRecordHasContent.js";
+import { archiveContentRevision } from "../content/contentRevisionStore.js";
 
 export const DCC_AGENT_MAX_COUNT = 20;
 
@@ -928,35 +930,109 @@ export async function putDccProfileBundle(
   }
   const data: Prisma.UserDccAgentProfileUpdateInput = {};
   if (input.dcc !== undefined) {
-    data.dccSnapshotJson =
-      input.dcc && typeof input.dcc === "object"
-        ? (input.dcc as Prisma.InputJsonValue)
-        : Prisma.JsonNull;
-    /* 컬럼 photoUrl 과 dcc 스냅샷 동기화 — 전환 시 stale 컬럼이 새 사진을 덮지 않게 */
-    if (input.dcc && typeof input.dcc === "object" && "photoUrl" in input.dcc) {
-      const photoRaw = String((input.dcc as { photoUrl?: unknown }).photoUrl ?? "").trim();
-      data.photoUrl =
-        photoRaw && (isHttpMediaUrl(photoRaw) || photoRaw.startsWith("/")) ? photoRaw : null;
+    const incomingEmpty = !dccSnapshotHasContent(input.dcc);
+    const keepSavedDcc = incomingEmpty && dccSnapshotHasContent(profile.dccSnapshotJson);
+    if (keepSavedDcc) {
+      void archiveContentRevision({
+        userId,
+        scope: "agent_dcc",
+        recordKey: profileId,
+        fieldName: "dcc",
+        event: "rejected_empty",
+        snapshot: input.dcc
+      });
+    } else if (dccSnapshotHasContent(profile.dccSnapshotJson)) {
+      void archiveContentRevision({
+        userId,
+        scope: "agent_dcc",
+        recordKey: profileId,
+        fieldName: "dcc",
+        event: "superseded",
+        snapshot: profile.dccSnapshotJson
+      });
+    }
+    if (!keepSavedDcc) {
+      data.dccSnapshotJson =
+        input.dcc && typeof input.dcc === "object"
+          ? (input.dcc as Prisma.InputJsonValue)
+          : Prisma.JsonNull;
+      /* 컬럼 photoUrl 과 dcc 스냅샷 동기화 — 전환 시 stale 컬럼이 새 사진을 덮지 않게 */
+      if (input.dcc && typeof input.dcc === "object" && "photoUrl" in input.dcc) {
+        const photoRaw = String((input.dcc as { photoUrl?: unknown }).photoUrl ?? "").trim();
+        data.photoUrl =
+          photoRaw && (isHttpMediaUrl(photoRaw) || photoRaw.startsWith("/")) ? photoRaw : null;
+      }
     }
   }
   if (input.showcase !== undefined) {
     if (input.showcase?.editor !== undefined) {
-      data.showcaseStyleJson =
-        input.showcase.editor && typeof input.showcase.editor === "object"
-          ? (input.showcase.editor as Prisma.InputJsonValue)
-          : Prisma.JsonNull;
+      const editor = input.showcase.editor;
+      const wipeEditor =
+        !showcaseRecordHasContent(editor) && showcaseRecordHasContent(profile.showcaseStyleJson);
+      if (wipeEditor) {
+        void archiveContentRevision({
+          userId,
+          scope: "agent_showcase",
+          recordKey: profileId,
+          fieldName: "editor",
+          event: "rejected_empty",
+          snapshot: editor
+        });
+      } else if (showcaseRecordHasContent(profile.showcaseStyleJson)) {
+        void archiveContentRevision({
+          userId,
+          scope: "agent_showcase",
+          recordKey: profileId,
+          fieldName: "editor",
+          event: "superseded",
+          snapshot: profile.showcaseStyleJson
+        });
+      }
+      if (!wipeEditor) {
+        data.showcaseStyleJson =
+          editor && typeof editor === "object"
+            ? (editor as Prisma.InputJsonValue)
+            : Prisma.JsonNull;
+      }
     }
     if (input.showcase?.live !== undefined) {
-      data.showcaseLiveStyleJson =
-        input.showcase.live && typeof input.showcase.live === "object"
-          ? (input.showcase.live as Prisma.InputJsonValue)
-          : Prisma.JsonNull;
+      const live = input.showcase.live;
+      const wipeLive =
+        !showcaseRecordHasContent(live) && showcaseRecordHasContent(profile.showcaseLiveStyleJson);
+      if (wipeLive) {
+        void archiveContentRevision({
+          userId,
+          scope: "agent_showcase",
+          recordKey: profileId,
+          fieldName: "live",
+          event: "rejected_empty",
+          snapshot: live
+        });
+      } else if (showcaseRecordHasContent(profile.showcaseLiveStyleJson)) {
+        void archiveContentRevision({
+          userId,
+          scope: "agent_showcase",
+          recordKey: profileId,
+          fieldName: "live",
+          event: "superseded",
+          snapshot: profile.showcaseLiveStyleJson
+        });
+      }
+      if (!wipeLive) {
+        data.showcaseLiveStyleJson =
+          live && typeof live === "object"
+            ? (live as Prisma.InputJsonValue)
+            : Prisma.JsonNull;
+      }
     }
   }
-  const updated = await prisma.userDccAgentProfile.update({
-    where: { id: profileId },
-    data
-  });
+  const updated =
+    Object.keys(data).length === 0
+      ? profile
+      : await prisma.userDccAgentProfile.update({
+          where: { id: profileId },
+          data
+        });
   const { syncAssignedLinesForAgent } = await import("./dccLineService.js");
   await syncAssignedLinesForAgent(userId, updated);
   const assignments = await loadAssignments(userId);

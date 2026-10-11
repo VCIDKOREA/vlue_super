@@ -6,6 +6,11 @@ import { formatPhoneDisplayKR } from "../../lib/phoneDisplay.js";
 import { addMonths } from "../membership/subscriptionBilling.js";
 import { sendOfficePushToUser } from "../fcmNotificationService.js";
 import { ssePublish } from "../../realtime/sseHub.js";
+import { archiveContentRevision } from "../content/contentRevisionStore.js";
+import {
+  planSubscriptionPurgeArchives,
+  SUBSCRIPTION_EXPIRED_EVENT
+} from "./subscriptionPurgeArchive.js";
 
 export const LINE_GRACE_DAYS = 7;
 export const LINE_GRACE_PIN_KIND = "line_grace";
@@ -482,6 +487,44 @@ export async function cancelLineSubscription(
 }
 
 async function hardDeleteLineShowcase(businessCardId: string, userId: string, isCertified: boolean) {
+  const card = await prisma.businessCard.findUnique({
+    where: { id: businessCardId },
+    select: {
+      dccSnapshotJson: true,
+      lineShowcaseStyleJson: true,
+      lineShowcaseLiveStyleJson: true,
+      lineShowcaseLiveSourceJson: true,
+      profileJson: true
+    }
+  });
+  const account = isCertified
+    ? await prisma.user.findUnique({
+        where: { id: userId },
+        select: { showcaseStyleJson: true, showcaseLiveStyleJson: true }
+      })
+    : null;
+  const archives = planSubscriptionPurgeArchives({
+    userId,
+    businessCardId,
+    isCertified,
+    card,
+    account
+  });
+  for (const row of archives) {
+    const saved = await archiveContentRevision({
+      userId,
+      scope: row.scope,
+      recordKey: row.recordKey,
+      fieldName: row.fieldName,
+      event: row.event,
+      snapshot: row.snapshot
+    });
+    if (!saved) {
+      throw new Error(
+        `subscription purge archive failed: ${row.scope}.${row.fieldName} ${SUBSCRIPTION_EXPIRED_EVENT}`
+      );
+    }
+  }
   await prisma.businessCard.update({
     where: { id: businessCardId },
     data: {
@@ -535,7 +578,17 @@ export async function lapseExpiredGraceLines(asOf = new Date()): Promise<{ scann
   for (const row of due) {
     const certifiedPhone = await certifiedPhoneOf(row.userId);
     const isCertified = Boolean(certifiedPhone) && row.businessCard.phoneE164 === certifiedPhone;
-    await hardDeleteLineShowcase(row.businessCardId, row.userId, isCertified);
+    try {
+      await hardDeleteLineShowcase(row.businessCardId, row.userId, isCertified);
+    } catch (err) {
+      console.error(
+        "[line-billing] grace lapse kept showcase because revision archive failed",
+        row.id,
+        row.userId,
+        err
+      );
+      continue;
+    }
     await prisma.lineSubscription.update({
       where: { id: row.id },
       data: {
