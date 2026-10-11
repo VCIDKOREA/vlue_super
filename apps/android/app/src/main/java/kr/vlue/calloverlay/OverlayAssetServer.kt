@@ -68,14 +68,26 @@ object OverlayAssetServer {
         } catch (_: Exception) {
             null
         }
-        if (webHost != null && !uri.host.equals(webHost, ignoreCase = true)) return null
+        if (webHost != null && !uri.host.equals(webHost, ignoreCase = true)) {
+            OverlayDebugLog.asset(
+                "SKIP host mismatch url=$uri expectedHost=$webHost — 이 요청은 APK assets 가 아니라 네트워크로 간다"
+            )
+            return null
+        }
 
         val rel = path.removePrefix(URL_PREFIX).ifEmpty { ENTRY_FILE }
-        if (rel.contains("..")) return notFound()
+        if (rel.contains("..")) {
+            OverlayDebugLog.asset("MISS path_traversal url=$uri")
+            return notFound()
+        }
         return try {
-            val stream = context.applicationContext.assets.open("$ASSET_DIR/$rel")
-            if (rel == ENTRY_FILE) Log.i(TAG, "overlay entry served from APK assets (server-independent)")
+            val bytes = context.applicationContext.assets.open("$ASSET_DIR/$rel").use { it.readBytes() }
             val ext = MimeTypeMap.getFileExtensionFromUrl(rel).lowercase()
+            if (isText(ext) || rel == ENTRY_FILE) {
+                OverlayDebugLog.asset(
+                    "SERVE apk-assets/$ASSET_DIR/$rel bytes=${bytes.size} sha256=${OverlayDebugLog.sha256(bytes)} url=$uri"
+                )
+            }
             WebResourceResponse(
                 mimeOf(ext),
                 if (isText(ext)) "utf-8" else null,
@@ -85,9 +97,10 @@ object OverlayAssetServer {
                     "Cache-Control" to "no-store",
                     "Access-Control-Allow-Origin" to "*"
                 ),
-                stream
+                java.io.ByteArrayInputStream(bytes)
             )
         } catch (e: Exception) {
+            OverlayDebugLog.asset("MISS apk-assets/$ASSET_DIR/$rel url=$uri err=${e.message}")
             Log.w(TAG, "asset miss: $rel (${e.message})")
             notFound()
         }

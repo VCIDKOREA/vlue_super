@@ -227,7 +227,14 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
         setVideoReady(true);
       };
       v.addEventListener("playing", onPlaying);
-      if (!v.paused) setVideoReady(true);
+      const segNow = segmentRef.current;
+      if (
+        !v.paused &&
+        segNow &&
+        v.currentTime >= segNow.segmentStart - 0.05
+      ) {
+        setVideoReady(true);
+      }
       videoCleanupFnsRef.current.push(() => {
         v.removeEventListener("timeupdate", onTimeUpdate);
         v.removeEventListener("playing", onPlaying);
@@ -238,13 +245,13 @@ function Splash({ onDone, shellBg = SPLASH_SHELL_BG }) {
         const afterSeek = () => {
           window.clearTimeout(seekFallback);
           playSafe(v).catch(() => {
-            /* Android WebView: seek 실패 시 0초부터라도 재생 */
+            /* 0초는 런처 아이콘 프레임이다. 시크가 될 때까지 폴백 눈만 보여 준다. */
             try {
-              v.currentTime = 0;
+              v.pause();
+              v.currentTime = startAt;
             } catch {
               /* ignore */
             }
-            playSafe(v).catch(failVideo);
           });
         };
         try {

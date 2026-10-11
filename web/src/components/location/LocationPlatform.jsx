@@ -1882,6 +1882,10 @@ export default function LocationPlatform() {
   };
 
   const dark = theme === "dark";
+  const appDark =
+    typeof document !== "undefined" &&
+    document.getElementById("app-body")?.classList.contains("dark-mode");
+  const overseasDark = dark || Boolean(appDark);
   const glass = dark
     ? "border border-white/10 bg-[#0c1220]/80 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-2xl"
     : "border border-black/[0.06] bg-white/82 text-slate-900 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-2xl";
@@ -1980,8 +1984,8 @@ export default function LocationPlatform() {
         <div className={`pointer-events-none absolute right-3 z-30 flex w-[min(280px,calc(100%-5.5rem))] flex-col items-end gap-2 ${familyBarOpen ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
         {session.mode === "family" && overseasMembers.length ? (
           <div className="pointer-events-none flex w-full justify-end">
-            <div className={`pointer-events-auto w-full max-w-[280px] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${dark ? "border border-violet-300/30 bg-[#1a1030]/88 text-white" : "border border-violet-200 bg-white/92 text-slate-900"}`}>
-              <p className="text-[12px] font-black tracking-tight">✈️ 해외 구성원 ({overseasMembers.length}명)</p>
+            <div className={`pointer-events-auto w-full max-w-[280px] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${overseasDark ? "border border-violet-300/40 bg-[#24143f] text-[#f5f3ff]" : "border border-violet-200 bg-white text-slate-900"}`}>
+              <p className={`text-[12px] font-black tracking-tight ${overseasDark ? "text-[#f5f3ff]" : "text-slate-900"}`}>✈️ 해외 구성원 ({overseasMembers.length}명)</p>
               <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
                 {overseasMembers.map((member) => (
                   <li key={member.userId}>
@@ -1990,14 +1994,14 @@ export default function LocationPlatform() {
                       className={`block w-full rounded-xl px-2 py-1.5 text-left text-[11px] font-semibold ${
                         selected?.userId === member.userId
                           ? "bg-violet-500 text-white"
-                          : dark
-                            ? "bg-white/10"
-                            : "bg-violet-50 text-violet-900"
+                          : overseasDark
+                            ? "bg-white/10 text-[#f5f3ff]"
+                            : "bg-violet-50 text-violet-950"
                       }`}
                       onClick={() => focusMember(member, { detail: true })}
                     >
                       <span className="block truncate">{member.displayName}</span>
-                      <span className="block truncate opacity-80">
+                      <span className={`block truncate ${overseasDark ? "text-[#ddd6fe]" : "text-violet-800"}`}>
                         {[member.cityName || member.city_name, member.countryName || member.country_name]
                           .filter(Boolean)
                           .join(", ") || "해외"}
@@ -2011,7 +2015,7 @@ export default function LocationPlatform() {
                   네이버 가족 지도
                 </button>
               ) : (
-                <p className="mt-1.5 text-[10px] font-medium opacity-70">프로필을 누르면 Google Maps로 전환</p>
+                <p className={`mt-1.5 text-[10px] font-medium ${overseasDark ? "text-[#ddd6fe]" : "text-slate-600"}`}>프로필을 누르면 Google Maps로 전환</p>
               )}
             </div>
           </div>
@@ -2627,7 +2631,7 @@ export default function LocationPlatform() {
                     <span className="font-bold">
                       {member.displayName}
                       {session.mode === "family" && isOverseasMember(member) ? (
-                        <span className="ml-1 text-[10px] font-black text-violet-500">✈️ 해외</span>
+                        <span className={`ml-1 text-[10px] font-black ${dark ? "text-[#ddd6fe]" : "text-violet-700"}`}>✈️ 해외</span>
                       ) : null}
                     </span>
                     <span className="text-[11px] opacity-70">

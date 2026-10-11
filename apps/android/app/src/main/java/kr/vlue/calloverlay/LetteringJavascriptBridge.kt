@@ -22,12 +22,19 @@ class LetteringJavascriptBridge(
     private val service: CallOverlayService
 ) {
     @JavascriptInterface
+    fun logJsError(detail: String?) {
+        OverlayDebugLog.jsError("hook", detail.orEmpty())
+    }
+
+    @JavascriptInterface
     fun dismissOverlay() {
+        OverlayDebugLog.bridgeIn("dismissOverlay", "")
         service.dismissOverlay()
     }
 
     @JavascriptInterface
     fun logBigPushTrace(step: String?, detail: String?) {
+        OverlayDebugLog.bridgeIn("logBigPushTrace", "step=${step.orEmpty()} detail=${detail.orEmpty()}")
         val s = step.orEmpty()
         val d = detail.orEmpty()
         when {
@@ -50,6 +57,7 @@ class LetteringJavascriptBridge(
     /** 통화만 종료 — 쇼케이스 오버레이 유지 */
     @JavascriptInterface
     fun endCallKeepOverlay() {
+        OverlayDebugLog.bridgeIn("endCallKeepOverlay", "")
         try {
             LetteringCallAudioHelper.endCallOnly(service, keepOverlay = true)
             service.notifyWebCallState("ended_keep_overlay")
@@ -60,12 +68,14 @@ class LetteringJavascriptBridge(
 
     @JavascriptInterface
     fun endCallOnly() {
+        OverlayDebugLog.bridgeIn("endCallOnly", "")
         endCallKeepOverlay()
     }
 
     /** 통화 종료 + 오버레이 닫기. MainActivity·모니터는 종료하지 않음. */
     @JavascriptInterface
     fun endCall() {
+        OverlayDebugLog.bridgeIn("endCall", "")
         try {
             if (!VlueInCallController.disconnect(keepOverlay = false)) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -93,6 +103,7 @@ class LetteringJavascriptBridge(
      */
     @JavascriptInterface
     fun answerCall() {
+        OverlayDebugLog.bridgeIn("answerCall", "")
         CompanionPerfTracker.measureJsBridge("answerCall") {
             try {
                 if (!LetteringCallAudioHelper.answerCall()) {
@@ -120,6 +131,7 @@ class LetteringJavascriptBridge(
      */
     @JavascriptInterface
     fun revealSystemCallUi() {
+        OverlayDebugLog.bridgeIn("revealSystemCallUi", "")
         CompanionPerfTracker.measureJsBridge("revealSystemCallUi") {
             try {
                 service.onMinimizeRequestedFromWeb(source = "js.revealSystemCallUi")
@@ -132,6 +144,7 @@ class LetteringJavascriptBridge(
     /** Restore Request — MINI_CASE / BIG_PUSH → SHOWCASE/FULLSCREEN (Controller 판단) */
     @JavascriptInterface
     fun restoreShowcaseOverlay() {
+        OverlayDebugLog.bridgeIn("restoreShowcaseOverlay", "")
         CompanionPerfTracker.measureJsBridge("restoreShowcaseOverlay") {
             try {
                 Log.i(TAG, "restoreShowcaseOverlay invoked")
@@ -152,6 +165,7 @@ class LetteringJavascriptBridge(
      */
     @JavascriptInterface
     fun setMiniCaseVisibility(value: String) {
+        OverlayDebugLog.bridgeIn("setMiniCaseVisibility", value)
         try {
             val vis = when {
                 value.equals("EDGE_HIDDEN", ignoreCase = true) ||
@@ -171,6 +185,7 @@ class LetteringJavascriptBridge(
      */
     @JavascriptInterface
     fun updateMiniOverlayFrame(x: String, y: String, w: String, h: String) {
+        OverlayDebugLog.bridgeIn("updateMiniOverlayFrame", "x=$x y=$y w=$w h=$h")
         try {
             val xi = x.toFloatOrNull()?.toInt() ?: return
             val yi = y.toFloatOrNull()?.toInt() ?: return
@@ -184,12 +199,14 @@ class LetteringJavascriptBridge(
 
     @JavascriptInterface
     fun getScreenSizeJson(): String {
-        return try {
+        val json = try {
             service.getScreenSizeJson()
         } catch (e: Exception) {
             Log.e(TAG, "getScreenSizeJson failed", e)
             """{"w":360,"h":640,"d":1,"sb":0}"""
         }
+        OverlayDebugLog.bridgeIn("getScreenSizeJson", "return=$json")
+        return json
     }
 
     @JavascriptInterface
@@ -251,11 +268,13 @@ class LetteringJavascriptBridge(
 
     @JavascriptInterface
     fun expandOutgoingShowcase() {
+        OverlayDebugLog.bridgeIn("expandOutgoingShowcase", "")
         service.onOutgoingLogoTapFromWeb()
     }
 
     @JavascriptInterface
     fun syncMemberPhone(phone: String?) {
+        OverlayDebugLog.bridgeIn("syncMemberPhone", phone.orEmpty())
         LetteringPrefs.setMemberPhone(service, phone)
     }
 
@@ -279,6 +298,7 @@ class LetteringJavascriptBridge(
 
     @JavascriptInterface
     fun setOverlayModal(value: String) {
+        OverlayDebugLog.bridgeIn("setOverlayModal", value)
         val open = value == "1" || value.equals("true", ignoreCase = true)
         service.setOverlayModal(open)
     }
@@ -335,12 +355,14 @@ class LetteringJavascriptBridge(
      */
     @JavascriptInterface
     fun notifyVlueAuthMemberReady(phone: String?) {
+        OverlayDebugLog.bridgeIn("notifyVlueAuthMemberReady", phone.orEmpty())
         service.onVlueAuthMemberReadyFromWeb(phone.orEmpty())
     }
 
     /** 웹 정상 팝업 「확인」→ MiniCase (enterMiniCaseAfterAuthPopupConfirm) */
     @JavascriptInterface
     fun confirmVlueAuthMemberPopup() {
+        OverlayDebugLog.bridgeIn("confirmVlueAuthMemberPopup", "")
         service.onAuthMemberPopupConfirmFromWeb()
     }
 
@@ -388,6 +410,8 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.confirmVlueAuthMemberPopup = function(){ try{ Android.confirmVlueAuthMemberPopup(); }catch(e){} };
                 window.Android.confirmVlueAuthMemberPopup = window.VlueLettering.confirmVlueAuthMemberPopup;
                 window.VlueLettering.onNativeCallState = window.VlueLettering.onNativeCallState || function(){};
+                window.VlueLettering.logJsError = function(detail){ try{ Android.logJsError(String(detail||'')); }catch(e){} };
+                window.Android.logJsError = window.VlueLettering.logJsError;
                 try { delete window.VlueLettering.setOverlayFullscreen; } catch (e) {}
             """.trimIndent()
             webView.evaluateJavascript(bridgeJs, null)

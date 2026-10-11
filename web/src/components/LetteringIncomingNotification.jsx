@@ -741,6 +741,8 @@ export default function LetteringIncomingNotification({
 
   const isExpandedView =
     expanded && expandContent !== false && (canExpand || hadFullShowcaseThisCall);
+  const holdPaidShowcase =
+    hadFullShowcaseThisCall && verified && !isContactSafeCare && !isExpiredLine && !isDcp;
   const showExpandedLayout = isExpandedView || keepExpandedLayout;
   const prevExpandedViewRef = useRef(isExpandedView);
 
@@ -1083,14 +1085,8 @@ export default function LetteringIncomingNotification({
 
   const expandShowcaseFromMiniCase = useCallback(() => {
     /* pointerup 직후 남는 click 이 새 live-bar 에 떨어져 toggle→접힘 되는 것 차단 */
-    expandFromMiniGuardUntilRef.current = Date.now() + 700;
-    const restorePopupOnly = Boolean(
-      showcaseOffPreview || isContactSafeCare || isDcp || isExpiredLine
-    );
-    if (!restorePopupOnly) {
-      setExpanded(true);
-      setHadFullShowcaseThisCall(true);
-    }
+    expandFromMiniGuardUntilRef.current = Date.now() + 900;
+    setHadFullShowcaseThisCall(true);
     try {
       window.Android?.logBigPushTrace?.(
         "MINI_TAP_EXPAND",
@@ -1099,22 +1095,18 @@ export default function LetteringIncomingNotification({
     } catch {
       /* ignore */
     }
-    if (expandedProp === undefined) {
-      try {
-        nativeRestoreShowcaseOverlay();
-      } catch {
-        /* ignore */
-      }
+    /*
+     * 호스트 onExpandedChange 는 창이 커진 뒤에만 웹을 연다.
+     * 복원 요청 자체는 여기서 바로 네이티브로 보낸다.
+     * expanded prop 이 있어도 보내야 한다. 안 보내면 미니 탭이 창을 키우지 못한다.
+     */
+    setExpanded(true);
+    try {
+      nativeRestoreShowcaseOverlay();
+    } catch {
+      /* ignore */
     }
-  }, [
-    setExpanded,
-    canRestoreFromMiniCase,
-    expandedProp,
-    showcaseOffPreview,
-    isContactSafeCare,
-    isDcp,
-    isExpiredLine
-  ]);
+  }, [setExpanded, canRestoreFromMiniCase, expandedProp]);
 
   const openSamsungCallOptions = useCallback(() => {
     if (previewMode) {
@@ -1439,7 +1431,7 @@ export default function LetteringIncomingNotification({
               ? "번호 확인 중"
               : isAdMobSponsor
                 ? `${previewShowcaseId || displayLabel || "스폰서"} AD Sponsor Showcase`
-                : showcaseOffPreview
+                : showcaseOffPreview && !holdPaidShowcase
                   ? "VLUÉ 인증"
                   : previewShowcaseId
                     ? `${previewShowcaseId} Showcase`
@@ -1660,7 +1652,7 @@ export default function LetteringIncomingNotification({
           </div>
         ) : null}
 
-        {canExpand && isPaidMember && !showcaseOffPreview ? (
+        {((canExpand && isPaidMember && !showcaseOffPreview) || holdPaidShowcase) ? (
           <div
             ref={expandSlotRef}
             className="lettering-ongoing-expand-slot lettering-ongoing-expand-slot--reception"
