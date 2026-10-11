@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBusinessCardByNumber } from "../lib/getBusinessCardByNumber.js";
 import { isLookupMatchedBody, mapLookupToLetteringCard } from "../lib/letteringCardMapper.js";
-import { isUnknownPhoneToken } from "../lib/letteringPhoneMatch.js";
+import { isUnknownPhoneToken, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
 import { readLetteringEnabled } from "../lib/letteringSettings.js";
 import { submitLetteringReport, submitLetteringTip } from "../lib/letteringReport.js";
@@ -44,6 +44,89 @@ import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmConte
 import { dcpCardMatchesIncoming, dcpRouteForIncoming, matchNationalAgency } from "../lib/nationalAgencyDcpClient.js";
 import "../styles/tent-showcase.css";
 import "../styles/showcase-call-glass.css";
+
+const SHOWCASE_SURFACE_SELECTOR = [
+  ".lettering-overlay-host__tent-shell",
+  ".lettering-ongoing--fullscreen-tent",
+  ".lettering-ongoing-expand-slot",
+  ".lettering-ongoing-expand-slot__inner"
+].join(",");
+
+function overlayHeightCss() {
+  try {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue("--vlue-overlay-h").trim();
+    const n = Number.parseFloat(raw);
+    /* 미니·로고 잔여(≈120–168px)를 풀쇼케이스 높이로 쓰면 DCC 가 다시 접힌다. */
+    if (!Number.isFinite(n) || n < 280) return "";
+    return raw;
+  } catch {
+    return "";
+  }
+}
+
+function clearShowcaseSurfaceUnlock() {
+  document.querySelectorAll("[data-vlue-surface-unlock]").forEach((el) => {
+    el.style.removeProperty("display");
+    el.style.removeProperty("opacity");
+    el.style.removeProperty("transform");
+    el.style.removeProperty("height");
+    el.style.removeProperty("min-height");
+    delete el.dataset.vlueSurfaceUnlock;
+  });
+  const root = document.getElementById("root");
+  [document.documentElement, document.body, root].forEach((el) => {
+    if (!el) return;
+    el.style.removeProperty("height");
+    el.style.removeProperty("min-height");
+  });
+}
+
+/** 미니→쇼케이스 복귀. display/opacity/translateY 고착과 0높이 뷰포트를 푼 뒤 다시 그린다. */
+function redrawShowcaseOverlay() {
+  const root = document.getElementById("root");
+  const overlayH = overlayHeightCss();
+  const host = document.querySelector(
+    ".lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo)"
+  );
+  [document.documentElement, document.body, root].forEach((el) => {
+    if (!el) return;
+    el.style.height = "100%";
+    el.style.minHeight = overlayH || "100%";
+  });
+  if (host) {
+    const shell = host.querySelector(".lettering-overlay-host__tent-shell");
+    const tent = host.querySelector(".lettering-ongoing--fullscreen-tent");
+    [host, shell, tent].forEach((el) => {
+      if (!el) return;
+      el.style.setProperty("display", "flex", "important");
+      el.style.setProperty("opacity", "1", "important");
+      el.style.setProperty("transform", "none", "important");
+      el.style.setProperty("height", overlayH || "100%", "important");
+      el.style.setProperty("min-height", overlayH || "100%", "important");
+      el.dataset.vlueSurfaceUnlock = "1";
+    });
+    host.querySelectorAll(SHOWCASE_SURFACE_SELECTOR).forEach((el) => {
+      if (el === shell || el === tent) return;
+      let stuck = false;
+      try {
+        const cs = getComputedStyle(el);
+        stuck =
+          cs.display === "none" ||
+          Number.parseFloat(cs.opacity) < 0.05 ||
+          (cs.transform && cs.transform !== "none");
+      } catch {
+        stuck = true;
+      }
+      if (!stuck) return;
+      el.style.setProperty("display", "flex", "important");
+      el.style.setProperty("opacity", "1", "important");
+      el.style.setProperty("transform", "none", "important");
+      el.dataset.vlueSurfaceUnlock = "1";
+    });
+  }
+  if (root) void root.offsetHeight;
+  window.dispatchEvent(new Event("resize"));
+}
 
 /** 상대가 쇼케이스/DCC 를 송출 ON 으로 저장하지 않은 경우 — 인증 팝업만 */
 function createPeerAuthOnlyShowcaseStyle() {
@@ -223,29 +306,102 @@ function applyOverlayPeerPack(pack, setters) {
   setters.setLoading(false);
 }
 
+/** 같은 번호의 live 조회는 한 번만. restore/connected 재주입이 2.8초 타이머를 또 열지 않게. */
+const overlayEnrichInflight = new Map();
+
+const DCC_KEEP_FIELDS = [
+  "email",
+  "phone",
+  "organization",
+  "companyName",
+  "title",
+  "department",
+  "photoUrl",
+  "avatarUrl",
+  "companyIntro",
+  "customBackText",
+  "publicHandle",
+  "name",
+  "displayName"
+];
+
+function cardResolvedForLiveCall(card) {
+  if (!card || typeof card !== "object") return false;
+  if (String(card.profileKind || "") === "lookup_pending") return false;
+  if (card.showcaseStyle?.includeDigitalCard === true) return true;
+  if (String(card.userId || card.ownerUserId || "").trim()) return true;
+  if (String(card.email || card.organization || "").trim()) return true;
+  return Boolean(String(card.name || card.displayName || "").trim());
+}
+
+function sameOverlayPeer(prev, next) {
+  const a = String(prev?.userId || prev?.ownerUserId || "").trim();
+  const b = String(next?.userId || next?.ownerUserId || "").trim();
+  if (a && b) return a === b;
+  return true;
+}
+
+/**
+ * live 타임아웃(incomplete)은 이미 그린 DCC 를 유지한다.
+ * 얇은 페이로드의 빈 문자열은 채워진 전화·이메일·상호를 지우지 않는다.
+ */
+function mergeEnrichIntoCard(prev, pack) {
+  const next = pack?.card;
+  if (!next) return prev ?? null;
+  if (pack.incomplete && cardResolvedForLiveCall(prev)) return prev;
+  const merged = { ...(prev || {}), ...next };
+  if (prev && sameOverlayPeer(prev, next)) {
+    for (const key of DCC_KEEP_FIELDS) {
+      const incoming = next[key];
+      const kept = prev[key];
+      const incomingEmpty = incoming == null || String(incoming).trim() === "";
+      const keptFilled = kept != null && String(kept).trim() !== "";
+      if (incomingEmpty && keptFilled) merged[key] = kept;
+    }
+  }
+  merged.showcaseStyle =
+    pack.incomplete && prev?.showcaseStyle?.includeDigitalCard === true
+      ? prev.showcaseStyle
+      : mergeShowcaseStyle(prev?.showcaseStyle, next);
+  return merged;
+}
+
+function mergeEnrichStyle(prev, pack) {
+  if (pack?.incomplete && prev?.includeDigitalCard === true) return prev;
+  return mergeShowcaseStyle(prev, pack?.card || pack);
+}
+
 function scheduleOverlayPeerEnrich(phone, seedCard, applyPack) {
   const ph = String(phone || "").trim();
   if (!ph) {
     applyPack(null);
     return;
   }
-  void resolveCallHistoryShowcasePeer(ph, {
-    displayName: seedCard?.name || seedCard?.displayName || "",
-    avatarUrl: seedCard?.photoUrl || seedCard?.avatarUrl || ""
-  })
-    .then((payload) => {
-      const pack = {
-        card: payload.card,
-        showcaseStyle: payload.card?.showcaseStyle || payload.showcaseStyle,
-        verified: Boolean(payload.verified),
-        phone: payload.phone || ph
-      };
-      writeCallHistoryPeerCache(ph, pack);
-      applyPack(pack);
+  const key = ph.replace(/\D/g, "") || ph;
+  let run = overlayEnrichInflight.get(key);
+  if (!run) {
+    run = resolveCallHistoryShowcasePeer(ph, {
+      displayName: seedCard?.name || seedCard?.displayName || "",
+      avatarUrl: seedCard?.photoUrl || seedCard?.avatarUrl || ""
     })
-    .catch(() => {
-      applyPack(null);
-    });
+      .then((payload) => {
+        const pack = {
+          card: payload.card,
+          showcaseStyle: payload.card?.showcaseStyle || payload.showcaseStyle,
+          verified: Boolean(payload.verified),
+          phone: payload.phone || ph,
+          incomplete: payload.incomplete === true
+        };
+        if (!pack.incomplete && pack.card) writeCallHistoryPeerCache(ph, pack);
+        return pack;
+      })
+      .catch(() => null)
+      .finally(() => {
+        if (overlayEnrichInflight.get(key) === run) overlayEnrichInflight.delete(key);
+      });
+    overlayEnrichInflight.set(key, run);
+  }
+  void run.then((pack) => applyPack(pack));
 }
 
 function isUnknownIncoming(phone) {
@@ -632,7 +788,17 @@ function LetteringOverlayHostInner() {
     return undefined;
   }, [direction, urlMiniCase]);
 
+  const prevIncomingDigitsRef = useRef("");
   useEffect(() => {
+    const nextDigits = normalizePhoneDigits(incoming);
+    /*
+     * 같은 통화에서 번호 표기만 바뀌면(010-2398-0761 ↔ 01023980761) 카드를 비우지 않는다.
+     * STATE_ACTIVE / 문서 재주입이 이 효과를 다시 타면 DCC 가 잠깐 떴다가 빈 화면이 된다.
+     */
+    if (prevIncomingDigitsRef.current && prevIncomingDigitsRef.current === nextDigits) {
+      return;
+    }
+    prevIncomingDigitsRef.current = nextDigits;
     matchedRef.current = false;
     autoExpandedOnceRef.current = false;
     showcaseDecisionReadyRef.current = Boolean(urlMiniCase);
@@ -853,14 +1019,10 @@ function LetteringOverlayHostInner() {
             );
           }
           scheduleOverlayPeerEnrich(incoming || detail.phoneE164 || seeded.phone, seeded, (pack) => {
-            markShowcaseDecisionReady(true);
             if (!pack?.card) return;
-            setCard((prev) => ({
-              ...(prev || {}),
-              ...pack.card,
-              showcaseStyle: mergeShowcaseStyle(prev?.showcaseStyle, pack.card || pack)
-            }));
-            setShowcaseStyle((prev) => mergeShowcaseStyle(prev, pack.card || pack));
+            if (!pack.incomplete) markShowcaseDecisionReady(true);
+            setCard((prev) => mergeEnrichIntoCard(prev, pack));
+            setShowcaseStyle((prev) => mergeEnrichStyle(prev, pack));
           });
         }
       } catch {
@@ -995,14 +1157,10 @@ function LetteringOverlayHostInner() {
             if (!isDcp) {
               scheduleOverlayPeerEnrich(incoming, seeded, (pack) => {
                 if (cancelled) return;
-                markShowcaseDecisionReady(true);
                 if (!pack?.card) return;
-                setCard((prev) => ({
-                  ...(prev || {}),
-                  ...pack.card,
-                  showcaseStyle: mergeShowcaseStyle(prev?.showcaseStyle, pack.card || pack)
-                }));
-                setShowcaseStyle((prev) => mergeShowcaseStyle(prev, pack.card || pack));
+                if (!pack.incomplete) markShowcaseDecisionReady(true);
+                setCard((prev) => mergeEnrichIntoCard(prev, pack));
+                setShowcaseStyle((prev) => mergeEnrichStyle(prev, pack));
               });
             }
             return;
@@ -1030,17 +1188,16 @@ function LetteringOverlayHostInner() {
 
       scheduleOverlayPeerEnrich(incoming, null, (pack) => {
         if (cancelled) return;
-        markShowcaseDecisionReady(true);
         if (matchedRef.current) return;
+        /* 타임아웃 팩으로 매칭을 잠그면 이미 그린 DCC 가 미인증으로 바뀐다 */
+        if (!pack?.card || pack.incomplete) return;
         /* 미매칭/미인증 번들로 matchedRef 를 잠그면 by-number 가 스킵되어 미인증 고착 */
-        if (!pack?.verified || !pack?.card) return;
+        if (!pack.verified) return;
+        markShowcaseDecisionReady(true);
         matchedRef.current = true;
-        setCard((prev) => ({
-          ...(pack.card || {}),
-          showcaseStyle: mergeShowcaseStyle(prev?.showcaseStyle, pack.card || pack)
-        }));
+        setCard((prev) => mergeEnrichIntoCard(prev, pack));
         setVerified(true);
-        setShowcaseStyle((prev) => mergeShowcaseStyle(prev, pack.card || pack));
+        setShowcaseStyle((prev) => mergeEnrichStyle(prev, pack));
         setLoading(false);
         if (!isDcpOverlayCard(pack.card)) {
           void reportLineCallEvent(incoming, direction === "outgoing" ? "out" : "in");
@@ -1083,14 +1240,10 @@ function LetteringOverlayHostInner() {
         if (!isDcp && !isExpiredLineCard(nextCard)) {
           scheduleOverlayPeerEnrich(incoming, nextCard, (pack) => {
             if (cancelled) return;
-            markShowcaseDecisionReady(true);
             if (!pack?.card) return;
-            setCard((prev) => ({
-              ...(prev || {}),
-              ...pack.card,
-              showcaseStyle: mergeShowcaseStyle(prev?.showcaseStyle, pack.card || pack)
-            }));
-            setShowcaseStyle((prev) => mergeShowcaseStyle(prev, pack.card || pack));
+            if (!pack.incomplete) markShowcaseDecisionReady(true);
+            setCard((prev) => mergeEnrichIntoCard(prev, pack));
+            setShowcaseStyle((prev) => mergeEnrichStyle(prev, pack));
           });
         }
         return;
@@ -1177,6 +1330,27 @@ function LetteringOverlayHostInner() {
   }, []);
 
   useEffect(() => {
+    if (!expanded) {
+      clearShowcaseSurfaceUnlock();
+      return undefined;
+    }
+    let alive = true;
+    const run = () => {
+      if (alive) redrawShowcaseOverlay();
+    };
+    run();
+    const raf = window.requestAnimationFrame(run);
+    const retrySoon = window.setTimeout(run, 80);
+    const retryLate = window.setTimeout(run, 360);
+    return () => {
+      alive = false;
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(retrySoon);
+      window.clearTimeout(retryLate);
+    };
+  }, [expanded]);
+
+  useEffect(() => {
     const onNativeCall = (e) => {
       const rawState = String(e?.detail?.state || e?.detail?.callState || "");
       /*
@@ -1236,6 +1410,10 @@ function LetteringOverlayHostInner() {
         if (Date.now() < restoreHoldUntilRef.current) {
           return;
         }
+        /* 이미 연 쇼케이스는 늦은 big_push 로 접지 않는다. 접기는 사용자 미니만. */
+        if (autoExpandedOnceRef.current && !userChoseMiniRef.current) {
+          return;
+        }
         if (
           directionRef.current === "outgoing" &&
           outgoingLogoModeRef.current &&
@@ -1273,6 +1451,7 @@ function LetteringOverlayHostInner() {
         forceShowcaseBarRef.current = false;
         setForceShowcaseBar(false);
         setExpanded(true);
+        queueMicrotask(() => redrawShowcaseOverlay());
       }
       const next = normalizeCallState(rawState);
       if (next) {
@@ -1291,13 +1470,14 @@ function LetteringOverlayHostInner() {
             setExpanded(false);
           } else if (native) {
             /*
-             * 화면 종류는 네이티브가 고른다. 다만 이미 연 쇼케이스는
-             * connected 재주입으로 접지 않는다. 접기는 minimize_showcase 만.
+             * 네이티브가 connected 를 보낸 시점은 이미 풀 창이다.
+             * 여기서 expanded 를 그대로 두면 CompanionMiniCase 만 그려지고,
+             * 창은 MATCH_PARENT #0B101B 라 검은 화면이 터치를 막는다.
+             * 접기는 minimize_showcase 만. 첫 connected 도 연다.
              */
-            if (
-              !userChoseMiniRef.current &&
-              (autoExpandedOnceRef.current || Date.now() < restoreHoldUntilRef.current)
-            ) {
+            if (!userChoseMiniRef.current) {
+              autoExpandedOnceRef.current = true;
+              restoreHoldUntilRef.current = Date.now() + 3500;
               forceShowcaseBarRef.current = false;
               setForceShowcaseBar(false);
               setExpanded(true);
@@ -1944,10 +2124,16 @@ function LetteringOverlayHostInner() {
                * 쇼케이스 통화는 쇼케이스를, 안심팝업 통화는 같은 팝업을 다시 연다.
                */
               if (typeof nativeRestore === "function") {
-                if (hasShowcase) {
-                  userChoseMiniRef.current = false;
-                  restoreHoldUntilRef.current = Date.now() + 4500;
-                }
+                /*
+                 * 창이 MATCH_PARENT 가 된 뒤에만 웹을 연다.
+                 * 여기서 setExpanded(true) 하면 미니 높이 안에 라이브바·광고가 그려지고
+                 * 그 창이 삼성 통화 UI 위에 남는다.
+                 * 펼침은 네이티브 flushShowcaseWebExpand → restore_showcase 만.
+                 */
+                userChoseMiniRef.current = false;
+                restoreHoldUntilRef.current = Date.now() + 4500;
+                forceShowcaseBarRef.current = false;
+                setForceShowcaseBar(false);
                 try {
                   nativeRestore();
                 } catch {
