@@ -1,7 +1,7 @@
 import { apiUrl } from "../../lib/apiBase.js";
 
 /** Instagram 로그인 버튼 — 서버 OAuth: GET /api/v1/auth/instagram */
-export default function InstagramLoginButton({ className = "", disabled = false, onBeforeNavigate }) {
+export default function InstagramLoginButton({ className = "", disabled = false, pending = false, onBeforeNavigate }) {
   const startInstagramOAuth = () => {
     if (disabled) return;
     onBeforeNavigate?.();
@@ -22,14 +22,17 @@ export default function InstagramLoginButton({ className = "", disabled = false,
         .filter(Boolean)
         .join(" ")}
     >
-      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden>
+      {pending ? (
+        <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden />
+      ) : null}
+      <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center ${pending ? "hidden" : ""}`} aria-hidden>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
           <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.8" />
           <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="1.8" />
           <circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" />
         </svg>
       </span>
-      <span>Instagram 로그인</span>
+      <span>{pending ? "연결 중" : "Instagram 로그인"}</span>
     </button>
   );
 }

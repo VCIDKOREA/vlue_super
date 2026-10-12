@@ -3,7 +3,7 @@ import { apiUrl } from "../../lib/apiBase.js";
 /**
  * Google 로그인 버튼 — 서버 OAuth: GET /api/v1/auth/google
  */
-export default function GoogleLoginButton({ className = "", disabled = false, onBeforeNavigate }) {
+export default function GoogleLoginButton({ className = "", disabled = false, pending = false, onBeforeNavigate }) {
   const startGoogleOAuth = () => {
     if (disabled) return;
     onBeforeNavigate?.();
@@ -24,7 +24,10 @@ export default function GoogleLoginButton({ className = "", disabled = false, on
         .filter(Boolean)
         .join(" ")}
     >
-      <svg className="h-5 w-5 shrink-0" viewBox="0 0 48 48" aria-hidden>
+      {pending ? (
+        <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" aria-hidden />
+      ) : null}
+      <svg className={`h-5 w-5 shrink-0 ${pending ? "hidden" : ""}`} viewBox="0 0 48 48" aria-hidden>
         <path
           fill="#FFC107"
           d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.5-.4-3.5z"
@@ -42,7 +45,7 @@ export default function GoogleLoginButton({ className = "", disabled = false, on
           d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.3 4.1-4.1 5.5l.1.1 6.2 5.2C39.2 37.3 44 32.5 44 24c0-1.3-.1-2.5-.4-3.5z"
         />
       </svg>
-      <span>Google 로그인</span>
+      <span>{pending ? "연결 중" : "Google 로그인"}</span>
     </button>
   );
 }

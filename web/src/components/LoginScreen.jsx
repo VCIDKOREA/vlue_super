@@ -35,6 +35,7 @@ function LoginScreen({
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [pwEyeBlinkSeq, setPwEyeBlinkSeq] = useState(0);
   const [loginBusy, setLoginBusy] = useState(false);
+  const [socialBusy, setSocialBusy] = useState("");
   const [loginError, setLoginError] = useState("");
   const [recoveryOpen, setRecoveryOpen] = useState(() => {
     try {
@@ -192,10 +193,26 @@ function LoginScreen({
                 간편 로그인은 휴대폰 본인인증 가입 후 마이페이지에서 SNS를 연동해야 사용할 수 있습니다.
               </p>
               <div className="mt-4 flex w-full flex-col gap-2.5">
-                <KakaoLoginButton />
-                <GoogleLoginButton />
-                <NaverLoginButton />
-                <InstagramLoginButton />
+                <KakaoLoginButton
+                  disabled={Boolean(socialBusy)}
+                  pending={socialBusy === "kakao"}
+                  onBeforeNavigate={() => setSocialBusy("kakao")}
+                />
+                <GoogleLoginButton
+                  disabled={Boolean(socialBusy)}
+                  pending={socialBusy === "google"}
+                  onBeforeNavigate={() => setSocialBusy("google")}
+                />
+                <NaverLoginButton
+                  disabled={Boolean(socialBusy)}
+                  pending={socialBusy === "naver"}
+                  onBeforeNavigate={() => setSocialBusy("naver")}
+                />
+                <InstagramLoginButton
+                  disabled={Boolean(socialBusy)}
+                  pending={socialBusy === "instagram"}
+                  onBeforeNavigate={() => setSocialBusy("instagram")}
+                />
               </div>
               <button
                 type="button"

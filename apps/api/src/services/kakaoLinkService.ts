@@ -10,6 +10,7 @@ import {
 } from "../integrations/kakao/kakaoTalkId.js";
 import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
 import { getVlueShareOrigin } from "./bizcard/bizcardPublicUrls.js";
+import { linkSocialAccountToUser } from "./socialAuthService.js";
 
 async function resolveKakaoProfilePageUrlForUser(userId: string): Promise<string> {
   const user = await prisma.user.findUnique({
@@ -93,6 +94,17 @@ export async function completeKakaoLinkForUser(userId: string, code: string) {
       accessToken
     }
   });
+
+  /* 쇼케이스 연동과 함께 간편 로그인 테이블도 연결. 프로필만 저장되면 화면은 미연동으로 남는다. */
+  try {
+    await linkSocialAccountToUser(
+      userId,
+      { provider: "kakao", socialToken: accessToken },
+      { header: () => undefined }
+    );
+  } catch (e) {
+    console.warn("[kakao] social login link upsert failed:", e instanceof Error ? e.message : e);
+  }
 
   return {
     kakaoUserId: link.kakaoUserId,

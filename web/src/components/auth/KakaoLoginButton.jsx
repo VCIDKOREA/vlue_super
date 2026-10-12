@@ -4,7 +4,7 @@ import { apiUrl } from "../../lib/apiBase.js";
  * 카카오 공식 가이드 스타일 로그인 버튼.
  * 클릭 시 서버 OAuth 시작: GET /api/v1/auth/kakao
  */
-export default function KakaoLoginButton({ className = "", disabled = false, onBeforeNavigate }) {
+export default function KakaoLoginButton({ className = "", disabled = false, pending = false, onBeforeNavigate }) {
   const startKakaoOAuth = () => {
     if (disabled) return;
     onBeforeNavigate?.();
@@ -25,13 +25,17 @@ export default function KakaoLoginButton({ className = "", disabled = false, onB
         .filter(Boolean)
         .join(" ")}
     >
-      <span
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-[#191919] text-[11px] font-black leading-none text-[#FEE500]"
-        aria-hidden
-      >
-        K
-      </span>
-      <span>카카오 로그인</span>
+      {pending ? (
+        <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-[#191919] border-t-transparent" aria-hidden />
+      ) : (
+        <span
+          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-[#191919] text-[11px] font-black leading-none text-[#FEE500]"
+          aria-hidden
+        >
+          K
+        </span>
+      )}
+      <span>{pending ? "연결 중" : "카카오 로그인"}</span>
     </button>
   );
 }

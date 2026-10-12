@@ -158,6 +158,42 @@ async function findUserBySocialMapping(identity: ResolvedSocialIdentity) {
       phoneE164: true
     }
   });
+  if (!legacy && identity.provider === "kakao") {
+    const kakaoProfile = await prisma.userKakaoLink.findFirst({
+      where: { kakaoUserId: identity.providerUserId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            legalName: true,
+            publicHandle: true,
+            accountStatus: true,
+            phoneE164: true
+          }
+        }
+      }
+    });
+    if (kakaoProfile?.user) {
+      await prisma.userSocialLoginLink.upsert({
+        where: {
+          userId_provider: { userId: kakaoProfile.user.id, provider: "kakao" }
+        },
+        create: {
+          userId: kakaoProfile.user.id,
+          provider: "kakao",
+          providerUserId: identity.providerUserId,
+          providerEmail: identity.providerEmail
+        },
+        update: {
+          providerUserId: identity.providerUserId,
+          providerEmail: identity.providerEmail,
+          lastLoginAt: new Date()
+        }
+      });
+      return { user: kakaoProfile.user, via: "kakao_profile" as const };
+    }
+  }
+
   if (!legacy) return null;
 
   await prisma.userSocialLoginLink.upsert({

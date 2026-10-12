@@ -644,6 +644,22 @@ authV1Routes.get("/social/links", requireUserHeader, async (c) => {
     },
     orderBy: { linkedAt: "asc" }
   });
+  if (!links.some((row) => row.provider === "kakao")) {
+    const kakao = await prisma.userKakaoLink.findUnique({
+      where: { userId },
+      select: { id: true, kakaoUserId: true, linkedAt: true }
+    });
+    if (kakao?.kakaoUserId) {
+      links.push({
+        id: kakao.id,
+        provider: "kakao",
+        providerUserId: kakao.kakaoUserId,
+        providerEmail: null,
+        linkedAt: kakao.linkedAt,
+        lastLoginAt: null
+      });
+    }
+  }
   return c.json({ links });
 });
 
