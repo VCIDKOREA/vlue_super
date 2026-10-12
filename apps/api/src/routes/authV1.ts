@@ -667,7 +667,8 @@ authV1Routes.get("/social/links", requireUserHeader, async (c) => {
 authV1Routes.delete("/social/links/:provider", requireUserHeader, async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
-    const result = await unlinkSocialLogin(userId, c.req.param("provider"));
+    const provider = String(c.req.param("provider") || "").trim();
+    const result = await unlinkSocialLogin(userId, provider);
     return c.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "소셜 연동 해제에 실패했습니다.";
