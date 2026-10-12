@@ -6,6 +6,7 @@ import {
 
 const NAVER_AUTH_BASE = "https://nid.naver.com/oauth2.0/authorize";
 const NAVER_TOKEN_URL = "https://nid.naver.com/oauth2.0/token";
+const NAVER_LOGOUT_URL = "https://nid.naver.com/nidlogin.logout";
 
 export function buildNaverAuthorizeUrl(state: string): string {
   const clientId = getNaverClientId();
@@ -15,9 +16,17 @@ export function buildNaverAuthorizeUrl(state: string): string {
     response_type: "code",
     client_id: clientId,
     redirect_uri: getNaverOAuthRedirectUri(),
-    state
+    state,
+    /* 이미 동의한 계정이어도 동의항목 화면을 다시 연다. 검수·계정 변경에 필요. */
+    auth_type: "reprompt"
   });
   return `${NAVER_AUTH_BASE}?${params.toString()}`;
+}
+
+/** 네이버 로그인 쿠키를 지운 뒤 동의 화면으로 보낸다. 다른 계정으로 다시 연동할 수 있다. */
+export function buildNaverFreshAuthorizeUrl(state: string): string {
+  const authorize = buildNaverAuthorizeUrl(state);
+  return `${NAVER_LOGOUT_URL}?returl=${encodeURIComponent(authorize)}`;
 }
 
 export async function exchangeNaverCodeForAccessToken(

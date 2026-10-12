@@ -4,7 +4,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { buildKakaoAuthorizeUrl, createKakaoLinkState, exchangeKakaoCodeForAccessToken, verifyKakaoLinkState } from "../integrations/kakao/kakaoOAuth.js";
 import { getFrontendOrigin } from "../integrations/kakao/kakaoEnv.js";
 import { buildGoogleAuthorizeUrl, exchangeGoogleCodeForAccessToken } from "../integrations/google/googleOAuth.js";
-import { buildNaverAuthorizeUrl, exchangeNaverCodeForAccessToken } from "../integrations/naver/naverOAuth.js";
+import { buildNaverFreshAuthorizeUrl, exchangeNaverCodeForAccessToken } from "../integrations/naver/naverOAuth.js";
 import {
   buildInstagramAuthorizeUrl,
   createInstagramLinkState,
@@ -361,7 +361,7 @@ authV1Routes.get("/naver", (c) => {
   try {
     const state = randomBytes(24).toString("base64url");
     setOAuthStateCookie(c, NAVER_STATE_COOKIE, state);
-    return c.redirect(buildNaverAuthorizeUrl(state), 302);
+    return c.redirect(buildNaverFreshAuthorizeUrl(state), 302);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "네이버 로그인을 시작할 수 없습니다.";
     return redirectAuthError("naver", msg);
@@ -373,7 +373,7 @@ authV1Routes.post("/naver/link/start", requireUserHeader, async (c) => {
   try {
     const userId = c.get("vlueUserId") as string;
     const state = createSocialLoginLinkState(userId, "naver");
-    const url = buildNaverAuthorizeUrl(state);
+    const url = buildNaverFreshAuthorizeUrl(state);
     return c.json({ url });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "네이버 연동을 시작할 수 없습니다.";
