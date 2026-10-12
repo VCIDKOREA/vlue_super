@@ -79,6 +79,24 @@ export async function startSocialOAuthLink(provider) {
   return url;
 }
 
+export async function unlinkSocialAccount(provider) {
+  const p = String(provider || "").toLowerCase();
+  const res = await vlueAuthFetch(apiUrl(`/api/v1/auth/social/links/${encodeURIComponent(p)}`), {
+    method: "DELETE",
+    headers: vlueAuthHeaders()
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || "소셜 연동 해제에 실패했습니다.");
+  }
+  try {
+    await fetchSocialLinks();
+  } catch {
+    /* ignore refresh failure */
+  }
+  return data;
+}
+
 export function isProviderLinked(links, provider) {
   return (links || []).some((row) => String(row.provider).toLowerCase() === String(provider).toLowerCase());
 }

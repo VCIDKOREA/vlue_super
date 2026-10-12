@@ -346,3 +346,22 @@ export async function linkSocialAccountToUser(
     }
   };
 }
+
+/** 간편 로그인 연동 해제. 같은 제공자의 프로필 연동도 지워서 다른 계정으로 다시 인증할 수 있게 한다. */
+export async function unlinkSocialLogin(userId: string, providerRaw: string) {
+  const provider = normalizeProvider(String(providerRaw || ""));
+  if (!provider) throw new Error("지원하지 않는 소셜 연동입니다.");
+
+  await prisma.userSocialLoginLink.deleteMany({ where: { userId, provider } });
+  if (provider === "kakao") {
+    await prisma.userKakaoLink.deleteMany({ where: { userId } });
+  }
+  if (provider === "instagram") {
+    await prisma.userInstagramLink.deleteMany({ where: { userId } });
+  }
+  await prisma.user.updateMany({
+    where: { id: userId, socialProvider: provider },
+    data: { socialProvider: null, socialId: null }
+  });
+  return { ok: true, provider };
+}

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchSocialLinks,
   readCachedSocialLinks,
-  startSocialOAuthLink
+  startSocialOAuthLink,
+  unlinkSocialAccount
 } from "../../lib/socialAccountLinkApi.js";
 
 const PROVIDERS = [
@@ -68,6 +69,7 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, pl
   const [links, setLinks] = useState(() => readCachedSocialLinks());
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState("");
+  const [confirmProvider, setConfirmProvider] = useState("");
   const [error, setError] = useState("");
   const inProfile = placement === "profile";
 
@@ -123,6 +125,23 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, pl
     }
     return m;
   }, [links]);
+
+  const unlinkProvider = async (provider) => {
+    setBusyProvider(provider);
+    setError("");
+    try {
+      await unlinkSocialAccount(provider);
+      setConfirmProvider("");
+      await refresh();
+      onToast?.("연동을 해제했습니다. 다른 계정으로 다시 연동할 수 있습니다.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "소셜 연동 해제에 실패했습니다.";
+      setError(msg);
+      onToast?.(msg);
+    } finally {
+      setBusyProvider("");
+    }
+  };
 
   const linkWithOAuthRedirect = async (provider) => {
     setBusyProvider(provider);
@@ -249,7 +268,48 @@ export default function SocialAccountLinkPanel({ onToast, isDarkMode = false, pl
                 >
                   {isBusy ? "연동 중…" : p.actionLabel}
                 </button>
-              ) : null}
+              ) : confirmProvider === p.id ? (
+                <div className="mt-3">
+                  <p className={`text-[11px] leading-relaxed [word-break:keep-all] ${providerSubCls}`}>
+                    해제하면 이 계정으로 간편 로그인할 수 없습니다. 다른 계정으로 다시 연동할 수 있습니다.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={Boolean(busyProvider)}
+                      onClick={() => unlinkProvider(p.id)}
+                      className="flex-1 rounded-lg bg-rose-600 py-2.5 text-[13px] font-semibold text-white disabled:opacity-60"
+                    >
+                      {isBusy ? "해제 중…" : "해제"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(busyProvider)}
+                      onClick={() => setConfirmProvider("")}
+                      className={
+                        isDarkMode
+                          ? "flex-1 rounded-lg border border-white/15 py-2.5 text-[13px] font-semibold text-gray-200 disabled:opacity-60"
+                          : "flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-[13px] font-semibold text-slate-700 disabled:opacity-60"
+                      }
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={Boolean(busyProvider)}
+                  onClick={() => setConfirmProvider(p.id)}
+                  className={
+                    isDarkMode
+                      ? "mt-3 flex w-full items-center justify-center rounded-lg border border-rose-400/40 py-2.5 text-[13px] font-semibold text-rose-200 disabled:opacity-60"
+                      : "mt-3 flex w-full items-center justify-center rounded-lg border border-rose-200 bg-white py-2.5 text-[13px] font-semibold text-rose-700 disabled:opacity-60"
+                  }
+                >
+                  연동 해제
+                </button>
+              )}
             </div>
           );
         })}

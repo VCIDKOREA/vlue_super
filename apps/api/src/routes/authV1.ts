@@ -12,7 +12,7 @@ import {
   exchangeInstagramShortLivedForLongLived,
   verifyInstagramLinkState
 } from "../integrations/instagram/instagramOAuth.js";
-import { completeSocialLogin, linkSocialAccountToUser } from "../services/socialAuthService.js";
+import { completeSocialLogin, linkSocialAccountToUser, unlinkSocialLogin } from "../services/socialAuthService.js";
 import {
   completeKakaoLinkForUser,
   disconnectKakaoLink,
@@ -661,6 +661,18 @@ authV1Routes.get("/social/links", requireUserHeader, async (c) => {
     }
   }
   return c.json({ links });
+});
+
+/** 간편 로그인 연동 해제 — 다른 SNS 계정으로 다시 인증할 수 있게 */
+authV1Routes.delete("/social/links/:provider", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const result = await unlinkSocialLogin(userId, c.req.param("provider"));
+    return c.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "소셜 연동 해제에 실패했습니다.";
+    return c.json({ error: msg }, 400);
+  }
 });
 
 /** 로그인 계정에 추가 소셜 연동 */
