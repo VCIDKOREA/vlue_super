@@ -6,8 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import kr.vlue.calloverlay.family.translate.TranslationCacheEntity
 import kr.vlue.calloverlay.family.translate.TranslationCacheDao
-/** `android-database-sqlcipher` 4.5.x — 패키지는 net.sqlcipher (신규 sqlcipher-android 와 다름) */
-import net.sqlcipher.database.SupportFactory
+/** `sqlcipher-android` 4.6.x (16KB Page Size 호환) SupportOpenHelperFactory */
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
     entities = [PosLedgerEntity::class, FamilySecurityStateEntity::class, TranslationCacheEntity::class],
@@ -29,7 +29,7 @@ abstract class VlueEncryptedDatabase : RoomDatabase() {
         }
 
         private fun build(context: Context): VlueEncryptedDatabase {
-            val factory = SupportFactory(DatabaseKeyHelper.getOrCreatePassphrase(context))
+            val factory = SupportOpenHelperFactory(DatabaseKeyHelper.getOrCreatePassphrase(context))
             return Room.databaseBuilder(context, VlueEncryptedDatabase::class.java, "vlue_encrypted.db")
                 .openHelperFactory(factory)
                 .fallbackToDestructiveMigration()

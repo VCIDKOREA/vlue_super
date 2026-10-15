@@ -7,3 +7,5 @@
 -keepclassmembers class kr.vlue.calloverlay.family.VlueFamilyBridge { *; }
 -dontwarn net.sqlcipher.**
 -keep class net.sqlcipher.** { *; }
+-dontwarn net.zetetic.**
+-keep class net.zetetic.** { *; }
