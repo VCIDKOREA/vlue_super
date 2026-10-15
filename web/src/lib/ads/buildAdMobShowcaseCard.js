@@ -83,7 +83,7 @@ export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
   const body = String(assets.body || "").trim();
   const advertiser = String(assets.advertiser || "").trim() || "스폰서";
   const mediaUrl = String(assets.mediaUrl || "").trim();
-  const hasVideo = Boolean(assets.hasVideoContent);
+  const hasVideo = Boolean(assets.hasVideoContent || assets.videoUrl);
   const iconUrl = String(assets.iconUrl || "").trim();
   const localId = getLocalVlueUserId();
   const specs = getBrandHighlightSpecs(assets);

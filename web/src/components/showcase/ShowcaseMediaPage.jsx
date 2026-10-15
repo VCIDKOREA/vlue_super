@@ -208,107 +208,21 @@ export default function ShowcaseMediaPage({
         axis.current = null;
       }}
     >
-      {current.isAdMobSponsor ? (
-        <div className="showcase-ad-rich-frame relative flex h-full w-full flex-col justify-between overflow-hidden bg-[#0B101B]">
-          {/* 1. 고화질 풀스크린 앰비언트 블러 배경 (영상 또는 이미지) */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {current.videoUrl ? (
-              <video
-                src={current.videoUrl}
-                poster={current.url}
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="h-full w-full object-cover blur-2xl scale-125 opacity-35"
-                aria-hidden="true"
-              />
-            ) : (
-              <img
-                src={current.url}
-                alt=""
-                className="h-full w-full object-cover blur-2xl scale-125 opacity-35"
-                aria-hidden="true"
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0B101B]/80 via-transparent to-[#0B101B]/95" />
-          </div>
-
-          {/* 2. 상단 헤더: BGM 바 영역과 안전한 간격을 확보하여 최상단 텍스트 짤림 100% 방지 */}
-          <div className="relative z-10 px-5 pt-3.5 text-center">
-            {current.badge ? (
-              <span
-                className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wider uppercase mb-1.5 shadow-sm"
-                style={{
-                  backgroundColor: `${current.accentColor || "#38bdf8"}22`,
-                  color: current.accentColor || "#38bdf8",
-                  border: `1px solid ${current.accentColor || "#38bdf8"}44`
-                }}
-              >
-                {current.badge}
-              </span>
-            ) : null}
-
-            <h3 className="text-[17px] font-black leading-snug tracking-tight text-white drop-shadow-md">
-              {current.body || current.headline}
-            </h3>
-
-            {current.body && current.headline ? (
-              <p className="mt-1 text-[12px] font-bold text-slate-300 tracking-tight">
-                {current.headline}
-              </p>
-            ) : null}
-          </div>
-
-          {/* 3. 중앙 고화질 메인 비주얼 (영상 자동 재생 또는 이미지) */}
-          <div className="relative z-10 mx-auto w-[92%] max-w-[340px] flex-1 min-h-0 flex items-center justify-center my-2">
-            <div className="relative w-full max-h-[100%] overflow-hidden rounded-2xl border border-white/15 bg-black/60 shadow-2xl">
-              {current.videoUrl ? (
-                <video
-                  key={current.videoUrl}
-                  src={current.videoUrl}
-                  poster={current.url}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="h-full w-full object-contain max-h-[260px] mx-auto select-none rounded-2xl"
-                />
-              ) : (
-                <img
-                  key={current.id || current.url}
-                  src={current.url}
-                  alt={current.headline || "스폰서 쇼케이스"}
-                  className="h-full w-full object-contain max-h-[260px] mx-auto select-none"
-                  draggable={false}
-                  onError={() => onImageError?.(current)}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* 4. 디테일 스펙/하이라이트 칩 (글래스모피즘 배지) + 하단 소셜/프로필 안전 여백 */}
-          <div className="relative z-10 px-4 pb-24 text-center">
-            {current.specs && current.specs.length > 0 ? (
-              <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[320px] mx-auto">
-                {current.specs.map((spec, sIdx) => (
-                  <span
-                    key={sIdx}
-                    className="flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10.5px] font-bold text-white/95 shadow-sm backdrop-blur-md"
-                  >
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: current.accentColor || "#38bdf8" }}
-                    />
-                    {spec}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : (
-        <div className="showcase-media-page__frame">
+      <div className="showcase-media-page__frame bg-black flex items-center justify-center">
+        {current.isAdMobSponsor || current.videoUrl ? (
+          <video
+            key={current.videoUrl || current.id || current.url}
+            src={current.videoUrl || current.url}
+            poster={current.url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            webkit-playsinline="true"
+            className="showcase-media-page__img w-full h-full object-contain bg-black select-none"
+            draggable={false}
+          />
+        ) : (
           <img
             key={current.id || current.url}
             src={current.url}
@@ -317,10 +231,12 @@ export default function ShowcaseMediaPage({
             draggable={false}
             onError={() => onImageError?.(current)}
           />
-          <div className="showcase-media-page__veil" aria-hidden />
+        )}
+        <div className="showcase-media-page__veil" aria-hidden />
+        {!current.isAdMobSponsor ? (
           <ShowcasePhotoTextOverlay key={`tx-${current.id || current.url}`} photo={current} />
-        </div>
-      )}
+        ) : null}
+      </div>
 
       {canSwipe ? (
         <>
