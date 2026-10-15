@@ -2,6 +2,74 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ShowcasePhotoTextOverlay from "./ShowcasePhotoTextOverlay.jsx";
 
+const FALLBACK_SPONSOR_VIDEO_URL =
+  "https://videos.pexels.com/video-files/855828/855828-hd_1920_1080_30fps.mp4";
+
+/**
+ * 스폰서 AD 전용 100% 동영상 오토플레이 플레이어
+ * - 정지 이미지(poster/img) 절대 사용 금지
+ * - 비디오 오토플레이 보장 및 상단 BGM 바와 1:1 사운드 상태 실시간 동기화
+ * - 가로 비율(16:9 등) 영상도 세로 카드 틀 내부에서 object-contain 레터박스로 자연스럽게 스케일링
+ */
+function SponsorAdVideoPlayer({ src }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const onToggle = (e) => {
+      const nextMuted = Boolean(e?.detail?.muted);
+      if (videoRef.current) {
+        videoRef.current.muted = nextMuted;
+        if (!nextMuted) {
+          videoRef.current.play().catch(() => {});
+        }
+      }
+    };
+    window.addEventListener("vlue-admob-toggle-mute", onToggle);
+    return () => window.removeEventListener("vlue-admob-toggle-mute", onToggle);
+  }, []);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = false;
+    const playPromise = v.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // 브라우저 오토플레이 정책으로 소리 포함 자동재생 차단 시 무음으로 즉시 100% 자동재생 보장
+        v.muted = true;
+        window.dispatchEvent(
+          new CustomEvent("vlue-admob-sound-status", { detail: { isMuted: true } })
+        );
+        v.play().catch(() => {});
+      });
+    }
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      key={src}
+      src={src}
+      autoPlay
+      loop
+      muted={false}
+      playsInline
+      webkit-playsinline="true"
+      className="showcase-media-page__img w-full h-full object-contain bg-black select-none pointer-events-auto"
+      draggable={false}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!videoRef.current) return;
+        const nextMuted = !videoRef.current.muted;
+        videoRef.current.muted = nextMuted;
+        window.dispatchEvent(
+          new CustomEvent("vlue-admob-sound-status", { detail: { isMuted: nextMuted } })
+        );
+      }}
+    />
+  );
+}
+
 /**
  * 쇼케이스 한 페이지 — 최대 20장 사진을 VLUÉ 카드로 표시 (공식 Instagram 임베드 없음)
  * media_url 은 API/메타데이터 URL을 그대로 img src 에 사용 (파일 저장 없음)
@@ -210,17 +278,12 @@ export default function ShowcaseMediaPage({
     >
       <div className="showcase-media-page__frame bg-black flex items-center justify-center">
         {current.isAdMobSponsor || current.videoUrl ? (
-          <video
-            key={current.videoUrl || current.id || current.url}
-            src={current.videoUrl || current.url}
-            poster={current.url}
-            autoPlay
-            loop
-            muted
-            playsInline
-            webkit-playsinline="true"
-            className="showcase-media-page__img w-full h-full object-contain bg-black select-none"
-            draggable={false}
+          <SponsorAdVideoPlayer
+            src={
+              current.videoUrl && !current.videoUrl.includes("commondatastorage.googleapis.com")
+                ? current.videoUrl
+                : (current.url && current.url.endsWith(".mp4") ? current.url : FALLBACK_SPONSOR_VIDEO_URL)
+            }
           />
         ) : (
           <img

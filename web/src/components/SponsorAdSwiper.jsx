@@ -6,8 +6,8 @@ import { openAdMobShowcase } from "../lib/ads/openAdMobShowcase.js";
 const CARD_W = 140;
 const CARD_H = 248;
 
-/** localStorage 일일 캐싱 키 */
-const DAILY_SPONSOR_STORAGE_KEY = "vlue_daily_sponsor_cards_v1";
+/** localStorage 일일 캐싱 키 (v2: 유효한 MP4 비디오 CDN 링크 보장) */
+const DAILY_SPONSOR_STORAGE_KEY = "vlue_daily_sponsor_cards_v2";
 
 /**
  * 대기업 브랜드/명품/IT/자동차 컨셉의 프리미엄 하우스 스폰서 풀 (12종)
@@ -223,6 +223,13 @@ function getTodayDateString() {
  * - 매일 자정 00:00(날짜 변경 시) 자동으로 다음 6개 세트로 로테이션 갱신
  */
 function getDailyRotatedSponsors(dateStr) {
+  // 0. 구버전 캐시 정리
+  try {
+    localStorage.removeItem("vlue_daily_sponsor_cards_v1");
+  } catch {
+    /* ignore storage errors */
+  }
+
   // 1. localStorage 캐시 확인
   try {
     const cachedRaw = localStorage.getItem(DAILY_SPONSOR_STORAGE_KEY);
@@ -408,13 +415,19 @@ export default function SponsorAdSwiper({ className = "" }) {
    * 4번 밋밋한 팝업 모달 대신 3번 사진과 동일한 VLUÉ Full-Screen 스폰서 쇼케이스 뷰어(ShowcaseViewer)로 바로 열기
    */
   const handleCardClick = (card) => {
+    const rawVideo = String(card.videoUrl || "").trim();
+    const isBrokenGcs = rawVideo.includes("commondatastorage.googleapis.com");
+    const safeVideoUrl = (!rawVideo || isBrokenGcs)
+      ? "https://videos.pexels.com/video-files/855828/855828-hd_1920_1080_30fps.mp4"
+      : rawVideo;
+
     openAdMobShowcase({
       headline: card.headline,
       body: card.body,
       advertiser: card.brand || "스폰서 광고주",
-      mediaUrl: card.bgImage || card.mediaUrl,
-      videoUrl: card.videoUrl || "",
-      hasVideoContent: Boolean(card.videoUrl),
+      mediaUrl: safeVideoUrl,
+      videoUrl: safeVideoUrl,
+      hasVideoContent: true,
       bgmTitle: card.bgmTitle || `${card.brand || "스폰서"} AD Original Track`,
       ctaLabel: card.ctaLabel || "신제품 상세보기",
       ctaType: card.ctaType || (card.category?.includes("자동차") || card.category?.includes("모빌리티") ? "car" : "tech"),

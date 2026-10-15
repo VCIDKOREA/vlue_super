@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Car, Sparkles, Download, ShieldCheck } from "lucide-react";
+import { X, Volume2, VolumeX, Car, Sparkles, Download, ShieldCheck } from "lucide-react";
 import AppFullScreenView from "../AppFullScreenView.jsx";
 import PeerShowcasePreview from "../showcase/PeerShowcasePreview.jsx";
 import { buildAdMobShowcaseCard } from "../../lib/ads/buildAdMobShowcaseCard.js";
@@ -14,7 +14,8 @@ import { pushAndroidBackHandler } from "../../lib/androidBackStack.js";
 /**
  * AdMob 및 VLUÉ 추천 스폰서 쇼케이스 오버레이
  * - VLUÉ 원본 쇼케이스 세로 카드 프레임(1번 사진 제원) 100% 동일 규격 적용 (PeerShowcasePreview 기반)
- * - 모든 스폰서 광고는 100% 동영상(Video) 오토플레이 (ShowcaseMediaPage 내 video 렌더링)
+ * - 상단 BGM/오디오 트랙 바 및 브랜드 트랙명 강제 복원 (글래스모피즘 칩 + 1:1 사운드 상태 연동)
+ * - 모든 스폰서 광고는 100% 동영상(Video) 오토플레이 (ShowcaseMediaPage 내 video 렌더링, poster/img 절대 배제)
  * - 가로 영상(16:9 등)도 세로 카드 프레임 내부에서 object-contain 레터박스로 자연스럽게 스케일링
  * - 비디오 카드 내부 최하단 좌측 [@ceo님이 좋아합니다] + [VLUÉ 프로필 / 브랜드명], 우측 하단 소셜 레일(하트, 댓글, 공유, 더보기) 원본 좌표 고정
  * - 최하단 구좌: 원본 쇼케이스 띠배너(468x60) 위치 및 제원과 동일한 높이로 브랜드 맞춤 CTA 버튼 가로 꽉 차게 배치
@@ -24,6 +25,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
   const [open, setOpen] = useState(false);
   const [assets, setAssets] = useState(null);
   const [ctaPaused, setCtaPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const rootRef = useRef(null);
   const syncTimer = useRef(0);
 
@@ -45,6 +47,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     setOpen(false);
     setAssets(null);
     setCtaPaused(false);
+    setIsMuted(false);
     try {
       bridge?.closeNativeAdShowcaseSlots?.();
     } catch {
@@ -63,6 +66,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
       setAssets(detail);
       setOpen(true);
       setCtaPaused(false);
+      setIsMuted(false);
       hideBannersHard();
     };
     const onClose = () => close();
@@ -90,6 +94,17 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     return () => window.removeEventListener("vlue-admob-pause-cta", onPauseCta);
   }, []);
 
+  // 비디오 플레이어로부터 음소거/재생 상태 수신
+  useEffect(() => {
+    const onSoundStatus = (ev) => {
+      if (typeof ev?.detail?.isMuted === "boolean") {
+        setIsMuted(ev.detail.isMuted);
+      }
+    };
+    window.addEventListener("vlue-admob-sound-status", onSoundStatus);
+    return () => window.removeEventListener("vlue-admob-sound-status", onSoundStatus);
+  }, []);
+
   useEffect(() => {
     if (!open) return undefined;
     return pushAndroidBackHandler(() => {
@@ -105,6 +120,27 @@ export default function AdMobShowcaseOverlay({ onToast }) {
 
   const advertiser = String(assets?.advertiser || card?.name || "스폰서").trim() || "스폰서";
   const accentColor = String(assets?.accentColor || "#38bdf8").trim();
+
+  // 브랜드별 맞춤 사운드 트랙명
+  const brandTrackTitle = useMemo(() => {
+    if (assets?.bgmTitle) return String(assets.bgmTitle).trim();
+    if (advertiser && advertiser !== "스폰서") {
+      return `${advertiser} AD Original Track`;
+    }
+    return "Sponsor AD Original Track";
+  }, [assets?.bgmTitle, advertiser]);
+
+  // 상단 오디오 트랙 바 1:1 토글 제어
+  const handleToggleSound = useCallback(() => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    window.dispatchEvent(
+      new CustomEvent("vlue-admob-toggle-mute", { detail: { muted: nextMuted } })
+    );
+    onToast?.(
+      nextMuted ? "광고 사운드가 음소거되었습니다." : `${brandTrackTitle} 사운드가 켜졌습니다.`
+    );
+  }, [isMuted, brandTrackTitle, onToast]);
 
   // 맞춤형 CTA 버튼 분석
   const ctaMeta = useMemo(() => {
@@ -266,6 +302,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           [data-admob-showcase] .showcase-call-carousel__slide-call { display: none !important; }
           [data-admob-showcase] .showcase-call-carousel__slide-corner { display: none !important; }
           [data-admob-showcase] .showcase-photo-text-overlay { display: none !important; }
+          [data-admob-showcase] .showcase-call-carousel__meta { display: none !important; }
           [data-admob-showcase] .showcase-social-rail { z-index: 40; pointer-events: auto !important; }
           [data-admob-showcase] .lettering-live-indicator__bar {
             background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 50%, #06b6d4 100%);
@@ -315,6 +352,44 @@ export default function AdMobShowcaseOverlay({ onToast }) {
             </button>
           </div>
         </header>
+
+        {/* 상단 글래스모피즘 BGM / 오디오 트랙 컨트롤 바 (사진 2번 제원 100% 일치) */}
+        <div className="shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-[#0e1626]/90 border-b border-white/10 backdrop-blur-md z-20">
+          <span className="text-[11.5px] font-bold text-slate-400 shrink-0">쇼케이스 1/1</span>
+
+          {/* 중앙: 브랜드 맞춤 사운드 트랙명 글래스모피즘 칩 */}
+          <button
+            type="button"
+            onClick={handleToggleSound}
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 max-w-[200px] sm:max-w-[260px] shadow-sm backdrop-blur-md active:scale-95 transition-all truncate cursor-pointer"
+            title={brandTrackTitle}
+          >
+            <span className="text-[12px] shrink-0">🎵</span>
+            <span className="truncate text-slate-200 tracking-tight font-medium">
+              {brandTrackTitle}
+            </span>
+          </button>
+
+          {/* 우측: 사운드 재생 상태 및 음소거 1:1 토글 버튼 */}
+          <button
+            type="button"
+            onClick={handleToggleSound}
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-slate-200 active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
+            aria-label={isMuted ? "음소거 해제" : "음소거"}
+          >
+            {isMuted ? (
+              <>
+                <VolumeX size={14} className="text-slate-400" />
+                <span className="text-[10.5px] text-slate-400 font-bold">음소거</span>
+              </>
+            ) : (
+              <>
+                <Volume2 size={14} className="text-cyan-400 animate-pulse" />
+                <span className="text-[10.5px] text-cyan-300 font-bold">재생 중</span>
+              </>
+            )}
+          </button>
+        </div>
 
         {/* VLUÉ 원본 쇼케이스 뷰어 (PeerShowcasePreview 규격 100% 동일) */}
         <div className="relative min-h-0 flex-1">

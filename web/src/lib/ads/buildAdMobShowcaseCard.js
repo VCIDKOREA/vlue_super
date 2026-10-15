@@ -78,45 +78,48 @@ export function getBrandHighlightSpecs(assets = {}) {
  * }} assets
  * @param {{ title?: string, audioUrl?: string } | null} [signatureBgm]
  */
+const FALLBACK_SPONSOR_VIDEO_URL =
+  "https://videos.pexels.com/video-files/855828/855828-hd_1920_1080_30fps.mp4";
+
 export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
   const headline = String(assets.headline || "").trim() || "광고";
   const body = String(assets.body || "").trim();
   const advertiser = String(assets.advertiser || "").trim() || "스폰서";
   const mediaUrl = String(assets.mediaUrl || "").trim();
-  const hasVideo = Boolean(assets.hasVideoContent || assets.videoUrl);
+  const rawVideoUrl = String(assets.videoUrl || assets.video_url || "").trim();
+  const isBrokenGcs = rawVideoUrl.includes("commondatastorage.googleapis.com");
+  const effectiveVideoUrl = (!rawVideoUrl || isBrokenGcs) ? FALLBACK_SPONSOR_VIDEO_URL : rawVideoUrl;
   const iconUrl = String(assets.iconUrl || "").trim();
   const localId = getLocalVlueUserId();
   const specs = getBrandHighlightSpecs(assets);
 
-  const photo = (mediaUrl || assets.videoUrl)
-    ? {
-        id: "admob-media",
-        url: mediaUrl || assets.videoUrl,
-        videoUrl: String(assets.videoUrl || "").trim(),
-        hasVideoContent: Boolean(assets.videoUrl || assets.hasVideoContent),
-        caption: headline,
-        overlayText: "", // 상단 짤림 방지: 레거시 텍스트 오버레이 비우고 전용 럭셔리 레이아웃으로 렌더링
-        isAdMobSponsor: true,
-        headline,
-        body,
-        advertiser,
-        badge: assets.badge || "공식 스폰서",
-        category: assets.category || "브랜드 제휴",
-        accentColor: assets.accentColor || "#38bdf8",
-        specs,
-        ctaLabel: assets.ctaLabel || "신제품 상세보기",
-        ctaType: assets.ctaType || "tech"
-      }
-    : null;
+  const photo = {
+    id: "admob-media",
+    url: effectiveVideoUrl,
+    videoUrl: effectiveVideoUrl,
+    hasVideoContent: true,
+    caption: headline,
+    overlayText: "", // 상단 짤림 방지: 레거시 텍스트 오버레이 비우고 전용 럭셔리 레이아웃으로 렌더링
+    isAdMobSponsor: true,
+    headline,
+    body,
+    advertiser,
+    badge: assets.badge || "공식 스폰서",
+    category: assets.category || "브랜드 제휴",
+    accentColor: assets.accentColor || "#38bdf8",
+    specs,
+    ctaLabel: assets.ctaLabel || "신제품 상세보기",
+    ctaType: assets.ctaType || "tech"
+  };
 
   const style = createDefaultShowcaseStyle();
   style.includeDigitalCard = false;
   style.verifiedBadgeOn = true;
-  style.gallery = { photos: photo ? [photo] : [] };
+  style.gallery = { photos: [photo] };
   style.pages = [
     createShowcasePage(SHOWCASE_PAGE_TYPES.RICH_CUSTOM, {
       id: "admob-sponsor-page",
-      gallery: { photos: photo ? [photo] : [] },
+      gallery: { photos: [photo] },
       richCustom: {
         bodyText: body || headline
       }
@@ -125,32 +128,19 @@ export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
 
   const brandTrackTitle = String(assets.bgmTitle || `${advertiser} AD Original Track`).trim();
 
-  /* 이미지: VLUE Signature BGM / 동영상: 웹 BGM 끄고 MediaView 오디오 */
-  if (!hasVideo && signatureBgm?.audioUrl) {
-    style.bgm = {
-      ...style.bgm,
-      mode: "signature",
-      title: String(signatureBgm.title || brandTrackTitle).trim() || brandTrackTitle,
-      artistName: advertiser || "VLUE",
-      audioUrl: String(signatureBgm.audioUrl).trim(),
-      attributionLabel: brandTrackTitle,
-      linkBroken: false,
-      volumeLevel: "medium",
-      playMode: "single",
-      playlist: []
-    };
-  } else if (hasVideo) {
-    style.bgm = {
-      ...style.bgm,
-      mode: "signature",
-      title: brandTrackTitle,
-      artistName: advertiser,
-      audioUrl: "",
-      attributionLabel: brandTrackTitle,
-      linkBroken: true,
-      playlist: []
-    };
-  }
+  /* 스폰서 AD: 브랜드 사운드 트랙명 상단 BGM 칩 노출 (linkBroken: false) */
+  style.bgm = {
+    ...style.bgm,
+    mode: "signature",
+    title: brandTrackTitle,
+    artistName: advertiser,
+    audioUrl: effectiveVideoUrl,
+    attributionLabel: brandTrackTitle,
+    linkBroken: false,
+    volumeLevel: "medium",
+    playMode: "single",
+    playlist: []
+  };
 
   return {
     name: advertiser,
