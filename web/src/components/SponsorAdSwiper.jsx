@@ -21,7 +21,6 @@ const HOUSE_BRAND_POOL = [
     headline: "Galaxy S26 Ultra",
     body: "Galaxy AI와 2억 화소 쿼드 카메라의 압도적 혁신",
     category: "전자기기 / IT",
-    color: "from-blue-600/90 via-slate-900/90 to-black",
     accentColor: "#38bdf8",
     bgImage: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=600&q=80",
     ctaLabel: "자세히 보기",
@@ -34,7 +33,6 @@ const HOUSE_BRAND_POOL = [
     headline: "GENESIS G90 Black",
     body: "대한민국 럭셔리 플래그십 세단의 가장 순수한 정점",
     category: "자동차",
-    color: "from-zinc-700/90 via-neutral-900/90 to-black",
     accentColor: "#fbbf24",
     bgImage: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=80",
     ctaLabel: "시승 예약",
@@ -47,7 +45,6 @@ const HOUSE_BRAND_POOL = [
     headline: "Tesla CyberCab & S",
     body: "0-100km/h 2.1초, 하드웨어 4.0 기반 AI 오토파일럿",
     category: "미래 모빌리티",
-    color: "from-red-900/90 via-slate-950/90 to-black",
     accentColor: "#f87171",
     bgImage: "https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=600&q=80",
     ctaLabel: "주문하기",
@@ -60,7 +57,6 @@ const HOUSE_BRAND_POOL = [
     headline: "iPhone 18 Pro Max",
     body: "항공우주 티타늄과 3나노 A19 Pro 칩의 초월적 성능",
     category: "IT 디바이스",
-    color: "from-amber-900/90 via-stone-900/90 to-black",
     accentColor: "#fcd34d",
     bgImage: "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=600&q=80",
     ctaLabel: "구입하기",
@@ -73,7 +69,6 @@ const HOUSE_BRAND_POOL = [
     headline: "Maybach EQS 680",
     body: "퍼스트 클래스 리어 시트와 전동 럭셔리의 극치",
     category: "명품 자동차",
-    color: "from-emerald-950/90 via-slate-950/90 to-black",
     accentColor: "#34d399",
     bgImage: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=600&q=80",
     ctaLabel: "브로슈어 신청",
@@ -86,7 +81,6 @@ const HOUSE_BRAND_POOL = [
     headline: "LG 올레드 M4 무선",
     body: "세계 최초 무선 4K 144Hz AV 전송, 공간의 예술",
     category: "프리미엄 라이프",
-    color: "from-indigo-950/90 via-zinc-950/90 to-black",
     accentColor: "#a78bfa",
     bgImage: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=600&q=80",
     ctaLabel: "체험관 안내",
@@ -99,7 +93,6 @@ const HOUSE_BRAND_POOL = [
     headline: "Porsche Taycan Turbo GT",
     body: "최고출력 1,034마력, 뉘르부르크링 랩타임 신기록의 전기 스포츠카",
     category: "명품 자동차",
-    color: "from-purple-950/90 via-slate-950/90 to-black",
     accentColor: "#c084fc",
     bgImage: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=80",
     ctaLabel: "나만의 포르쉐",
@@ -112,7 +105,6 @@ const HOUSE_BRAND_POOL = [
     headline: "다이슨 에어랩 i.d.™",
     body: "블루투스 무선 연동과 지능형 열제어로 완성하는 손상 없는 스타일링",
     category: "프리미엄 라이프",
-    color: "from-pink-950/90 via-stone-900/90 to-black",
     accentColor: "#f472b6",
     bgImage: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&q=80",
     ctaLabel: "신제품 보기",
@@ -125,7 +117,6 @@ const HOUSE_BRAND_POOL = [
     headline: "BMW i7 M70 xDrive",
     body: "31.3인치 BMW 시어터 스크린과 이그제큐티브 라운지의 절대적 안락함",
     category: "자동차",
-    color: "from-blue-950/90 via-neutral-900/90 to-black",
     accentColor: "#60a5fa",
     bgImage: "https://images.unsplash.com/photo-1555215695-3004980ad54e?w=600&q=80",
     ctaLabel: "시승 신청",
@@ -138,7 +129,6 @@ const HOUSE_BRAND_POOL = [
     headline: "Sony α9 III 글로벌 셔터",
     body: "초당 120연사 무왜곡 촬영, 세계 최초 풀프레임 글로벌 셔터",
     category: "전자기기 / IT",
-    color: "from-orange-950/90 via-slate-950/90 to-black",
     accentColor: "#fb923c",
     bgImage: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80",
     ctaLabel: "자세히 보기",
@@ -151,7 +141,6 @@ const HOUSE_BRAND_POOL = [
     headline: "B&O Beolab 50",
     body: "공간 음향 빔 제어와 2,100W 출력의 마스터피스 어쿠스틱",
     category: "명품 가전",
-    color: "from-yellow-950/90 via-zinc-950/90 to-black",
     accentColor: "#facc15",
     bgImage: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=600&q=80",
     ctaLabel: "체험 예약",
@@ -164,7 +153,6 @@ const HOUSE_BRAND_POOL = [
     headline: "Oyster Perpetual Submariner",
     body: "수심 300미터 방수 오이스터스틸과 세라크롬 베젤의 독보적 위상",
     category: "명품 워치",
-    color: "from-emerald-950/90 via-neutral-950/90 to-black",
     accentColor: "#10b981",
     bgImage: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
     ctaLabel: "컬렉션 보기",
@@ -244,7 +232,6 @@ export default function SponsorAdSwiper({ className = "" }) {
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [countdown, setCountdown] = useState(4);
-  const [activeModalItem, setActiveModalItem] = useState(null);
   const scrollRef = useRef(null);
 
   // AdMob 네이티브 광고 연동 상태
@@ -265,7 +252,6 @@ export default function SponsorAdSwiper({ className = "" }) {
       }
     };
 
-    // 30초마다 날짜 변경 여부 체크
     const midnightInterval = window.setInterval(checkMidnight, 30 * 1000);
     return () => window.clearInterval(midnightInterval);
   }, [currentDate]);
@@ -285,15 +271,14 @@ export default function SponsorAdSwiper({ className = "" }) {
         setAdMobStatus("loaded");
         setAdMobAsset({
           id: "admob-native",
-          brand: payload.advertiser || "스폰서 AD",
+          brand: payload.advertiser || "스폰서 광고주",
           badge: "맞춤 스폰서",
           headline: payload.headline || "추천 브랜드 스폰서",
           body: payload.body || "Google AdMob 프리미엄 파트너십",
           category: "브랜드 제휴",
-          color: "from-sky-900/90 via-slate-900/90 to-black",
           accentColor: "#38bdf8",
           bgImage: payload.mediaUrl || "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=600&q=80",
-          ctaLabel: payload.ctaLabel || "방문하기",
+          ctaLabel: payload.ctaLabel || "자세히 보기",
           isAdMob: true
         });
       } else if (st === "failed" || st === "timeout") {
@@ -303,7 +288,6 @@ export default function SponsorAdSwiper({ className = "" }) {
 
     window.addEventListener("vlue-native-ad-status", onAdStatus);
 
-    // 브랜드/전자기기/자동차/명품/IT 타겟팅 옵션을 네이티브에 전송
     try {
       bridge.showNativeAdFallback?.(
         JSON.stringify({
@@ -328,7 +312,7 @@ export default function SponsorAdSwiper({ className = "" }) {
     };
   }, [hasBridge, bridge]);
 
-  // 4. 당일 6개 카드 목록 확정 (AdMob 로드 성공 시 1번 슬롯 결합, 미노출 시 당일 하우스 브랜드 6개 유지)
+  // 4. 당일 6개 카드 목록 확정
   const sponsorCards = useMemo(() => {
     return dailyCards.map((card, idx) => {
       if (idx === 0 && adMobAsset) {
@@ -343,7 +327,6 @@ export default function SponsorAdSwiper({ className = "" }) {
     const timer = window.setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          // 카운트다운 완료 시 다음 슬라이드로 부드럽게 자동 롤링
           setActiveIndex((currentIdx) => {
             const nextIdx = (currentIdx + 1) % sponsorCards.length;
             if (scrollRef.current) {
@@ -352,7 +335,7 @@ export default function SponsorAdSwiper({ className = "" }) {
             }
             return nextIdx;
           });
-          return 4; // 4초 주기 롤링
+          return 4;
         }
         return prev - 1;
       });
@@ -372,12 +355,23 @@ export default function SponsorAdSwiper({ className = "" }) {
     }
   };
 
+  /**
+   * 세로 AD 카드 탭 시:
+   * 4번 밋밋한 팝업 모달 대신 3번 사진과 동일한 VLUÉ Full-Screen 스폰서 쇼케이스 뷰어(ShowcaseViewer)로 바로 열기
+   */
   const handleCardClick = (card) => {
-    if (card.isAdMob) {
-      openAdMobShowcase();
-      return;
-    }
-    setActiveModalItem(card);
+    openAdMobShowcase({
+      headline: card.headline,
+      body: card.body,
+      advertiser: card.brand || "스폰서 광고주",
+      mediaUrl: card.bgImage || card.mediaUrl,
+      ctaLabel: card.ctaLabel || "자세히 보기",
+      landingUrl: card.link,
+      link: card.link,
+      iconUrl: card.iconUrl || card.bgImage,
+      hasVideoContent: false,
+      isAdMob: Boolean(card.isAdMob)
+    });
   };
 
   const formattedTimer = `00:${String(countdown).padStart(2, "0")}`;
@@ -435,10 +429,13 @@ export default function SponsorAdSwiper({ className = "" }) {
             <div
               key={card.id || index}
               onClick={() => handleCardClick(card)}
-              className="relative shrink-0 snap-start overflow-hidden rounded-[18px] bg-slate-950 text-left shadow-md transition-transform duration-200 active:scale-[0.98] cursor-pointer"
+              className="relative shrink-0 snap-start overflow-hidden rounded-[18px] bg-slate-900 text-left shadow-md transition-transform duration-200 active:scale-[0.98] cursor-pointer"
               style={{ width: CARD_W, height: CARD_H }}
             >
-              {/* 배경 이미지 */}
+              {/* 
+                1. 원본 브랜드 고화질 이미지 — 쨍하고 선명하게 100% 명확히 노출
+                어두운 전체 오버레이 필터를 완전히 제거하여 브랜드 제품의 선명도 극대화
+              */}
               {card.bgImage ? (
                 <img
                   src={card.bgImage}
@@ -448,17 +445,18 @@ export default function SponsorAdSwiper({ className = "" }) {
                 />
               ) : null}
 
-              {/* 그라디언트 오버레이 */}
-              <div
-                className={`absolute inset-0 bg-gradient-to-t ${card.color || "from-black/90 via-black/40 to-transparent"}`}
-              />
+              {/* 
+                2. 최하단 글자 가독성을 위한 최소한의 은은한 그라디언트 (최하단 35% 영역만 최소 적용)
+                상단/중앙 영역은 투명 처리되어 원본 사진이 쨍하게 보임
+              */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
 
               {/* 상단 태그 및 카운트다운 타이머 뱃지 */}
               <div className="absolute inset-x-0 top-0 flex items-center justify-between p-2">
-                <span className="rounded-md bg-black/60 backdrop-blur-sm px-1.5 py-0.5 text-[8.5px] font-black text-white/95 ring-1 ring-white/10">
+                <span className="rounded-md bg-black/50 backdrop-blur-sm px-1.5 py-0.5 text-[8.5px] font-black text-white/95 ring-1 ring-white/15">
                   AD
                 </span>
-                <span className="rounded-md bg-sky-950/80 backdrop-blur-sm px-1.5 py-0.5 text-[8.5px] font-black text-sky-300 ring-1 ring-sky-500/30">
+                <span className="rounded-md bg-black/50 backdrop-blur-sm px-1.5 py-0.5 text-[8.5px] font-black text-sky-300 ring-1 ring-sky-500/30">
                   ⏱️ {isCurrent ? formattedTimer : "00:04"}
                 </span>
               </div>
@@ -467,19 +465,19 @@ export default function SponsorAdSwiper({ className = "" }) {
               <div className="absolute inset-x-0 bottom-0 p-2.5">
                 <div className="flex items-center gap-1">
                   <span
-                    className="text-[9px] font-black uppercase tracking-wider"
+                    className="text-[9px] font-black uppercase tracking-wider drop-shadow-sm"
                     style={{ color: card.accentColor || "#38bdf8" }}
                   >
                     {card.brand}
                   </span>
-                  <span className="text-[8px] text-white/60">· {card.category}</span>
+                  <span className="text-[8px] text-white/70">· {card.category}</span>
                 </div>
 
-                <h4 className="mt-0.5 line-clamp-1 text-[12px] font-black leading-snug text-white">
+                <h4 className="mt-0.5 line-clamp-1 text-[12px] font-black leading-snug text-white drop-shadow-sm">
                   {card.headline}
                 </h4>
 
-                <p className="mt-0.5 line-clamp-2 text-[9.5px] font-medium leading-tight text-slate-300">
+                <p className="mt-0.5 line-clamp-1 text-[9.5px] font-medium leading-tight text-slate-200 drop-shadow-sm">
                   {card.body}
                 </p>
 
@@ -487,7 +485,7 @@ export default function SponsorAdSwiper({ className = "" }) {
                   <span className="inline-flex items-center text-[9px] font-bold text-sky-300">
                     {card.ctaLabel || "보기"} ›
                   </span>
-                  <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[8px] font-semibold text-white/80">
+                  <span className="rounded-full bg-white/20 backdrop-blur-sm px-1.5 py-0.5 text-[8px] font-semibold text-white/90">
                     {card.badge}
                   </span>
                 </div>
@@ -496,79 +494,6 @@ export default function SponsorAdSwiper({ className = "" }) {
           );
         })}
       </div>
-
-      {/* 브랜드 스폰서 상세 팝업 모달 */}
-      {activeModalItem ? (
-        <div
-          className="fixed inset-0 z-[650] flex items-center justify-center bg-black/65 px-4 backdrop-blur-sm"
-          onClick={() => setActiveModalItem(null)}
-          role="presentation"
-        >
-          <div
-            className="relative w-full max-w-sm overflow-hidden rounded-[26px] border border-white/10 bg-slate-900 p-5 text-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="스폰서 상세 안내"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-sky-500/20 px-2 py-0.5 text-[10px] font-black text-sky-400">
-                  {activeModalItem.brand}
-                </span>
-                <span className="text-[11px] font-bold text-slate-400">{activeModalItem.category}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveModalItem(null)}
-                className="rounded-full bg-white/10 p-1 text-[13px] font-bold text-white hover:bg-white/20"
-                aria-label="닫기"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-4">
-              {activeModalItem.bgImage ? (
-                <div className="relative h-40 w-full overflow-hidden rounded-2xl bg-black">
-                  <img
-                    src={activeModalItem.bgImage}
-                    alt={activeModalItem.headline}
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                  <p className="absolute bottom-2 left-3 text-[14px] font-black text-white">
-                    {activeModalItem.headline}
-                  </p>
-                </div>
-              ) : null}
-
-              <p className="mt-3 text-[13px] font-medium leading-relaxed text-slate-300">
-                {activeModalItem.body}
-              </p>
-
-              <div className="mt-5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveModalItem(null)}
-                  className="flex-1 rounded-xl bg-white/10 py-2.5 text-[12px] font-bold text-slate-300 hover:bg-white/20"
-                >
-                  닫기
-                </button>
-                {activeModalItem.link ? (
-                  <a
-                    href={activeModalItem.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 rounded-xl bg-sky-500 py-2.5 text-center text-[12px] font-black text-slate-950 shadow-md hover:bg-sky-400"
-                  >
-                    공식 브랜드 방문 ›
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "../lib/apiBase.js";
 import { vlueAuthHeaders } from "../lib/vlueAuthHeaders.js";
+import { openAdMobShowcase } from "../lib/ads/openAdMobShowcase.js";
 
 /** 카테고리 탭 및 네이버 API 검색 키워드 매핑 */
 const NEWS_TABS = [
@@ -22,7 +23,8 @@ const IN_FEED_SPONSOR_ADS = [
     actionText: "Knox 보안 살펴보기",
     link: "https://www.samsung.com/sec/apps/samsung-knox/",
     accentColor: "#3b82f6",
-    bgGradient: "from-blue-950 via-slate-900 to-black"
+    bgGradient: "from-blue-950 via-slate-900 to-black",
+    mediaUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&q=80"
   },
   {
     id: "genesis-connected",
@@ -33,7 +35,8 @@ const IN_FEED_SPONSOR_ADS = [
     actionText: "커넥티드 서비스 확인",
     link: "https://www.genesis.com",
     accentColor: "#f59e0b",
-    bgGradient: "from-zinc-900 via-neutral-900 to-black"
+    bgGradient: "from-zinc-900 via-neutral-900 to-black",
+    mediaUrl: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=80"
   },
   {
     id: "fsc-safeguard",
@@ -44,7 +47,8 @@ const IN_FEED_SPONSOR_ADS = [
     actionText: "계좌정보통합관리 확인",
     link: "https://www.payinfo.or.kr",
     accentColor: "#10b981",
-    bgGradient: "from-emerald-950 via-slate-900 to-black"
+    bgGradient: "from-emerald-950 via-slate-900 to-black",
+    mediaUrl: "https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=600&q=80"
   }
 ];
 
@@ -84,7 +88,6 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
       })
       .catch(() => {
         if (cancelled) return;
-        // 클라이언트 Fallback 데이터 세팅
         setNewsItems([]);
       })
       .finally(() => {
@@ -110,9 +113,24 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
     window.open(link, "_blank", "noopener,noreferrer");
   };
 
+  const handleSponsorClick = (sponsor) => {
+    openAdMobShowcase({
+      headline: sponsor.title,
+      body: sponsor.description,
+      advertiser: sponsor.sponsorName,
+      mediaUrl: sponsor.mediaUrl,
+      ctaLabel: sponsor.actionText || "자세히 보기",
+      landingUrl: sponsor.link,
+      link: sponsor.link,
+      iconUrl: sponsor.mediaUrl,
+      hasVideoContent: false,
+      isAdMob: false
+    });
+  };
+
   return (
     <section
-      className={`security-news-feed w-full select-none px-2.5 pt-3 pb-8 ${className}`.trim()}
+      className={`security-news-feed w-full select-none px-2.5 pt-3 pb-1 ${className}`.trim()}
       aria-label="보안 및 생활정보 뉴스 피드"
     >
       {/* 섹션 타이틀 헤더 */}
@@ -123,7 +141,7 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
             실시간 보안 · 안심 생활 브리핑
           </h3>
         </div>
-        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">네이버 뉴스 API</span>
+        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">네이버 뉴스 API</span>
       </div>
 
       {/* 5개 카테고리 탭 (가로 스크롤 가능) */}
@@ -155,57 +173,77 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
-                className="animate-pulse rounded-2xl border border-slate-200/60 bg-white p-3.5 shadow-sm dark:border-white/10 dark:bg-slate-900"
+                className="flex items-start gap-3 rounded-2xl border border-slate-200/60 bg-white p-3.5 shadow-sm dark:border-white/10 dark:bg-slate-900 animate-pulse"
               >
-                <div className="h-3 w-20 rounded bg-slate-200 dark:bg-white/10" />
-                <div className="mt-2 h-4 w-3/4 rounded bg-slate-200 dark:bg-white/10" />
-                <div className="mt-1.5 h-3 w-full rounded bg-slate-100 dark:bg-white/5" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-20 rounded bg-slate-200 dark:bg-white/10" />
+                  <div className="h-4 w-full rounded bg-slate-200 dark:bg-white/10" />
+                  <div className="h-3 w-4/5 rounded bg-slate-100 dark:bg-white/5" />
+                </div>
+                <div className="h-20 w-20 shrink-0 rounded-xl bg-slate-200 dark:bg-white/10" />
               </div>
             ))}
           </div>
         ) : (
           newsItems.map((news, index) => {
-            // 3번째 뉴스(index 2, 5, 8...)마다 중간 AD 스폰서 카드 교차 삽입
             const showSponsorAfter = (index + 1) % 3 === 0;
             const sponsorAd = IN_FEED_SPONSOR_ADS[Math.floor(index / 3) % IN_FEED_SPONSOR_ADS.length];
+            const thumbSrc =
+              news.thumbnailUrl ||
+              "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=320&q=80";
 
             return (
               <div key={news.link || `${news.title}-${index}`} className="space-y-2.5">
-                {/* 뉴스 카드 */}
+                {/* 뉴스 카드: 좌측 헤드라인/본문/출처 + 우측 w-20 h-20 썸네일 이미지 결합 레이아웃 */}
                 <article
                   onClick={() => handleOpenLink(news.link || news.originallink)}
-                  className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-3.5 shadow-sm transition-all duration-150 active:scale-[0.99] hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+                  className="group flex cursor-pointer items-start justify-between gap-3 overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-3.5 shadow-sm transition-all duration-150 active:scale-[0.99] hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-900"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9.5px] font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                      {news.source || "보안 리포트"}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300">
-                      {news.formattedDate || "최근"}
-                    </span>
+                  {/* 좌측: 출처/시간, 헤드라인 2줄, 요약 1줄, 원문 읽기 링크 */}
+                  <div className="flex min-w-0 flex-1 flex-col justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[9.5px] font-black text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        {news.source || "보안 리포트"}
+                      </span>
+                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        {news.formattedDate || "최근"}
+                      </span>
+                    </div>
+
+                    <h4 className="mt-1.5 line-clamp-2 text-[13px] font-black leading-snug text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-sky-400">
+                      {news.title}
+                    </h4>
+
+                    <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-relaxed text-slate-500 dark:text-slate-400">
+                      {news.description}
+                    </p>
+
+                    <div className="mt-2 flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-sky-400">
+                      <span>원문 기사 읽기</span>
+                      <span className="text-[11px]">›</span>
+                    </div>
                   </div>
 
-                  <h4 className="mt-2 line-clamp-2 text-[13.5px] font-black leading-snug text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-sky-400">
-                    {news.title}
-                  </h4>
-
-                  <p className="mt-1.5 line-clamp-2 text-[11.5px] font-medium leading-relaxed text-slate-500 dark:text-slate-400">
-                    {news.description}
-                  </p>
-
-                  <div className="mt-2.5 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-white/5">
-                    <span className="text-[10px] font-bold text-blue-600 dark:text-sky-400">
-                      원문 기사 읽기
-                    </span>
-                    <span className="text-[11px] text-slate-400">›</span>
+                  {/* 우측: w-20 h-20 (80px * 80px) 모바일 뉴스 썸네일 */}
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-100 shadow-inner dark:bg-slate-800">
+                    <img
+                      src={thumbSrc}
+                      alt={news.title}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=320&q=80";
+                      }}
+                    />
                   </div>
                 </article>
 
                 {/* 중간 교차 삽입 브랜드 스폰서 카드 */}
                 {showSponsorAfter && sponsorAd ? (
                   <aside
-                    onClick={() => handleOpenLink(sponsorAd.link)}
-                    className="relative cursor-pointer overflow-hidden rounded-2xl bg-gradient-to-r p-3.5 text-white shadow-md transition-all duration-150 active:scale-[0.99]"
+                    onClick={() => handleSponsorClick(sponsorAd)}
+                    className="relative cursor-pointer overflow-hidden rounded-2xl p-3.5 text-white shadow-md transition-all duration-150 active:scale-[0.99]"
                     style={{
                       backgroundImage: `linear-gradient(to right, #0f172a, #1e293b)`
                     }}
@@ -243,7 +281,7 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
                       >
                         {sponsorAd.actionText} ›
                       </span>
-                      <span className="text-[9px] font-medium text-white/50">VLUÉ 공식 파트너</span>
+                      <span className="text-[9px] font-medium text-white/50">VLUÉ 공식 쇼케이스</span>
                     </div>
                   </aside>
                 ) : null}

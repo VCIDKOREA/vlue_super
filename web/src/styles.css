@@ -140,7 +140,7 @@ html.vlue-safety-patch .home-main-feed--spaced {
 }
 
 html.vlue-safety-patch .home-kakao-stack {
-  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 56px) + 48px);
+  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 56px));
 }
 
 .vlue-scroll-pad-bottom-nav {

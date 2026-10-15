@@ -6,6 +6,7 @@ export type NaverNewsItem = {
   pubDate: string;
   source?: string;
   formattedDate?: string;
+  thumbnailUrl?: string;
 };
 
 export type NaverNewsResult = {
@@ -77,6 +78,102 @@ function formatRelativeTime(dateStr: string): string {
   }
 }
 
+/** og:image 메모리 캐시 (동일 URL 중복 요청 방지) */
+const ogImageCache = new Map<string, string>();
+
+/** 카테고리별 테마 고화질 뉴스 썸네일 이미지 풀 (실시간 뉴스 피드 전용) */
+const CATEGORY_THUMBNAILS = {
+  voicePhishing: [
+    "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=320&q=80", // 보안 경고 화면
+    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=320&q=80", // 사이버 보안
+    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=320&q=80", // 수사/모니터링
+    "https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=320&q=80"  // 디지털 락
+  ],
+  government: [
+    "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=320&q=80", // 정책 서류
+    "https://images.unsplash.com/photo-1450133064473-71024230f91b?w=320&q=80", // 공공 지원
+    "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=320&q=80", // 정부 청사/정책
+    "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=320&q=80"  // 안심 지원금
+  ],
+  messenger: [
+    "https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=320&q=80", // 스마트폰 메신저
+    "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?w=320&q=80", // 채팅 문자 알림
+    "https://images.unsplash.com/photo-1534536281715-e28d76689b4d?w=320&q=80", // 의심 통화
+    "https://images.unsplash.com/photo-1556742049-0a67c5574f73?w=320&q=80"  // 스마트폰 액정
+  ],
+  lifeSecurity: [
+    "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=320&q=80", // 스팸 전화 차단
+    "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=320&q=80", // 안심 쉴드 패치
+    "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=320&q=80", // 도어락/생활 안심
+    "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?w=320&q=80"  // 보안 데스크
+  ],
+  financialFraud: [
+    "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=320&q=80", // 금융 이상거래 감지
+    "https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=320&q=80", // ATM/계좌 일괄지급정지
+    "https://images.unsplash.com/photo-1601597111158-2fceff292cdc?w=320&q=80", // 모바일 뱅킹 보호
+    "https://images.unsplash.com/photo-1616077168079-7e09a677fb2c?w=320&q=80"  // 금융 안심
+  ]
+};
+
+/** 키워드 및 뉴스 내용에 기반한 테마 썸네일 선정 */
+function getSmartThumbnail(title: string, desc: string, query: string, index: number): string {
+  const combined = `${title} ${desc} ${query}`.toLowerCase();
+  let pool = CATEGORY_THUMBNAILS.voicePhishing;
+
+  if (combined.includes("지원금") || combined.includes("정책") || combined.includes("행정안전부") || combined.includes("기획재정부")) {
+    pool = CATEGORY_THUMBNAILS.government;
+  } else if (combined.includes("메신저") || combined.includes("사칭") || combined.includes("카카오톡") || combined.includes("엄마") || combined.includes("문자")) {
+    pool = CATEGORY_THUMBNAILS.messenger;
+  } else if (combined.includes("스팸") || combined.includes("생활") || combined.includes("차단") || combined.includes("보안패치") || combined.includes("원격")) {
+    pool = CATEGORY_THUMBNAILS.lifeSecurity;
+  } else if (combined.includes("금융") || combined.includes("계좌") || combined.includes("지급정지") || combined.includes("사기") || combined.includes("코인")) {
+    pool = CATEGORY_THUMBNAILS.financialFraud;
+  }
+
+  return pool[index % pool.length];
+}
+
+/** 기사 원문 페이지에서 og:image 빠른 추출 (타임아웃 800ms) */
+async function fetchOgImageQuick(targetUrl: string): Promise<string | null> {
+  if (!targetUrl || !targetUrl.startsWith("http")) return null;
+  if (ogImageCache.has(targetUrl)) return ogImageCache.get(targetUrl) || null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 900);
+
+  try {
+    const res = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      ogImageCache.set(targetUrl, "");
+      return null;
+    }
+
+    const html = await res.text();
+    // og:image 정규식 추출
+    const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+      html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+
+    if (ogMatch && ogMatch[1] && ogMatch[1].startsWith("http")) {
+      const imgUrl = ogMatch[1];
+      ogImageCache.set(targetUrl, imgUrl);
+      return imgUrl;
+    }
+  } catch {
+    clearTimeout(timer);
+  }
+
+  ogImageCache.set(targetUrl, "");
+  return null;
+}
+
 /** 네이버 API 연동 또는 Fallback 뉴스 제공 */
 export async function searchNaverNews(keyword: string, display = 15): Promise<NaverNewsResult> {
   const q = String(keyword || "").trim();
@@ -114,12 +211,15 @@ export async function searchNaverNews(keyword: string, display = 15): Promise<Na
         };
         const rawItems = json.items || [];
         if (rawItems.length > 0) {
-          const items: NaverNewsItem[] = rawItems.map((item) => {
+          // 1차 매핑: 스마트 테마 썸네일 즉시 할당
+          const items: NaverNewsItem[] = rawItems.map((item, idx) => {
             const rawTitle = stripTags(item.title || "");
             const rawDesc = stripTags(item.description || "");
             const link = item.link || item.originallink || "";
             const source = extractSourceFromUrl(item.originallink || item.link || "");
             const formattedDate = formatRelativeTime(item.pubDate || "");
+            const smartThumb = getSmartThumbnail(rawTitle, rawDesc, q, idx);
+
             return {
               title: rawTitle,
               originallink: item.originallink || "",
@@ -127,9 +227,22 @@ export async function searchNaverNews(keyword: string, display = 15): Promise<Na
               description: rawDesc,
               pubDate: item.pubDate || "",
               source,
-              formattedDate
+              formattedDate,
+              thumbnailUrl: smartThumb
             };
           });
+
+          // 상위 8개 기사에 대해 og:image 비동기 병렬 추출 시도 (있으면 실제 기사 사진으로 업그레이드)
+          try {
+            const ogPromises = items.slice(0, 8).map(async (it) => {
+              const target = it.originallink || it.link;
+              const og = await fetchOgImageQuick(target);
+              if (og) it.thumbnailUrl = og;
+            });
+            await Promise.allSettled(ogPromises);
+          } catch {
+            /* 스마트 썸네일 유지 */
+          }
 
           return {
             status: "success",
@@ -167,7 +280,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "정부24 및 관할 주민센터를 통해 신청 가능한 신규 취약계층·소상공인 지원금 세부 기준이 확정되었습니다. 사칭 스미싱 문자에 각별한 주의가 요구됩니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
         source: "행정안전부",
-        formattedDate: "35분 전"
+        formattedDate: "35분 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=320&q=80"
       },
       {
         title: "기획재정부·금융위, '서민 안심 생활안정자금' 저금리 대환 대출 확대",
@@ -176,7 +290,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "고금리 부담을 겪는 금융 취약계층을 위한 공공 대환 대출이 3조원 규모로 확대 공급됩니다. 공식 금융기관 앱을 통해서만 비대면 신청이 가능합니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
         source: "금융위원회",
-        formattedDate: "2시간 전"
+        formattedDate: "2시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1450133064473-71024230f91b?w=320&q=80"
       },
       {
         title: "[알림] '정부 지원금 신청 안내' 미끼 스미싱 문자 주의보 발령",
@@ -185,7 +300,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "KISA와 경찰청은 정부 지원금 신청을 사칭하여 악성 앱 설치 URL을 유도하는 스미싱 문자가 급증하고 있어 국민들의 철저한 확인을 당부했습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
         source: "한국인터넷진흥원",
-        formattedDate: "4시간 전"
+        formattedDate: "4시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=320&q=80"
       },
       {
         title: "중소벤처기업부, 소상공인 스마트 상점 기술 보급 및 보안패치 지원",
@@ -194,7 +310,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "골목상권 소상공인의 POS 기기 및 스마트 키오스크의 해킹 방지를 위해 정부 전액 지원 보안 안심패치 배포 프로그램이 가동됩니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
         source: "전자신문",
-        formattedDate: "6시간 전"
+        formattedDate: "6시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=320&q=80"
       }
     ];
   }
@@ -208,7 +325,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "최근 카카오톡과 텔레그램을 통한 자녀 사칭 수법이 AI 음성 복제 기술과 결합하여 급속 확산 중입니다. 직접 전화 통화로 확인하기 전까지 송금 금지 조치가 권고됩니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
         source: "연합뉴스",
-        formattedDate: "18분 전"
+        formattedDate: "18분 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=320&q=80"
       },
       {
         title: "택배 배송 오류·교통 범칙금 미납… 일상 파고드는 '링크 클릭' 악성 앱 유포",
@@ -217,7 +335,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "문자 속 단축 URL을 누르는 순간 스마트폰에 원격제어 악성 앱(APK)이 자동 설치되어 금융 정보를 탈취당하는 피해 사례가 잇따르고 있습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
         source: "보안뉴스",
-        formattedDate: "1시간 전"
+        formattedDate: "1시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?w=320&q=80"
       },
       {
         title: "검찰·금감원 사칭 '안전계좌 이체 요구' 여전히 최다… 공문서 위조도 정교화",
@@ -226,7 +345,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "수사기관은 어떤 경우에도 현금 이체나 자금 검수를 요구하지 않습니다. 의심 통화는 즉시 끊고 국번없이 112 또는 1332로 신고해야 합니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
         source: "조선일보",
-        formattedDate: "3시간 전"
+        formattedDate: "3시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1534536281715-e28d76689b4d?w=320&q=80"
       },
       {
         title: "청첩장·돌잔치 부고장 사칭 문자… 지인 번호 도용 발송 피해 확산",
@@ -235,7 +355,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "지인의 번호로 발송된 모바일 청첩장 링크라도 반드시 전화나 다른 채널로 본인 발송 여부를 재확인해야 2차 피해를 예방할 수 있습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
         source: "동아일보",
-        formattedDate: "5시간 전"
+        formattedDate: "5시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1556742049-0a67c5574f73?w=320&q=80"
       }
     ];
   }
@@ -249,7 +370,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "스팸 필터링 시스템을 우회하는 편법 발송 행위에 대한 단속이 전면 강화됩니다. 악성 스팸 발신 번호는 즉각 블랙리스트에 등록되어 차단됩니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
         source: "방송통신위원회",
-        formattedDate: "25분 전"
+        formattedDate: "25분 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=320&q=80"
       },
       {
         title: "스마트폰 원격제어 앱 활성화 감지 필수… '가족 안심 지킴이' 설정 권장",
@@ -258,7 +380,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "고령층 부모님의 기기에 비인가 원격제어 앱(TeamViewer, AnyDesk 등 변조 앱) 설치 시 가족에게 실시간 알림이 전송되는 보호 서비스가 주목받고 있습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
         source: "전자신문",
-        formattedDate: "1시간 전"
+        formattedDate: "1시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=320&q=80"
       },
       {
         title: "중고거래 직거래 안심결제 수수료 무료화… 사기 계좌 실시간 대조 연동",
@@ -267,7 +390,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "주요 플랫폼들이 경찰청 사이버안전국 사기 의심 계좌·연락처 DB를 실시간 대조하여 위험 거래를 사전에 차단하는 시스템을 본격 도입했습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 210).toISOString(),
         source: "한국경제",
-        formattedDate: "3시간 전"
+        formattedDate: "3시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=320&q=80"
       },
       {
         title: "해외 IP 로그인 차단 및 2단계 보안 인증, 필수 생활 수칙으로 자리매김",
@@ -276,7 +400,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "포털 및 주요 SNS 계정 도용을 방지하기 위해 해외 로그인 차단 설정과 일회용 패스워드(OTP) 2차 인증 활성화가 강력히 권장됩니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 320).toISOString(),
         source: "지디넷코리아",
-        formattedDate: "5시간 전"
+        formattedDate: "5시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?w=320&q=80"
       }
     ];
   }
@@ -290,7 +415,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "보이스피싱 피해 의심 시 즉시 본인 명의 모든 금융권 계좌의 출금을 한 번에 동결할 수 있는 원스톱 지급정지 서비스의 실효성이 입증되었습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
         source: "금융감독원",
-        formattedDate: "40분 전"
+        formattedDate: "40분 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=320&q=80"
       },
       {
         title: "가짜 코인 투자 리딩방 '1000% 수익 보장' 덫… 원금 회수 요구하자 잠적",
@@ -299,7 +425,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "SNS 단체 대화방에서 가짜 HTS 화면을 조작하여 고수익을 보여준 뒤 출금 수수료 명목으로 추가 입금을 요구하는 사기 조직이 무더기 검거되었습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 110).toISOString(),
         source: "매일경제",
-        formattedDate: "1시간 전"
+        formattedDate: "1시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=320&q=80"
       },
       {
         title: "AI 딥보이스로 지인 목소리 흉내… '통장 대여 요구' 금융사기 신종 수법 주의",
@@ -308,7 +435,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "SNS에 올라온 짧은 음성 파일로 목소리를 합성한 뒤 급전을 요구하는 신종 사기가 확산하고 있어 대면 확인 없는 이체에 주의해야 합니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 200).toISOString(),
         source: "연합뉴스",
-        formattedDate: "3시간 전"
+        formattedDate: "3시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1601597111158-2fceff292cdc?w=320&q=80"
       },
       {
         title: "경찰청, 보이스피싱 3대 대포물건(통장·유심·인터넷전화) 특별 단속 강화",
@@ -317,7 +445,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
         description: "불법 개통된 알뜰폰 유심과 번호 변작 중계기에 대한 집중 수사를 통해 보이스피싱 범죄 조직의 수법을 근원적으로 차단하는 작업에 돌입했습니다.",
         pubDate: new Date(Date.now() - 1000 * 60 * 380).toISOString(),
         source: "경찰청",
-        formattedDate: "6시간 전"
+        formattedDate: "6시간 전",
+        thumbnailUrl: "https://images.unsplash.com/photo-1616077168079-7e09a677fb2c?w=320&q=80"
       }
     ];
   }
@@ -331,7 +460,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
       description: "통화 중 '대출 빙자', '보안코드 요구', '수사관 사칭' 키워드가 반복될 경우 즉시 경고 알림을 띄우고 거래를 차단하는 AI 안심 보안망이 가동됩니다.",
       pubDate: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
       source: "연합뉴스",
-      formattedDate: "15분 전"
+      formattedDate: "15분 전",
+      thumbnailUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=320&q=80"
     },
     {
       title: "보이스피싱 피해액 회수율 높인다… 은행권 '이상 금융거래탐지시스템(FDS)' 고도화",
@@ -340,7 +470,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
       description: "평소와 다른 야간 고액 이체나 단기간 다수 계좌 분할 송금 발생 시 24시간 모니터링 전담팀이 개입하여 자동 출금 지연 조치를 취합니다.",
       pubDate: new Date(Date.now() - 1000 * 60 * 50).toISOString(),
       source: "금융위원회",
-      formattedDate: "50분 전"
+      formattedDate: "50분 전",
+      thumbnailUrl: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=320&q=80"
     },
     {
       title: "\"저금리 대환대출 해드립니다\"… 햇살론·소상공인 대출 사칭 문자 주의",
@@ -349,7 +480,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
       description: "시중 은행을 사칭하며 기존 대출 상환 명목으로 특정 계좌 송금을 요구하는 것은 100% 보이스피싱입니다. 대표 전화로 직접 대조 확인하세요.",
       pubDate: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
       source: "KISA",
-      formattedDate: "2시간 전"
+      formattedDate: "2시간 전",
+      thumbnailUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=320&q=80"
     },
     {
       title: "스마트폰 안심패치 업데이트로 악성 앱 설치 실시간 차단… 보안 강화 권고",
@@ -358,7 +490,8 @@ function getSecurityNewsFallback(keyword: string): NaverNewsItem[] {
       description: "알 수 없는 출처의 앱 설치 제한 및 정기적인 기기 안심패치 동기화를 통해 스마트폰 내 원격제어 도구 활성화를 선제적으로 방어해야 합니다.",
       pubDate: new Date(Date.now() - 1000 * 60 * 270).toISOString(),
       source: "보안뉴스",
-      formattedDate: "4시간 전"
+      formattedDate: "4시간 전",
+      thumbnailUrl: "https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=320&q=80"
     }
   ];
 }

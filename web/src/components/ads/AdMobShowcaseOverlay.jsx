@@ -128,6 +128,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
 
   const syncNativeSlots = useCallback(() => {
     if (!open || !bridge?.syncNativeAdShowcaseSlots) return;
+    if (assets && assets.isAdMob === false) return;
     const root = rootRef.current;
     if (!root) return;
     const mediaEl =
@@ -290,9 +291,23 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           <button
             type="button"
             data-admob-cta-slot
-            className="flex w-full items-center justify-center rounded-2xl bg-blue-600 px-4 py-3.5 text-[16px] font-black text-white"
+            onClick={() => {
+              const targetUrl = assets?.landingUrl || assets?.link;
+              if (targetUrl) {
+                try {
+                  if (bridge?.openExternalUrl) {
+                    bridge.openExternalUrl(targetUrl);
+                    return;
+                  }
+                } catch {
+                  /* ignore */
+                }
+                window.open(targetUrl, "_blank", "noopener,noreferrer");
+              }
+            }}
+            className="flex w-full items-center justify-center rounded-2xl bg-blue-600 px-4 py-3.5 text-[16px] font-black text-white active:bg-blue-700 cursor-pointer"
             style={{
-              pointerEvents: "none",
+              pointerEvents: (assets?.isAdMob && bridge?.syncNativeAdShowcaseSlots) ? "none" : "auto",
               visibility: ctaPaused ? "hidden" : "visible",
               height: ctaPaused ? 0 : undefined,
               paddingTop: ctaPaused ? 0 : undefined,
@@ -300,8 +315,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
               margin: 0,
               overflow: "hidden"
             }}
-            tabIndex={-1}
-            aria-hidden
+            tabIndex={0}
           >
             {ctaLabel}
           </button>
