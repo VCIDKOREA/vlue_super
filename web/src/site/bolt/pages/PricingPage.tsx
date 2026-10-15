@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Star, Zap, ArrowRight, CreditCard, Building2, Sparkles, Phone, CheckCircle } from 'lucide-react';
-import { pricingTiers } from '../data/mockData';
+import PricingSection from '../../../components/PricingSection.jsx';
 import { VlueBrandMark } from '../../../components/VlueBrandLogo.jsx';
 import {
   ShowcaseMarketingPreview,
@@ -19,17 +19,6 @@ interface PricingPageProps {
   /** V1 — 가입·결제는 앱: 요금제 CTA → 다운로드 */
   onDownloadClick?: () => void;
 }
-
-function BrandTierIcon({ className }: { className?: string }) {
-  return <VlueBrandMark size={14} className={className} />;
-}
-const TIER_ICONS = [BrandTierIcon, Zap, Star, Sparkles];
-const TIER_COLORS = {
-  gray: { header: 'bg-gray-50', badge: 'bg-gray-100 text-gray-600', border: 'border-gray-200' },
-  blue: { header: 'bg-primary-600', badge: 'bg-white/20 text-white', border: 'border-primary-300' },
-  gold: { header: 'bg-gray-900', badge: 'bg-amber-400/20 text-amber-300', border: 'border-gray-700' },
-  purple: { header: 'bg-violet-700', badge: 'bg-white/20 text-violet-100', border: 'border-violet-300' },
-};
 
 const CARD_PART_GUIDE: Record<ShowcaseDemoGrade, { title: string; intro: string; parts: { label: string; desc: string }[] }> = {
   police112: {
@@ -130,76 +119,14 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-16">
-          {pricingTiers.map((tier, idx) => {
-            const Icon = TIER_ICONS[idx] ?? Sparkles;
-            const colors = TIER_COLORS[tier.color as keyof typeof TIER_COLORS] ?? TIER_COLORS.gray;
-            const isBlue = tier.color === 'blue';
-            const isGold = tier.color === 'gold';
-            const isPurple = tier.color === 'purple';
-            const isDarkHeader = isBlue || isGold || isPurple;
-            const listPrice = 'listPrice' in tier ? (tier as { listPrice?: number | null }).listPrice : null;
-
-            return (
-              <div
-                key={tier.id}
-                className={`rounded-3xl border overflow-hidden relative flex flex-col shadow-card ${colors.border} ${isBlue ? 'scale-[1.02] shadow-card-hover' : ''}`}
-              >
-                {tier.recommended && (
-                  <div className="absolute top-4 right-4 px-2.5 py-1 bg-white rounded-full text-primary-600 text-xs font-black shadow-sm z-10">
-                    V1 특가
-                  </div>
-                )}
-                <div className={`${colors.header} px-6 pt-6 pb-8`}>
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 ${colors.badge}`}>
-                    <Icon className="w-3.5 h-3.5" />
-                    {tier.name}
-                  </div>
-                  <div className={`mb-2 ${isDarkHeader ? 'text-white' : 'text-gray-900'}`}>
-                    {listPrice ? (
-                      <p className={`text-sm font-semibold line-through mb-1 ${isDarkHeader ? 'text-white/50' : 'text-gray-400'}`}>
-                        {listPrice.toLocaleString()}원
-                      </p>
-                    ) : null}
-                    <span className="text-4xl font-black font-inter">
-                      {tier.price === 0 ? '무료' : tier.price.toLocaleString()}
-                    </span>
-                    {tier.price > 0 && <span className="text-base font-medium">원/{tier.period}</span>}
-                  </div>
-                  <p className={`text-sm ${isDarkHeader ? 'text-white/70' : 'text-gray-500'}`}>{tier.description}</p>
-                  {'priceNote' in tier && tier.priceNote ? (
-                    <p className={`text-xs mt-2 ${isDarkHeader ? 'text-white/55' : 'text-gray-400'}`}>{tier.priceNote}</p>
-                  ) : null}
-                </div>
-
-                <div className="bg-white px-6 py-6 flex-1 flex flex-col">
-                  <ul className="space-y-3 mb-6 flex-1">
-                    {tier.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2.5 text-sm text-gray-700">
-                        <CheckCircle className="w-4 h-4 text-primary-600 flex-shrink-0 mt-0.5" />
-                        <span style={{ wordBreak: 'keep-all' }}>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={goAppForJoinPay}
-                    className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-1.5 ${
-                      isBlue ? 'btn-primary' : isGold
-                        ? 'bg-amber-400 text-gray-900 hover:bg-amber-300 font-bold'
-                        : isPurple
-                          ? 'bg-violet-500 text-white hover:bg-violet-600 font-bold'
-                          : 'btn-secondary'
-                    }`}
-                  >
-                    {tier.price === 0 ? '앱에서 무료로 시작' : '앱에서 가입·결제'}
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        {/* 컴팩트 4개 요금제 카드 그리드 + 상세 혜택 보기 팝업 모달 */}
+        <div className="mb-16">
+          <PricingSection
+            user={user}
+            onLoginClick={onLoginClick}
+            onDownloadClick={onDownloadClick}
+            onApplyTier={() => goAppForJoinPay()}
+          />
         </div>
 
         <div className="mb-16">
