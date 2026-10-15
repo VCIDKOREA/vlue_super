@@ -4341,16 +4341,15 @@ function App() {
   }, [page]);
 
   const activeBottomTab = useMemo(() => {
-    if (showcaseStyleSheetOpen) return "home";
-    if (smsInboxOpen) return "sms";
-    if (callShowcaseSheetOpen) return "calls";
+    if (showcaseStyleSheetOpen) return "main";
+    if (smsInboxOpen || callShowcaseSheetOpen) return "comms";
     if (appNotificationOpen) return "notifications";
-    if (page === "main") return "";
-    if (page === "friendSearch") return "home";
+    if (page === "main") return "main";
+    if (page === "friendSearch") return "friends";
+    if (page === "mycase") return "mycase";
     if (page === "calendar") return "mypage";
     if (page === "memo") return "chat";
     if (page === "blueai") return "blueai";
-    if (page === "mycase") return "mycase";
     if (page === "mypage") return "mypage";
     if (page === "betaGuide") return "mypage";
     if (page === "subhub") return "shopping";
@@ -4360,7 +4359,7 @@ function App() {
   }, [page, appNotificationOpen, callShowcaseSheetOpen, showcaseStyleSheetOpen, smsInboxOpen]);
 
   const bottomNavPulseChat = totalUnread > 0 && activeBottomTab !== "chat";
-  const bottomNavPulseFriendSearch = friendInboxRequests.length > 0 && activeBottomTab !== "home";
+  const bottomNavPulseFriendSearch = friendInboxRequests.length > 0 && activeBottomTab !== "friends";
 
   const closeQrScanner = useCallback(() => {
     setQrScannerOpen(false);
@@ -5718,11 +5717,19 @@ function App() {
       <CallShowcaseHistorySheet
         open={v1AppShell.callShowcaseHistoryNav && callShowcaseSheetOpen}
         onClose={() => setCallShowcaseSheetOpen(false)}
+        onSwitchToSms={() => {
+          setCallShowcaseSheetOpen(false);
+          setSmsInboxOpen(true);
+        }}
         isDarkMode={isDarkMode}
       />
       <SmsInboxSheet
         open={v1AppShell.smsInbox && smsInboxOpen}
         onClose={() => setSmsInboxOpen(false)}
+        onSwitchToCalls={() => {
+          setSmsInboxOpen(false);
+          setCallShowcaseSheetOpen(true);
+        }}
         isDarkMode={isDarkMode}
         membershipTier={membershipTier}
       />
@@ -5933,6 +5940,7 @@ function App() {
             </button>
             ) : null}
 
+            {/* 1번: 앱 알림케이스 (종모양) */}
             {v1AppShell.notificationInbox ? (
             <button
               type="button"
@@ -5940,12 +5948,14 @@ function App() {
                 triggerHeaderEyeNavBlink();
                 requireApp(() => {
                   setCallShowcaseSheetOpen(false);
+                  setSmsInboxOpen(false);
                   setShowcaseStyleSheetOpen(false);
                   setAppNotificationOpen(true);
                 });
               }}
               className="relative flex flex-col items-center justify-center w-full active:scale-95 transition-all"
               aria-label="앱 알림"
+              title="앱 알림"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -5979,6 +5989,7 @@ function App() {
             </button>
             ) : null}
 
+            {/* 2번: 케이스함 (그리드 아이콘) */}
             {v1AppShell.mycase ? (
             <button
               type="button"
@@ -5995,8 +6006,8 @@ function App() {
                 requireApp(() => navigate({ nextPage: "mycase", nextTab: activeTab, nextRoomId: null }));
               }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
-              aria-label="마이케이스"
-              title="마이케이스"
+              aria-label="케이스함"
+              title="케이스함"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -6024,29 +6035,28 @@ function App() {
             </button>
             ) : null}
 
-            {v1AppShell.callShowcaseHistoryNav ? (
+            {/* 3번 (정중앙): 홈 버튼 (Home) ⭐ */}
             <button
               type="button"
               onClick={() => {
                 triggerHeaderEyeNavBlink();
-                requireApp(() => {
-                  setAppNotificationOpen(false);
-                  setShowcaseStyleSheetOpen(false);
-                  setSmsInboxOpen(false);
-                  setCallShowcaseSheetOpen(true);
-                  /* 케이스함 언마운트 → BGM 즉시 정지, 닫아도 케이스함으로 복귀하지 않음 */
-                  if (page === "mycase") {
-                    navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
-                  }
-                });
+                setAppNotificationOpen(false);
+                setCallShowcaseSheetOpen(false);
+                setSmsInboxOpen(false);
+                setShowcaseStyleSheetOpen(false);
+                navigate({ nextPage: "main", nextTab: "all", nextRoomId: null });
+                if (page === "main") {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
               }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
-              aria-label="통화 목록"
+              aria-label="홈"
+              title="홈"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="21"
-                height="21"
+                width="22"
+                height="22"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -6054,19 +6064,20 @@ function App() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className={`${
-                  activeBottomTab === "calls"
+                  activeBottomTab === "main"
                     ? "text-blue-500"
                     : isDarkMode
                       ? "text-gray-400"
                       : "text-gray-400"
                 }`}
               >
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
             </button>
-            ) : null}
 
-            {v1AppShell.smsInbox ? (
+            {/* 4번: 통합 커뮤니케이션 (전화 + 메시지) */}
+            {v1AppShell.callShowcaseHistoryNav || v1AppShell.smsInbox ? (
             <button
               type="button"
               onClick={() => {
@@ -6074,34 +6085,50 @@ function App() {
                 requireApp(() => {
                   setAppNotificationOpen(false);
                   setShowcaseStyleSheetOpen(false);
-                  setCallShowcaseSheetOpen(false);
-                  setSmsInboxOpen(true);
-                  /* 케이스함 언마운트 → BGM 즉시 정지, 문자함 닫아도 케이스함으로 복귀하지 않음 */
+                  if (callShowcaseSheetOpen) {
+                    setCallShowcaseSheetOpen(false);
+                    setSmsInboxOpen(true);
+                  } else if (smsInboxOpen) {
+                    setSmsInboxOpen(false);
+                    setCallShowcaseSheetOpen(true);
+                  } else {
+                    setSmsInboxOpen(false);
+                    setCallShowcaseSheetOpen(true);
+                  }
                   if (page === "mycase") {
                     navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null });
                   }
                 });
               }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
-              aria-label="문자함"
+              aria-label="통합 커뮤니케이션 (통화 · 문자)"
+              title="통화 · 문자"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="21"
-                height="21"
+                width="22"
+                height="22"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2.3"
+                strokeWidth="2.2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={activeBottomTab === "sms" ? "text-blue-500" : "text-gray-400"}
+                className={`${
+                  activeBottomTab === "comms"
+                    ? "text-blue-500"
+                    : isDarkMode
+                      ? "text-gray-400"
+                      : "text-gray-400"
+                }`}
               >
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                <path d="M14 3h6a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1l-2.5 2.5V10H14a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
               </svg>
             </button>
             ) : null}
 
+            {/* 5번: 친구 관리 */}
             <button
               type="button"
               onClick={() => {
@@ -6117,6 +6144,8 @@ function App() {
                 requireApp(() => navigate({ nextPage: "friendSearch", nextTab: activeTab, nextRoomId: null }));
               }}
               className="flex flex-col items-center justify-center w-full active:scale-95 transition-all"
+              aria-label="친구 관리"
+              title="친구 관리"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -6129,7 +6158,7 @@ function App() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className={`${
-                  activeBottomTab === "home"
+                  activeBottomTab === "friends"
                     ? "text-blue-500"
                     : bottomNavPulseFriendSearch
                       ? `${isDarkMode ? "text-blue-300" : "text-gray-500"} nav-bottom-icon-pulse`

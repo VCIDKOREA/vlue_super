@@ -470,7 +470,7 @@ function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, ch
  * 네트워크 결과는 백그라운드에서 같은 화면에 덮어쓴다.
  */
 
-export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false }) {
+export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = false, onSwitchToSms = null }) {
   const [items, setItems] = useState(() =>
     applyPersistedMemberHintsToCallGroups(readCallHistoryListCache() || [])
   );
@@ -1443,6 +1443,27 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
       isDarkMode={isDarkMode}
       reserveBottomNav
     >
+      {onSwitchToSms ? (
+        <div className={`flex items-center justify-between border-b px-4 py-2 ${isDarkMode ? "border-white/10 bg-[#0B101B]/80" : "border-slate-100 bg-slate-50/80"}`}>
+          <div className={`inline-flex rounded-xl p-0.5 ${isDarkMode ? "bg-slate-800" : "bg-slate-200/80"}`}>
+            <button
+              type="button"
+              className="px-3.5 py-1 text-[12px] font-black rounded-lg bg-blue-600 text-white shadow-sm"
+            >
+              통화 목록
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToSms}
+              className={`px-3.5 py-1 text-[12px] font-bold rounded-lg transition-colors ${
+                isDarkMode ? "text-slate-300 hover:text-white" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              문자함
+            </button>
+          </div>
+        </div>
+      ) : null}
       {toast ? (
         <p className="call-history-toast call-history-toast--list" role="status">
           {toast}
