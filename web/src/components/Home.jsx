@@ -32,6 +32,9 @@ import HomeNotificationPanel from "./HomeNotificationPanel.jsx";
 import { v1AppShell } from "../lib/v1ReleaseScope.js";
 import AdMobNativeFallbackSlot from "./ads/AdMobNativeFallbackSlot.jsx";
 import HomeCentralFeedBanner from "./ads/HomeCentralFeedBanner.jsx";
+import SponsorAdSwiper from "./SponsorAdSwiper.jsx";
+import AnsimPatchButton from "./AnsimPatchButton.jsx";
+import SecurityNewsFeed from "./SecurityNewsFeed.jsx";
 
 function readHomeGeo() {
   return new Promise((resolve) => {
@@ -941,7 +944,14 @@ function Home({
       </div>
       ) : null}
 
-      {v1AppShell.callBigPush ? <HomeCentralFeedBanner layout={publishedLayout} /> : null}
+      {/* 1. 추천 스폰서 세로 AD 영역 (최대 6개 좌우 스와이프 캐러셀 & 브랜드 타겟팅) */}
+      <SponsorAdSwiper className="mt-1" />
+
+      {/* 2. TODAY 안심패치 버튼 (고정 블록형 필수 포함) */}
+      <AnsimPatchButton className="my-1" isDarkMode={isDarkMode} />
+
+      {/* 3. 네이버 뉴스 API 연동 보안/생활정보 뉴스 피드 (중간 스폰서 카드 교차 삽입) */}
+      <SecurityNewsFeed isDarkMode={isDarkMode} />
       </div>
 
       {v1AppShell.friendShowcaseFeed ? (

@@ -30,7 +30,7 @@ const FALLBACK_LINES = [
   { icon: "🛡️", title: "보안패치", body: "24시간 TODAY 안심패치 세션이 활성화되었습니다." }
 ];
 
-export default function TodaySafetyPatch({ isDarkMode = false }) {
+export default function TodaySafetyPatch({ isDarkMode = false, hideFloating = true }) {
   const [lastPatchedAt, setLastPatchedAt] = useState(() => readLocalPatch()?.lastPatchedAt || null);
   const [now, setNow] = useState(() => Date.now());
   const [promptOpen, setPromptOpen] = useState(false);
@@ -230,38 +230,40 @@ export default function TodaySafetyPatch({ isDarkMode = false }) {
 
   return (
     <>
-      <div
-        className="fixed inset-x-0 z-[170] flex flex-col items-center gap-1 px-3"
-        style={{ bottom: stickerBottom }}
-      >
-        {scanError && !promptOpen && !scanning && !briefOpen ? (
-          <p className="max-w-md rounded-2xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white">{scanError}</p>
-        ) : null}
-        {complete ? (
-          <button
-            type="button"
-            onClick={(e) => void openCompletedBrief(e)}
-            onPointerUp={(e) => {
-              /* 일부 WebView는 click이 누락되고 pointerup만 옴 */
-              if (e.pointerType === "touch" || e.pointerType === "pen") {
-                void openCompletedBrief(e);
-              }
-            }}
-            aria-label="안심패치 내용 보기"
-            className={`inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight shadow-md active:scale-[0.98] ${stickerClass}`}
-          >
-            <span className="truncate">🟢 TODAY 안심패치 완료 | {formatPatchCountdown(remaining)}</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void runPatch()}
-            className={`inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight shadow-md active:scale-[0.98] ${stickerClass}`}
-          >
-            <span className="truncate">🛡️ TODAY 안심패치 미완료</span>
-          </button>
-        )}
-      </div>
+      {!hideFloating ? (
+        <div
+          className="fixed inset-x-0 z-[170] flex flex-col items-center gap-1 px-3"
+          style={{ bottom: stickerBottom }}
+        >
+          {scanError && !promptOpen && !scanning && !briefOpen ? (
+            <p className="max-w-md rounded-2xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white">{scanError}</p>
+          ) : null}
+          {complete ? (
+            <button
+              type="button"
+              onClick={(e) => void openCompletedBrief(e)}
+              onPointerUp={(e) => {
+                /* 일부 WebView는 click이 누락되고 pointerup만 옴 */
+                if (e.pointerType === "touch" || e.pointerType === "pen") {
+                  void openCompletedBrief(e);
+                }
+              }}
+              aria-label="안심패치 내용 보기"
+              className={`inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight shadow-md active:scale-[0.98] ${stickerClass}`}
+            >
+              <span className="truncate">🟢 TODAY 안심패치 완료 | {formatPatchCountdown(remaining)}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void runPatch()}
+              className={`inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 text-[12px] font-black tracking-tight shadow-md active:scale-[0.98] ${stickerClass}`}
+            >
+              <span className="truncate">🛡️ TODAY 안심패치 미완료</span>
+            </button>
+          )}
+        </div>
+      ) : null}
 
       {promptOpen && !scanning && !briefOpen ? (
         <div className="fixed inset-0 z-[640] flex items-end justify-center bg-black/45 px-4 pb-[calc(54px+env(safe-area-inset-bottom,0px)+64px)]">

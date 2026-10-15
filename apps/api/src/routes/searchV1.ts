@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { runPublicBusinessSearch } from "../services/search/publicBusinessSearchService.js";
 import { runSearchVerify } from "../services/search/searchVerifyService.js";
+import { searchNaverNews } from "../integrations/naver/naverNewsSearch.js";
 
 export const searchV1Routes = new Hono();
 
@@ -54,5 +55,24 @@ searchV1Routes.get("/business", async (c) => {
   } catch (e) {
     const message = e instanceof Error ? e.message : "사업자 조회 중 오류가 발생했습니다.";
     return c.json({ status: "error", message }, 500);
+  }
+});
+
+/**
+ * GET /api/v1/search/news?query=보이스피싱&display=15
+ * 네이버 뉴스 검색 API 연동 보안/생활정보 뉴스 피드
+ */
+searchV1Routes.get("/news", async (c) => {
+  const query = c.req.query("query")?.trim() || c.req.query("q")?.trim() || "보이스피싱";
+  const display = Number(c.req.query("display") || 15);
+
+  try {
+    const result = await searchNaverNews(query, display);
+    return c.json(result, 200, {
+      "Cache-Control": "public, max-age=60, stale-while-revalidate=120"
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "뉴스 조회 중 오류가 발생했습니다.";
+    return c.json({ status: "error", message, query, items: [] }, 500);
   }
 });
