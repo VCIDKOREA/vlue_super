@@ -215,12 +215,13 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           visible: true,
           viewportWidth: window.innerWidth,
           viewportHeight: window.innerHeight,
-          hasVideoContent: Boolean(assets?.videoUrl || assets?.hasVideoContent),
+          /* 웹에서 100% 비디오를 단독 렌더링하므로, 네이티브 MediaView가 웹 비디오 위에 겹쳐 구글 로고/정지 이미지가 중첩되는 현상을 원천 방지 (hasVideoContent: false 지정 시 안드로이드 NativeAdManager가 MediaView를 오프스크린 INVISIBLE 처리) */
+          hasVideoContent: false,
           media: {
-            left: media.left,
-            top: media.top,
-            width: media.width,
-            height: media.height
+            left: -9999,
+            top: -9999,
+            width: 1,
+            height: 1
           },
           cta: {
             left: cta.left,
@@ -313,6 +314,10 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           [data-admob-showcase] .showcase-call-carousel__banner {
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
             background: #000000 !important;
+            overflow: hidden !important;
+          }
+          [data-admob-showcase] .showcase-media-page__frame {
+            overflow: hidden !important;
           }
           [data-admob-showcase] .showcase-banner-footer {
             margin-bottom: 2px !important;

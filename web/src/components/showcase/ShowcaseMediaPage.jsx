@@ -56,6 +56,15 @@ function SponsorAdVideoPlayer({ src }) {
       playsInline
       webkit-playsinline="true"
       className="showcase-media-page__img w-full h-full object-contain bg-black select-none pointer-events-auto"
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        objectPosition: "center",
+        backgroundColor: "#000000"
+      }}
       draggable={false}
       onClick={(e) => {
         e.stopPropagation();
@@ -276,7 +285,7 @@ export default function ShowcaseMediaPage({
         axis.current = null;
       }}
     >
-      <div className="showcase-media-page__frame bg-black flex items-center justify-center">
+      <div className="showcase-media-page__frame bg-black flex items-center justify-center overflow-hidden">
         {current.isAdMobSponsor || current.videoUrl ? (
           <SponsorAdVideoPlayer
             src={
@@ -286,19 +295,19 @@ export default function ShowcaseMediaPage({
             }
           />
         ) : (
-          <img
-            key={current.id || current.url}
-            src={current.url}
-            alt=""
-            className="showcase-media-page__img"
-            draggable={false}
-            onError={() => onImageError?.(current)}
-          />
+          <>
+            <img
+              key={current.id || current.url}
+              src={current.url}
+              alt=""
+              className="showcase-media-page__img"
+              draggable={false}
+              onError={() => onImageError?.(current)}
+            />
+            <div className="showcase-media-page__veil" aria-hidden />
+            <ShowcasePhotoTextOverlay key={`tx-${current.id || current.url}`} photo={current} />
+          </>
         )}
-        <div className="showcase-media-page__veil" aria-hidden />
-        {!current.isAdMobSponsor ? (
-          <ShowcasePhotoTextOverlay key={`tx-${current.id || current.url}`} photo={current} />
-        ) : null}
       </div>
 
       {canSwipe ? (
