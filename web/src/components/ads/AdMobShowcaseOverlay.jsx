@@ -26,6 +26,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
   const [assets, setAssets] = useState(null);
   const [ctaPaused, setCtaPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [hasAudio, setHasAudio] = useState(null);
   const rootRef = useRef(null);
   const syncTimer = useRef(0);
 
@@ -48,6 +49,10 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     setAssets(null);
     setCtaPaused(false);
     setIsMuted(false);
+    setHasAudio(null);
+    window.dispatchEvent(
+      new CustomEvent("vlue-admob-toggle-mute", { detail: { muted: true } })
+    );
     try {
       bridge?.closeNativeAdShowcaseSlots?.();
     } catch {
@@ -67,6 +72,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
       setOpen(true);
       setCtaPaused(false);
       setIsMuted(false);
+      setHasAudio(null);
       hideBannersHard();
     };
     const onClose = () => close();
@@ -94,11 +100,14 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     return () => window.removeEventListener("vlue-admob-pause-cta", onPauseCta);
   }, []);
 
-  // 비디오 플레이어로부터 음소거/재생 상태 수신
+  // 비디오 플레이어로부터 음소거/재생 상태 및 오디오 트랙 유무 수신
   useEffect(() => {
     const onSoundStatus = (ev) => {
       if (typeof ev?.detail?.isMuted === "boolean") {
         setIsMuted(ev.detail.isMuted);
+      }
+      if (typeof ev?.detail?.hasAudio === "boolean") {
+        setHasAudio(ev.detail.hasAudio);
       }
     };
     window.addEventListener("vlue-admob-sound-status", onSoundStatus);
@@ -132,6 +141,9 @@ export default function AdMobShowcaseOverlay({ onToast }) {
 
   // 상단 오디오 트랙 바 1:1 토글 제어
   const handleToggleSound = useCallback(() => {
+    if (hasAudio === false) {
+      return;
+    }
     const nextMuted = !isMuted;
     setIsMuted(nextMuted);
     window.dispatchEvent(
@@ -140,7 +152,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
     onToast?.(
       nextMuted ? "광고 사운드가 음소거되었습니다." : `${brandTrackTitle} 사운드가 켜졌습니다.`
     );
-  }, [isMuted, brandTrackTitle, onToast]);
+  }, [hasAudio, isMuted, brandTrackTitle, onToast]);
 
   // 맞춤형 CTA 버튼 분석
   const ctaMeta = useMemo(() => {
@@ -365,35 +377,47 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           {/* 중앙: 브랜드 맞춤 사운드 트랙명 글래스모피즘 칩 */}
           <button
             type="button"
-            onClick={handleToggleSound}
-            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 max-w-[200px] sm:max-w-[260px] shadow-sm backdrop-blur-md active:scale-95 transition-all truncate cursor-pointer"
+            onClick={hasAudio === false ? undefined : handleToggleSound}
+            className={`flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 max-w-[200px] sm:max-w-[260px] shadow-sm backdrop-blur-md active:scale-95 transition-all truncate ${
+              hasAudio === false ? "opacity-60 cursor-default pointer-events-none" : "cursor-pointer"
+            }`}
             title={brandTrackTitle}
           >
-            <span className="text-[12px] shrink-0">🎵</span>
+            <span className="text-[12px] shrink-0">{hasAudio === false ? "🔇" : "🎵"}</span>
             <span className="truncate text-slate-200 tracking-tight font-medium">
-              {brandTrackTitle}
+              {hasAudio === false ? `${advertiser} (무음 비디오)` : brandTrackTitle}
             </span>
           </button>
 
-          {/* 우측: 사운드 재생 상태 및 음소거 1:1 토글 버튼 */}
-          <button
-            type="button"
-            onClick={handleToggleSound}
-            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-slate-200 active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
-            aria-label={isMuted ? "음소거 해제" : "음소거"}
-          >
-            {isMuted ? (
-              <>
-                <VolumeX size={14} className="text-slate-400" />
-                <span className="text-[10.5px] text-slate-400 font-bold">음소거</span>
-              </>
-            ) : (
-              <>
-                <Volume2 size={14} className="text-cyan-400 animate-pulse" />
-                <span className="text-[10.5px] text-cyan-300 font-bold">재생 중</span>
-              </>
-            )}
-          </button>
+          {/* 우측: 사운드 재생 상태 및 음소거 1:1 토글 버튼 (무음 영상 시 '소리 없음' UI 표기) */}
+          {hasAudio === false ? (
+            <div
+              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-400 opacity-50 pointer-events-none shrink-0 select-none shadow-sm cursor-default"
+              aria-label="소리 없음"
+            >
+              <VolumeX size={14} className="text-slate-500" />
+              <span className="text-[10.5px] text-slate-400 font-bold">소리 없음</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleToggleSound}
+              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-slate-200 active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
+              aria-label={isMuted ? "음소거 해제" : "음소거"}
+            >
+              {isMuted ? (
+                <>
+                  <VolumeX size={14} className="text-slate-400" />
+                  <span className="text-[10.5px] text-slate-400 font-bold">음소거</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 size={14} className="text-cyan-400 animate-pulse" />
+                  <span className="text-[10.5px] text-cyan-300 font-bold">재생 중</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* VLUÉ 원본 쇼케이스 뷰어 (PeerShowcasePreview 규격 100% 동일) */}
@@ -405,6 +429,7 @@ export default function AdMobShowcaseOverlay({ onToast }) {
             includeDigitalCard={false}
             digitalCardOnly={false}
             preferContentSlide
+            suppressBgm
           />
         </div>
 

@@ -14,7 +14,9 @@ export default function PeerShowcasePreview({
   /** 카톡 공개 링크 — 접기/종료로 풀뷰를 죽이지 않음 */
   publicLinkMode = false,
   /** 명함 다음 콘텐츠 슬라이드부터 시작 (공개 링크) */
-  preferContentSlide = false
+  preferContentSlide = false,
+  /** 배경음악 억제 (스폰서 비디오 광고 단독 오디오 재생 시 중복 방지) */
+  suppressBgm = false
 }) {
   const style =
     (card?.showcaseStyle && typeof card.showcaseStyle === "object"
@@ -71,6 +73,11 @@ export default function PeerShowcasePreview({
           savedContactName={previewCard.name || previewCard.displayName || ""}
           isKnownContact
           card={previewCard}
+          suppressBgm={Boolean(
+            suppressBgm ||
+            previewCard?.admobSponsor ||
+            previewCard?.profileKind === "admob_sponsor"
+          )}
           includeDigitalCard={Boolean(includeDigitalCard)}
           digitalCardOnly={Boolean(digitalCardOnly)}
           preferContentSlide={Boolean(preferContentSlide)}

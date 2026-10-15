@@ -6,44 +6,190 @@ const FALLBACK_SPONSOR_VIDEO_URL =
   "https://videos.pexels.com/video-files/855828/855828-hd_1920_1080_30fps.mp4";
 
 /**
+ * 비디오 미디어의 실제 오디오 트랙 존재 여부 정밀 판별
+ * 1. URL 패턴 (Pexels, MDN flower 등 무음 스톡 영상 사전 즉각 판별)
+ * 2. 표준 audioTracks API (Safari 등)
+ * 3. Firefox mozHasAudio
+ * 4. captureStream / mozCaptureStream (Chromium, Android WebView)
+ * 5. webkitAudioDecodedByteCount (Blink 재생 중 디코딩 바이트 수)
+ */
+function detectVideoAudioPresence(video, url = "") {
+  const lowerUrl = String(url || video?.currentSrc || video?.src || "").toLowerCase();
+  if (lowerUrl.includes("videos.pexels.com") || lowerUrl.includes("flower.mp4")) {
+    return false;
+  }
+
+  if (!video) return null;
+
+  // 1. 표준 audioTracks API
+  if (video.audioTracks && typeof video.audioTracks.length === "number") {
+    return video.audioTracks.length > 0;
+  }
+
+  // 2. Firefox mozHasAudio
+  if (typeof video.mozHasAudio === "boolean") {
+    return video.mozHasAudio;
+  }
+
+  // 3. captureStream / mozCaptureStream (Chromium / Android WebView)
+  try {
+    const streamFunc = video.captureStream || video.mozCaptureStream;
+    if (typeof streamFunc === "function") {
+      const stream = streamFunc.call(video);
+      if (stream && typeof stream.getAudioTracks === "function") {
+        const audioTracks = stream.getAudioTracks();
+        if (Array.isArray(audioTracks)) {
+          return audioTracks.length > 0;
+        }
+      }
+    }
+  } catch {
+    /* ignore CORS or security limitations */
+  }
+
+  // 4. webkitAudioDecodedByteCount (재생 중 실제 디코딩 바이트 판별)
+  if (typeof video.webkitAudioDecodedByteCount === "number") {
+    if (video.webkitAudioDecodedByteCount > 0) {
+      return true;
+    }
+    if (video.currentTime > 0.3 && video.webkitAudioDecodedByteCount === 0) {
+      return false;
+    }
+  }
+
+  return null;
+}
+
+/**
  * 스폰서 AD 전용 100% 동영상 오토플레이 플레이어
  * - 정지 이미지(poster/img) 절대 사용 금지
  * - 비디오 오토플레이 보장 및 상단 BGM 바와 1:1 사운드 상태 실시간 동기화
  * - 가로 비율(16:9 등) 영상도 세로 카드 틀 내부에서 object-contain 레터박스로 자연스럽게 스케일링
+ * - 무음 영상 감지 시 '소리 없음' UI 즉시 연동 및 불필요한 사운드 제어 배제
+ * - 유음 영상 시 [재생 중] / [음소거] 1:1 다이렉트 직결 및 잔상 겹침 방지
  */
 function SponsorAdVideoPlayer({ src }) {
   const videoRef = useRef(null);
+  const hasAudioRef = useRef(null);
 
+  // 이전 오디오 잔상/겹침 방지: 앱 내 다른 audio/video 일시정지
+  const resetOtherAudio = useCallback((currentEl) => {
+    try {
+      const allMedia = document.querySelectorAll("audio, video");
+      allMedia.forEach((el) => {
+        if (el !== currentEl && !el.paused) {
+          try {
+            el.pause();
+          } catch {
+            /* ignore */
+          }
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("vlue-letter-bgm-pause"));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const reportStatus = useCallback((muted, hasAudio) => {
+    window.dispatchEvent(
+      new CustomEvent("vlue-admob-sound-status", {
+        detail: {
+          isMuted: Boolean(muted),
+          hasAudio: hasAudio // boolean or null
+        }
+      })
+    );
+  }, []);
+
+  const checkAndSyncAudio = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const detected = detectVideoAudioPresence(v, src);
+    if (detected !== null && detected !== hasAudioRef.current) {
+      hasAudioRef.current = detected;
+      if (detected === false) {
+        v.muted = true;
+      }
+      reportStatus(v.muted, detected);
+    }
+  }, [src, reportStatus]);
+
+  // 상단 바에서 음소거 토글 이벤트 수신 -> 실제 video DOM 1:1 직결
   useEffect(() => {
     const onToggle = (e) => {
       const nextMuted = Boolean(e?.detail?.muted);
-      if (videoRef.current) {
-        videoRef.current.muted = nextMuted;
-        if (!nextMuted) {
-          videoRef.current.play().catch(() => {});
+      const v = videoRef.current;
+      if (v) {
+        if (hasAudioRef.current === false) {
+          v.muted = true;
+          reportStatus(true, false);
+          return;
         }
+        v.muted = nextMuted;
+        if (!nextMuted) {
+          resetOtherAudio(v);
+          v.volume = 1.0;
+          v.play().catch(() => {});
+        }
+        reportStatus(nextMuted, hasAudioRef.current ?? true);
       }
     };
     window.addEventListener("vlue-admob-toggle-mute", onToggle);
     return () => window.removeEventListener("vlue-admob-toggle-mute", onToggle);
-  }, []);
+  }, [reportStatus, resetOtherAudio]);
 
+  // 비디오 마운트 및 소스 변경 시
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+
+    // 초기 URL 기반 사전 판별
+    const quickDetect = detectVideoAudioPresence(null, src);
+    hasAudioRef.current = quickDetect;
+
+    if (quickDetect === false) {
+      v.muted = true;
+      reportStatus(true, false);
+      v.play().catch(() => {});
+      return;
+    }
+
+    // 유음 가능 영상: 전역 오디오 리셋 후 재생 시도
+    resetOtherAudio(v);
+    v.volume = 1.0;
     v.muted = false;
+
     const playPromise = v.play();
     if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // 브라우저 오토플레이 정책으로 소리 포함 자동재생 차단 시 무음으로 즉시 100% 자동재생 보장
-        v.muted = true;
-        window.dispatchEvent(
-          new CustomEvent("vlue-admob-sound-status", { detail: { isMuted: true } })
-        );
-        v.play().catch(() => {});
-      });
+      playPromise
+        .then(() => {
+          checkAndSyncAudio();
+          reportStatus(v.muted, hasAudioRef.current ?? true);
+        })
+        .catch(() => {
+          // 브라우저 오토플레이 정책으로 소리 포함 자동재생 차단 시 무음으로 즉시 100% 자동재생
+          v.muted = true;
+          checkAndSyncAudio();
+          reportStatus(true, hasAudioRef.current ?? true);
+          v.play().catch(() => {});
+        });
     }
-  }, [src]);
+
+    return () => {
+      if (v) {
+        try {
+          v.pause();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [src, reportStatus, resetOtherAudio, checkAndSyncAudio]);
 
   return (
     <video
@@ -55,6 +201,13 @@ function SponsorAdVideoPlayer({ src }) {
       muted={false}
       playsInline
       webkit-playsinline="true"
+      onLoadedMetadata={checkAndSyncAudio}
+      onCanPlay={checkAndSyncAudio}
+      onPlaying={() => {
+        resetOtherAudio(videoRef.current);
+        checkAndSyncAudio();
+      }}
+      onTimeUpdate={checkAndSyncAudio}
       className="showcase-media-page__img w-full h-full object-contain bg-black select-none pointer-events-auto"
       style={{
         position: "absolute",
@@ -68,12 +221,17 @@ function SponsorAdVideoPlayer({ src }) {
       draggable={false}
       onClick={(e) => {
         e.stopPropagation();
-        if (!videoRef.current) return;
-        const nextMuted = !videoRef.current.muted;
-        videoRef.current.muted = nextMuted;
-        window.dispatchEvent(
-          new CustomEvent("vlue-admob-sound-status", { detail: { isMuted: nextMuted } })
-        );
+        const v = videoRef.current;
+        if (!v) return;
+        if (hasAudioRef.current === false) return;
+        const nextMuted = !v.muted;
+        v.muted = nextMuted;
+        if (!nextMuted) {
+          resetOtherAudio(v);
+          v.volume = 1.0;
+          v.play().catch(() => {});
+        }
+        reportStatus(nextMuted, true);
       }}
     />
   );
