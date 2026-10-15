@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiUrl } from "../lib/apiBase.js";
 import { vlueAuthHeaders } from "../lib/vlueAuthHeaders.js";
 import { openAdMobShowcase } from "../lib/ads/openAdMobShowcase.js";
+import InAppBrowserModal from "./InAppBrowserModal.jsx";
 
 /** 카테고리 탭 및 네이버 API 검색 키워드 매핑 */
 const NEWS_TABS = [
@@ -57,6 +58,7 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
   const [newsItems, setNewsItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [cache, setCache] = useState({});
+  const [selectedNews, setSelectedNews] = useState(null);
 
   const activeTab = NEWS_TABS.find((t) => t.id === activeTabId) || NEWS_TABS[0];
 
@@ -98,6 +100,13 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
       cancelled = true;
     };
   }, [activeTab.keyword, cache]);
+
+  const handleOpenNews = (news) => {
+    if (!news) return;
+    const url = news.originallink || news.link;
+    if (!url) return;
+    setSelectedNews(news);
+  };
 
   const handleOpenLink = (link) => {
     if (!link) return;
@@ -200,7 +209,7 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
               >
                 {/* 뉴스 카드: 좌측 헤드라인/본문/출처 + 우측 w-20 h-20 썸네일 이미지 결합 레이아웃 */}
                 <article
-                  onClick={() => handleOpenLink(news.link || news.originallink)}
+                  onClick={() => handleOpenNews(news)}
                   className={`group flex cursor-pointer items-start justify-between gap-3 overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-3.5 shadow-sm transition-all duration-150 active:scale-[0.99] hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-900 ${
                     isLast && (!showSponsorAfter || !sponsorAd) ? "mb-0 pb-0" : ""
                   }`}
@@ -298,6 +307,19 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
           })
         )}
       </div>
+
+      {/* 실시간 뉴스 인앱 브라우저 모달 (외부 브라우저 이탈 방지) */}
+      {selectedNews ? (
+        <InAppBrowserModal
+          open={Boolean(selectedNews)}
+          url={selectedNews.originallink || selectedNews.link}
+          title={selectedNews.title}
+          source={selectedNews.source}
+          formattedDate={selectedNews.formattedDate}
+          onClose={() => setSelectedNews(null)}
+          isDarkMode={isDarkMode}
+        />
+      ) : null}
     </section>
   );
 }
