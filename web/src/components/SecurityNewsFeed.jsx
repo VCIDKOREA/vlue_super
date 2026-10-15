@@ -130,7 +130,7 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
 
   return (
     <section
-      className={`security-news-feed w-full select-none px-2.5 pt-3 pb-1 ${className}`.trim()}
+      className={`security-news-feed w-full select-none px-2.5 pt-3 pb-0 mb-0 ${className}`.trim()}
       aria-label="보안 및 생활정보 뉴스 피드"
     >
       {/* 섹션 타이틀 헤더 */}
@@ -166,10 +166,10 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
       </div>
 
       {/* 뉴스 피드 리스트 + 중간 AD 스폰서 카드 교차 삽입 */}
-      <div className="mt-1 space-y-2.5">
+      <div className="mt-1 space-y-2.5 pb-0 mb-0">
         {loading && newsItems.length === 0 ? (
           // 스켈레톤 로딩
-          <div className="space-y-2.5 py-1">
+          <div className="space-y-2.5 py-1 pb-0 mb-0">
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
@@ -186,6 +186,7 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
           </div>
         ) : (
           newsItems.map((news, index) => {
+            const isLast = index === newsItems.length - 1;
             const showSponsorAfter = (index + 1) % 3 === 0;
             const sponsorAd = IN_FEED_SPONSOR_ADS[Math.floor(index / 3) % IN_FEED_SPONSOR_ADS.length];
             const thumbSrc =
@@ -193,11 +194,16 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
               "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=320&q=80";
 
             return (
-              <div key={news.link || `${news.title}-${index}`} className="space-y-2.5">
+              <div
+                key={news.link || `${news.title}-${index}`}
+                className={`space-y-2.5 ${isLast ? "mb-0 pb-0" : ""}`}
+              >
                 {/* 뉴스 카드: 좌측 헤드라인/본문/출처 + 우측 w-20 h-20 썸네일 이미지 결합 레이아웃 */}
                 <article
                   onClick={() => handleOpenLink(news.link || news.originallink)}
-                  className="group flex cursor-pointer items-start justify-between gap-3 overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-3.5 shadow-sm transition-all duration-150 active:scale-[0.99] hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+                  className={`group flex cursor-pointer items-start justify-between gap-3 overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-3.5 shadow-sm transition-all duration-150 active:scale-[0.99] hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-slate-900 ${
+                    isLast && (!showSponsorAfter || !sponsorAd) ? "mb-0 pb-0" : ""
+                  }`}
                 >
                   {/* 좌측: 출처/시간, 헤드라인 2줄, 요약 1줄, 원문 읽기 링크 */}
                   <div className="flex min-w-0 flex-1 flex-col justify-between">
@@ -243,7 +249,9 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
                 {showSponsorAfter && sponsorAd ? (
                   <aside
                     onClick={() => handleSponsorClick(sponsorAd)}
-                    className="relative cursor-pointer overflow-hidden rounded-2xl p-3.5 text-white shadow-md transition-all duration-150 active:scale-[0.99]"
+                    className={`relative cursor-pointer overflow-hidden rounded-2xl p-3.5 text-white shadow-md transition-all duration-150 active:scale-[0.99] ${
+                      isLast ? "mb-0 pb-0" : ""
+                    }`}
                     style={{
                       backgroundImage: `linear-gradient(to right, #0f172a, #1e293b)`
                     }}

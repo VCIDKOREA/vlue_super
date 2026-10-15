@@ -924,11 +924,11 @@ function Home({
     <main
       className={`home-main-feed min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col overflow-y-auto overflow-x-hidden ${
         v1FriendHomeLayout
-          ? "home-main-feed--kakao px-0 pb-0 pt-0"
+          ? "home-main-feed--kakao px-0 pb-0 pt-0 mb-0"
           : "home-main-feed--spaced gap-5 px-2.5 pb-32 pt-0"
       }`}
     >
-      <div className={v1FriendHomeLayout ? "home-kakao-stack flex min-h-0 flex-1 flex-col gap-0 px-0 pt-0" : "contents"}>
+      <div className={v1FriendHomeLayout ? "home-kakao-stack flex min-h-0 flex-1 flex-col gap-0 px-0 pt-0 pb-0 mb-0" : "contents"}>
       {v1AppShell.homeBizSearch ? (
       <div data-home-anchor="search" className="home-kakao-anchor home-kakao-anchor--search shrink-0">
       <HomeBizDirectorySearch
@@ -951,7 +951,7 @@ function Home({
       <AnsimPatchButton className="my-1" isDarkMode={isDarkMode} />
 
       {/* 3. 네이버 뉴스 API 연동 보안/생활정보 뉴스 피드 (중간 스폰서 카드 교차 삽입) */}
-      <SecurityNewsFeed isDarkMode={isDarkMode} />
+      <SecurityNewsFeed isDarkMode={isDarkMode} className="mb-0 pb-0" />
       </div>
 
       {v1AppShell.friendShowcaseFeed ? (

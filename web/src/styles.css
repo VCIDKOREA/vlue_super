@@ -145,7 +145,8 @@ html.vlue-safety-patch .home-main-feed.home-main-feed--kakao {
 }
 
 html.vlue-safety-patch .home-kakao-stack {
-  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 54px));
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 .vlue-scroll-pad-bottom-nav {
@@ -1420,7 +1421,19 @@ html.vlue-safety-patch .home-kakao-stack {
 }
 
 .home-kakao-stack {
-  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 54px));
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* [VLUÉ] 뉴스 피드 하단 ~ 팔로우 쇼케이스 사이 여백 완전 제로화 */
+.security-news-feed {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.security-news-feed > div:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .home-kakao-anchor--showcase {

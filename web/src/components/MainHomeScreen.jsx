@@ -19,7 +19,7 @@ export default function MainHomeScreen({
   onOpenBusinessRoom = null
 }) {
   return (
-    <div className="main-home-screen flex min-h-0 flex-1 flex-col overflow-y-auto px-0 pt-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="main-home-screen flex min-h-0 flex-1 flex-col overflow-y-auto px-0 pt-0 pb-0 mb-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* 1. 상단 상호/해시태그/아이디 검색 바 */}
       <div data-home-anchor="search" className="shrink-0">
         <HomeBizDirectorySearch
@@ -40,7 +40,7 @@ export default function MainHomeScreen({
       <AnsimPatchButton className="my-1" isDarkMode={isDarkMode} />
 
       {/* 5. 네이버 뉴스 API 연동 보안/생활정보 뉴스 피드 (중간 스폰서 카드 교차 삽입) */}
-      <SecurityNewsFeed isDarkMode={isDarkMode} />
+      <SecurityNewsFeed isDarkMode={isDarkMode} className="mb-0 pb-0" />
     </div>
   );
 }
