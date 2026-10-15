@@ -75,6 +75,19 @@ android {
         buildConfigField("String", "ADMOB_NATIVE_ID", "\"$admobNativeId\"")
         buildConfigField("String", "ADMOB_BANNER_ID", "\"$admobBannerId\"")
         manifestPlaceholders["admobAppId"] = admobAppId
+
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
+        externalNativeBuild {
+            cmake {
+                arguments("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+                cppFlags("-Wl,-z,max-page-size=16384")
+            }
+            ndkBuild {
+                arguments("APP_LDFLAGS+=-Wl,-z,max-page-size=16384")
+            }
+        }
     }
 
     /* AAB/APK 파일명에 버전명·버전코드를 넣어 스토어 업로드본이 섞이지 않게 한다. */
@@ -114,9 +127,11 @@ android {
 
     buildTypes {
         getByName("debug") {
+            isDebuggable = true
             isMinifyEnabled = false
         }
         getByName("release") {
+            isDebuggable = false
             /* 저메모리 PC에서 R8 OOM 방지 — 상태바 핫픽스 AAB용. 이후 RAM 여유 시 다시 true */
             isMinifyEnabled = false
             isShrinkResources = false
@@ -129,6 +144,16 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+
+    packaging {
+        jniLibs {
+            /* 16KB 페이지 크기 대응: uncompressed 라이브러리 정렬 이슈 방지 (설치 시 16KB 정렬 추출) */
+            useLegacyPackaging = true
+        }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 
@@ -160,7 +185,7 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
-    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
+    implementation("net.zetetic:android-database-sqlcipher:4.5.5")
     implementation("androidx.sqlite:sqlite:2.4.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 

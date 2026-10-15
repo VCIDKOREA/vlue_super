@@ -40,6 +40,23 @@ android {
         buildConfig = true
     }
 
+    buildTypes {
+        getByName("debug") {
+            isDebuggable = true
+            isMinifyEnabled = false
+        }
+        getByName("release") {
+            isDebuggable = false
+            isMinifyEnabled = false
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
