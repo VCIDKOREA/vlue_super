@@ -24,7 +24,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#38bdf8",
     bgImage: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=600&q=80",
     ctaLabel: "자세히 보기",
-    link: "https://www.samsung.com/sec/smartphones/galaxy-s/"
+    link: "https://www.samsung.com/sec/smartphones/galaxy-s/",
+    specs: ["Galaxy AI", "2억 화소 쿼드", "Knox Vault 보안", "티타늄 프레임"]
   },
   {
     id: "genesis-g90",
@@ -34,9 +35,10 @@ const HOUSE_BRAND_POOL = [
     body: "대한민국 럭셔리 플래그십 세단의 가장 순수한 정점",
     category: "자동차",
     accentColor: "#fbbf24",
-    bgImage: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=80",
+    bgImage: "https://images.unsplash.com/photo-1555353540-64580b51c258?w=800&q=80",
     ctaLabel: "시승 예약",
-    link: "https://www.genesis.com/kr/ko/models/luxury-sedan-genesis/g90.html"
+    link: "https://www.genesis.com/kr/ko/models/luxury-sedan-genesis/g90.html",
+    specs: ["럭셔리 플래그십", "AWD 드라이브", "VIP 리어 시트", "프리미엄 안심케어"]
   },
   {
     id: "tesla-fsd",
@@ -48,7 +50,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#f87171",
     bgImage: "https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=600&q=80",
     ctaLabel: "주문하기",
-    link: "https://www.tesla.com/ko_kr"
+    link: "https://www.tesla.com/ko_kr",
+    specs: ["FSD 완전자율주행", "0-100km 2.1s", "OTA 업데이트", "AI 슈퍼컴퓨팅"]
   },
   {
     id: "apple-iphone",
@@ -60,7 +63,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#fcd34d",
     bgImage: "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=600&q=80",
     ctaLabel: "구입하기",
-    link: "https://www.apple.com/kr/iphone/"
+    link: "https://www.apple.com/kr/iphone/",
+    specs: ["A19 Pro 칩셋", "항공우주 티타늄", "ProMotion 120Hz", "공간 음향"]
   },
   {
     id: "maybach-eqs",
@@ -72,7 +76,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#34d399",
     bgImage: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=600&q=80",
     ctaLabel: "브로슈어 신청",
-    link: "https://www.mercedes-benz.co.kr"
+    link: "https://www.mercedes-benz.co.kr",
+    specs: ["하이엔드 럭셔리", "퍼스트 클래스 리어", "Burmester® 4D", "에어매틱"]
   },
   {
     id: "lg-signature",
@@ -84,7 +89,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#a78bfa",
     bgImage: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=600&q=80",
     ctaLabel: "체험관 안내",
-    link: "https://www.lge.co.kr"
+    link: "https://www.lge.co.kr",
+    specs: ["무선 4K 144Hz", "올레드 evo", "α11 AI 프로세서", "돌비 비전"]
   },
   {
     id: "porsche-taycan",
@@ -96,7 +102,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#c084fc",
     bgImage: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=80",
     ctaLabel: "나만의 포르쉐",
-    link: "https://www.porsche.com/korea/ko/"
+    link: "https://www.porsche.com/korea/ko/",
+    specs: ["최고출력 1,034hp", "Launch Control", "800V 초고속충전", "액티브 라이드"]
   },
   {
     id: "dyson-airwrap",
@@ -108,7 +115,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#f472b6",
     bgImage: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&q=80",
     ctaLabel: "신제품 보기",
-    link: "https://www.dyson.co.kr"
+    link: "https://www.dyson.co.kr",
+    specs: ["지능형 열제어", "코안다 스타일링", "블루투스 무선연동", "손상 없는 케어"]
   },
   {
     id: "bmw-i7",
@@ -120,7 +128,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#60a5fa",
     bgImage: "https://images.unsplash.com/photo-1555215695-3004980ad54e?w=600&q=80",
     ctaLabel: "시승 신청",
-    link: "https://www.bmw.co.kr"
+    link: "https://www.bmw.co.kr",
+    specs: ["31.3인치 시어터", "이그제큐티브 라운지", "M 스포츠 xDrive", "크리스탈 라이트"]
   },
   {
     id: "sony-alpha",
@@ -132,7 +141,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#fb923c",
     bgImage: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&q=80",
     ctaLabel: "자세히 보기",
-    link: "https://www.sony.co.kr"
+    link: "https://www.sony.co.kr",
+    specs: ["글로벌 셔터", "초당 120연사", "AI 피사체 인식", "블랙아웃 프리"]
   },
   {
     id: "bo-beolab",
@@ -144,7 +154,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#facc15",
     bgImage: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=600&q=80",
     ctaLabel: "체험 예약",
-    link: "https://www.bang-olufsen.com/ko/kr"
+    link: "https://www.bang-olufsen.com/ko/kr",
+    specs: ["2,100W 출력", "어쿠스틱 렌즈", "액티브 룸 보정", "명품 사운드"]
   },
   {
     id: "rolex-submariner",
@@ -156,7 +167,8 @@ const HOUSE_BRAND_POOL = [
     accentColor: "#10b981",
     bgImage: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
     ctaLabel: "컬렉션 보기",
-    link: "https://www.rolex.com/ko"
+    link: "https://www.rolex.com/ko",
+    specs: ["수심 300m 방수", "오이스터스틸", "세라크롬 베젤", "최상급 크로노미터"]
   }
 ];
 
@@ -369,6 +381,10 @@ export default function SponsorAdSwiper({ className = "" }) {
       landingUrl: card.link,
       link: card.link,
       iconUrl: card.iconUrl || card.bgImage,
+      badge: card.badge,
+      category: card.category,
+      accentColor: card.accentColor,
+      specs: card.specs,
       hasVideoContent: false,
       isAdMob: Boolean(card.isAdMob)
     });

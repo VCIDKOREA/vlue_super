@@ -37,7 +37,8 @@ const IN_FEED_SPONSOR_ADS = [
     link: "https://www.genesis.com",
     accentColor: "#f59e0b",
     bgGradient: "from-zinc-900 via-neutral-900 to-black",
-    mediaUrl: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&q=80"
+    mediaUrl: "https://images.unsplash.com/photo-1555353540-64580b51c258?w=800&q=80",
+    specs: ["24h 긴급출동", "원격 차량진단", "도난 추적지원", "안전 운행케어"]
   },
   {
     id: "fsc-safeguard",
@@ -49,7 +50,8 @@ const IN_FEED_SPONSOR_ADS = [
     link: "https://www.payinfo.or.kr",
     accentColor: "#10b981",
     bgGradient: "from-emerald-950 via-slate-900 to-black",
-    mediaUrl: "https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=600&q=80"
+    mediaUrl: "https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=600&q=80",
+    specs: ["일괄 지급정지", "24시간 피해구제", "보이스피싱 예방", "금융소비자보호"]
   }
 ];
 
@@ -132,6 +134,9 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
       landingUrl: sponsor.link,
       link: sponsor.link,
       iconUrl: sponsor.mediaUrl,
+      badge: sponsor.badge,
+      specs: sponsor.specs,
+      accentColor: sponsor.accentColor,
       hasVideoContent: false,
       isAdMob: false
     });

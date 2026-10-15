@@ -234,12 +234,25 @@ export default function AdMobShowcaseOverlay({ onToast }) {
           [data-admob-showcase] .showcase-dcc-bottom-banner { display: none !important; }
           [data-admob-showcase] .lettering-ongoing-actions-secondary { display: none !important; }
           [data-admob-showcase] .showcase-call-carousel__slide-settings { display: none !important; }
+          [data-admob-showcase] .showcase-call-carousel__slide-call { display: none !important; }
+          [data-admob-showcase] .showcase-call-carousel__slide-corner { display: none !important; }
+          [data-admob-showcase] .showcase-photo-text-overlay { display: none !important; }
           [data-admob-showcase] .showcase-social-rail { z-index: 40; pointer-events: auto !important; }
           [data-admob-showcase] .lettering-live-indicator__bar {
             background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 50%, #06b6d4 100%);
           }
           [data-admob-showcase] .lettering-live-indicator {
             filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.9));
+          }
+          [data-admob-showcase] .showcase-call-carousel__banner {
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background: #0B101B !important;
+          }
+          [data-admob-showcase] .showcase-banner-footer {
+            margin-bottom: 2px !important;
+          }
+          [data-admob-showcase] .showcase-like-summary {
+            margin-bottom: 4px !important;
           }
           ${hasVideo ? "[data-admob-showcase] .showcase-media-page__img{opacity:0!important}" : ""}
         `}</style>
