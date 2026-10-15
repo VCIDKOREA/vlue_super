@@ -136,11 +136,16 @@ html.vlue-android-app:not(.vlue-status-inset-ready) .vlue-top-safe {
 }
 
 html.vlue-safety-patch .home-main-feed--spaced {
-  padding-bottom: calc(8rem + 44px) !important;
+  padding-bottom: 0 !important;
+}
+
+html.vlue-safety-patch .home-main-feed--kakao,
+html.vlue-safety-patch .home-main-feed.home-main-feed--kakao {
+  padding-bottom: 0 !important;
 }
 
 html.vlue-safety-patch .home-kakao-stack {
-  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 56px));
+  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 54px));
 }
 
 .vlue-scroll-pad-bottom-nav {
@@ -1415,7 +1420,7 @@ html.vlue-safety-patch .home-kakao-stack {
 }
 
 .home-kakao-stack {
-  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 56px));
+  padding-bottom: calc(var(--friend-sheet-collapsed-h, 52px) + var(--vlue-bottom-nav-offset, 54px));
 }
 
 .home-kakao-anchor--showcase {

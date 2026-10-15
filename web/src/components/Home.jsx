@@ -922,13 +922,13 @@ function Home({
 
   return (
     <main
-      className={`home-main-feed home-main-feed--spaced min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col overflow-y-auto overflow-x-hidden ${
+      className={`home-main-feed min-h-0 w-full max-w-none min-w-0 flex-1 flex flex-col overflow-y-auto overflow-x-hidden ${
         v1FriendHomeLayout
           ? "home-main-feed--kakao px-0 pb-0 pt-0"
-          : "gap-5 px-2.5 pb-32 pt-0"
+          : "home-main-feed--spaced gap-5 px-2.5 pb-32 pt-0"
       }`}
     >
-      <div className={v1FriendHomeLayout ? "home-kakao-stack flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto px-0 pt-0" : "contents"}>
+      <div className={v1FriendHomeLayout ? "home-kakao-stack flex min-h-0 flex-1 flex-col gap-0 px-0 pt-0" : "contents"}>
       {v1AppShell.homeBizSearch ? (
       <div data-home-anchor="search" className="home-kakao-anchor home-kakao-anchor--search shrink-0">
       <HomeBizDirectorySearch
