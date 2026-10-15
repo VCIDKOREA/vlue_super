@@ -38,7 +38,8 @@ import {
   getEnterpriseBranding,
   parseBrandingPayload,
   patchEnterpriseBranding,
-  uploadEnterpriseLogo
+  uploadEnterpriseLogo,
+  uploadEnterpriseWatermark
 } from "../services/b2b/enterpriseBranding.js";
 import { logB2bPipeline } from "../lib/b2bPipelineLog.js";
 import { handleB2bRouteError } from "../lib/b2bRouteError.js";
@@ -353,6 +354,21 @@ b2bRoutes.post("/enterprise/branding/logo", async (c) => {
     return c.json(result);
   } catch (err) {
     return handleB2bRouteError(c, "/enterprise/branding/logo", err);
+  }
+});
+
+b2bRoutes.post("/enterprise/branding/watermark", async (c) => {
+  try {
+    const me = c.get("vlueUserId")!;
+    const body = (await c.req.json().catch(() => ({}))) as {
+      dataUrl?: string;
+      fileName?: string;
+    };
+    const result = await uploadEnterpriseWatermark(me, body);
+    if (!result.ok) return c.json({ error: result.error }, 400);
+    return c.json(result);
+  } catch (err) {
+    return handleB2bRouteError(c, "/enterprise/branding/watermark", err);
   }
 });
 

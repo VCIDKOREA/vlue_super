@@ -64,8 +64,8 @@ android {
     defaultConfig {
         minSdk = 26
         targetSdk = 36
-        versionCode = 82
-        versionName = "1.0.34"
+        versionCode = 84
+        versionName = "1.0.36"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
         buildConfigField("String", "SUPABASE_URL", "\"$vlueSupabaseUrl\"")

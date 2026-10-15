@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchB2bEnterpriseBranding,
   patchB2bEnterpriseBranding,
-  uploadB2bEnterpriseLogo
+  uploadB2bEnterpriseLogo,
+  uploadB2bEnterpriseWatermark
 } from "../lib/b2bEnterpriseApi.js";
 import { applyCorporateBrandingToCard } from "../lib/b2bCorporateBranding.js";
 import { notifyB2bBrandingChanged } from "../lib/b2bBrandingEvents.js";
@@ -44,6 +45,8 @@ export default function EnterpriseBrandingEditor({ onToast, companyName = "", on
       setLogoFileName(String(b.logoFileName || ""));
       setPrimaryColor(String(b.primaryColor || DEFAULT_PRIMARY));
       setSecondaryColor(String(b.secondaryColor || DEFAULT_SECONDARY));
+      setWatermarkUrl(String(b.watermarkUrl || ""));
+      setWatermarkFileName(String(b.watermarkFileName || ""));
       setFontFamily(String(b.fontFamily || FONT_OPTIONS[0].value));
     } catch (e) {
       onToast?.(e?.message || "브랜딩 정보를 불러오지 못했습니다.");
@@ -67,11 +70,12 @@ export default function EnterpriseBrandingEditor({ onToast, companyName = "", on
         logoUrl,
         primaryColor,
         secondaryColor,
+        watermarkUrl,
         fontFamily
       },
       { company_name: companyName || base.organization }
     );
-  }, [logoUrl, primaryColor, secondaryColor, fontFamily, companyName]);
+  }, [logoUrl, watermarkUrl, primaryColor, secondaryColor, fontFamily, companyName]);
 
   const handleLogoFile = async (file) => {
     if (!file) return;
@@ -100,6 +104,8 @@ export default function EnterpriseBrandingEditor({ onToast, companyName = "", on
         logoFileName: logoFileName || undefined,
         primaryColor,
         secondaryColor,
+        watermarkUrl: watermarkUrl.trim(),
+        watermarkFileName: watermarkFileName || undefined,
         fontFamily
       });
       logB2bPipeline("branding.saved", {
@@ -195,6 +201,62 @@ export default function EnterpriseBrandingEditor({ onToast, companyName = "", on
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-[10px] font-bold text-slate-500">
+        <div>
+          <p className="text-[10px] font-bold text-slate-500">DCC 워터마크 (대표 계정 전용)</p>
+          <p className="mt-1 rounded-lg border border-amber-100 bg-amber-50/80 px-2.5 py-2 text-[10px] leading-relaxed text-amber-950">
+            일반 유료 회원 명함 가운데에는 VLUE 로고가 고정입니다. B2B 대표만 회사 로고로 바꿀 수 있습니다.
+            <br />
+            배경을 지운 PNG(누끼)로 올려 주세요. VLUE가 배경을 지우지는 않습니다. JPG나 배경이 있는 파일을
+            올리면 명함 한가운데 네모 상자로 보입니다.
+          </p>
+          <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-amber-200 bg-amber-50/40 py-5 text-center">
+            <div className="mb-2 flex h-[96px] w-[96px] items-center justify-center rounded-xl border border-dashed border-amber-300/70 bg-[linear-gradient(45deg,#f8fafc_25%,transparent_25%,transparent_75%,#f8fafc_75%),linear-gradient(45deg,#f8fafc_25%,transparent_25%,transparent_75%,#f8fafc_75%)] bg-[length:12px_12px] bg-[position:0_0,6px_6px]">
+              {watermarkUrl ? (
+                <img src={watermarkUrl} alt="" className="h-full w-full object-contain p-1" />
+              ) : (
+                <span className="text-center text-[9px] font-bold leading-tight text-amber-700">
+                  PNG
+                  <br />
+                  누끼
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] font-bold text-amber-950">
+              {watermarkUrl ? "워터마크 교체 (PNG)" : "누끼 PNG 선택"}
+            </span>
+            <input
+              type="file"
+              accept="image/png"
+              className="sr-only"
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                if (f.type && f.type !== "image/png") {
+                  onToast?.("워터마크는 배경을 지운 PNG만 등록할 수 있습니다.");
+                  return;
+                }
+                setBusy(true);
+                readImageFileAsDataUrl(f)
+                  .then(({ dataUrl, fileName }) => uploadB2bEnterpriseWatermark({ dataUrl, fileName }))
+                  .then((result) => {
+                    setWatermarkUrl(String(result.branding?.watermarkUrl || ""));
+                    setWatermarkFileName(String(result.branding?.watermarkFileName || f.name));
+                    notifyB2bBrandingChanged({ logo: true });
+                    onSaved?.();
+                    onToast?.("워터마크가 등록되었습니다. 이 기업 명함 가운데에 표시됩니다.");
+                  })
+                  .catch((err) => onToast?.(err?.message || String(err)))
+                  .finally(() => setBusy(false));
+              }}
+            />
+          </label>
+          {watermarkFileName ? (
+            <p className="mt-1 truncate text-[9px] text-slate-500">{watermarkFileName}</p>
+          ) : null}
+        </div>
+
             프라이머리 컬러
             <div className="mt-1 flex items-center gap-2">
               <input

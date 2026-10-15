@@ -194,7 +194,11 @@ import { fetchKakaoUserMeClient, getKakaoAccessTokenWithLogin } from "./lib/kaka
 import { consumeSocialOAuthReturn } from "./lib/socialOAuthReturn.js";
 import { consumeInstagramLinkReturn } from "./lib/instagramLinkApi.js";
 import { consumeKakaoLinkReturn } from "./lib/kakaoLinkApi.js";
-import { formatSocialLoginError, isSnsUnlinkedError } from "./lib/socialLoginPolicy.js";
+import {
+  formatSocialLoginError,
+  isSnsUnlinkedError,
+  UNREGISTERED_SNS_TOAST_MESSAGE
+} from "./lib/socialLoginPolicy.js";
 import { VLUE_MARKETING_SIGNUP_KEY, withdrawVlueAccount } from "./lib/vlueAuthApi.js";
 import LetteringNotificationPreviewPage from "./components/LetteringNotificationPreviewPage.jsx";
 import LetteringOverlayHost from "./components/LetteringOverlayHost.jsx";
@@ -376,6 +380,8 @@ function App() {
   const [pendingAuthAction, setPendingAuthAction] = useState(null);
   const [guestAuthOverlay, setGuestAuthOverlay] = useState(false);
   const [snsUnlinkedAlert, setSnsUnlinkedAlert] = useState("");
+  const [signupHighlightTrigger, setSignupHighlightTrigger] = useState(0);
+  const [snsUnlinkedToast, setSnsUnlinkedToast] = useState("");
 
   /** 마케팅 웹(www) 회원가입 탭 → /app 동일 온보딩 (PC file:// 앱은 외부 브라우저) */
   useEffect(() => {
@@ -2695,9 +2701,25 @@ function App() {
       return () => clearTimeout(t);
     }
     const formatted = formatSocialLoginError(result.message);
-    if (isSnsUnlinkedError(result.message || formatted)) {
-      setSnsUnlinkedAlert(formatted);
-      return undefined;
+    if (result.unlinked || isSnsUnlinkedError(result.message || formatted)) {
+      try {
+        clearLocalStorageForLogin("", { keepRememberLogin: true, keepOnboarding: false });
+        localStorage.removeItem("vlue_temp_social_token");
+        localStorage.removeItem("vlue_social_login_provider");
+        sessionStorage.removeItem("vlue_oauth_state");
+      } catch {
+        /* ignore */
+      }
+      setIsLoggedIn(false);
+      setBottomToast(UNREGISTERED_SNS_TOAST_MESSAGE);
+      setSnsUnlinkedToast(UNREGISTERED_SNS_TOAST_MESSAGE);
+      setSignupHighlightTrigger(Date.now());
+      setSnsUnlinkedAlert("");
+      const t = setTimeout(() => {
+        setBottomToast("");
+        setSnsUnlinkedToast("");
+      }, 4000);
+      return () => clearTimeout(t);
     }
     setBottomToast(formatted || "소셜 로그인에 실패했습니다. 다시 시도해 주세요.");
     const t = setTimeout(() => setBottomToast(""), 3200);
@@ -2945,7 +2967,23 @@ function App() {
       if (!res.ok) {
         const formatted = formatSocialLoginError(data?.error);
         if (isSnsUnlinkedError(data?.error || formatted)) {
-          setSnsUnlinkedAlert(formatted);
+          try {
+            clearLocalStorageForLogin("", { keepRememberLogin: true, keepOnboarding: false });
+            localStorage.removeItem("vlue_temp_social_token");
+            localStorage.removeItem("vlue_social_login_provider");
+            sessionStorage.removeItem("vlue_oauth_state");
+          } catch {
+            /* ignore */
+          }
+          setIsLoggedIn(false);
+          setBottomToast(UNREGISTERED_SNS_TOAST_MESSAGE);
+          setSnsUnlinkedToast(UNREGISTERED_SNS_TOAST_MESSAGE);
+          setSignupHighlightTrigger(Date.now());
+          setSnsUnlinkedAlert("");
+          setTimeout(() => {
+            setBottomToast("");
+            setSnsUnlinkedToast("");
+          }, 4000);
           return false;
         }
         throw new Error(formatted);
@@ -4718,6 +4756,9 @@ function App() {
             onSocialLogin={handleSocialLogin}
             snsUnlinkedAlert={snsUnlinkedAlert}
             onDismissSnsAlert={() => setSnsUnlinkedAlert("")}
+            signupHighlightTrigger={signupHighlightTrigger}
+            initialToast={snsUnlinkedToast}
+            onClearToast={() => setSnsUnlinkedToast("")}
           />
         </div>
       ) : null}
@@ -4729,6 +4770,9 @@ function App() {
             snsUnlinkedAlert={snsUnlinkedAlert}
             onDismissSnsAlert={() => setSnsUnlinkedAlert("")}
             onDismiss={closeGuestAuthOverlay}
+            signupHighlightTrigger={signupHighlightTrigger}
+            initialToast={snsUnlinkedToast}
+            onClearToast={() => setSnsUnlinkedToast("")}
             onLogin={async (payload) => {
               const result = await handleLogin(payload);
               if (result?.ok) {

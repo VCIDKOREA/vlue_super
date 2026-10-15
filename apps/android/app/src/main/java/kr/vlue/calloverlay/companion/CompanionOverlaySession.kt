@@ -62,21 +62,19 @@ class CompanionOverlaySession {
     }
 
     /**
-     * 풀 쇼케이스 CSS 높이는 화면 픽셀만 허용한다.
-     * 측정값이 로고·미니·0이면 그 값을 싣지 않는다. 미리보기와 같이 본문이 잘리지 않게 한다.
+     * 측정된 창이 화면의 80% 이상일 때만 그 픽셀을 CSS 높이로 쓴다.
+     * 로고·미니 높이에 화면 픽셀을 실으면 본문이 창 밖으로 잘려 빈 다크 화면이 된다.
      *
-     * @return 발행할 px. null 이면 이번 측정은 무시.
+     * @return 발행할 px. null 이면 아직 창이 안 커진 상태라 발행하지 않는다.
      */
     fun fullscreenCssHeightPx(screenPx: Int, measuredPx: Int): Int? {
         if (screenPx <= 0) return null
-        if (measuredPx in 1 until (screenPx * 0.8f).toInt()) {
-            Log.i(
-                TAG,
-                "SKIP_COMPACT_HEIGHT measured=$measuredPx screen=$screenPx — keep fullscreen css"
-            )
-            return screenPx
+        val floor = (screenPx * 0.8f).toInt()
+        if (measuredPx < floor) {
+            Log.i(TAG, "SKIP_COMPACT_HEIGHT measured=$measuredPx screen=$screenPx")
+            return null
         }
-        return screenPx
+        return measuredPx
     }
 
     /**

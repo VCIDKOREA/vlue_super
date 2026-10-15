@@ -150,9 +150,8 @@ html.vlue-overlay-webview .lettering-overlay-host--connected .ldr-reception--pus
 }
 
 /*
- * 오버레이 WebView 는 창 리사이즈 직후 100vh/100dvh 가 0 으로 남는다.
- * html/body/#root 와 쇼케이스 최상위는 퍼센트(또는 네이티브 --vlue-overlay-h)만 쓴다.
- * 퍼센트 부모가 0이고 overflow:hidden 이면 안쪽 min-height 는 잘려 빈 다크 화면이 된다.
+ * 통화 풀쇼케이스는 앱 미리보기와 같은 문서 흐름이다.
+ * 창보다 큰 CSS 높이, flex 0, position:absolute 는 라이브바만 남기고 DCC 를 잘라 빈 화면이 된다.
  */
 html.vlue-lettering-overlay-doc,
 html.vlue-overlay-webview,
@@ -161,116 +160,107 @@ html.vlue-overlay-webview body,
 html.vlue-lettering-overlay-doc #root,
 html.vlue-overlay-webview #root {
   height: 100% !important;
-  min-height: var(--vlue-overlay-h, 100%) !important;
+  min-height: 100% !important;
   max-height: none !important;
 }
 
 html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo),
-html.vlue-lettering-overlay-doc .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo),
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) > .lettering-overlay-host__tent-shell,
-html.vlue-lettering-overlay-doc .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) > .lettering-overlay-host__tent-shell,
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded,
-html.vlue-lettering-overlay-doc .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded {
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-showcase-fs,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-showcase-fs__shell {
+  position: relative !important;
+  inset: auto !important;
   display: flex !important;
   flex-direction: column !important;
-  opacity: 1 !important;
-  transform: none !important;
-  height: var(--vlue-overlay-h, 100%) !important;
-  min-height: var(--vlue-overlay-h, 100%) !important;
-  max-height: none !important;
-}
-
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-expand-slot,
-html.vlue-lettering-overlay-doc .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-expand-slot,
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner,
-html.vlue-lettering-overlay-doc .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner {
-  display: flex !important;
-  opacity: 1 !important;
-  transform: none !important;
-}
-
-html.vlue-overlay-webview .tent-showcase--fullscreen,
-html.vlue-lettering-overlay-doc .tent-showcase--fullscreen {
   width: 100% !important;
-  height: var(--vlue-overlay-h, 100%) !important;
-  min-height: var(--vlue-overlay-h, 100%) !important;
-  max-height: none !important;
-}
-
-/*
- * home-glass 기본값은 height:auto 다.
- * 수화(connected)에서 캐러셀을 position:absolute + height:auto 로 빼면
- * 부모 높이가 콘텐츠(하단 배너)만으로 줄어 가운데 DCC 가 0이 된다.
- * 풀쇼케이스만 라이브바·캐러셀·배너가 한 컬럼으로 높이를 나눠 갖게 한다.
- * 미니·bar-only 는 제외.
- */
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--fullscreen-tent.lettering-ongoing--home-glass.lettering-ongoing--expanded {
   height: 100% !important;
   min-height: 100% !important;
   max-height: none !important;
-  display: flex !important;
-  flex-direction: column !important;
+  animation: none !important;
+  overflow: visible !important;
 }
 
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded > .lettering-ongoing-body {
-  flex: 1 1 0px !important;
+/* 창 안에 라이브바·명함·앞뒤 탭·50px 띠배너를 모두 넣는다. 명함에 창 높이를 주면 하단이 잘린다. */
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--fullscreen-tent.lettering-ongoing--expanded {
+  height: 100% !important;
   min-height: 0 !important;
-  height: auto !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
+  box-sizing: border-box !important;
+  padding-bottom: var(--vlue-nav-inset, 0px) !important;
 }
 
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"] {
-  flex: 1 1 0px !important;
-  min-height: 0 !important;
-  height: auto !important;
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .lettering-ongoing-body,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .lettering-ongoing-expand-slot,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"],
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .lettering-ongoing-expand-slot__inner,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .lettering-ongoing-reception {
+  position: relative !important;
+  inset: auto !important;
   display: flex !important;
   flex-direction: column !important;
   grid-template-rows: none !important;
-  overflow: hidden !important;
-  opacity: 1 !important;
-}
-
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-expand-slot[data-open="true"] .lettering-ongoing-expand-slot__inner,
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-reception {
-  flex: 1 1 auto !important;
+  flex: 1 1 0% !important;
   min-height: 0 !important;
-  height: auto !important;
-  display: flex !important;
-  flex-direction: column !important;
+  max-height: none !important;
+  overflow: hidden !important;
   opacity: 1 !important;
   transform: none !important;
+  transition: none !important;
+  will-change: auto !important;
 }
 
-/*
- * WebView 는 flex 로 늘어난 높이에 height:100% 를 0으로 계산한다.
- * 네이티브가 넣은 --vlue-overlay-h(창 px)로 가운데 슬롯에 확정 높이를 준다.
- */
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .lettering-ongoing-scroll--carousel {
+/* 명함은 창 픽셀을 고정하지 않는다. 라이브바와 50px 배너를 뺀 나머지를 채운다. */
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .lettering-ongoing-scroll--carousel,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .showcase-call-carousel,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .showcase-call-carousel__viewport {
+  display: flex !important;
+  flex-direction: column !important;
   position: relative !important;
   flex: 1 1 auto !important;
-  height: auto !important;
-  min-height: calc(var(--vlue-overlay-h, 100%) - 108px) !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
   overflow: hidden !important;
 }
 
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .showcase-call-carousel,
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .showcase-call-carousel__viewport {
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .showcase-call-carousel__stage {
   position: absolute !important;
   inset: 0 !important;
-  width: auto !important;
-  height: auto !important;
+  height: 100% !important;
   min-height: 0 !important;
-  flex: none !important;
+  overflow: hidden !important;
 }
 
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .showcase-call-carousel__card,
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .showcase-call-carousel__banner,
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .ldr-reception--push,
-html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only) .lettering-ongoing--expanded .ldr-panel-stage {
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .showcase-call-carousel__slide,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .showcase-call-carousel__card,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .ldr-reception--push,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .ldr-panel-wrap,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .ldr-panel-stage {
+  position: relative !important;
+  flex: 1 1 auto !important;
   height: 100% !important;
-  min-height: 100% !important;
+  min-height: 0 !important;
   max-height: none !important;
+  overflow: hidden !important;
+}
+
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .ldr-face-tabs {
+  flex: 0 0 auto !important;
+  min-height: 36px !important;
+  overflow: visible !important;
+  position: relative !important;
+}
+
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .showcase-dcc-bottom-banner,
+html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo) .lettering-ongoing--expanded .vlue-ad-banner-slot {
+  flex: 0 0 50px !important;
+  height: 50px !important;
+  min-height: 50px !important;
+  max-height: 50px !important;
+  overflow: hidden !important;
+  padding-bottom: 0 !important;
 }
 
 .lettering-ongoing--fullscreen-tent > .lettering-live-bar::after,
@@ -5316,6 +5306,23 @@ html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-over
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+.vlue-roll-label {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.vlue-roll-label.is-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+.vlue-roll-label.is-out {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 .outgoing-call-logo__badge {
   flex: 0 0 auto;

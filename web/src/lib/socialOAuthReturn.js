@@ -1,4 +1,5 @@
 import { setVlueSessionTokens } from "./vlueAuthHeaders.js";
+import { isSnsUnlinkedError } from "./socialLoginPolicy.js";
 
 const SAVED_ID_KEY = "vlue_saved_login_id";
 const SAVED_PASSWORD_KEY = "vlue_saved_login_password";
@@ -116,8 +117,10 @@ export function consumeSocialOAuthReturn() {
             : provider;
 
   if (detected.mode === "error") {
+    const rawMsg = detected.error || "";
+    const isUnlinked = isSnsUnlinkedError(rawMsg);
     const message =
-      detected.error ||
+      rawMsg ||
       (detected.linkOnly
         ? `${label} 연동에 실패했습니다. 다시 시도해 주세요.`
         : `${label} 로그인에 실패했습니다. 다시 시도해 주세요.`);
@@ -127,6 +130,7 @@ export function consumeSocialOAuthReturn() {
       success: false,
       provider,
       linkOnly: Boolean(detected.linkOnly),
+      unlinked: isUnlinked,
       message: decodeURIComponent(message)
     };
   }

@@ -22,6 +22,11 @@ class LetteringJavascriptBridge(
     private val service: CallOverlayService
 ) {
     @JavascriptInterface
+    fun onUnregisteredTipSaved(ok: String?, label: String?, error: String?) {
+        service.onUnregisteredTipSaved(ok == "1", label.orEmpty(), error.orEmpty())
+    }
+
+    @JavascriptInterface
     fun logJsError(detail: String?) {
         OverlayDebugLog.jsError("hook", detail.orEmpty())
     }
@@ -366,6 +371,18 @@ class LetteringJavascriptBridge(
         service.onAuthMemberPopupConfirmFromWeb()
     }
 
+    /** 통화 오버레이 DCC 하단 320x50 띠배너. 앱 미리보기와 같은 AdView 를 창 안에 붙인다. */
+    @JavascriptInterface
+    fun showBannerAd(slotKey: String?, rectJson: String?): String {
+        service.showOverlayBannerAd(slotKey, rectJson)
+        return """{"ok":true,"accepted":true}"""
+    }
+
+    @JavascriptInterface
+    fun hideBannerAd(slotKey: String?) {
+        service.hideOverlayBannerAd(slotKey)
+    }
+
     companion object {
         const val INTERFACE_NAME = "Android"
         private const val TAG = "LetteringJsBridge"
@@ -409,6 +426,10 @@ class LetteringJavascriptBridge(
                 window.Android.notifyVlueAuthMemberReady = window.VlueLettering.notifyVlueAuthMemberReady;
                 window.VlueLettering.confirmVlueAuthMemberPopup = function(){ try{ Android.confirmVlueAuthMemberPopup(); }catch(e){} };
                 window.Android.confirmVlueAuthMemberPopup = window.VlueLettering.confirmVlueAuthMemberPopup;
+                window.VlueLettering.showBannerAd = function(slot,rect){ try{ return Android.showBannerAd(String(slot||''), String(rect||'{}')); }catch(e){ return '{"ok":false}'; } };
+                window.Android.showBannerAd = window.VlueLettering.showBannerAd;
+                window.VlueLettering.hideBannerAd = function(slot){ try{ Android.hideBannerAd(String(slot||'')); }catch(e){} };
+                window.Android.hideBannerAd = window.VlueLettering.hideBannerAd;
                 window.VlueLettering.onNativeCallState = window.VlueLettering.onNativeCallState || function(){};
                 window.VlueLettering.logJsError = function(detail){ try{ Android.logJsError(String(detail||'')); }catch(e){} };
                 window.Android.logJsError = window.VlueLettering.logJsError;

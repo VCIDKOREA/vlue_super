@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBusinessCardByNumber } from "../lib/getBusinessCardByNumber.js";
 import { isLookupMatchedBody, mapLookupToLetteringCard } from "../lib/letteringCardMapper.js";
 import { isUnknownPhoneToken, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
-import { checkLetteringPhoneBlocked } from "../lib/letteringApi.js";
+import { checkLetteringPhoneBlocked, fetchLetteringTipSummary } from "../lib/letteringApi.js";
 import { readLetteringEnabled } from "../lib/letteringSettings.js";
 import { submitLetteringReport, submitLetteringTip } from "../lib/letteringReport.js";
 import { blockLetteringPhoneOnly } from "../lib/letteringPhoneBlock.js";
@@ -16,7 +16,7 @@ import { syncMemberIdentityToNative } from "../lib/showcaseSmsShare.js";
 import { applyShowcaseStyleToCard } from "../lib/showcase/applyShowcaseStyleToCard.js";
 import { fetchPeerLiveStylePublic } from "../lib/showcase/showcaseStyleApi.js";
 import { fetchFollowProfile } from "../lib/followApi.js";
-import { isPaidLetteringTier, peerMayUsePaidCallFeatures } from "../lib/letteringMembership.js";
+import { isPaidLetteringTier, peerAuthCycleLapsed, peerMayUsePaidCallFeatures } from "../lib/letteringMembership.js";
 import { createDefaultShowcaseStyle } from "../lib/showcase/showcaseStyleStorage.js";
 import { resolveCallHistoryShowcasePeer } from "../lib/resolveCallHistoryShowcasePeer.js";
 import {
@@ -36,7 +36,7 @@ import LetteringCertModal from "./LetteringCertModal.jsx";
 import RenderErrorGuard from "./RenderErrorGuard.jsx";
 import { resetCompanionMiniCaseSessionPos } from "./call/CompanionMiniCase.jsx";
 import OutgoingCallLogo from "./call/OutgoingCallLogo.jsx";
-import { outgoingLogoShowsMemberBadge, resolveOutgoingLogoLabel } from "../lib/call/outgoingLogoLabel.js";
+import { outgoingLogoShowsMemberBadge, resolveCallIdentityRoll } from "../lib/call/outgoingLogoLabel.js";
 import { cardHasOfficialCyanBadge } from "../lib/vlueVerifiedBadgeApi.js";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
@@ -317,12 +317,15 @@ const DCC_KEEP_FIELDS = [
   "title",
   "department",
   "photoUrl",
+  "titlePhotoUrl",
+  "photoFocus",
   "avatarUrl",
   "companyIntro",
   "customBackText",
   "publicHandle",
   "name",
-  "displayName"
+  "displayName",
+  "dccWatermarkUrl"
 ];
 
 function cardResolvedForLiveCall(card) {
@@ -373,6 +376,12 @@ function mergeEnrichIntoCard(prev, pack) {
       const keptFilled = kept != null && String(kept).trim() !== "";
       if (incomingEmpty && keptFilled) merged[key] = kept;
     }
+    const keptTitle = String(prev.titlePhotoUrl || "").trim();
+    if (keptTitle && !String(merged.titlePhotoUrl || "").trim()) {
+      merged.titlePhotoUrl = keptTitle;
+      merged.noTitlePhoto = false;
+      if (String(prev.photoFocus || "").trim()) merged.photoFocus = prev.photoFocus;
+    }
   }
   merged.showcaseStyle =
     pack.incomplete && prev?.showcaseStyle?.includeDigitalCard === true
@@ -380,6 +389,36 @@ function mergeEnrichIntoCard(prev, pack) {
       : mergeShowcaseStyle(prev?.showcaseStyle, next);
   if (showcasePageCount(prev?.showcaseStyle) > 0 && showcasePageCount(merged.showcaseStyle) === 0) {
     merged.showcaseStyle = prev.showcaseStyle;
+  }
+  /*
+   * 늦은 profile 이 membershipTier 를 free 로 덮으면 캐러셀이 isPaid=false 가 되고
+   * 사진 없는 pages 만 있을 때 슬라이드를 [] 로 비운다. 이미 그린 유료 DCC 는 유지.
+   */
+  /*
+   * 이번 통화에서 이미 그린 명함은 늦은 조회가 등급·송출을 내려도 유지한다.
+   * expired_line 도 같은 통화 중에는 슬라이드를 언마운트하지 않는다.
+   */
+  if (
+    prev &&
+    !peerAuthCycleLapsed(prev) &&
+    !peerAuthCycleLapsed(next) &&
+    !peerAuthCycleLapsed(merged) &&
+    isPaidLetteringTier(prev.membershipTier) &&
+    (prev.digitalCardActive === true || prev.showcaseStyle?.includeDigitalCard === true) &&
+    (
+      !isPaidLetteringTier(merged.membershipTier) ||
+      merged.digitalCardActive !== true ||
+      merged.showcaseStyle?.includeDigitalCard !== true
+    )
+  ) {
+    merged.membershipTier = prev.membershipTier;
+    if (prev.digitalCardActive === true) merged.digitalCardActive = true;
+    if (prev.showcaseStyle?.includeDigitalCard === true) {
+      merged.showcaseStyle = {
+        ...(merged.showcaseStyle || {}),
+        includeDigitalCard: true
+      };
+    }
   }
   return merged;
 }
@@ -653,6 +692,7 @@ function LetteringOverlayHostInner() {
   /* Native BIG_PUSH 창 — 앱 쇼케이스바(접힘) 강제. MiniCase 금지. mini=1 URL 은 MiniCase 부팅 */
   const [forceShowcaseBar, setForceShowcaseBar] = useState(() => !parseOverlayParams().urlMiniCase);
   /** 발신 전용 — peer BigPush 생략, 중앙 VLUÉ 로고 */
+  const [communityTipLabel, setCommunityTipLabel] = useState("");
   const [outgoingLogoMode, setOutgoingLogoMode] = useState(() => {
     const boot = parseOverlayParams();
     return boot.direction === "outgoing" && !boot.urlMiniCase;
@@ -684,6 +724,27 @@ function LetteringOverlayHostInner() {
   const matchedRef = useRef(Boolean(readBootNativeLookupCard(parseOverlayParams().incoming)));
   const peerAuthPopupOnlyRef = useRef(false);
   const forceShowcaseBarRef = useRef(!parseOverlayParams().urlMiniCase);
+  useEffect(() => {
+    const phone = String(incoming || "").trim();
+    if (!phone || isUnknownPhoneToken(phone)) {
+      setCommunityTipLabel("");
+      return undefined;
+    }
+    let cancelled = false;
+    const load = () => {
+      fetchLetteringTipSummary(phone).then((data) => {
+        if (cancelled) return;
+        setCommunityTipLabel(data?.ok ? String(data.topLabel || "").trim() : "");
+      });
+    };
+    load();
+    window.addEventListener("vlue-lettering-reports-changed", load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("vlue-lettering-reports-changed", load);
+    };
+  }, [incoming]);
+
   const outgoingLogoModeRef = useRef(outgoingLogoMode);
   const directionRef = useRef(direction);
   const showcaseStyleRef = useRef(showcaseStyle);
@@ -768,6 +829,38 @@ function LetteringOverlayHostInner() {
     }, 50);
     return () => window.clearTimeout(t);
   }, [loading, blocked, card, verified, expanded, callState, incoming]);
+
+  useEffect(() => {
+    if (!expanded || !native) return undefined;
+    const box = (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return "missing";
+      const r = el.getBoundingClientRect();
+      const s = getComputedStyle(el);
+      return `h=${Math.round(r.height)} op=${s.opacity} disp=${s.display} rows=${s.gridTemplateRows} ov=${s.overflow}`;
+    };
+    const snap = (tag) => {
+      const slot = document.querySelector(".lettering-ongoing-expand-slot");
+      const slide = document.querySelector(".showcase-call-carousel__slide");
+      const detail = [
+        tag,
+        `include=${card?.showcaseStyle?.includeDigitalCard === true}`,
+        `open=${slot?.getAttribute("data-open") || "-"}`,
+        `slide=${slide?.getAttribute("data-slide-type") || slide?.className?.split(" ").pop() || "-"}`,
+        `slot[${box(".lettering-ongoing-expand-slot")}]`,
+        `card[${box(".ldr-reception--push")}]`,
+        `stage[${box(".showcase-call-carousel__stage")}]`
+      ].join(" ");
+      try {
+        window.Android?.logBigPushTrace?.("DCC_BOX", detail);
+      } catch {
+        /* ignore */
+      }
+    };
+    snap("t0");
+    const t = window.setTimeout(() => snap("t2s"), 2000);
+    return () => window.clearTimeout(t);
+  }, [expanded, native, card, showcaseStyle]);
 
   useEffect(() => {
     const onHash = () => setParams(parseOverlayParams());
@@ -1979,6 +2072,28 @@ function LetteringOverlayHostInner() {
     [incoming, showToast]
   );
 
+  useEffect(() => {
+    window.__VLUE_SUBMIT_TIP__ = (label) => {
+      void handleTipSubmit({ label }).then((result) => {
+        const failed = Boolean(result?.server && result.server.ok === false);
+        const msg = failed ? String(result.server.error || "").trim() : "";
+        const shown = String(result?.summary?.topLabel || label || "").trim();
+        try {
+          window.Android?.onUnregisteredTipSaved?.(failed ? "0" : "1", shown, msg);
+        } catch {
+          /* ignore */
+        }
+      });
+    };
+    return () => {
+      try {
+        delete window.__VLUE_SUBMIT_TIP__;
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [handleTipSubmit]);
+
   const handleBlockOnly = useCallback(async () => {
     const blockResult = await blockLetteringPhoneOnly(incoming, { cardName: card?.name || "" });
     if (!blockResult.ok) {
@@ -2050,6 +2165,7 @@ function LetteringOverlayHostInner() {
   const peerIncludeDccSlide = Boolean(
     verified &&
       peerBroadcastOn &&
+      !peerAuthCycleLapsed(styledCard) &&
       peerMayUsePaidCallFeatures(styledCard?.membershipTier || membershipTier || "free")
   );
   const isSafeCareProfile =
@@ -2085,7 +2201,7 @@ function LetteringOverlayHostInner() {
         {/* 로고 모드는 네이티브 expand 성공 후 해제 — 탭 직후 지우면 쇼케이스/팝업이 안 뜸 */}
         <OutgoingCallLogo
           connected={onCall}
-          label={resolveOutgoingLogoLabel(styledCard)}
+          labels={resolveCallIdentityRoll(styledCard, communityTipLabel).labels}
           memberBadge={outgoingLogoShowsMemberBadge(styledCard, verified)}
         />
         {toast ? (
@@ -2117,6 +2233,14 @@ function LetteringOverlayHostInner() {
               <p className="text-[12px] text-slate-400">{incoming || "발신 번호"}</p>
             </div>
           }
+        >
+        <div
+          className={expanded && onCall && !miniCollapsed && !authPopupOnlyUi && !barOnlyConnected ? "lettering-showcase-fs" : undefined}
+          style={expanded && onCall && !miniCollapsed && !authPopupOnlyUi && !barOnlyConnected ? undefined : { display: "contents" }}
+        >
+        <div
+          className={expanded && onCall && !miniCollapsed && !authPopupOnlyUi && !barOnlyConnected ? "lettering-showcase-fs__shell" : undefined}
+          style={expanded && onCall && !miniCollapsed && !authPopupOnlyUi && !barOnlyConnected ? undefined : { display: "contents" }}
         >
         <LetteringIncomingNotification
           className={`lettering-ongoing--on-call lettering-ongoing--fullscreen-tent lettering-ongoing--home-glass ${
@@ -2203,6 +2327,8 @@ function LetteringOverlayHostInner() {
             setCertOpen(true);
           }}
         />
+        </div>
+        </div>
         </RenderErrorGuard>
         ) : null}
       </div>

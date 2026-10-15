@@ -5,6 +5,9 @@ import { logB2bPipeline } from "../../lib/b2bPipelineLog.js";
 export type CompanyBrandingJson = {
   logoUrl?: string;
   logoFileName?: string;
+  /** DCC 중앙 위조방지 워터마크. 배경이 지워진 PNG 만. */
+  watermarkUrl?: string;
+  watermarkFileName?: string;
   primaryColor?: string;
   secondaryColor?: string;
   fontFamily?: string;
@@ -39,6 +42,21 @@ export function parseBrandingPayload(body: Record<string, unknown>): {
     return { ok: false, error: "세컨더리 컬러는 #RRGGBB 형식이어야 합니다." };
   }
   const logoFileName = String(body.logoFileName ?? body.logo_file_name ?? "").trim();
+  const watermarkUrl = String(body.watermarkUrl ?? body.watermark_url ?? "").trim();
+  const watermarkFileName = String(body.watermarkFileName ?? body.watermark_file_name ?? "").trim();
+  if (
+    watermarkUrl &&
+    !/^https?:\/\//i.test(watermarkUrl) &&
+    !watermarkUrl.startsWith("data:image/png")
+  ) {
+    return {
+      ok: false,
+      error: "워터마크는 배경을 지운 PNG만 올릴 수 있습니다. JPG는 명함 가운데 네모로 보입니다."
+    };
+  }
+  if (watermarkUrl.startsWith("data:image/png") && watermarkUrl.length > MAX_LOGO_DATA_URL_LEN) {
+    return { ok: false, error: "워터마크 PNG가 너무 큽니다. 1.5MB 이하로 올려 주세요." };
+  }
 
   if (
     logoUrl &&
@@ -56,6 +74,8 @@ export function parseBrandingPayload(body: Record<string, unknown>): {
     branding: {
       logoUrl: logoUrl || undefined,
       logoFileName: logoFileName || undefined,
+      watermarkUrl: watermarkUrl || undefined,
+      watermarkFileName: watermarkFileName || undefined,
       primaryColor,
       secondaryColor,
       fontFamily: fontFamily || FONT_OPTIONS[0],
@@ -69,6 +89,7 @@ export function hasActiveEnterpriseBranding(branding: unknown): boolean {
   const b = branding as CompanyBrandingJson;
   return Boolean(
     b.logoUrl ||
+    b.watermarkUrl ||
     b.primaryColor ||
     b.secondaryColor ||
     (b.fontFamily && b.fontFamily !== FONT_OPTIONS[0])
@@ -138,6 +159,52 @@ export async function uploadEnterpriseLogo(
     ...scope
   });
 
+  return {
+    ok: true as const,
+    enterpriseId: ent.id,
+    branding: updated.companyBrandingJson,
+    appliesAccountWide: true
+  };
+}
+
+/** B2B 대표 계정 DCC 워터마크. 누끼 PNG 만 받는다. */
+export async function uploadEnterpriseWatermark(
+  adminUserId: string,
+  payload: { dataUrl?: string; fileName?: string }
+) {
+  const dataUrl = String(payload.dataUrl || "").trim();
+  const fileName = String(payload.fileName || "watermark.png").trim();
+  if (!dataUrl.startsWith("data:image/png")) {
+    return {
+      ok: false as const,
+      error: "워터마크는 배경이 지워진 PNG만 등록할 수 있습니다. JPG·사진을 그대로 올리면 명함 가운데 네모 상자로 보입니다."
+    };
+  }
+  if (dataUrl.length > MAX_LOGO_DATA_URL_LEN) {
+    return { ok: false as const, error: "워터마크 PNG가 너무 큽니다. 1.5MB 이하로 올려 주세요." };
+  }
+
+  const ent = await prisma.b2BEnterpriseAccount.findFirst({
+    where: { adminUserId },
+    orderBy: { updatedAt: "desc" }
+  });
+  if (!ent) {
+    return { ok: false as const, error: "B2B 기업 계정이 없습니다. 대표 계정에서만 워터마크를 등록할 수 있습니다." };
+  }
+
+  const prev = (ent.companyBrandingJson as CompanyBrandingJson | null) ?? {};
+  const branding: CompanyBrandingJson = {
+    ...prev,
+    watermarkUrl: dataUrl,
+    watermarkFileName: fileName,
+    appliesAccountWide: true
+  };
+  const updated = await prisma.b2BEnterpriseAccount.update({
+    where: { id: ent.id },
+    data: { companyBrandingJson: branding as Prisma.InputJsonValue }
+  });
+  const scope = await applyBrandingAccountWide(ent.id, adminUserId);
+  logB2bPipeline("branding.watermark_uploaded", { enterpriseId: ent.id, fileName, ...scope });
   return {
     ok: true as const,
     enterpriseId: ent.id,

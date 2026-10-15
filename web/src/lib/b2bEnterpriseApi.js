@@ -162,6 +162,16 @@ export async function patchB2bEnterpriseBranding(payload) {
   return parseJson(res);
 }
 
+/** B2B 대표 DCC 워터마크. 배경이 지워진 PNG 만. */
+export async function uploadB2bEnterpriseWatermark({ dataUrl, fileName }) {
+  const res = await vlueAuthFetch(apiUrl("/api/b2b/enterprise/branding/watermark"), {
+    method: "POST",
+    headers: vlueAuthHeaders(),
+    body: JSON.stringify({ dataUrl, fileName })
+  });
+  return parseJson(res);
+}
+
 /** 기업 로고 이미지 파일 업로드 (data URL → DB · 계정 전체 적용) */
 export async function uploadB2bEnterpriseLogo({ dataUrl, fileName }) {
   const res = await vlueAuthFetch(apiUrl("/api/b2b/enterprise/branding/logo"), {

@@ -22,6 +22,8 @@ import androidx.core.content.ContextCompat
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.animation.AnimatorListenerAdapter
@@ -92,6 +94,7 @@ class CallOverlayService : Service() {
     private var overlayLoadFailed: Boolean = false
     private var overlayLoadFailCount: Int = 0
     private var webView: WebView? = null
+    private var overlayBannerAds: VlueBannerAdManager? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var dismissing = false
     private val companion = CompanionOverlayController()
@@ -980,6 +983,8 @@ class CallOverlayService : Service() {
         }
         rootContainer = container
         webView = wv
+        overlayBannerAds?.destroy()
+        overlayBannerAds = VlueBannerAdManager(this, container, wv)
         layoutParams = params
         ShowcaseProximitySensor.attach(this, wv)
         publishCompanion(
@@ -1859,8 +1864,9 @@ class CallOverlayService : Service() {
         view.translationY = 0f
         view.visibility = android.view.View.VISIBLE
         userMinimized = false
-        params.height = WindowManager.LayoutParams.MATCH_PARENT
-        params.width = WindowManager.LayoutParams.MATCH_PARENT
+        val (screenW, screenH) = screenSizePx()
+        params.height = screenH
+        params.width = screenW
         params.x = 0
         params.y = 0
         params.gravity = Gravity.TOP or Gravity.START
@@ -1880,9 +1886,8 @@ class CallOverlayService : Service() {
             OverlayDiagTracker.markShowcaseFullscreenCommit()
             OverlayDiagTracker.markLayoutApplied("FULLSCREEN", OverlayPosition.FULLSCREEN.name)
             if (!notifyWeb) showcaseWebExpandPending = false
-            /* connected 로 웹이 펼쳐지기 전에 화면 높이를 넣는다. 컴팩트 높이가 남으면 본문이 잘린다. */
+            /* 측정 전 화면 높이를 CSS에 넣지 않는다. 작은 창에 큰 본문이 잘린다. */
             lastChromeSignature = ""
-            writeOverlaySafeInsetsNow(webView)
             scheduleFullscreenSettle()
             VlueBigPushTrace.milestone(
                 "OVERLAY_ATTACHED",
@@ -2070,6 +2075,102 @@ class CallOverlayService : Service() {
                 }
             mainHandler.postDelayed(openReport, 250L)
             mainHandler.postDelayed(openReport, 900L)
+        }
+    }
+
+    /**
+     * 미등록 안심팝업 「제보하기」.
+     * 팝업을 지우지 않고 같은 카드에 입력칸을 연 뒤 키보드를 올린다.
+     */
+    private fun beginUnregisteredTipOnPopup() {
+        mainHandler.post {
+            if (dismissing) return@post
+            val view = dcpPopupView ?: return@post
+            allowUnregisteredTipIme()
+            val input = DcpAbnormalWarningView.showTipComposer(view) { raw ->
+                submitUnregisteredTipFromPopup(raw)
+            } ?: return@post
+            input.post {
+                input.requestFocus()
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+            }
+            VlueBigPushTrace.lifecycle(
+                "UNREGISTERED_TIP_COMPOSER",
+                "phone=${ReleaseDebugGate.maskPhoneForLog(currentPhone)}"
+            )
+        }
+    }
+
+    private fun allowUnregisteredTipIme() {
+        val view = dcpPopupView ?: return
+        val params = dcpPopupParams ?: return
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+        @Suppress("DEPRECATION")
+        params.softInputMode =
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN
+        params.height = WindowManager.LayoutParams.WRAP_CONTENT
+        try {
+            wm.updateViewLayout(view, params)
+        } catch (e: Exception) {
+            VlueBigPushTrace.lifecycle(
+                "UNREGISTERED_TIP_FOCUS_FAIL",
+                "${e.javaClass.simpleName}: ${e.message}"
+            )
+        }
+    }
+
+    private fun submitUnregisteredTipFromPopup(raw: String) {
+        val label = raw.trim().replace(Regex("\\s+"), " ").take(40)
+        if (label.isEmpty()) return
+        val view = dcpPopupView
+        val input = view?.findViewWithTag<EditText>(DcpAbnormalWarningView.TIP_INPUT_TAG)
+        input?.let {
+            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(it.windowToken, 0)
+        }
+        val quoted = label
+            .replace("\\", "\\\\")
+            .replace("'", "\\'")
+            .replace("\n", " ")
+            .replace("\r", " ")
+        onUnregisteredTipSaved(true, label, "")
+        webView?.evaluateJavascript(
+            "try{if(typeof window.__VLUE_SUBMIT_TIP__==='function'){window.__VLUE_SUBMIT_TIP__('$quoted');}else{}}catch(e){}",
+            null
+        )
+    }
+
+    /** 웹 제보 저장 결과. 실패해도 팝업은 유지하고, 성공하면 제보 문구를 카드에 남긴다. */
+    fun onUnregisteredTipSaved(ok: Boolean, label: String, error: String) {
+        mainHandler.post {
+            val view = dcpPopupView ?: return@post
+            if (!ok) {
+                allowUnregisteredTipIme()
+                val input = DcpAbnormalWarningView.showTipComposer(view) { raw ->
+                    submitUnregisteredTipFromPopup(raw)
+                }
+                if (!label.isBlank()) input?.setText(label)
+                DcpAbnormalWarningView.showTipError(
+                    view,
+                    error.ifBlank { "로그인 후 제보할 수 있습니다." }
+                )
+                return@post
+            }
+            DcpAbnormalWarningView.showSavedTip(view, label)
+            val params = dcpPopupParams
+            if (params != null) {
+                applyPassThroughTouchFlags(params)
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT
+                try {
+                    val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+                    wm.updateViewLayout(view, params)
+                } catch (_: Exception) {
+                }
+            }
+            VlueBigPushTrace.lifecycle("UNREGISTERED_TIP_SAVED", "len=${label.length}")
         }
     }
 
@@ -2946,6 +3047,8 @@ class CallOverlayService : Service() {
     /** DCP 팝업 테스트 때 이전 전체 오버레이가 홈/뒤로가기를 먹지 않게 제거 */
     private fun detachCompanionOverlayKeepingService() {
         rootContainer?.animate()?.cancel()
+        overlayBannerAds?.destroy()
+        overlayBannerAds = null
         webView?.destroy()
         webView = null
         forgetLiveOverlayDocument()
@@ -3233,7 +3336,7 @@ class CallOverlayService : Service() {
                 null
             },
             onTip = if (spec.unregistered) {
-                { onUnregisteredReportRequested(openReportSheet = false) }
+                { beginUnregisteredTipOnPopup() }
             } else {
                 null
             }
@@ -3455,6 +3558,8 @@ class CallOverlayService : Service() {
         rootContainer = null
         layoutParams = null
         try {
+            overlayBannerAds?.destroy()
+            overlayBannerAds = null
             webView?.destroy()
         } catch (_: Exception) {
         }
@@ -3929,6 +4034,8 @@ class CallOverlayService : Service() {
                 "state=${companion.state.name}"
         )
         VlueBigPushTrace.lifecycle("WEBVIEW_REPLACE", reason)
+        overlayBannerAds?.destroy()
+        overlayBannerAds = null
         webView = null
         if (dead != null) {
             try {
@@ -3962,6 +4069,7 @@ class CallOverlayService : Service() {
             )
         )
         webView = wv
+        overlayBannerAds = VlueBannerAdManager(this, container, wv)
         wv.webViewClient = overlayWebViewClient()
         val mini = companion.state == OverlayState.MINI_CASE || userMinimized || authPopupConfirmedToMini
         loadOverlayDocument(
@@ -4124,8 +4232,9 @@ class CallOverlayService : Service() {
         val params = layoutParams
         val wm = windowManager
         if (view != null && params != null && wm != null) {
-            params.width = WindowManager.LayoutParams.MATCH_PARENT
-            params.height = WindowManager.LayoutParams.MATCH_PARENT
+            val (screenW, screenH) = screenSizePx()
+            params.width = screenW
+            params.height = screenH
             params.x = 0
             params.y = 0
             params.gravity = Gravity.TOP or Gravity.START
@@ -4167,34 +4276,12 @@ class CallOverlayService : Service() {
         val js = """
             (function(){try{
               var r=document.documentElement;
-              var raw=(r.style.getPropertyValue('--vlue-overlay-h')||'').trim();
-              var n=parseFloat(raw);
-              var h=(isFinite(n)&&n>=280)?raw:'';
               var root=document.getElementById('root');
               [r,document.body,root].forEach(function(el){
                 if(!el)return;
                 el.style.height='100%';
-                el.style.minHeight=h||'100%';
+                el.style.minHeight='100%';
               });
-              var host=document.querySelector('.lettering-overlay-host--connected:not(.lettering-overlay-host--mini):not(.lettering-overlay-host--bar-only):not(.lettering-overlay-host--outgoing-logo)');
-              if(host){
-                [host,host.querySelector('.lettering-overlay-host__tent-shell'),host.querySelector('.lettering-ongoing--fullscreen-tent')].forEach(function(el){
-                  if(!el)return;
-                  el.style.setProperty('display','flex','important');
-                  el.style.setProperty('opacity','1','important');
-                  el.style.setProperty('transform','none','important');
-                  el.style.setProperty('height',h||'100%','important');
-                  el.style.setProperty('min-height',h||'100%','important');
-                });
-                host.querySelectorAll('.lettering-ongoing-expand-slot,.lettering-ongoing-expand-slot__inner').forEach(function(el){
-                  var cs=getComputedStyle(el);
-                  if(cs.display==='none'||parseFloat(cs.opacity)<0.05||(cs.transform&&cs.transform!=='none')){
-                    el.style.setProperty('display','flex','important');
-                    el.style.setProperty('opacity','1','important');
-                    el.style.setProperty('transform','none','important');
-                  }
-                });
-              }
               if(root){void root.offsetHeight;}
               window.dispatchEvent(new Event('resize'));
             }catch(e){}})();
@@ -4226,15 +4313,17 @@ class CallOverlayService : Service() {
         val density = resources.displayMetrics.density.coerceAtLeast(1f)
         val sbCss = statusBarHeightPx() / density
         val sbLabel = ((sbCss * 10).toInt() / 10f).toString()
+        val navCss = navigationBarHeightPx() / density
+        val navLabel = ((navCss * 10).toInt() / 10f).toString()
         val measuredPx = overlayHostHeightPx()
         val hostPx = if (companion.position == OverlayPosition.FULLSCREEN) {
             overlaySession.fullscreenCssHeightPx(screenSizePx().second, rootContainer?.height ?: 0)
-                ?: measuredPx
+                ?: return
         } else {
             measuredPx
         }
         if (hostPx <= 0) return
-        val signature = "${companion.position.name}:$hostPx"
+        val signature = "${companion.position.name}:$hostPx:$navLabel"
         if (signature == lastChromeSignature) return
         lastChromeSignature = signature
         val hostLabel = ((hostPx / density * 10).toInt() / 10f).toString()
@@ -4251,9 +4340,38 @@ class CallOverlayService : Service() {
                 "r.classList.add('vlue-overlay-webview');" +
                 "r.classList.add('vlue-status-inset-ready');" +
                 "r.style.setProperty('--vlue-status-inset','${sbLabel}px');" +
+                "r.style.setProperty('--vlue-nav-inset','${navLabel}px');" +
                 "r.style.setProperty('--vlue-overlay-h','${hostLabel}px');" +
                 "}catch(e){}})();"
         view?.evaluateJavascript(script, null)
+    }
+
+    fun showOverlayBannerAd(slotKey: String?, rectJson: String?) {
+        mainHandler.post {
+            val root = rootContainer ?: return@post
+            val wv = webView ?: return@post
+            val ads = overlayBannerAds ?: VlueBannerAdManager(this, root, wv).also { overlayBannerAds = it }
+            ads.show(slotKey, rectJson)
+        }
+    }
+
+    fun hideOverlayBannerAd(slotKey: String?) {
+        mainHandler.post { overlayBannerAds?.hide(slotKey) }
+    }
+
+    private fun navigationBarHeightPx(): Int {
+        val resId = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        val fromRes = if (resId > 0) resources.getDimensionPixelSize(resId) else 0
+        val insets = rootContainer?.rootWindowInsets
+        val fromWindow = if (insets == null) {
+            0
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+        } else {
+            @Suppress("DEPRECATION")
+            insets.systemWindowInsetBottom
+        }
+        return maxOf(fromRes, fromWindow)
     }
 
     private fun dp(v: Int): Int =
@@ -4792,6 +4910,11 @@ class CallOverlayService : Service() {
         params.softInputMode =
             WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED or
                 WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        /* 미니가 DEFAULT 로 바꿔 두면 y=0 이 상태바 아래가 되어 라이브바가 한 칸 내려온다. */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            params.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
     }
 
     /** 신고 시트 등 — 전체 창 + 터치 포커스 (취소 버튼이 compact 창 밖으로 나가 무반응이던 문제) */
@@ -5401,6 +5524,8 @@ class CallOverlayService : Service() {
         cancelBigPushSettle()
         cancelAnswerUiResume()
         ShowcaseProximitySensor.detach()
+        overlayBannerAds?.destroy()
+        overlayBannerAds = null
         webView?.destroy()
         webView = null
         forgetLiveOverlayDocument()

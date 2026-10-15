@@ -115,6 +115,30 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
+    fun lapsedPaid_withDccOnly_isAuthPopup() {
+        val json =
+            """{"matched":true,"is_verified":true,"membershipTier":"paid","authCycleEndAt":"2020-01-01T00:00:00Z","displayName":"전중희","digitalCardActive":true,"photoUrl":"https://x/tree.png","email":"test@vlue.kr","publicHandle":"jeonjunghee","showcaseStyle":{"includeDigitalCard":true}}"""
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
+    fun lapsedPaid_withEmptyPageOrBgm_isAuthPopup() {
+        val stub =
+            """{"matched":true,"is_verified":true,"authCycleEndAt":"2020-01-01T00:00:00Z","displayName":"전중희","email":"test@vlue.kr","showcaseStyle":{"includeDigitalCard":true,"pages":[{"type":"image"}],"bgm":{"audioUrl":"https://x/a.wav"}}}"""
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(stub, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(stub))
+    }
+
+    @Test
+    fun lapsedPaid_withShowcasePhoto_opensShowcase() {
+        val json =
+            """{"matched":true,"is_verified":true,"authCycleEndAt":"2020-01-01T00:00:00Z","displayName":"전중희","showcaseStyle":{"includeDigitalCard":true,"pages":[{"type":"rich_custom","gallery":{"photos":[{"url":"https://x/a.jpg"}]}}]}}"""
+        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertTrue(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
     fun jeonjungheeBroadcastOn_withPhoto_isNotAuthMemberOnly() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"전중희","showcaseStyle":{"includeDigitalCard":true},"photoUrl":"https://x/tree.png","email":"test@vlue.kr"}"""

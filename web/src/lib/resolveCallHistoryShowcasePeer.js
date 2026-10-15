@@ -72,9 +72,15 @@ function mergeCardFromProfile(baseCard, profRes) {
     photoUrl,
     avatarUrl: photoUrl || String(baseCard?.avatarUrl || "").trim(),
     titlePhotoUrl: String(exp?.titlePhotoUrl || baseCard?.titlePhotoUrl || "").trim(),
-    noTitlePhoto: Boolean(exp?.noTitlePhoto ?? baseCard?.noTitlePhoto),
-    logoUrl,
+    noTitlePhoto:
+      Boolean(exp?.noTitlePhoto) &&
+      !String(exp?.titlePhotoUrl || baseCard?.titlePhotoUrl || "").trim()
+        ? true
+        : Boolean(baseCard?.noTitlePhoto) &&
+          !String(exp?.titlePhotoUrl || baseCard?.titlePhotoUrl || "").trim(),
     photoFocus: String(exp?.photoFocus || baseCard?.photoFocus || "center").trim(),
+    logoUrl,
+    dccWatermarkUrl: String(baseCard?.dccWatermarkUrl || baseCard?.dcc_watermark_url || "").trim(),
     companyIntro: String(
       exp?.companyIntro || profile.companyIntro || profile.intro || baseCard?.companyIntro || ""
     ).trim(),

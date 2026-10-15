@@ -11,6 +11,10 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.text.InputFilter
+import android.text.InputType
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -40,6 +44,11 @@ object DcpAbnormalWarningView {
     const val VLUE_AUTH_MEMBER_MESSAGE = VlueAuthMemberPopupPolicy.MESSAGE
 
     const val ACTION_TAG = "dcp_action"
+    const val TIP_ROW_TAG = "dcp_unregistered_actions"
+    const val TIP_COMPOSER_TAG = "dcp_tip_composer"
+    const val TIP_INPUT_TAG = "dcp_tip_input"
+    const val TIP_RESULT_TAG = "dcp_tip_result"
+    const val TIP_ERROR_TAG = "dcp_tip_error"
     private const val BANNER_HOST_TAG = "dcp_popup_ad_banner"
 
     data class Spec(
@@ -280,6 +289,7 @@ object DcpAbnormalWarningView {
                 }
             val row = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
+                tag = TIP_ROW_TAG
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -386,6 +396,127 @@ object DcpAbnormalWarningView {
             Unit
         }
         return Built(view = stack, destroyAds = destroyAds)
+    }
+
+    /**
+     * 미등록 안심팝업 「제보하기」 — 팝업을 닫지 않고 한 줄 입력과 저장을 같은 카드에 연다.
+     * @return 포커스를 줄 EditText. 카드가 없으면 null.
+     */
+    fun showTipComposer(root: View, onSave: (String) -> Unit): EditText? {
+        val card = root.findViewWithTag<LinearLayout>(TAG) ?: return null
+        val row = card.findViewWithTag<View>(TIP_ROW_TAG) ?: return null
+        card.findViewWithTag<View>(TIP_ERROR_TAG)?.let { card.removeView(it) }
+        card.findViewWithTag<View>(TIP_RESULT_TAG)?.let { card.removeView(it) }
+        val existing = card.findViewWithTag<EditText>(TIP_INPUT_TAG)
+        if (existing != null) return existing
+        row.visibility = View.GONE
+        val ctx = card.context
+        val composer = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            tag = TIP_COMPOSER_TAG
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(ctx, 12) }
+        }
+        val input = EditText(ctx).apply {
+            tag = TIP_INPUT_TAG
+            hint = "예: 삼성카드"
+            setHintTextColor(Color.parseColor("#94A3B8"))
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            filters = arrayOf(InputFilter.LengthFilter(40))
+            isSingleLine = true
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#0F172A"))
+                setStroke(dp(ctx, 1), Color.parseColor("#60A5FA"))
+                cornerRadius = dp(ctx, 12).toFloat()
+            }
+            setPadding(dp(ctx, 12), dp(ctx, 10), dp(ctx, 12), dp(ctx, 10))
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    onSave(text?.toString().orEmpty())
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        val save = TextView(ctx).apply {
+            text = "저장"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            tag = ACTION_TAG
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#2563EB"))
+                cornerRadius = dp(ctx, 12).toFloat()
+            }
+            setPadding(dp(ctx, 12), dp(ctx, 12), dp(ctx, 12), dp(ctx, 12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(ctx, 8) }
+            setOnClickListener { onSave(input.text?.toString().orEmpty()) }
+        }
+        composer.addView(input)
+        composer.addView(save)
+        val at = card.indexOfChild(row).coerceAtLeast(0) + 1
+        card.addView(composer, at)
+        return input
+    }
+
+    /** 저장이 끝나면 입력칸을 접고, 제보 문구를 안심팝업 본문에 남긴다. */
+    fun showSavedTip(root: View, label: String) {
+        val card = root.findViewWithTag<LinearLayout>(TAG) ?: return
+        card.findViewWithTag<View>(TIP_COMPOSER_TAG)?.let { card.removeView(it) }
+        card.findViewWithTag<View>(TIP_ERROR_TAG)?.let { card.removeView(it) }
+        card.findViewWithTag<View>(TIP_ROW_TAG)?.visibility = View.VISIBLE
+        val shown = label.trim()
+        if (shown.isEmpty()) return
+        val existing = card.findViewWithTag<TextView>(TIP_RESULT_TAG)
+        if (existing != null) {
+            existing.text = shown
+            return
+        }
+        val ctx = card.context
+        val result = TextView(ctx).apply {
+            tag = TIP_RESULT_TAG
+            text = shown
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, dp(ctx, 12), 0, 0)
+        }
+        val row = card.findViewWithTag<View>(TIP_ROW_TAG)
+        val at = if (row != null) card.indexOfChild(row) else card.childCount
+        card.addView(result, at.coerceAtLeast(0))
+    }
+
+    fun showTipError(root: View, message: String) {
+        val card = root.findViewWithTag<LinearLayout>(TAG) ?: return
+        val ctx = card.context
+        val text = message.ifBlank { "제보에 실패했습니다." }
+        val existing = card.findViewWithTag<TextView>(TIP_ERROR_TAG)
+        if (existing != null) {
+            existing.text = text
+            return
+        }
+        val error = TextView(ctx).apply {
+            tag = TIP_ERROR_TAG
+            this.text = text
+            setTextColor(Color.parseColor("#FDA4AF"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(ctx, 8), 0, 0)
+        }
+        val composer = card.findViewWithTag<View>(TIP_COMPOSER_TAG)
+        val at = if (composer != null) card.indexOfChild(composer) + 1 else card.childCount
+        card.addView(error, at.coerceAtLeast(0))
     }
 
     /**

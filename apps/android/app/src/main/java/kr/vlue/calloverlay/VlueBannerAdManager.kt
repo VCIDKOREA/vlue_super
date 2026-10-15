@@ -1,5 +1,6 @@
 package kr.vlue.calloverlay
 
+import android.content.Context
 import android.util.DisplayMetrics
 import android.view.View
 import android.widget.FrameLayout
@@ -14,7 +15,7 @@ import kotlin.math.roundToInt
  * slot: ribbon | bottom | …
  */
 class VlueBannerAdManager(
-    private val activity: MainActivity,
+    private val context: Context,
     private val root: FrameLayout,
     private val webView: android.webkit.WebView,
 ) {
@@ -47,7 +48,7 @@ class VlueBannerAdManager(
             rect.optString("unitId").trim().ifEmpty { BuildConfig.ADMOB_BANNER_ID }
         val slot = slots.getOrPut(key) {
             val host =
-                FrameLayout(activity).apply {
+                FrameLayout(context).apply {
                     layoutParams =
                         FrameLayout.LayoutParams(1, 1).apply {
                             leftMargin = 0
@@ -108,7 +109,7 @@ class VlueBannerAdManager(
             }
 
         val adView =
-            AdView(activity).apply {
+            AdView(context).apply {
                 adUnitId = slot.unitId
                 setAdSize(size)
             }
@@ -136,9 +137,9 @@ class VlueBannerAdManager(
     }
 
     private fun adaptiveSize(): AdSize {
-        val dm: DisplayMetrics = activity.resources.displayMetrics
+        val dm: DisplayMetrics = context.resources.displayMetrics
         val adWidth = (dm.widthPixels / dm.density).roundToInt().coerceAtLeast(320)
-        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, adWidth)
+        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, adWidth)
     }
 
     private fun applyRect(slot: Slot, rect: JSONObject) {

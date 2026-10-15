@@ -8,6 +8,7 @@ import {
 } from "../../lib/call/nativeCallControl.js";
 import IdentitySecondaryText from "../IdentitySecondaryText.jsx";
 import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
+import RollingIdentityLabel from "./RollingIdentityLabel.jsx";
 
 /** 통화 세션 동안 Mini Case 위치 유지 — 통화 종료 시 reset (앱 종료 아님) */
 let sessionMiniCasePos = null;
@@ -104,6 +105,7 @@ function revealPosFromPeek(pos, cardW, vw) {
  */
 export default function CompanionMiniCase({
   displayName = "",
+  nameLabels = null,
   phoneLabel = "",
   statusLabel = "",
   durationLabel = "0:00",
@@ -379,7 +381,14 @@ export default function CompanionMiniCase({
           ) : (
             <div className="companion-mini-case__card">
               <p className="companion-mini-case__line1">
-                <span className="companion-mini-case__name">{displayName || "—"}</span>
+                <RollingIdentityLabel
+                  labels={
+                    Array.isArray(nameLabels) && nameLabels.some((item) => String(item || "").trim())
+                      ? nameLabels
+                      : [displayName || "—"]
+                  }
+                  className="companion-mini-case__name"
+                />
                 {cyanBadge ? (
                   <VlueCyanVerifiedSeal size={14} className="companion-mini-case__cyan" title="VLUÉ 인증" />
                 ) : statusLabel && statusLabel !== "인증" ? (

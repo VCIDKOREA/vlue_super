@@ -2,6 +2,7 @@ import { prisma } from "../db/client.js";
 import { absolutizeMediaUrl } from "../lib/mediaUrlGuard.js";
 import { normalizeToE164KR } from "../lib/phoneE164.js";
 import { isPlatformCeoHandle } from "./admin/platformAccountRoles.js";
+import { hasCurrentSelfPaidEntitlement } from "./membership/paidEntitlementDb.js";
 import { getVluePublicOrigin } from "./bizcard/bizcardPublicUrls.js";
 import { buildViewerAccessContext } from "./follow/followService.js";
 import { maskProfileForViewer, privacySelect } from "./follow/profileAccessControl.js";
@@ -28,6 +29,65 @@ async function overlayShowcaseStyleForUserId(userId: string | null | undefined):
   const id = String(userId || "").trim();
   if (!id) return null;
   return loadOverlayShowcaseStyleLite(id);
+}
+
+/** 통화 조회 멤버십. 명함 행이 있어도 구독 주기가 끝나면 free. */
+async function overlayCallMembershipTier(userId: string): Promise<"paid" | "free"> {
+  try {
+    return (await hasCurrentSelfPaidEntitlement(userId)) ? "paid" : "free";
+  } catch {
+    return "free";
+  }
+}
+
+/**
+ * 구독 만료이고 등록된 쇼케이스(페이지·갤러리·BGM)가 없으면 송출 OFF.
+ * 네이티브는 명시 includeDigitalCard:false 를 안심팝업으로 본다.
+ */
+function applyLapsedCallShowcase(
+  tier: "paid" | "free",
+  showcaseStyle: unknown
+): unknown {
+  if (tier === "paid" || !showcaseStyle || typeof showcaseStyle !== "object") return showcaseStyle;
+  const style = showcaseStyle as Record<string, unknown>;
+  const pages = Array.isArray(style.pages) ? style.pages : [];
+  const bgm = style.bgm;
+  const hasBgm =
+    Boolean(bgm && typeof bgm === "object" && !Array.isArray(bgm) && String((bgm as { audioUrl?: unknown }).audioUrl || "").trim()) ||
+    Boolean(
+      bgm &&
+        typeof bgm === "object" &&
+        Array.isArray((bgm as { playlist?: unknown }).playlist) &&
+        ((bgm as { playlist: unknown[] }).playlist.length > 0)
+    );
+  if (pages.length > 0 || hasBgm || style.hasGallery === true) return style;
+  return { ...style, includeDigitalCard: false };
+}
+
+/** B2B 대표가 등록한 DCC 워터마크 PNG. 없으면 빈 문자열 → 클라이언트는 VLUE 로고. */
+async function loadB2bDccWatermarkUrl(userId: string): Promise<string> {
+  const id = String(userId || "").trim();
+  if (!id) return "";
+  try {
+    const ent = await prisma.b2BEnterpriseAccount.findFirst({
+      where: {
+        OR: [
+          { adminUserId: id },
+          { businessCards: { some: { userId: id } } },
+          { corporateMembers: { some: { userId: id } } }
+        ]
+      },
+      orderBy: { updatedAt: "desc" },
+      select: { companyBrandingJson: true }
+    });
+    const branding = ent?.companyBrandingJson;
+    if (!branding || typeof branding !== "object" || Array.isArray(branding)) return "";
+    const url = String((branding as { watermarkUrl?: unknown }).watermarkUrl || "").trim();
+    if (/^https?:\/\//i.test(url) || url.startsWith("data:image/png")) return url;
+    return "";
+  } catch {
+    return "";
+  }
 }
 
 async function officialCyanBadgeForUserId(userId: string): Promise<boolean> {
@@ -713,6 +773,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       userId: card.user.id
     });
     const authSub = card.user.subscriptions?.[0];
+    const callTier = await overlayCallMembershipTier(card.user.id);
+    const dccWatermarkUrl = await loadB2bDccWatermarkUrl(card.user.id);
     /* 멀티프로필 연락처 지정 — 조회자 번호가 지정돼 있을 때만 해당 프로필로 송출 */
     let routedAgent: {
       id?: string;
@@ -785,6 +847,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
         };
       }
     }
+    showcaseStyle = applyLapsedCallShowcase(callTier, showcaseStyle);
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -801,7 +864,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           companyName: routedAgent
             ? firstStr(agentDcc?.organization, agentDcc?.companyName, companyName)
             : companyName,
-          membershipTier: "paid",
+          membershipTier: callTier,
           email,
           profile,
           website: routedAgent ? firstStr(agentDcc?.website, profile.website) : firstStr(profile.website),
@@ -824,10 +887,11 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           accountGroupDocName: accountFields.accountGroupDocName || undefined,
           authCycleEndAt: authSub?.cycleEndAt ? authSub.cycleEndAt.toISOString() : null,
           authPaidAt: authSub?.cycleStartAt ? authSub.cycleStartAt.toISOString() : null,
-          digitalCardActive: Boolean(card.user.digitalCard),
+          digitalCardActive: callTier === "paid" && Boolean(card.user.digitalCard),
           showcaseStyle,
           image_url: routedPhoto,
           logo_url: routedLogo,
+          dccWatermarkUrl,
           voice_url: null,
           phoneE164: card.phoneE164,
           publicHandle: card.user.publicHandle || "",
@@ -896,7 +960,12 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       userId: user.id
     });
     const sub = user.subscriptions?.[0];
-    const showcaseStyle = await overlayShowcaseStyleForUserId(user.id);
+    const callTier = await overlayCallMembershipTier(user.id);
+    const dccWatermarkUrl = await loadB2bDccWatermarkUrl(user.id);
+    const showcaseStyle = applyLapsedCallShowcase(
+      callTier,
+      await overlayShowcaseStyleForUserId(user.id)
+    );
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -914,7 +983,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
             user.businessProfile?.jobTitle
           ),
           companyName,
-          membershipTier: "paid",
+          membershipTier: callTier,
           email: firstStr(profile.email, user.email),
           profile,
           website: firstStr(profile.website),
@@ -929,7 +998,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           accountGroupDocName: exportSnap?.accountGroupDocName || undefined,
           authCycleEndAt: sub?.cycleEndAt ? sub.cycleEndAt.toISOString() : null,
           authPaidAt: sub?.cycleStartAt ? sub.cycleStartAt.toISOString() : null,
-          digitalCardActive: Boolean(user.digitalCard),
+          digitalCardActive: callTier === "paid" && Boolean(user.digitalCard),
           showcaseStyle,
           image_url: photo || (isCeo ? ceoDefaultBrandLogoUrl() : null),
           logo_url:
@@ -937,6 +1006,7 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
               user.digitalCard?.logoUrl,
               pickProfileString(profile, ["logoUrl", "logo_url"])
             ) || (isCeo ? ceoDefaultBrandLogoUrl() : null),
+          dccWatermarkUrl,
           voice_url: null,
           phoneE164: user.phoneE164,
           access: {

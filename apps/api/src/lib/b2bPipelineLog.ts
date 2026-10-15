@@ -5,6 +5,7 @@ export type B2bPipelineStage =
   | "enrollment.submit_failed"
   | "branding.saved"
   | "branding.logo_uploaded"
+  | "branding.watermark_uploaded"
   | "branding.save_failed"
   | "admin.attribution_approved"
   | "cart.activated"

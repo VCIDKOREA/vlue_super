@@ -143,6 +143,12 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
       "",
     noTitlePhoto: Boolean(body.noTitlePhoto || nested.noTitlePhoto || profile.noTitlePhoto),
     logoUrl: profile.logoUrl || profile.logo_url || body.logo_url || body.dcp?.logoUrl || "",
+    dccWatermarkUrl:
+      body.dccWatermarkUrl ||
+      body.dcc_watermark_url ||
+      nested.dccWatermarkUrl ||
+      nested.dcc_watermark_url ||
+      "",
     image_url: body.image_url || nested.image_url || "",
     department:
       profile.department || profile.dept || profile.team || profile.division || nested.department || "",

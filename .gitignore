@@ -137,3 +137,6 @@ vlue-release-keystore-SECRET.txt
 
 
 apps/android/build-out.txt
+*.hprof
+dist-aab/
+

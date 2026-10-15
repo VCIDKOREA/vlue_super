@@ -14,7 +14,7 @@ import {
 import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 import ShowcaseMediaPage from "./ShowcaseMediaPage.jsx";
 import InCallDtmfPad from "../call/InCallDtmfPad.jsx";
-import { isPaidLetteringTier, peerMayUsePaidCallFeatures } from "../../lib/letteringMembership.js";
+import { peerAuthCycleLapsed, peerMayUsePaidCallFeatures } from "../../lib/letteringMembership.js";
 import {
   maxInstagramEmbedsForTier,
   maxShowcasePhotosPerPage,
@@ -183,10 +183,13 @@ export default function ShowcaseCallCarousel({
 
   const tier = normalizeUserTier(membershipTier || card?.membershipTier);
   const isDcp = card?.profileKind === "dcp" || Boolean(card?.dcp);
-  const isPaid = isDcp || peerMayUsePaidCallFeatures(tier);
+  const cycleLapsed = peerAuthCycleLapsed(card);
+  /* 구독은 끝났어도 등록된 쇼케이스 페이지 수는 유지. DCC 슬라이드만 뺀다. */
+  const isPaid = isDcp || peerMayUsePaidCallFeatures(tier) || cycleLapsed;
   const photosPerPage = maxShowcasePhotosPerPage();
-  /* 무료는 includeDigitalCard prop 이 true 여도 DCC 슬라이드 금지 */
-  const showDigitalCard = isDcp || (Boolean(includeDigitalCard) && isPaid);
+  /* 무료·구독 만료는 includeDigitalCard prop 이 true 여도 DCC 슬라이드 금지 */
+  const showDigitalCard =
+    !cycleLapsed && (isDcp || (Boolean(includeDigitalCard) && peerMayUsePaidCallFeatures(tier)));
   const maxIgPages = maxInstagramEmbedsForTier(tier, { includeDigitalCard: showDigitalCard });
   /** 게시물 열람(suppressBgm) 시에도 재생 중인 케이스함 음원 메타를 칩에 표시 */
   const bgmChipStyle =
@@ -456,7 +459,14 @@ export default function ShowcaseCallCarousel({
           }
         ];
       }
-      /* 레거시 FreeTier/Tent 쇼케이스 삭제 — 콘텐츠 없으면 빈 슬라이드 */
+      /* 구독이 살아있는 유료 명함만 유지. 만료 회원 DCC 는 다시 넣지 않는다. */
+      if (
+        !peerAuthCycleLapsed(card) &&
+        (card?.showcaseStyle?.includeDigitalCard === true || card?.digitalCardActive === true) &&
+        peerMayUsePaidCallFeatures(card?.membershipTier)
+      ) {
+        return [{ type: "card", id: "digital-card" }];
+      }
       return [];
     }
 
@@ -499,11 +509,14 @@ export default function ShowcaseCallCarousel({
       return [cardSlide, ...capped];
     }
     if (capped.length === 0) {
+      /* 구독 만료 통화에는 편집용 빈 슬롯을 넣지 않는다. 쇼케이스 없으면 안심팝업. */
+      if (cycleLapsed) return [];
       return [{ type: "empty-slot", id: "empty-1", slot: 1, max: photosPerPage }];
     }
     return capped;
   }, [
     isPaid,
+    cycleLapsed,
     showcaseOffPreview,
     contentPages,
     igPages,
@@ -516,7 +529,9 @@ export default function ShowcaseCallCarousel({
     photosPerPage,
     igUrlMap,
     igUsername,
-    igProfilePictureUrl
+    igProfilePictureUrl,
+    card?.showcaseStyle?.includeDigitalCard,
+    card?.digitalCardActive
   ]);
 
   const count = slides.length;
@@ -965,9 +980,9 @@ export default function ShowcaseCallCarousel({
                     ? slideIdx + 1
                     : Math.max(1, slideIdx + 1 - photoIndexBase);
               return (
-              <article key={slide.id} className="showcase-call-carousel__slide">
+              <article key={slide.id} className="showcase-call-carousel__slide" data-slide-type={slide.type}>
                 {!near ? <div className="showcase-call-carousel__slide-placeholder" aria-hidden /> : null}
-                {near && slide.type === "card" && isPaid ? (
+                {near && slide.type === "card" ? (
                   <div className="showcase-call-carousel__card">
                     {renderSlideCornerAction("card")}
                     <RenderErrorGuard

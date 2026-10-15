@@ -31,6 +31,7 @@ export const UNREGISTERED_POPUP_COPY = Object.freeze({
 export default function UnregisteredSafePopup({ open = false, phone = "", onClose, onToast }) {
   const [tipOpen, setTipOpen] = useState(false);
   const [tipLabel, setTipLabel] = useState("");
+  const [savedTip, setSavedTip] = useState("");
   const [busy, setBusy] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -56,6 +57,7 @@ export default function UnregisteredSafePopup({ open = false, phone = "", onClos
         return;
       }
       onToast?.("제보가 반영되었습니다");
+      setSavedTip(label);
       setTipOpen(false);
       setTipLabel("");
     } catch (err) {
@@ -93,6 +95,7 @@ export default function UnregisteredSafePopup({ open = false, phone = "", onClos
           <p className="vlue-auth-member-popup__msg vlue-unregistered-popup__body">
             <span>{UNREGISTERED_POPUP_COPY.linePathNormal}</span>
             <span>{UNREGISTERED_POPUP_COPY.lineMoneyCaution}</span>
+            {savedTip ? <span>{savedTip}</span> : null}
           </p>
 
           {tipOpen ? (

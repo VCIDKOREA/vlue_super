@@ -50,7 +50,8 @@ import ShowcaseDialConfirmModal from "./showcase/ShowcaseDialConfirmModal.jsx";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardStorage.js";
 import { canUseV1PaidDccFeatures, requestV1PaidPackageGate } from "../lib/v1PaidPackageGate.js";
-import { peerMayUsePaidCallFeatures } from "../lib/letteringMembership.js";
+import { peerAuthCycleLapsed, peerMayUsePaidCallFeatures } from "../lib/letteringMembership.js";
+import { resolveCallIdentityRoll } from "../lib/call/outgoingLogoLabel.js";
 import "../styles/showcase-call-glass.css";
 import "../styles/incall-controls.css";
 
@@ -433,7 +434,8 @@ export default function LetteringIncomingNotification({
   /** 실시간 수신 통화만 송출 ON/OFF 게이트 — 통화기록·공유·미리보기는 등록 정보 그대로 */
   const livePeerCallOverlay = !previewMode && !fromCallHistory;
   const peerStyleBroadcastOn = c?.showcaseStyle?.includeDigitalCard === true;
-  const dccEntitled = peerMayUsePaidCallFeatures(c.membershipTier);
+  const dccEntitled =
+    !peerAuthCycleLapsed(c) && peerMayUsePaidCallFeatures(c.membershipTier);
   const showDigitalCard =
     isDcpCard ||
     (dccEntitled &&
@@ -737,12 +739,16 @@ export default function LetteringIncomingNotification({
   }, [isUnverified, tipSummary, localTipSummary]);
 
   const tipBroadcastLabel = String(activeTipSummary?.topLabel || "").trim();
-  const tipBroadcastCount = Number(activeTipSummary?.topCount || activeTipSummary?.tipCount || 0);
 
   const isExpandedView =
     expanded && expandContent !== false && (canExpand || hadFullShowcaseThisCall);
   const holdPaidShowcase =
-    hadFullShowcaseThisCall && verified && !isContactSafeCare && !isExpiredLine && !isDcp;
+    hadFullShowcaseThisCall &&
+    verified &&
+    !isContactSafeCare &&
+    !isExpiredLine &&
+    !isDcp &&
+    !peerAuthCycleLapsed(c);
   const showExpandedLayout = isExpandedView || keepExpandedLayout;
   const prevExpandedViewRef = useRef(isExpandedView);
 
@@ -1349,6 +1355,14 @@ export default function LetteringIncomingNotification({
       !nameDisp || nameDisp === "—" || nameDisp === "-" || nameDisp === "\u2014"
         ? phoneDisp
         : nameDisp;
+    const identityRoll =
+      isExpiredLine || isUnverified
+        ? { labels: [] }
+        : resolveCallIdentityRoll(c);
+    const miniNameLabels =
+      identityRoll.labels.filter((item) => String(item || "").trim() && item !== "탭하여 정보확인").length > 0
+        ? identityRoll.labels
+        : [nameDispSafe];
     const subPhone = isExpiredLine
       ? expiredSubtitle
       : String(receptionLines?.secondary || "").trim() || phoneDisp;
@@ -1360,6 +1374,7 @@ export default function LetteringIncomingNotification({
       >
         <CompanionMiniCase
           displayName={nameDispSafe}
+          nameLabels={miniNameLabels}
           phoneLabel={subPhone}
           statusLabel={isExpiredLine ? "인증 만료" : isUnverified ? "미인증" : verified ? "인증" : "미인증"}
           durationLabel={companionDurationLabel}
@@ -1505,7 +1520,7 @@ export default function LetteringIncomingNotification({
                 </p>
                 {tipBroadcastLabel ? (
                   <p className="lettering-ongoing-unverified-hint mt-0.5 text-[10px] font-bold text-amber-800">
-                    {`제보 ${tipBroadcastCount}회 · ${unverifiedCollapsedPhone || "번호"}`}
+                    {`VLUE 제보 | ${unverifiedCollapsedPhone || formatLetteringPhoneDisplay(incoming) || "번호"}`}
                   </p>
                 ) : (
                   <p className="lettering-ongoing-unverified-hint mt-0.5 text-[10px] font-semibold text-amber-700/90">

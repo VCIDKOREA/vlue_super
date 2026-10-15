@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import { VlueNavLogoMark, useVlueLogoBlink } from "../VlueNavLogoMark.jsx";
 import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
 import { OUTGOING_LOGO_TAP_HINT } from "../../lib/call/outgoingLogoLabel.js";
+import RollingIdentityLabel from "./RollingIdentityLabel.jsx";
 
 /** 발신 중앙 로고 — 화면 정중앙 타일 (과대 금지) */
 const OUTGOING_LOGO_SIZE = 48;
@@ -18,10 +19,15 @@ const OUTGOING_LOGO_SIZE = 48;
 export default function OutgoingCallLogo({
   connected = false,
   label = "",
+  labels = null,
   memberBadge = false,
   onExpand
 }) {
-  const topText = String(label || "").trim() || OUTGOING_LOGO_TAP_HINT;
+  const rollLabels = (Array.isArray(labels) ? labels : [label])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+  const topText = rollLabels[0] || OUTGOING_LOGO_TAP_HINT;
+  const shownLabels = rollLabels.length ? rollLabels : [OUTGOING_LOGO_TAP_HINT];
   const { blinkSeq, triggerBlink } = useVlueLogoBlink();
   const expandingRef = useRef(false);
 
@@ -50,7 +56,7 @@ export default function OutgoingCallLogo({
         onClick={handleTap}
       >
         <span className="outgoing-call-logo__top">
-          <span className="outgoing-call-logo__name">{topText}</span>
+          <RollingIdentityLabel labels={shownLabels} className="outgoing-call-logo__name" />
           {memberBadge ? (
             <VlueCyanVerifiedSeal
               size={12}

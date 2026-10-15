@@ -328,36 +328,26 @@ function resolveCardLogoUrl(card) {
 }
 
 /**
- * 뒷배경 워터마크 (크기·명도는 전 유저 동일)
- * - CEO: VLUÉ 공식 로고
- * - 그 외: 프로필 로고와 동일 / 없으면 없음
+ * 중앙 위조방지 워터마크.
+ * 유료·일반 회원은 항상 VLUÉ 로고. 회사 로고·프로필 사진으로 바꾸지 않는다.
+ * B2B 대표가 등록한 누끼 PNG 가 있을 때만 그 파일로 바꾼다.
  */
 function CompanyLogoWatermark({ card }) {
-  const [imgBroken, setImgBroken] = useState(false);
-  const ceo = isCeoOwnerCard(card);
-  const company = resolveCardLogoUrl(card);
-
-  let logoUrl = "";
-  let variant = "nukki";
-  if (ceo) {
-    logoUrl = CEO_WATERMARK_SRC;
-    variant = "ceo";
-  } else if (company) {
-    logoUrl = company;
-    variant = "nukki";
-  } else {
-    return null;
-  }
-
-  if (!logoUrl || imgBroken) return null;
+  const [customBroken, setCustomBroken] = useState(false);
+  const custom = resolveRenderableMediaUrl(card?.dccWatermarkUrl || card?.dcc_watermark_url || "");
+  const useCustom = Boolean(custom) && !customBroken;
+  const logoUrl = useCustom ? custom : CEO_WATERMARK_SRC;
+  if (!logoUrl) return null;
 
   return (
-    <div className={`ldr-watermark ldr-watermark--${variant}`} aria-hidden>
+    <div className={`ldr-watermark ldr-watermark--${useCustom ? "nukki" : "brand"}`} aria-hidden>
       <img
         src={logoUrl}
         alt=""
         className="ldr-watermark__img"
-        onError={() => setImgBroken(true)}
+        onError={() => {
+          if (useCustom) setCustomBroken(true);
+        }}
       />
     </div>
   );

@@ -14,6 +14,14 @@ export function peerMayUsePaidCallFeatures(peerMembershipTier) {
   return isPaidLetteringTier(t);
 }
 
+/** 유료 구독 주기 종료. 날짜가 없으면 만료로 보지 않는다. */
+export function peerAuthCycleLapsed(card) {
+  const raw = card?.authCycleEndAt || card?.cycleEndAt || card?.authValidUntil || "";
+  const end = Date.parse(String(raw || "").trim());
+  if (!Number.isFinite(end)) return false;
+  return end <= Date.now();
+}
+
 export { normalizeMembershipKind } from "./membershipBm.js";
 
 export const LETTERING_FREE_LABEL = "VLUÉ \uC77C\uBC18\uBC88\uD638";

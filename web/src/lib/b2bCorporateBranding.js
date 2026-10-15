@@ -12,10 +12,12 @@ export function applyCorporateBrandingToCard(personalCard, branding, company) {
   const secondaryColor = String(b.secondaryColor || b.secondary_color || "").trim();
   const companyName = String(company?.company_name || personalCard.organization || "").trim();
 
+  const watermarkUrl = String(b.watermarkUrl || b.watermark_url || "").trim();
   return {
     ...personalCard,
     organization: companyName || personalCard.organization,
     logoUrl: logoUrl || personalCard.logoUrl,
+    dccWatermarkUrl: watermarkUrl,
     _corporateOverride: true,
     _corporatePrimaryColor: primaryColor,
     _corporateSecondaryColor: secondaryColor,

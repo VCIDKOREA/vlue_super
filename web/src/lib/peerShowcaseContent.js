@@ -1,3 +1,5 @@
+import { peerAuthCycleLapsed } from "./letteringMembership.js";
+
 /**
  * 통화·공유에서 상대가 DCC/쇼케이스 송출 콘텐츠가 있는지.
  * 네이티브 VlueAuthMemberPopupPolicy 와 동일:
@@ -73,9 +75,37 @@ export function cardHasSoftIdentityHints(card) {
  * 명시 includeDigitalCard:false → false.
  * 그 외(송출 ON · 키 누락) → 미디어·상호·DCC 실체·핸들이면 쇼케이스.
  */
+/**
+ * 등록된 쇼케이스 본문. 라이트 조회 스텁 `{type:"image"}` 와 DCC 명함 필드는 제외.
+ */
+export function styleHasRegisteredShowcase(style) {
+  if (!style || typeof style !== "object") return false;
+  if (Array.isArray(style.pages)) {
+    for (const page of style.pages) {
+      if (!page || typeof page !== "object") continue;
+      if (
+        page.imageUrl ||
+        page.mediaUrl ||
+        page.photoUrl ||
+        page.videoUrl ||
+        (Array.isArray(page.blocks) && page.blocks.length) ||
+        (Array.isArray(page.gallery?.photos) && page.gallery.photos.length)
+      ) {
+        return true;
+      }
+    }
+  }
+  if (Array.isArray(style.gallery?.photos) && style.gallery.photos.some((photo) => photo?.url)) {
+    return true;
+  }
+  return false;
+}
+
 export function peerHasDccOrShowcaseContent(card, style) {
   const st = style || card?.showcaseStyle || null;
   if (peerShowcaseBroadcastOff(st)) return false;
+  /* 구독 만료 — DCC 명함·이메일·핸들만으로는 쇼케이스를 열지 않는다. */
+  if (peerAuthCycleLapsed(card)) return styleHasRegisteredShowcase(st);
   const media = styleHasShowcaseMedia(st);
   const body = cardHasDccBody(card);
   const soft = cardHasSoftIdentityHints(card);

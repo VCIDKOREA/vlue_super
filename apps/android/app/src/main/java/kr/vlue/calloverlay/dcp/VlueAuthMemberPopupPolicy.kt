@@ -1,7 +1,8 @@
-﻿package kr.vlue.calloverlay.dcp
+package kr.vlue.calloverlay.dcp
 
 import kr.vlue.calloverlay.companion.OverlayState
 import org.json.JSONObject
+import java.time.Instant
 
 /**
  * VLUÉ 인증 회원 · 공개 DCC/쇼케이스 없음 → 수화 후 「경로 검증 · 정상」스타일 팝업.
@@ -139,8 +140,31 @@ object VlueAuthMemberPopupPolicy {
                 root.optBoolean("digitalCardIssued", false) ||
                 card.optBoolean("digitalCardIssued", false)
 
+        /*
+         * 유료 구독 주기 종료 — DCC 는 열지 않는다.
+         * 등록된 쇼케이스(페이지·갤러리·BGM)만 송출, 없으면 안심팝업.
+         */
+        /* 구독 만료 — 사진이 있는 쇼케이스만. 빈 페이지·BGM·DCC 필드는 안심팝업. */
+        if (authCycleLapsed(root, card)) return styleHasVisualShowcase(style)
         /* 키 누락 = 기본 송출 ON. 실 DCC/미디어/상호가 있으면 쇼케이스 */
         return media || orgHints || softHints || handle || digitalActive
+    }
+
+    /** authCycleEndAt 이 과거면 유료 DCC 자격 없음. 날짜가 없으면 만료로 보지 않는다. */
+    private fun authCycleLapsed(root: JSONObject, card: JSONObject): Boolean {
+        val raw = firstNonBlank(
+            card.optString("authCycleEndAt"),
+            root.optString("authCycleEndAt"),
+            card.optString("cycleEndAt"),
+            root.optString("cycleEndAt"),
+            card.optString("authValidUntil"),
+            root.optString("authValidUntil")
+        ) ?: return false
+        return try {
+            Instant.parse(raw).isBefore(Instant.now())
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /** 공개 송출 실체(상호·로고·타이틀샷) — 프로필 사진/이메일과 구분 */
@@ -180,6 +204,30 @@ object VlueAuthMemberPopupPolicy {
 
     private fun hasDccOrMediaHints(root: JSONObject, card: JSONObject): Boolean {
         return hasBroadcastOrgHints(root, card) || hasSoftIdentityHints(root, card)
+    }
+
+    /** 통화에 보여줄 쇼케이스 사진. 타입만 있는 스텁과 BGM은 제외. */
+    private fun styleHasVisualShowcase(style: JSONObject?): Boolean {
+        if (style == null) return false
+        val pages = style.optJSONArray("pages")
+        if (pages != null) {
+            for (i in 0 until pages.length()) {
+                val page = pages.optJSONObject(i) ?: continue
+                if (firstNonBlank(
+                        page.optString("imageUrl"),
+                        page.optString("mediaUrl"),
+                        page.optString("photoUrl"),
+                        page.optString("videoUrl")
+                    ) != null
+                ) {
+                    return true
+                }
+                val photos = page.optJSONObject("gallery")?.optJSONArray("photos")
+                if (photos != null && photos.length() > 0) return true
+            }
+        }
+        val photos = style.optJSONObject("gallery")?.optJSONArray("photos")
+        return photos != null && photos.length() > 0
     }
 
     private fun styleHasMedia(style: JSONObject?): Boolean {
