@@ -88,10 +88,12 @@ export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
   const localId = getLocalVlueUserId();
   const specs = getBrandHighlightSpecs(assets);
 
-  const photo = mediaUrl
+  const photo = (mediaUrl || assets.videoUrl)
     ? {
         id: "admob-media",
-        url: mediaUrl,
+        url: mediaUrl || assets.videoUrl,
+        videoUrl: String(assets.videoUrl || "").trim(),
+        hasVideoContent: Boolean(assets.videoUrl || assets.hasVideoContent),
         caption: headline,
         overlayText: "", // 상단 짤림 방지: 레거시 텍스트 오버레이 비우고 전용 럭셔리 레이아웃으로 렌더링
         isAdMobSponsor: true,
@@ -102,7 +104,8 @@ export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
         category: assets.category || "브랜드 제휴",
         accentColor: assets.accentColor || "#38bdf8",
         specs,
-        ctaLabel: assets.ctaLabel || "자세히 보기"
+        ctaLabel: assets.ctaLabel || "신제품 상세보기",
+        ctaType: assets.ctaType || "tech"
       }
     : null;
 
@@ -120,15 +123,17 @@ export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
     })
   ];
 
+  const brandTrackTitle = String(assets.bgmTitle || `${advertiser} AD Original Track`).trim();
+
   /* 이미지: VLUE Signature BGM / 동영상: 웹 BGM 끄고 MediaView 오디오 */
   if (!hasVideo && signatureBgm?.audioUrl) {
     style.bgm = {
       ...style.bgm,
       mode: "signature",
-      title: String(signatureBgm.title || "Nature Sound").trim() || "Nature Sound",
-      artistName: "VLUE",
+      title: String(signatureBgm.title || brandTrackTitle).trim() || brandTrackTitle,
+      artistName: advertiser || "VLUE",
       audioUrl: String(signatureBgm.audioUrl).trim(),
-      attributionLabel: "VLUE Signature Sound",
+      attributionLabel: brandTrackTitle,
       linkBroken: false,
       volumeLevel: "medium",
       playMode: "single",
@@ -138,10 +143,10 @@ export function buildAdMobShowcaseCard(assets = {}, signatureBgm = null) {
     style.bgm = {
       ...style.bgm,
       mode: "signature",
-      title: "광고 사운드",
-      artistName: "AdMob",
+      title: brandTrackTitle,
+      artistName: advertiser,
       audioUrl: "",
-      attributionLabel: "AdMob Video Sound",
+      attributionLabel: brandTrackTitle,
       linkBroken: true,
       playlist: []
     };

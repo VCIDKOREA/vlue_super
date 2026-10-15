@@ -33,9 +33,11 @@ export default function ShowcaseMediaPage({
       badge: p?.badge,
       category: p?.category,
       accentColor: p?.accentColor,
-      specs: Array.isArray(p?.specs) ? p.specs : []
+      specs: Array.isArray(p?.specs) ? p.specs : [],
+      videoUrl: p?.videoUrl || "",
+      hasVideoContent: Boolean(p?.videoUrl || p?.hasVideoContent)
     }))
-    .filter((p) => p.url)
+    .filter((p) => p.url || p.videoUrl)
     .slice(0, 20);
 
   const [index, setIndex] = useState(0);
@@ -208,14 +210,27 @@ export default function ShowcaseMediaPage({
     >
       {current.isAdMobSponsor ? (
         <div className="showcase-ad-rich-frame relative flex h-full w-full flex-col justify-between overflow-hidden bg-[#0B101B]">
-          {/* 1. 고화질 풀스크린 앰비언트 블러 배경 (리치한 쇼케이스 무드 연출) */}
+          {/* 1. 고화질 풀스크린 앰비언트 블러 배경 (영상 또는 이미지) */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <img
-              src={current.url}
-              alt=""
-              className="h-full w-full object-cover blur-2xl scale-125 opacity-35"
-              aria-hidden="true"
-            />
+            {current.videoUrl ? (
+              <video
+                src={current.videoUrl}
+                poster={current.url}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="h-full w-full object-cover blur-2xl scale-125 opacity-35"
+                aria-hidden="true"
+              />
+            ) : (
+              <img
+                src={current.url}
+                alt=""
+                className="h-full w-full object-cover blur-2xl scale-125 opacity-35"
+                aria-hidden="true"
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-b from-[#0B101B]/80 via-transparent to-[#0B101B]/95" />
           </div>
 
@@ -245,17 +260,30 @@ export default function ShowcaseMediaPage({
             ) : null}
           </div>
 
-          {/* 3. 중앙 고화질 메인 비주얼 (라운드 프레임 + 섀도우) */}
+          {/* 3. 중앙 고화질 메인 비주얼 (영상 자동 재생 또는 이미지) */}
           <div className="relative z-10 mx-auto w-[92%] max-w-[340px] flex-1 min-h-0 flex items-center justify-center my-2">
             <div className="relative w-full max-h-[100%] overflow-hidden rounded-2xl border border-white/15 bg-black/60 shadow-2xl">
-              <img
-                key={current.id || current.url}
-                src={current.url}
-                alt={current.headline || "스폰서 쇼케이스"}
-                className="h-full w-full object-contain max-h-[260px] mx-auto select-none"
-                draggable={false}
-                onError={() => onImageError?.(current)}
-              />
+              {current.videoUrl ? (
+                <video
+                  key={current.videoUrl}
+                  src={current.videoUrl}
+                  poster={current.url}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="h-full w-full object-contain max-h-[260px] mx-auto select-none rounded-2xl"
+                />
+              ) : (
+                <img
+                  key={current.id || current.url}
+                  src={current.url}
+                  alt={current.headline || "스폰서 쇼케이스"}
+                  className="h-full w-full object-contain max-h-[260px] mx-auto select-none"
+                  draggable={false}
+                  onError={() => onImageError?.(current)}
+                />
+              )}
             </div>
           </div>
 

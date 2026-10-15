@@ -48,7 +48,7 @@ import {
 } from "../../lib/showcase/showcaseSocialCache.js";
 import { readActiveShowcaseStyle } from "../../lib/showcase/showcaseStyleStorage.js";
 
-/** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 유지) */
+/** 갤러리 사진 → 슬라이드용 (텍스트 오버레이 필드 및 스폰서 메타 유지) */
 function pickPhotoSlideFields(p = {}) {
   return {
     id: p.id,
@@ -61,7 +61,19 @@ function pickPhotoSlideFields(p = {}) {
     overlayY: p.overlayY,
     overlayAnim: p.overlayAnim,
     overlayBorder: p.overlayBorder,
-    textOverlays: Array.isArray(p.textOverlays) ? p.textOverlays : undefined
+    textOverlays: Array.isArray(p.textOverlays) ? p.textOverlays : undefined,
+    isAdMobSponsor: Boolean(p.isAdMobSponsor),
+    headline: p.headline,
+    body: p.body,
+    advertiser: p.advertiser,
+    badge: p.badge,
+    category: p.category,
+    accentColor: p.accentColor,
+    specs: Array.isArray(p.specs) ? p.specs : undefined,
+    ctaLabel: p.ctaLabel,
+    videoUrl: p.videoUrl,
+    hasVideoContent: Boolean(p.hasVideoContent),
+    ctaType: p.ctaType
   };
 }
 

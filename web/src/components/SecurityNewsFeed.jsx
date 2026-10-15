@@ -21,11 +21,15 @@ const IN_FEED_SPONSOR_ADS = [
     badge: "하드웨어 보안 AD",
     title: "Galaxy Knox로 완성하는 가장 완벽한 금융 보안",
     description: "독립된 보안 프로세서와 메모리로 악성 앱, 루팅, 피싱 원격제어를 원천 차단합니다.",
-    actionText: "Knox 보안 살펴보기",
+    actionText: "신제품 상세보기",
     link: "https://www.samsung.com/sec/apps/samsung-knox/",
     accentColor: "#3b82f6",
     bgGradient: "from-blue-950 via-slate-900 to-black",
-    mediaUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&q=80"
+    mediaUrl: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&q=80",
+    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    bgmTitle: "SAMSUNG Knox Vault Secure Track",
+    ctaType: "tech",
+    specs: ["Knox Vault 칩셋", "실시간 커널 보호", "하드웨어 루트 보안", "DEF CON 인증"]
   },
   {
     id: "genesis-connected",
@@ -33,11 +37,14 @@ const IN_FEED_SPONSOR_ADS = [
     badge: "안심 모빌리티 AD",
     title: "사고 긴급출동 및 도난 추적, 24시간 안심 케어",
     description: "제네시스 커넥티드 서비스로 차량 상태 원격 진단과 안전 운행을 완벽히 지원합니다.",
-    actionText: "커넥티드 서비스 확인",
+    actionText: "시승 신청하기",
     link: "https://www.genesis.com",
     accentColor: "#f59e0b",
     bgGradient: "from-zinc-900 via-neutral-900 to-black",
     mediaUrl: "https://images.unsplash.com/photo-1555353540-64580b51c258?w=800&q=80",
+    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+    bgmTitle: "GENESIS Connected Sound",
+    ctaType: "car",
     specs: ["24h 긴급출동", "원격 차량진단", "도난 추적지원", "안전 운행케어"]
   },
   {
@@ -46,11 +53,14 @@ const IN_FEED_SPONSOR_ADS = [
     badge: "안심금융 공익 AD",
     title: "원스톱 본인계좌 일괄지급정지로 피해 예방",
     description: "의심 통화나 스미싱 링크 접속 시 즉시 전 금융권 출금을 동시에 동결하세요.",
-    actionText: "계좌정보통합관리 확인",
+    actionText: "지금 안심계좌 확인",
     link: "https://www.payinfo.or.kr",
     accentColor: "#10b981",
     bgGradient: "from-emerald-950 via-slate-900 to-black",
     mediaUrl: "https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=600&q=80",
+    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
+    bgmTitle: "금융안심케어 Official Sound",
+    ctaType: "safe",
     specs: ["일괄 지급정지", "24시간 피해구제", "보이스피싱 예방", "금융소비자보호"]
   }
 ];
@@ -130,14 +140,17 @@ export default function SecurityNewsFeed({ className = "", isDarkMode = false })
       body: sponsor.description,
       advertiser: sponsor.sponsorName,
       mediaUrl: sponsor.mediaUrl,
-      ctaLabel: sponsor.actionText || "자세히 보기",
+      videoUrl: sponsor.videoUrl || "",
+      hasVideoContent: Boolean(sponsor.videoUrl),
+      bgmTitle: sponsor.bgmTitle || `${sponsor.sponsorName} AD Track`,
+      ctaLabel: sponsor.actionText || "신제품 상세보기",
+      ctaType: sponsor.ctaType || "tech",
       landingUrl: sponsor.link,
       link: sponsor.link,
       iconUrl: sponsor.mediaUrl,
       badge: sponsor.badge,
       specs: sponsor.specs,
       accentColor: sponsor.accentColor,
-      hasVideoContent: false,
       isAdMob: false
     });
   };
