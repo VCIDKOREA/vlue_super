@@ -16,6 +16,9 @@ export function getApiBase() {
     if (host === RAILWAY_WEB_HOST) {
       return RAILWAY_API_BASE;
     }
+    if (host === "www.vlue.kr" || host === "vlue.kr") {
+      return "https://api.vlue.kr";
+    }
     if (window.location?.origin) {
       return window.location.origin.replace(/\/$/, "");
     }
