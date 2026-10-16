@@ -985,9 +985,9 @@ export default function VlueSettingsPanel({
               showSettingNotice?.("결제창을 여는 중…");
               try {
                 sessionStorage.setItem("vlue_v2_pay_amount", "1000");
-                sessionStorage.setItem("vlue_v2_pay_order_name", "VLUÉ V2 테스트");
+                sessionStorage.setItem("vlue_v2_pay_order_name", "VLUE V2 테스트");
                 const result = await requestPortoneV2Payment({
-                  orderName: "VLUÉ V2 테스트",
+                  orderName: "VLUE V2 테스트",
                   totalAmount: 1000,
                   payMethod: "CARD",
                   redirectUrl: defaultPortoneV2RedirectUrl(),
@@ -1000,7 +1000,7 @@ export default function VlueSettingsPanel({
                   );
                   const amount = Number(result.complete?.amountTotal || 1000);
                   const paymentId = String(result.complete?.paymentId || result.paymentId || "");
-                  const productName = "VLUÉ V2 테스트";
+                  const productName = "VLUE V2 테스트";
                   const productDetail =
                     "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다.";
                   addPushNotification({

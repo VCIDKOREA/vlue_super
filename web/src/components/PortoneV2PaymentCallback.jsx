@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { completePortoneV2FromRedirectSearch } from "../lib/portoneV2Payment.js";
+import {
+  applyPendingMembershipPayment,
+  clearPendingMembershipPayment
+} from "../lib/membershipPgCheckout.js";
 import "../styles/portone-v2-callback.css";
 
 function StatusIcon({ status }) {
@@ -71,6 +75,7 @@ export default function PortoneV2PaymentCallback({
 
         // 고객 취소·PG 실패는 승인 API 호출 없이 안내만
         if (code || pgCode === "9000" || /취소/.test(message)) {
+          clearPendingMembershipPayment();
           if (cancelled) return;
           setStatus("cancelled");
           setDetail(message || "결제가 취소되었습니다. 언제든 다시 시도할 수 있어요.");
@@ -83,10 +88,15 @@ export default function PortoneV2PaymentCallback({
           expectedAmount: pendingAmount > 0 ? pendingAmount : undefined,
           orderName: pendingName
         });
+        const membership = applyPendingMembershipPayment();
         if (cancelled) return;
         setStatus("ok");
         setPaymentId(result.paymentId || qPaymentId);
-        setDetail("결제가 정상적으로 승인되었습니다.");
+        setDetail(
+          membership
+            ? `${membership.tier === "b2b" ? "비즈니스" : "유료"} 플랜 전환이 완료되었습니다.`
+            : "결제가 정상적으로 승인되었습니다."
+        );
         try {
           const { addPushNotification, buildPaymentReceiptBody } = await import(
             "../lib/pushNotificationInbox.js"
@@ -117,6 +127,7 @@ export default function PortoneV2PaymentCallback({
         }
         onDone?.(result);
       } catch (e) {
+        clearPendingMembershipPayment();
         if (cancelled) return;
         setStatus("error");
         setDetail(e?.message || "결제 승인에 실패했습니다. 잠시 후 다시 시도해 주세요.");
@@ -145,7 +156,7 @@ export default function PortoneV2PaymentCallback({
     status === "ok"
       ? "VLUÉ에서 이어서 이용해 보세요."
       : status === "cancelled"
-        ? "설정 › 결제 테스트에서 다시 진행할 수 있습니다."
+        ? "언제든 다시 결제를 진행할 수 있습니다."
         : status === "error"
           ? "문제가 계속되면 고객센터로 문의해 주세요."
           : null;

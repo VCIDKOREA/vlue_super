@@ -25,7 +25,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import kr.vlue.calloverlay.applock.AppLockStore
 import kr.vlue.calloverlay.applock.PinLockController
@@ -217,8 +219,14 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 return handleSpecialUrl(url.orEmpty())
             }
 
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                applyExternalPageStatusInset(url.orEmpty())
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                applyExternalPageStatusInset(url.orEmpty())
                 injectStatusBarInsetCss()
                 injectFamilyBridgeBootstrap()
                 injectAppLockBridgeBootstrap()
@@ -686,6 +694,35 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         transport.webView = popup
         resultMsg.sendToTarget()
         return true
+    }
+
+    private fun isVlueHostUrl(url: String): Boolean {
+        return try {
+            val host = Uri.parse(url).host?.lowercase().orEmpty()
+            host == "www.vlue.kr" || host == "vlue.kr" || host.endsWith(".vlue.kr") ||
+                host == "localhost" || host == "127.0.0.1" || host.endsWith(".up.railway.app")
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    /**
+     * targetSdk 35+ 는 edge-to-edge 강제라 setDecorFitsSystemWindows(true)가 무시된다.
+     * VLUE 페이지는 CSS safe-area로 처리하지만, 외부 PG 페이지(KPN 등)는 그렇지 않아 상태바와 겹친다.
+     */
+    private fun applyExternalPageStatusInset(url: String) {
+        if (url.isBlank() || url.startsWith("about:")) return
+        val lp = webView.layoutParams as? ViewGroup.MarginLayoutParams ?: return
+        val top = if (isVlueHostUrl(url)) {
+            0
+        } else {
+            ViewCompat.getRootWindowInsets(mainRoot)
+                ?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0
+        }
+        if (lp.topMargin != top) {
+            lp.topMargin = top
+            webView.layoutParams = lp
+        }
     }
 
     private fun isAppShellReturnUrl(url: String): Boolean {

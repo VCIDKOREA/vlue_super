@@ -80,7 +80,12 @@ export async function requestPortoneV2Payment(opts = {}) {
     throw new Error("결제 금액(totalAmount)이 올바르지 않습니다.");
   }
 
-  const orderName = String(opts.orderName || "").trim();
+  // KPN 결제창은 비ASCII 라틴 문자를 HTML 엔티티(VLU&#201;)로 그대로 노출함
+  const orderName = String(opts.orderName || "")
+    .replace(/&#?\w+;/g, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
   if (!orderName) throw new Error("주문명(orderName)이 필요합니다.");
 
   // KPN(FirstPay) MxdIssueNO 최대 32byte — 영문·숫자만, 하이픈 불가

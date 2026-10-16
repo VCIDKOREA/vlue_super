@@ -19,14 +19,9 @@ import {
   B2B_STAFF_EVENT_MONTHLY_KRW,
   B2B_STAFF_REFERRAL_MONTHLY_KRW
 } from "../../lib/membershipBm.js";
-import { postSubscribeComplete } from "../../lib/subscribeCompleteApi.js";
-import { requestIamportBillingPay } from "../../lib/iamportClient.js";
-import { getPortoneUserCode, isPortoneTestMode } from "../../lib/portoneEnv.js";
 import { verifyReferralCode } from "../../lib/referralVerifyApi.js";
-import { resolveAuthValidityPeriod, writeMembershipBillingMeta } from "../../lib/authValidityPeriod.js";
-import { clearPendingPayment } from "../../lib/postSignupPayment.js";
 import { getAppLockStatus } from "../../lib/appLockBridge.js";
-import KcpPayment from "../payment/KcpPayment.jsx";
+import { membershipOrderName, openPaymentGateway } from "../../lib/membershipPgCheckout.js";
 
 const PLAN_BENEFITS = [
   {
@@ -99,8 +94,8 @@ function checkHasPinSet() {
  * 1. 탭 클릭 시 e.preventDefault(), e.stopPropagation() 완벽 적용 + selectedCategory만 변경
  * 2. [결제하기] 클릭 시 onClose() 호출 없이 step = 'RECOMMEND_CODE' 로 내부 뷰 스위칭
  * 3. 추천인/결제 요약 박스: bg-slate-50 border border-slate-100 rounded-2xl p-4 my-3 레이아웃 교정
- * 4. PIN 미등록 유저: '결제용 6자리 PIN 번호 신규 등록' ➔ '한 번 더 입력하여 확인' (2회 검증) ➔ KCP 직결
- * 5. PIN 등록 유저: '결제 승인 PIN 입력' (1회) ➔ KCP 직결
+ * 4. PIN 미등록 유저: '결제용 6자리 PIN 번호 신규 등록' ➔ '한 번 더 입력하여 확인' (2회 검증) ➔ 포트원 V2(KPN) 결제창
+ * 5. PIN 등록 유저: '결제 승인 PIN 입력' (1회) ➔ 포트원 V2(KPN) 결제창
  */
 export default function MembershipModal({
   open,
@@ -144,8 +139,6 @@ export default function MembershipModal({
   const [isPaying, setIsPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [successInfo, setSuccessInfo] = useState(null);
-
-  const testMode = isPortoneTestMode();
 
   useEffect(() => {
     if (!open) {
@@ -317,10 +310,7 @@ export default function MembershipModal({
                 /* ignore */
               }
               setHasPinSet(true);
-              // NHN KCP 안전결제 PG 창으로 즉시 직행
-              setTimeout(() => {
-                setStep("KCP_PAYMENT");
-              }, 120);
+              executePayment();
             } else {
               setPinError("PIN 번호가 일치하지 않습니다. 다시 입력해 주세요.");
               setTimeout(() => {
@@ -331,10 +321,7 @@ export default function MembershipModal({
             }
           }
         } else {
-          // [PIN 등록 유저 프로세스 ➔ NHN KCP 안전결제 PG 창으로 즉시 직행]
-          setTimeout(() => {
-            setStep("KCP_PAYMENT");
-          }, 120);
+          executePayment();
         }
       }
     }
@@ -350,87 +337,36 @@ export default function MembershipModal({
     setPinDigits((prev) => prev.slice(0, -1));
   };
 
-  // NHN KCP PG 결제 승인 콜백 수신 후 최종 구독 활성화 및 실시간 반영
-  const executePaymentSuccess = async (kcpResult) => {
+  // 설정 › KPN 테스트 결제와 동일한 포트원 V2 결제창 호출
+  const executePayment = async () => {
     setIsPaying(true);
     setPayError("");
     setPinError("");
 
+    const cycle = billingCycle === "annual" ? "annual" : "monthly";
+    const newTier = targetItem.kind === "b2b" ? "b2b" : "paid";
     try {
-      let userId = "";
-      try {
-        userId = localStorage.getItem("vlue_server_user_id") || "";
-      } catch {
-        /* ignore */
-      }
-      if (!userId) {
-        userId = `anon_${Date.now()}`;
-      }
+      const result = await openPaymentGateway({
+        tier: newTier,
+        amount: finalPrice,
+        billingCycle: cycle,
+        referralCode: referralApplied && referralInput.trim() ? referralInput.trim() : null
+      });
+      // 모바일은 PG 페이지로 이동 — 결과는 /app/payment/v2/callback 에서 처리
+      if (result.redirected) return;
 
-      const customer_uid = `user_customer_${userId}`;
-      const cycle = billingCycle === "annual" ? "annual" : "monthly";
-      const amount = finalPrice;
-      const isB2b = targetItem.kind === "b2b";
-      const newTier = isB2b ? "b2b" : "paid";
-
-      // 1) 결제 모듈 승인 결과 서버 통신
-      try {
-        await postSubscribeComplete({
-          customer_uid,
-          merchant_uid: kcpResult?.merchant_uid || `kcp_order_${Date.now()}`,
-          amount,
-          billingCycle: cycle,
-          devBillingBypass: true
-        });
-      } catch (apiErr) {
-        console.warn("[SubscribeComplete API sync fallback]", apiErr);
-      }
-
-      // 2) 로컬 세션 및 플랜 메타 실시간 반영
-      try {
-        const paidAt = new Date();
-        localStorage.setItem("vlue_subscription_paid", "1");
-        localStorage.setItem("membershipTier", newTier);
-        localStorage.setItem("vlue_membership_tier", newTier);
-        localStorage.setItem("vlue_membership_kind", newTier);
-        if (referralApplied && referralInput.trim()) {
-          localStorage.setItem("vlue_used_referral_code", referralInput.trim());
-        }
-        const validity = resolveAuthValidityPeriod({ billingCycle: cycle, paidAt });
-        writeMembershipBillingMeta({
-          billingCycle: cycle,
-          paidAt,
-          cycleEndAt: validity?.validUntil || null
-        });
-      } catch {
-        /* ignore */
-      }
-
-      clearPendingPayment();
-
-      // 상위 상태 및 이벤트 즉시 브로드캐스트
       onMembershipTierChange?.(newTier);
-      try {
-        window.dispatchEvent(
-          new CustomEvent("vlue-membership-changed", {
-            detail: { membershipTier: newTier, tier: newTier }
-          })
-        );
-      } catch {
-        /* ignore */
-      }
-
-      // 3) 최종 성공 화면으로 전환
       setSuccessInfo({
         tier: newTier,
-        planName: targetItem.name,
+        planName: membershipOrderName(newTier),
         amountKrw: finalPrice,
         billingCycle: cycle
       });
       setStep("SUCCESS");
     } catch (e) {
-      console.error("[KCP Payment complete error]", e);
-      setPayError("결제 완료 처리 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      console.error("[membership pg]", e);
+      setPayError(e?.message || "결제가 완료되지 않았습니다. 다시 시도해 주세요.");
+      setPinDigits("");
     } finally {
       setIsPaying(false);
     }
@@ -499,9 +435,7 @@ export default function MembershipModal({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (step === "KCP_PAYMENT") {
-                    setStep("PIN_VERIFY");
-                  } else if (step === "PIN_VERIFY") {
+                  if (step === "PIN_VERIFY") {
                     if (!hasPinSet && pinRegisterStep === "CONFIRM") {
                       setPinRegisterStep("ENTER");
                       setPinDigits("");
@@ -530,7 +464,6 @@ export default function MembershipModal({
                       ? "한 번 더 입력하여 확인"
                       : "결제용 6자리 PIN 번호 신규 등록"
                     : "결제 승인 PIN 입력")}
-                {step === "KCP_PAYMENT" && "NHN KCP 안전결제"}
                 {step === "SUCCESS" && "유료 플랜 전환 완료"}
               </h2>
             </div>
@@ -1103,7 +1036,7 @@ export default function MembershipModal({
         )}
 
         {/* ========================================================= */}
-        {/* STEP 3: PIN_VERIFY (미등록 즉석 2회 등록 / 등록 1회 검증 ➔ KCP 직결) */}
+        {/* STEP 3: PIN_VERIFY (미등록 즉석 2회 등록 / 등록 1회 검증 ➔ PG 결제창) */}
         {/* ========================================================= */}
         {step === "PIN_VERIFY" && (
           <div className="overflow-y-auto px-6 py-5 overscroll-contain flex flex-col items-center">
@@ -1149,7 +1082,7 @@ export default function MembershipModal({
               {isPaying ? (
                 <div className="flex items-center justify-center gap-2 text-[12px] font-medium text-blue-600">
                   <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                  <span>KCP 결제 승인 처리 중입니다. 잠시만 기다려 주세요…</span>
+                  <span>결제창을 여는 중입니다. 잠시만 기다려 주세요…</span>
                 </div>
               ) : payError ? (
                 <p className="text-[12px] font-medium text-rose-600">{payError}</p>
@@ -1214,22 +1147,7 @@ export default function MembershipModal({
         )}
 
         {/* ========================================================= */}
-        {/* STEP 4: KCP_PAYMENT (NHN KCP PG 결제창 실제 연동) */}
-        {/* ========================================================= */}
-        {step === "KCP_PAYMENT" && (
-          <div className="overflow-y-auto px-4 py-4 overscroll-contain">
-            <KcpPayment
-              orderName={targetItem.name}
-              amount={finalPrice}
-              isDarkMode={isDarkMode}
-              onSuccess={(kcpResult) => executePaymentSuccess(kcpResult)}
-              onCancel={() => setStep("PIN_VERIFY")}
-            />
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* STEP 5: SUCCESS ("유료 플랜 전환 완료" 성공 팝업) */}
+        {/* STEP 4: SUCCESS ("유료 플랜 전환 완료" 성공 팝업) */}
         {/* ========================================================= */}
         {step === "SUCCESS" && (
           <div className="overflow-y-auto px-6 py-6 overscroll-contain flex flex-col items-center text-center">
