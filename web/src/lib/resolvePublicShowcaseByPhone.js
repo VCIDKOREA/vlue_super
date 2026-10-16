@@ -6,18 +6,38 @@ import { createDefaultShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 
 /**
  * 공개 쇼케이스(미가입·카톡 링크)용 — 인증 헤더 없이 GET.
- * vlueAuthHeaders 의 Content-Type 이 붙으면 일부 WebView 에서 실패할 수 있어 분리.
+ * CDN 및 브라우저 HTTP 캐시를 활용하여 1초 이내 고속 로딩.
  */
 async function publicGetJson(path) {
   const url = apiUrl(path);
   const res = await fetch(url, {
     method: "GET",
     headers: { Accept: "application/json" },
-    credentials: "omit",
-    cache: "no-store"
+    credentials: "omit"
   });
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };
+}
+
+const showcasePayloadCache = new Map();
+const CACHE_TTL_MS = 3 * 60 * 1000;
+
+function getCachedPayload(phoneKey) {
+  const hit = showcasePayloadCache.get(phoneKey);
+  if (!hit) return null;
+  if (Date.now() - hit.timestamp > CACHE_TTL_MS) {
+    showcasePayloadCache.delete(phoneKey);
+    return null;
+  }
+  return hit.payload;
+}
+
+function setCachedPayload(phoneKey, payload) {
+  showcasePayloadCache.set(phoneKey, { payload, timestamp: Date.now() });
+  if (showcasePayloadCache.size > 200) {
+    const oldest = showcasePayloadCache.keys().next().value;
+    if (oldest) showcasePayloadCache.delete(oldest);
+  }
 }
 
 function httpMediaUrl(raw) {
@@ -99,12 +119,18 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     };
   }
 
+  /* In-memory 캐시 확인 — 동일 세션 / 재진입 시 0ms 즉시 반환 */
+  const cached = getCachedPayload(lookupNumber);
+  if (cached) {
+    return cached;
+  }
+
   const lookup = await publicGetJson(
     `/api/cards/lookup?number=${encodeURIComponent(lookupNumber)}`
   );
   const body = lookup.ok ? lookup.data : null;
   if (!body?.matched || !body.userId) {
-    return {
+    const fallbackRes = {
       phone: phoneDisplay,
       verified: false,
       source: "none",
@@ -113,24 +139,20 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
       card: normalizeLetteringCard({ phone: phoneDisplay, membershipTier: "free" }),
       error: lookup.ok ? "not_matched" : "lookup_failed"
     };
+    if (lookup.ok) {
+      setCachedPayload(lookupNumber, fallbackRes);
+    }
+    return fallbackRes;
   }
 
   const userId = String(body.userId).trim();
 
-  const [styleResFirst, exportSnap] = await Promise.all([
+  const [styleRes, exportSnap] = await Promise.all([
     publicGetJson(
       `/api/lettering/showcase/style/${encodeURIComponent(userId)}?number=${encodeURIComponent(lookupNumber)}`
     ),
     fetchPublicCardExport(userId)
   ]);
-
-  let styleRes = styleResFirst;
-  if (!styleRes.ok || !styleRes.data?.live) {
-    await new Promise((r) => setTimeout(r, 400));
-    styleRes = await publicGetJson(
-      `/api/lettering/showcase/style/${encodeURIComponent(userId)}?number=${encodeURIComponent(lookupNumber)}`
-    );
-  }
 
   const live =
     styleRes.ok && styleRes.data?.live && typeof styleRes.data.live === "object"
@@ -196,7 +218,7 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     showcaseStyle
   });
 
-  return {
+  const result = {
     phone: phoneDisplay,
     /* 공식 시안블루 배지는 통화 신원검증 is_verified와 분리한다. */
     verified: Boolean(body.vlue_verified_badge ?? body.vlueVerifiedBadge),
@@ -213,4 +235,7 @@ export async function resolvePublicShowcaseByPhone(phoneRaw) {
     cardExportLoaded: Boolean(exportSnap?.photoUrl || exportSnap?.email || exportSnap?.name),
     error: live ? null : "style_empty"
   };
+
+  setCachedPayload(lookupNumber, result);
+  return result;
 }

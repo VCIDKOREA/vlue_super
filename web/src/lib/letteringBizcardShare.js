@@ -196,6 +196,20 @@ export async function copyShowcaseShareUrl(card, opts = {}) {
     return { ok: false, error: "쇼케이스 주소를 만들지 못했습니다." };
   }
 
+  /* 웹뷰 환경: window.Android.copyToClipboard(url) 1순위 즉시 실행 */
+  try {
+    if (typeof window !== "undefined") {
+      const bridge = window.Android || window.VlueAndroid;
+      if (typeof bridge?.copyToClipboard === "function" || "copyToClipboard" in (bridge || {})) {
+        bridge.copyToClipboard(viewUrl);
+      } else if (typeof bridge?.copyText === "function" || "copyText" in (bridge || {})) {
+        bridge.copyText(viewUrl);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
   /* 카카오 스크랩 전 서버 cover 워밍 — 첫 붙여넣기에서 옛 캐시 이미지 방지 */
   try {
     const coverWarm = viewUrl.replace(/\/?$/, "") + "/cover.jpg";

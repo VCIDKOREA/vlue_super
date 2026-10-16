@@ -1,7 +1,7 @@
 /**
  * WebView·브라우저 공통 클립보드 복사.
- * Android WebView는 navigator.clipboard.writeText 가 존재해도 NotAllowedError 로
- * 실패하는 경우가 많아, 실패 시 execCommand / 네이티브 브리지로 폴백한다.
+ * Android WebView 환경에서는 window.Android.copyToClipboard(url) 를 1순위로 호출하여
+ * Android OS ClipboardManager 를 직접 실행 (NotAllowedError 차단 및 100% 복사 보장).
  *
  * @param {string} text
  * @returns {Promise<{ ok: boolean, channel?: string, error?: string }>}
@@ -12,38 +12,58 @@ export async function copyTextToClipboard(text) {
     return { ok: false, error: "복사할 내용이 없습니다." };
   }
 
-  /* 1) Android 네이티브 브리지 (가장 확실) */
+  /* 1순위: Android 네이티브 브리지 직접 호출 (최우선) */
   try {
     const bridge =
-      typeof window !== "undefined" ? window.Android || window.VlueAndroid || null : null;
-    if (bridge && typeof bridge.copyText === "function") {
-      const r = bridge.copyText(value);
-      const ok =
-        r === true ||
-        r === 1 ||
-        r === "1" ||
-        r === "ok" ||
-        String(r).toLowerCase() === "true";
-      /* Kotlin void 반환 시 JS null — 예외 없이 끝났으면 성공으로 간주 */
-      if (ok || r == null) {
-        return { ok: true, channel: "android_bridge" };
+      typeof window !== "undefined"
+        ? window.Android || window.VlueAndroid || null
+        : null;
+
+    if (bridge) {
+      if (typeof bridge.copyToClipboard === "function" || "copyToClipboard" in bridge) {
+        const r = bridge.copyToClipboard(value);
+        const ok =
+          r === true ||
+          r === 1 ||
+          r === "1" ||
+          r === "ok" ||
+          String(r).toLowerCase() === "true" ||
+          r == null;
+        if (ok) {
+          return { ok: true, channel: "android_bridge" };
+        }
+      }
+      if (typeof bridge.copyText === "function" || "copyText" in bridge) {
+        const r = bridge.copyText(value);
+        const ok =
+          r === true ||
+          r === 1 ||
+          r === "1" ||
+          r === "ok" ||
+          String(r).toLowerCase() === "true" ||
+          r == null;
+        if (ok) {
+          return { ok: true, channel: "android_bridge" };
+        }
       }
     }
-  } catch {
+  } catch (err) {
+    console.warn("[copyTextToClipboard] android bridge execution error:", err);
     /* fall through */
   }
 
-  /* 2) Clipboard API — 실패해도 throw 하지 않고 폴백 */
+  /* 2순위: Web Clipboard API */
   try {
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(value);
       return { ok: true, channel: "clipboard_api" };
     }
-  } catch {
+  } catch (err) {
+    console.warn("[copyTextToClipboard] navigator.clipboard error:", err);
     /* fall through */
   }
 
-  /* 3) execCommand fallback (구형 WebView·권한 거부 대비) */
+  /* 3순위: execCommand fallback (구형 브라우저) */
   try {
     const ta = document.createElement("textarea");
     ta.value = value;

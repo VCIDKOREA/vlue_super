@@ -19,6 +19,10 @@ type HtmlRow = { html: string; freshUntil: number; staleUntil: number };
 const htmlCache = new Map<string, HtmlRow>();
 const inflight = new Map<string, Promise<string>>();
 
+type MetaRow = { meta: ShowcaseOgShareMeta; freshUntil: number; staleUntil: number };
+const metaCache = new Map<string, MetaRow>();
+const metaInflight = new Map<string, Promise<ShowcaseOgShareMeta>>();
+
 function touch(phone: string, row: HtmlRow) {
   htmlCache.delete(phone);
   htmlCache.set(phone, row);
@@ -26,6 +30,16 @@ function touch(phone: string, row: HtmlRow) {
     const oldest = htmlCache.keys().next().value;
     if (!oldest) break;
     htmlCache.delete(oldest);
+  }
+}
+
+function touchMeta(phone: string, row: MetaRow) {
+  metaCache.delete(phone);
+  metaCache.set(phone, row);
+  while (metaCache.size > CACHE_MAX) {
+    const oldest = metaCache.keys().next().value;
+    if (!oldest) break;
+    metaCache.delete(oldest);
   }
 }
 
@@ -101,80 +115,144 @@ export async function loadShowcaseOgShareMeta(digits: string): Promise<ShowcaseO
   const e164 = normalizeToE164KR(digits);
   if (!e164) return empty;
 
-  const rows = await prisma.$queryRaw<
-    Array<{
-      name: string | null;
-      handle: string | null;
-      org: string | null;
-      role: string | null;
-      card_id: string | null;
-      photo_url: string | null;
-      share_cover: string | null;
-      kakao_bg: string | null;
-      title_photo: string | null;
-    }>
-  >`
-    SELECT
-      COALESCE(NULLIF(TRIM(dc.display_name), ''), NULLIF(TRIM(u.legal_name), '')) AS name,
-      NULLIF(TRIM(u.public_handle), '') AS handle,
-      COALESCE(NULLIF(TRIM(bp.company_name), ''), NULLIF(TRIM(dc.organization), '')) AS org,
-      COALESCE(NULLIF(TRIM(bp.job_title), ''), NULLIF(TRIM(dc.title_snapshot), '')) AS role,
-      dc.id AS card_id,
-      NULLIF(TRIM(dc.photo_url), '') AS photo_url,
-      NULLIF(TRIM(dc.export_snapshot_json->>'shareCoverUrl'), '') AS share_cover,
-      NULLIF(TRIM(dc.export_snapshot_json->>'kakaoFeedBgUrl'), '') AS kakao_bg,
-      NULLIF(TRIM(dc.export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo
-    FROM users u
-    LEFT JOIN digital_cards dc ON dc.user_id = u.id
-    LEFT JOIN user_business_profiles bp ON bp.user_id = u.id
-    WHERE u.phone_e164 = ${e164}
-    LIMIT 1
-  `;
+  const now = Date.now();
+  const cached = metaCache.get(digits);
+  if (cached) {
+    if (now < cached.freshUntil) {
+      return cached.meta;
+    }
+    if (now < cached.staleUntil) {
+      /* stale 반환 즉시 하고 백그라운드 갱신 */
+      void fetchShowcaseOgShareMetaFromDb(e164, digits).catch(() => {});
+      return cached.meta;
+    }
+    metaCache.delete(digits);
+  }
 
-  const row = rows[0];
-  if (!row) return empty;
-  return {
-    name: String(row.name || "").trim(),
-    org: String(row.org || "").trim(),
-    role: String(row.role || "").trim(),
-    handle: String(row.handle || "").trim().replace(/^@/, ""),
-    cardId: String(row.card_id || "").trim(),
-    photo: pickHttpUrl(row.photo_url),
-    /* 타이틀사진 우선 — 예전 카톡 커버(shareCover)가 남아 있어도 OG에 옛 사진이 고정되지 않게 */
-    shareCover: pickHttpUrl(row.title_photo, row.share_cover, row.kakao_bg)
+  const inflightHit = metaInflight.get(digits);
+  if (inflightHit) return inflightHit;
+
+  const p = fetchShowcaseOgShareMetaFromDb(e164, digits).finally(() => {
+    metaInflight.delete(digits);
+  });
+  metaInflight.set(digits, p);
+  return p;
+}
+
+async function fetchShowcaseOgShareMetaFromDb(
+  e164: string,
+  digits: string
+): Promise<ShowcaseOgShareMeta> {
+  const empty: ShowcaseOgShareMeta = {
+    name: "",
+    org: "",
+    role: "",
+    handle: "",
+    cardId: "",
+    photo: "",
+    shareCover: ""
   };
+
+  try {
+    const queryPromise = prisma.$queryRaw<
+      Array<{
+        name: string | null;
+        handle: string | null;
+        org: string | null;
+        role: string | null;
+        card_id: string | null;
+        photo_url: string | null;
+        share_cover: string | null;
+        kakao_bg: string | null;
+        title_photo: string | null;
+      }>
+    >`
+      SELECT
+        COALESCE(NULLIF(TRIM(dc.display_name), ''), NULLIF(TRIM(u.legal_name), '')) AS name,
+        NULLIF(TRIM(u.public_handle), '') AS handle,
+        COALESCE(NULLIF(TRIM(bp.company_name), ''), NULLIF(TRIM(dc.organization), '')) AS org,
+        COALESCE(NULLIF(TRIM(bp.job_title), ''), NULLIF(TRIM(dc.title_snapshot), '')) AS role,
+        dc.id AS card_id,
+        NULLIF(TRIM(dc.photo_url), '') AS photo_url,
+        NULLIF(TRIM(dc.export_snapshot_json->>'shareCoverUrl'), '') AS share_cover,
+        NULLIF(TRIM(dc.export_snapshot_json->>'kakaoFeedBgUrl'), '') AS kakao_bg,
+        NULLIF(TRIM(dc.export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo
+      FROM users u
+      LEFT JOIN digital_cards dc ON dc.user_id = u.id
+      LEFT JOIN user_business_profiles bp ON bp.user_id = u.id
+      WHERE u.phone_e164 = ${e164}
+      LIMIT 1
+    `;
+
+    /* DB Cold Start 시 3.5초 타임아웃 걸어 무한 대기 방지 */
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("query_timeout")), 3500)
+    );
+
+    const rows = await Promise.race([queryPromise, timeoutPromise]);
+    const row = rows[0];
+    const meta: ShowcaseOgShareMeta = row
+      ? {
+          name: String(row.name || "").trim(),
+          org: String(row.org || "").trim(),
+          role: String(row.role || "").trim(),
+          handle: String(row.handle || "").trim().replace(/^@/, ""),
+          cardId: String(row.card_id || "").trim(),
+          photo: pickHttpUrl(row.photo_url),
+          /* 타이틀사진 우선 — 예전 카톡 커버(shareCover)가 남아 있어도 OG에 옛 사진이 고정되지 않게 */
+          shareCover: pickHttpUrl(row.title_photo, row.share_cover, row.kakao_bg)
+        }
+      : empty;
+
+    const now = Date.now();
+    touchMeta(digits, {
+      meta,
+      freshUntil: now + FRESH_MS,
+      staleUntil: now + STALE_MS
+    });
+
+    return meta;
+  } catch (err) {
+    console.warn("[showcase-og-share] DB query error or timeout", err);
+    return empty;
+  }
 }
 
 const COVER_MAX_BYTES = 1_500_000;
 type CoverRow = { bytes: Buffer; contentType: string; freshUntil: number };
 const coverCache = new Map<string, CoverRow>();
 
-export function getCachedOgCover(phone: string): CoverRow | null {
-  const row = coverCache.get(phone);
+export function getCachedOgCover(cacheKey: string): CoverRow | null {
+  const row = coverCache.get(cacheKey);
   if (!row) return null;
   if (Date.now() >= row.freshUntil) {
-    coverCache.delete(phone);
+    coverCache.delete(cacheKey);
     return null;
   }
   return row;
 }
 
-export function setCachedOgCover(phone: string, bytes: Buffer, contentType: string) {
-  coverCache.set(phone, {
+export function setCachedOgCover(cacheKey: string, bytes: Buffer, contentType: string, ttlMs = FRESH_MS) {
+  coverCache.set(cacheKey, {
     bytes,
     contentType,
-    freshUntil: Date.now() + FRESH_MS
+    freshUntil: Date.now() + ttlMs
   });
 }
 
 export function clearCachedOgCover(phone: string) {
   const digits = String(phone || "").replace(/\D/g, "");
   if (!digits) return;
-  coverCache.delete(digits);
   const local = digits.startsWith("82") && digits.length >= 10 ? `0${digits.slice(2)}` : digits;
-  coverCache.delete(local);
+  for (const k of coverCache.keys()) {
+    if (k === digits || k.startsWith(`${digits}:`) || k === local || k.startsWith(`${local}:`)) {
+      coverCache.delete(k);
+    }
+  }
   htmlCache.delete(digits);
   htmlCache.delete(local);
+  metaCache.delete(digits);
+  metaCache.delete(local);
 }
 
 export function isAllowedOgImageHost(url: string): boolean {

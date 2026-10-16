@@ -205,5 +205,8 @@ followRoutes.get("/profile/:userId", async (c) => {
     purposeRaw === "search" || purposeRaw === "follow" || purposeRaw === "full" ? purposeRaw : "full";
   const payload = await getProfileForViewer(viewerId, targetUserId, { purpose });
   if (!payload) return c.json({ error: "user_not_found" }, 404);
+  if (!viewerId) {
+    c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
+  }
   return c.json({ ok: true, ...payload });
 });

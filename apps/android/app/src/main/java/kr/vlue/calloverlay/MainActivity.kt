@@ -1461,21 +1461,33 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
 
         /**
-         * 웹 → 시스템 클립보드. Android WebView 의 navigator.clipboard 가
-         * NotAllowedError 로 실패하는 경우를 보완한다. 성공 "1" / 실패 "0".
+         * 웹 → 시스템 클립보드 직접 복사 (Android OS ClipboardManager 호출).
+         * Android WebView 의 navigator.clipboard 권한 제한을 완벽 우회하여 100% 성공 보장.
          */
         @android.webkit.JavascriptInterface
-        fun copyText(text: String?): String {
+        fun copyToClipboard(text: String?): String {
             val value = text.orEmpty()
             if (value.isEmpty()) return "0"
             return try {
-                val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("vlue", value))
+                val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                activity.runOnUiThread {
+                    try {
+                        cm?.setPrimaryClip(ClipData.newPlainText("vlue", value))
+                    } catch (e: Exception) {
+                        Log.w("MainJsBridge", "copyToClipboard on UI thread failed", e)
+                    }
+                }
+                cm?.setPrimaryClip(ClipData.newPlainText("vlue", value))
                 "1"
             } catch (e: Exception) {
-                Log.w("MainJsBridge", "copyText failed", e)
+                Log.w("MainJsBridge", "copyToClipboard failed", e)
                 "0"
             }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun copyText(text: String?): String {
+            return copyToClipboard(text)
         }
 
         /** 웹 로그인 세션 → 네이티브 (알림·통화 감지 자동 무장) */

@@ -1,6 +1,9 @@
 package kr.vlue.calloverlay
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -383,6 +386,35 @@ class LetteringJavascriptBridge(
         service.hideOverlayBannerAd(slotKey)
     }
 
+    /**
+     * 웹 → 시스템 클립보드 직접 복사 (Android OS ClipboardManager 호출).
+     */
+    @JavascriptInterface
+    fun copyToClipboard(text: String?): String {
+        val value = text.orEmpty()
+        if (value.isEmpty()) return "0"
+        return try {
+            val cm = service.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                try {
+                    cm?.setPrimaryClip(ClipData.newPlainText("vlue", value))
+                } catch (e: Exception) {
+                    Log.w("LetteringJsBridge", "copyToClipboard on mainHandler failed", e)
+                }
+            }
+            cm?.setPrimaryClip(ClipData.newPlainText("vlue", value))
+            "1"
+        } catch (e: Exception) {
+            Log.w("LetteringJsBridge", "copyToClipboard failed", e)
+            "0"
+        }
+    }
+
+    @JavascriptInterface
+    fun copyText(text: String?): String {
+        return copyToClipboard(text)
+    }
+
     companion object {
         const val INTERFACE_NAME = "Android"
         private const val TAG = "LetteringJsBridge"
@@ -395,6 +427,8 @@ class LetteringJavascriptBridge(
                 window.VlueLettering.logBigPushTrace = function(s,d){ try{ Android.logBigPushTrace(String(s||''), String(d||'')); }catch(e){} };
                 window.Android = window.Android || Android;
                 window.Android.logBigPushTrace = window.VlueLettering.logBigPushTrace;
+                window.Android.copyToClipboard = function(t){ try { return Android.copyToClipboard(String(t||'')); }catch(e){ return '0'; } };
+                window.Android.copyText = window.Android.copyToClipboard;
                 window.VlueLettering.endCall = function(){ Android.endCall(); };
                 window.VlueLettering.endCallKeepOverlay = function(){ Android.endCallKeepOverlay(); };
                 window.VlueLettering.endCallOnly = function(){ Android.endCallOnly(); };

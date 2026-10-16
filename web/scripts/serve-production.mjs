@@ -99,6 +99,45 @@ const VLUE_SHARE_ORIGIN = String(process.env.VLUE_SHARE_ORIGIN || "https://m.vlu
   .trim()
   .replace(/\/$/, "");
 
+function isOgScraperUserAgent(uaRaw) {
+  const ua = String(uaRaw || "").toLowerCase();
+  if (!ua.trim()) return true;
+  return (
+    ua.includes("kakaotalk-scrap") ||
+    ua.includes("kakao-scrap") ||
+    ua.includes("kakaotalk share") ||
+    ua.includes("facebookexternalhit") ||
+    ua.includes("facebot") ||
+    ua.includes("twitterbot") ||
+    ua.includes("slackbot") ||
+    ua.includes("linkedinbot") ||
+    ua.includes("discordbot") ||
+    ua.includes("telegrambot") ||
+    ua.includes("linespider") ||
+    ua.includes("yeti/") ||
+    ua.includes("bingbot") ||
+    ua.includes("googlebot") ||
+    ua.includes("googleother") ||
+    ua.includes("embedly") ||
+    ua.includes("quora link preview") ||
+    ua.includes("showyoubot") ||
+    ua.includes("outbrain") ||
+    ua.includes("pinterest") ||
+    ua.includes("applebot") ||
+    ua.includes("whatsapp") ||
+    ua.includes("google-pagerenderer") ||
+    ua.includes("google web preview") ||
+    ua.includes("iframely") ||
+    ua.includes("skypeuripreview") ||
+    ua.includes("bitlybot") ||
+    ua.includes("redditbot") ||
+    ua.includes("qwantify") ||
+    ua.includes("pinterestbot") ||
+    (ua.includes("samsung") && ua.includes("message")) ||
+    ua.includes("com.google.android.apps.messaging")
+  );
+}
+
 /** `/showcase/010…` · `/s/010…` — 문자 OG 카드용. 관리 화면 `/showcase` 는 제외 */
 function matchPublicShowcaseShare(pathname) {
   const m = String(pathname || "").match(/^\/(?:showcase|s)\/(\d{8,15})\/?$/);
@@ -227,8 +266,12 @@ const server = createServer((request, response) => {
 
   const showcasePhone = matchPublicShowcaseShare(pathname);
   if (showcasePhone) {
-    void serveShowcaseOgShare(request, response, showcasePhone);
-    return;
+    const ua = request.headers["user-agent"] || "";
+    if (isOgScraperUserAgent(ua)) {
+      void serveShowcaseOgShare(request, response, showcasePhone);
+      return;
+    }
+    /* 실사용자 브라우저 진입: SSR 블로킹 및 302 리다이렉트 지연 없이 정적 셸(SPA) 즉시 서빙 (0.1초 내 렌더) */
   }
 
   if (serveLegalStatic(response, pathname)) {

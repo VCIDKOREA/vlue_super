@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, Paperclip } from "lucide-react";
 import { resolvePublicShowcaseByPhone } from "../../../lib/resolvePublicShowcaseByPhone.js";
+import { formatLetteringPhoneDisplay } from "../../../lib/letteringPhoneMatch.js";
 import { getVlueDownloadLinks } from "../../../lib/vlueClientAccess.js";
 import { openVlueDownload } from "../../../lib/vlueDownloadActions.js";
 import { hasShowcaseBgmConfigured } from "../../../lib/showcase/showcaseBgmPresets.js";
@@ -151,9 +152,163 @@ export default function ShowcaseWebPage({ phone }) {
   };
 
   if (!payload) {
+    const displayPhone = formatLetteringPhoneDisplay(phone) || phone || "";
     return (
-      <div className="showcase-web">
-        <p className="showcase-web__loading">불러오는 중…</p>
+      <div
+        className="showcase-web showcase-web--full-fs showcase-web--static-shell"
+        data-vlue-public-showcase="1"
+        style={{
+          minHeight: "100vh",
+          backgroundColor: "#0B101B",
+          color: "#e2e8f0",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          boxSizing: "border-box"
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "420px",
+            borderRadius: "24px",
+            background: "linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)",
+            overflow: "hidden",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)"
+          }}
+        >
+          {/* Top Badges */}
+          <div style={{ padding: "16px 20px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "9999px",
+                  backgroundColor: "#38bdf8",
+                  boxShadow: "0 0 10px #38bdf8",
+                  display: "inline-block"
+                }}
+              />
+              <span style={{ fontSize: "12px", fontWeight: "800", color: "#38bdf8", letterSpacing: "-0.02em" }}>
+                VLUÉ 인증 쇼케이스
+              </span>
+            </div>
+            {displayPhone ? (
+              <span style={{ fontSize: "12px", fontWeight: "600", color: "#94a3b8", letterSpacing: "-0.01em" }}>
+                {displayPhone}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Cover Skeleton */}
+          <div
+            style={{
+              width: "100%",
+              aspectRatio: "1.6",
+              background: "linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)",
+              position: "relative",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent)",
+                animation: "vlue-shell-pulse 1.8s ease-in-out infinite"
+              }}
+            />
+            <div style={{ textAlign: "center", padding: "16px", zIndex: 1 }}>
+              <div
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "9999px",
+                  background: "rgba(56, 189, 248, 0.12)",
+                  border: "1px solid rgba(56, 189, 248, 0.3)",
+                  margin: "0 auto 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#38bdf8"
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#e2e8f0" }}>
+                보안 인증 쇼케이스 연결 중…
+              </p>
+            </div>
+          </div>
+
+          {/* Content Skeleton */}
+          <div style={{ padding: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+              <div
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "16px",
+                  background: "rgba(148, 163, 184, 0.15)",
+                  flexShrink: 0
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    width: "55%",
+                    height: "16px",
+                    borderRadius: "6px",
+                    background: "rgba(148, 163, 184, 0.2)",
+                    marginBottom: "8px"
+                  }}
+                />
+                <div
+                  style={{
+                    width: "35%",
+                    height: "12px",
+                    borderRadius: "4px",
+                    background: "rgba(148, 163, 184, 0.12)"
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                width: "100%",
+                height: "42px",
+                borderRadius: "12px",
+                background: "linear-gradient(135deg, rgba(29, 78, 216, 0.5), rgba(37, 99, 235, 0.5))",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "13px",
+                fontWeight: "700",
+                color: "#93c5fd"
+              }}
+            >
+              안심 프로필 불러오는 중…
+            </div>
+          </div>
+        </div>
+        <style>{`
+          @keyframes vlue-shell-pulse {
+            0%, 100% { transform: translateX(-100%); }
+            50% { transform: translateX(100%); }
+          }
+        `}</style>
       </div>
     );
   }

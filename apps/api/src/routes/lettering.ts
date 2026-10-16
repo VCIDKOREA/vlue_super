@@ -540,6 +540,9 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
     const lineLive = await getLineShowcasePublicByPhone(numberQ, { viewerId });
     /* 번호 회선 쇼케이스는 path userId 와 일치할 때만 — 다른 회원 스타일 혼입 방지 */
     if (lineLive && String(lineLive.userId || "").trim() === userId) {
+      const cacheHdr = viewerId
+        ? "private, max-age=60"
+        : "public, max-age=60, s-maxage=300, stale-while-revalidate=86400";
       return c.json(
         {
           ok: true,
@@ -550,7 +553,7 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
           lineId: lineLive.cardId
         },
         200,
-        { "Cache-Control": "private, max-age=60" }
+        { "Cache-Control": cacheHdr }
       );
     }
   }
@@ -571,13 +574,14 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
     .replace(/^W\//i, "")
     .replace(/^"|"$/g, "");
   const pub = await getUserShowcasePublicLive(userId, { ifNoneMatch });
+  const pubCacheHdr = "public, max-age=60, s-maxage=300, stale-while-revalidate=86400";
   if (pub.unchanged) {
     return c.json(
       { ok: true, v: 2, unchanged: true, updatedAt: pub.updatedAt },
       200,
       pub.updatedAt
-        ? { ETag: `"${pub.updatedAt}"`, "Cache-Control": "private, max-age=60" }
-        : { "Cache-Control": "private, max-age=60" }
+        ? { ETag: `"${pub.updatedAt}"`, "Cache-Control": pubCacheHdr }
+        : { "Cache-Control": pubCacheHdr }
     );
   }
   return c.json(
@@ -590,8 +594,8 @@ letteringRoutes.get("/showcase/style/:userId", async (c) => {
     },
     200,
     pub.updatedAt
-      ? { ETag: `"${pub.updatedAt}"`, "Cache-Control": "private, max-age=60" }
-      : { "Cache-Control": "private, max-age=60" }
+      ? { ETag: `"${pub.updatedAt}"`, "Cache-Control": pubCacheHdr }
+      : { "Cache-Control": pubCacheHdr }
   );
 });
 

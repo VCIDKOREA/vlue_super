@@ -62,6 +62,31 @@ cardsRoutes.route("/enterprise-dcc", enterpriseDccRoutes);
 cardsRoutes.route("/dcc-agent-profiles", dccAgentProfileRoutes);
 cardsRoutes.route("/dcc-lines", dccLineRoutes);
 
+type PublicLookupRow = { body: unknown; status: number; expiresAt: number };
+const publicLookupCache = new Map<string, PublicLookupRow>();
+
+function getCachedPublicLookup(key: string): PublicLookupRow | null {
+  const row = publicLookupCache.get(key);
+  if (!row) return null;
+  if (Date.now() >= row.expiresAt) {
+    publicLookupCache.delete(key);
+    return null;
+  }
+  return row;
+}
+
+function setCachedPublicLookup(key: string, body: unknown, status: number) {
+  publicLookupCache.set(key, {
+    body,
+    status,
+    expiresAt: Date.now() + 5 * 60 * 1000
+  });
+  if (publicLookupCache.size > 500) {
+    const oldest = publicLookupCache.keys().next().value;
+    if (oldest) publicLookupCache.delete(oldest);
+  }
+}
+
 async function jsonLookup(
   raw: string,
   viewerId?: string | null,
@@ -84,10 +109,25 @@ cardsRoutes.get("/lookup", async (c) => {
     const forCallOverlay =
       c.req.query("purpose") === "call_overlay" || c.req.query("call_overlay") === "1";
     const dcpRoute = c.req.query("dcp_route") || c.req.query("dcpRoute") || null;
+
+    if (!viewerId && !forCallOverlay && !dcpRoute && raw) {
+      const cached = getCachedPublicLookup(raw);
+      if (cached) {
+        c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
+        return c.json(cached.body, cached.status as any);
+      }
+    }
+
     const result = await jsonLookup(raw, viewerId, { forCallOverlay, dcpRoute });
     if (forCallOverlay && viewerId && result.body && (result.body as { matched?: boolean }).matched) {
       void recordOverlayLineCallEvent({ viewerId, number: raw, direction: "in" }).catch(() => {});
     }
+
+    if (!viewerId && !forCallOverlay && !dcpRoute && raw && result.status === 200) {
+      setCachedPublicLookup(raw, result.body, result.status);
+      c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
+    }
+
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
@@ -103,10 +143,25 @@ cardsRoutes.get("/by-number", async (c) => {
     const forCallOverlay =
       c.req.query("purpose") === "call_overlay" || c.req.query("call_overlay") === "1";
     const dcpRoute = c.req.query("dcp_route") || c.req.query("dcpRoute") || null;
+
+    if (!viewerId && !forCallOverlay && !dcpRoute && raw) {
+      const cached = getCachedPublicLookup(raw);
+      if (cached) {
+        c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
+        return c.json(cached.body, cached.status as any);
+      }
+    }
+
     const result = await jsonLookup(raw, viewerId, { forCallOverlay, dcpRoute });
     if (forCallOverlay && viewerId && result.body && (result.body as { matched?: boolean }).matched) {
       void recordOverlayLineCallEvent({ viewerId, number: raw, direction: "in" }).catch(() => {});
     }
+
+    if (!viewerId && !forCallOverlay && !dcpRoute && raw && result.status === 200) {
+      setCachedPublicLookup(raw, result.body, result.status);
+      c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
+    }
+
     return c.json(result.body, result.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";

@@ -1,11 +1,14 @@
 import { Hono, type Context } from "hono";
 import {
   buildShowcaseOgLandingPage,
+  isOgScraperUserAgent,
   isUserDocumentNavigation
 } from "../services/showcase/showcaseOgLandingPage.js";
 import {
+  coalesceOgHtmlBuild,
   fetchOgCoverBytes,
   getCachedOgCover,
+  getCachedOgHtml,
   loadShowcaseOgShareMeta,
   setCachedOgCover,
   setCachedOgHtml,
@@ -113,11 +116,11 @@ function coverCacheKey(meta: {
 }
 
 function sendOgHtml(c: Context, html: string) {
-  c.header("Vary", "Accept-Encoding, Sec-Fetch-Mode, Sec-Fetch-User");
-  /* OG는 짧게 — 타이틀사진·명함 정보 변경 직후 스크랩 반영 */
-  c.header("Cache-Control", "public, max-age=60, s-maxage=60, must-revalidate");
-  c.header("CDN-Cache-Control", "public, max-age=60");
-  c.header("Cloudflare-CDN-Cache-Control", "public, max-age=60");
+  c.header("Vary", "Accept-Encoding, Sec-Fetch-Mode, Sec-Fetch-User, User-Agent");
+  /* In-memory 및 CDN(Cloudflare, Edge) 캐싱 — Cold Start 지연 해소 */
+  c.header("Cache-Control", "public, max-age=60, s-maxage=600, stale-while-revalidate=86400");
+  c.header("CDN-Cache-Control", "public, max-age=600, stale-while-revalidate=86400");
+  c.header("Cloudflare-CDN-Cache-Control", "public, max-age=600, stale-while-revalidate=86400");
   c.header("Content-Type", "text/html; charset=utf-8");
   if (c.req.method === "HEAD") {
     c.header("Content-Length", String(Buffer.byteLength(html, "utf8")));
@@ -137,9 +140,12 @@ async function resolveUpstreamCoverUrl(c: Context, digits: string): Promise<stri
   );
 }
 
-async function buildOgHtml(digits: string): Promise<string> {
+async function buildOgHtml(
+  digits: string,
+  prefetchedMeta?: import("../services/showcase/showcaseOgShareMeta.js").ShowcaseOgShareMeta
+): Promise<string> {
   const phoneDisplay = formatPhoneDisplayKR(digits) || digits;
-  const meta = await loadShowcaseOgShareMeta(digits);
+  const meta = prefetchedMeta || (await loadShowcaseOgShareMeta(digits));
   const name = meta.name || (meta.handle ? `@${meta.handle}` : phoneDisplay);
   const v = coverCacheKey({ ...meta, phone: digits });
   return buildShowcaseOgLandingPage({
@@ -166,15 +172,26 @@ export async function respondShowcaseOgView(c: Context) {
     const digits = phoneDigitsForUrl(rawPhone);
     if (!digits) return c.text("유효한 번호가 아닙니다.", 400);
 
-    if (
-      isUserDocumentNavigation({
-        userAgent: c.req.header("user-agent"),
-        secFetchUser: c.req.header("sec-fetch-user"),
-        secFetchMode: c.req.header("sec-fetch-mode"),
-        secFetchDest: c.req.header("sec-fetch-dest")
-      })
-    ) {
+    const ua = c.req.header("user-agent") || "";
+    const isScraper = isOgScraperUserAgent(ua);
+
+    /* 1) 사용자가 직접 브라우저(일반/모바일/인앱 브라우저)로 진입한 경우:
+       SSR 블로킹 제거하고 0.01초 내 즉시 SPA 정적 셸로 이동 */
+    if (!isScraper || isUserDocumentNavigation({
+      userAgent: ua,
+      secFetchUser: c.req.header("sec-fetch-user"),
+      secFetchMode: c.req.header("sec-fetch-mode"),
+      secFetchDest: c.req.header("sec-fetch-dest")
+    })) {
+      c.header("Cache-Control", "public, max-age=60, s-maxage=300");
       return c.redirect(spaUrlFor(digits), 302);
+    }
+
+    /* 2) OG 스크래퍼(카카오톡 스크랩, 메신저 봇 등):
+       In-memory 캐시 우선 확인하여 Cold Start 지연 해소 */
+    const cachedHtml = getCachedOgHtml(digits);
+    if (cachedHtml && !cachedHtml.stale) {
+      return sendOgHtml(c, cachedHtml.html);
     }
 
     const token = String(c.req.param("token") || "").trim();
@@ -184,17 +201,18 @@ export async function respondShowcaseOgView(c: Context) {
     /* 구 주소(/showcase/010…) 스크랩 → 최신 /t/{token} 로 보내 카카오 OG 캐시 우회 */
     if (!token && currentToken) {
       const dest = shareUrlFor(digits, currentToken);
-      c.header("Cache-Control", "no-store");
+      c.header("Cache-Control", "public, max-age=60, s-maxage=300");
       return c.redirect(dest, 302);
     }
 
     /* 토큰이 옛것이면 현재 토큰으로 정규화 */
     if (token && currentToken && token !== currentToken) {
-      c.header("Cache-Control", "no-store");
-      return c.redirect(shareUrlFor(digits, currentToken), 302);
+      const dest = shareUrlFor(digits, currentToken);
+      c.header("Cache-Control", "public, max-age=60, s-maxage=300");
+      return c.redirect(dest, 302);
     }
 
-    const html = await buildOgHtml(digits);
+    const html = await coalesceOgHtmlBuild(digits, () => buildOgHtml(digits, meta));
     setCachedOgHtml(digits, html);
     return sendOgHtml(c, html);
   } catch (err) {
@@ -210,14 +228,18 @@ export async function respondShowcaseOgCover(c: Context) {
     const digits = phoneDigitsForUrl(rawPhone);
     if (!digits) return c.text("not found", 404);
 
-    /* 토큰·?v= 있으면 메모리 캐시 스킵 — 타이틀사진 변경 즉시 반영 */
-    const bust =
-      String(c.req.param("token") || "").trim() || String(c.req.query("v") || "").trim();
-    const hit = bust ? null : getCachedOgCover(digits);
+    const token = String(c.req.param("token") || "").trim();
+    const queryV = String(c.req.query("v") || "").trim();
+    const tokenKey = token ? `${digits}:${token}` : (queryV ? `${digits}:${queryV}` : digits);
+
+    /* 토큰이 있는 경우 불변 키로 In-memory 캐시 즉시 적중 */
+    const hit = getCachedOgCover(tokenKey) || getCachedOgCover(digits);
     if (hit) {
-      c.header("Cache-Control", "public, max-age=60, must-revalidate");
-      c.header("CDN-Cache-Control", "public, max-age=60");
-      c.header("Cloudflare-CDN-Cache-Control", "public, max-age=60");
+      const maxAge = token ? 86400 : 300;
+      const sMaxAge = token ? 604800 : 1800;
+      c.header("Cache-Control", `public, max-age=${maxAge}, s-maxage=${sMaxAge}${token ? ", immutable" : ""}`);
+      c.header("CDN-Cache-Control", `public, max-age=${sMaxAge}`);
+      c.header("Cloudflare-CDN-Cache-Control", `public, max-age=${sMaxAge}`);
       c.header("Content-Type", hit.contentType);
       if (c.req.method === "HEAD") {
         c.header("Content-Length", String(hit.bytes.length));
@@ -235,10 +257,18 @@ export async function respondShowcaseOgCover(c: Context) {
         return c.redirect(fallback, 302);
       }
     }
-    setCachedOgCover(digits, fetched.bytes, fetched.contentType);
-    c.header("Cache-Control", "public, max-age=60, must-revalidate");
-    c.header("CDN-Cache-Control", "public, max-age=60");
-    c.header("Cloudflare-CDN-Cache-Control", "public, max-age=60");
+
+    const ttlMs = token ? 7 * 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
+    setCachedOgCover(tokenKey, fetched.bytes, fetched.contentType, ttlMs);
+    if (tokenKey !== digits) {
+      setCachedOgCover(digits, fetched.bytes, fetched.contentType, 30 * 60 * 1000);
+    }
+
+    const maxAge = token ? 86400 : 300;
+    const sMaxAge = token ? 604800 : 1800;
+    c.header("Cache-Control", `public, max-age=${maxAge}, s-maxage=${sMaxAge}${token ? ", immutable" : ""}`);
+    c.header("CDN-Cache-Control", `public, max-age=${sMaxAge}`);
+    c.header("Cloudflare-CDN-Cache-Control", `public, max-age=${sMaxAge}`);
     c.header("Content-Type", fetched.contentType);
     if (c.req.method === "HEAD") {
       c.header("Content-Length", String(fetched.bytes.length));
