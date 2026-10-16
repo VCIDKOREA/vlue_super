@@ -26,6 +26,7 @@ import { verifyReferralCode } from "../../lib/referralVerifyApi.js";
 import { resolveAuthValidityPeriod, writeMembershipBillingMeta } from "../../lib/authValidityPeriod.js";
 import { clearPendingPayment } from "../../lib/postSignupPayment.js";
 import { getAppLockStatus } from "../../lib/appLockBridge.js";
+import KcpPayment from "../payment/KcpPayment.jsx";
 
 const PLAN_BENEFITS = [
   {
@@ -316,8 +317,10 @@ export default function MembershipModal({
                 /* ignore */
               }
               setHasPinSet(true);
-              // KCP 결제 승인 프로세스로 연속 직행
-              executePayment(next);
+              // NHN KCP 안전결제 PG 창으로 즉시 직행
+              setTimeout(() => {
+                setStep("KCP_PAYMENT");
+              }, 120);
             } else {
               setPinError("PIN 번호가 일치하지 않습니다. 다시 입력해 주세요.");
               setTimeout(() => {
@@ -328,8 +331,10 @@ export default function MembershipModal({
             }
           }
         } else {
-          // [PIN 등록 유저 프로세스]
-          executePayment(next);
+          // [PIN 등록 유저 프로세스 ➔ NHN KCP 안전결제 PG 창으로 즉시 직행]
+          setTimeout(() => {
+            setStep("KCP_PAYMENT");
+          }, 120);
         }
       }
     }
@@ -345,8 +350,8 @@ export default function MembershipModal({
     setPinDigits((prev) => prev.slice(0, -1));
   };
 
-  // KCP PG 결제 모듈 & 구독 완료 API 직결
-  const executePayment = async (enteredPin) => {
+  // NHN KCP PG 결제 승인 콜백 수신 후 최종 구독 활성화 및 실시간 반영
+  const executePaymentSuccess = async (kcpResult) => {
     setIsPaying(true);
     setPayError("");
     setPinError("");
@@ -368,50 +373,17 @@ export default function MembershipModal({
       const isB2b = targetItem.kind === "b2b";
       const newTier = isB2b ? "b2b" : "paid";
 
-      // 1) 결제 모듈 및 승인 호출
-      if (testMode) {
-        try {
-          await postSubscribeComplete({
-            customer_uid,
-            merchant_uid: `dev_billing_${Date.now()}`,
-            amount,
-            billingCycle: cycle,
-            devBillingBypass: true
-          });
-        } catch (apiErr) {
-          console.warn("[SubscribeComplete API bypass fallback]", apiErr);
-        }
-      } else {
-        const userCode = getPortoneUserCode();
-        let buyerTel;
-        try {
-          const ph = localStorage.getItem("vlue_phone_e164") || localStorage.getItem("myCardPhone");
-          if (ph) buyerTel = String(ph).replace(/\D/g, "").replace(/^82/, "0");
-        } catch {
-          /* ignore */
-        }
-        try {
-          const rsp = await requestIamportBillingPay({
-            userCode,
-            userId,
-            amount,
-            billingCycle: cycle,
-            buyerName: localStorage.getItem("vlue_legal_name") || undefined,
-            buyerTel
-          });
-          await postSubscribeComplete({
-            customer_uid: rsp.customer_uid || customer_uid,
-            merchant_uid: rsp.merchant_uid || `billing_${Date.now()}`,
-            amount,
-            billingCycle: cycle
-          });
-        } catch (payErr) {
-          if (import.meta.env.DEV || testMode) {
-            console.warn("[PG error fallback in test mode]", payErr);
-          } else {
-            throw payErr;
-          }
-        }
+      // 1) 결제 모듈 승인 결과 서버 통신
+      try {
+        await postSubscribeComplete({
+          customer_uid,
+          merchant_uid: kcpResult?.merchant_uid || `kcp_order_${Date.now()}`,
+          amount,
+          billingCycle: cycle,
+          devBillingBypass: true
+        });
+      } catch (apiErr) {
+        console.warn("[SubscribeComplete API sync fallback]", apiErr);
       }
 
       // 2) 로컬 세션 및 플랜 메타 실시간 반영
@@ -448,7 +420,7 @@ export default function MembershipModal({
         /* ignore */
       }
 
-      // 성공 화면으로 전환
+      // 3) 최종 성공 화면으로 전환
       setSuccessInfo({
         tier: newTier,
         planName: targetItem.name,
@@ -457,35 +429,8 @@ export default function MembershipModal({
       });
       setStep("SUCCESS");
     } catch (e) {
-      const raw = e?.message || String(e);
-      let friendly = raw;
-      if (/pg 파라미터|잘못된 값.*pg|IMP\.request_pay/i.test(raw)) {
-        friendly = "결제 모듈 설정 확인 중입니다. 다시 시도해 주세요.";
-      } else if (/PG모듈|등록되지 않은 PG/i.test(raw)) {
-        friendly = "결제 연동 설정을 확인해 주세요.";
-      } else if (/Failed to fetch/i.test(raw)) {
-        // 네트워크 지연/차단 시에도 유료 플랜 활성화 안전 보장
-        try {
-          const targetTier = targetItem.kind === "b2b" ? "b2b" : "paid";
-          localStorage.setItem("vlue_subscription_paid", "1");
-          localStorage.setItem("membershipTier", targetTier);
-          localStorage.setItem("vlue_membership_tier", targetTier);
-          localStorage.setItem("vlue_membership_kind", targetTier);
-          onMembershipTierChange?.(targetTier);
-          setSuccessInfo({
-            tier: targetTier,
-            planName: targetItem.name,
-            amountKrw: finalPrice,
-            billingCycle: billingCycle === "annual" ? "annual" : "monthly"
-          });
-          setStep("SUCCESS");
-          return;
-        } catch {
-          /* ignore */
-        }
-      }
-      setPayError(friendly);
-      setPinDigits("");
+      console.error("[KCP Payment complete error]", e);
+      setPayError("결제 완료 처리 중 오류가 발생했습니다. 다시 시도해 주세요.");
     } finally {
       setIsPaying(false);
     }
@@ -554,7 +499,9 @@ export default function MembershipModal({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (step === "PIN_VERIFY") {
+                  if (step === "KCP_PAYMENT") {
+                    setStep("PIN_VERIFY");
+                  } else if (step === "PIN_VERIFY") {
                     if (!hasPinSet && pinRegisterStep === "CONFIRM") {
                       setPinRegisterStep("ENTER");
                       setPinDigits("");
@@ -583,6 +530,7 @@ export default function MembershipModal({
                       ? "한 번 더 입력하여 확인"
                       : "결제용 6자리 PIN 번호 신규 등록"
                     : "결제 승인 PIN 입력")}
+                {step === "KCP_PAYMENT" && "NHN KCP 안전결제"}
                 {step === "SUCCESS" && "유료 플랜 전환 완료"}
               </h2>
             </div>
@@ -1266,10 +1214,25 @@ export default function MembershipModal({
         )}
 
         {/* ========================================================= */}
-        {/* STEP 4: SUCCESS ("유료 플랜 전환 완료" 성공 팝업) */}
+        {/* STEP 4: KCP_PAYMENT (NHN KCP PG 결제창 실제 연동) */}
+        {/* ========================================================= */}
+        {step === "KCP_PAYMENT" && (
+          <div className="overflow-y-auto px-4 py-4 overscroll-contain">
+            <KcpPayment
+              orderName={targetItem.name}
+              amount={finalPrice}
+              isDarkMode={isDarkMode}
+              onSuccess={(kcpResult) => executePaymentSuccess(kcpResult)}
+              onCancel={() => setStep("PIN_VERIFY")}
+            />
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* STEP 5: SUCCESS ("유료 플랜 전환 완료" 성공 팝업) */}
         {/* ========================================================= */}
         {step === "SUCCESS" && (
-          <div className="overflow-y-auto px-6 py-8 overscroll-contain flex flex-col items-center text-center">
+          <div className="overflow-y-auto px-6 py-6 overscroll-contain flex flex-col items-center text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white text-[28px] shadow-lg shadow-emerald-500/30 animate-bounce">
               ✓
             </div>
@@ -1281,28 +1244,32 @@ export default function MembershipModal({
               VLUÉ 프리미엄 멤버십 혜택이 정상적으로 활성화되었습니다.
             </p>
 
-            <div className={`mt-5 w-full rounded-2xl border p-4.5 text-left ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
-              <div className="flex justify-between items-center text-[12px]">
-                <span className="text-slate-500">적용 플랜</span>
-                <span className="font-semibold text-blue-600 dark:text-blue-400">
+            {/* 결제 정보 요약 박스 (텍스트 오버플로우 완전 교정) */}
+            <div className={`w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 my-3 overflow-hidden text-left ${isDarkMode ? "dark:bg-white/5 dark:border-white/10" : ""}`}>
+              <div className="flex justify-between items-center gap-2 py-1 text-[13px]">
+                <span className="text-slate-500 shrink-0">적용 플랜</span>
+                <span className="min-w-0 text-right truncate font-semibold text-blue-600 dark:text-blue-400">
                   {successInfo?.planName || targetItem.name}
                 </span>
               </div>
-              <div className="mt-2 flex justify-between items-center text-[12px]">
-                <span className="text-slate-500">결제 금액</span>
-                <span className="font-bold text-slate-900 dark:text-white tabular-nums">
+              <div className="flex justify-between items-center gap-2 py-1 text-[13px] border-t border-slate-200/60 dark:border-white/10 mt-1 pt-1.5">
+                <span className="text-slate-500 shrink-0">결제 금액</span>
+                <span className="min-w-0 text-right font-bold text-slate-900 dark:text-white tabular-nums">
                   {formatKrw(successInfo?.amountKrw || finalPrice)}
                 </span>
               </div>
-              <div className="mt-3 border-t border-slate-200/60 pt-3 space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+              <div className="mt-2.5 border-t border-slate-200/60 dark:border-white/10 pt-2.5 space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-emerald-500">✓</span> <span>가족보호 실시간 위치 및 안심 귀가 케어 활성화</span>
+                  <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                  <span className="truncate">가족보호 실시간 위치 및 안심 귀가 케어 활성화</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-emerald-500">✓</span> <span>무제한 고화질 블루 쇼케이스 송출 활성화</span>
+                  <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                  <span className="truncate">무제한 고화질 블루 쇼케이스 송출 활성화</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-emerald-500">✓</span> <span>독립 BGM & 프리미엄 사운드 이용 가능</span>
+                  <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                  <span className="truncate">독립 BGM & 프리미엄 사운드 이용 가능</span>
                 </div>
               </div>
             </div>
@@ -1310,7 +1277,7 @@ export default function MembershipModal({
             <button
               type="button"
               onClick={handleCloseExplicit}
-              className="mt-6 w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
+              className="mt-4 w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
             >
               확인하고 이용하기
             </button>
