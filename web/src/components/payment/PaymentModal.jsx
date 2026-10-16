@@ -5,7 +5,7 @@ import { clearPendingPayment } from "../../lib/postSignupPayment.js";
 import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 import { verifyReferralCode } from "../../lib/referralVerifyApi.js";
 import { getAppLockStatus } from "../../lib/appLockBridge.js";
-import { openPaymentGateway } from "../../lib/membershipPgCheckout.js";
+import { membershipOrderName, openPaymentGateway } from "../../lib/membershipPgCheckout.js";
 
 function checkHasPinSet() {
   try {
@@ -67,7 +67,10 @@ export default function PaymentModal({
   const discountAmount = referralApplied ? Math.max(0, basePrice - 9900) : 0;
 
   const isB2b = isB2bMembershipKind(pending?.membershipKind);
-  const planTitle = isB2b ? "기업 비즈니스 플랜" : "VLUÉ 유료 플랜 (Paid)";
+  const planTitle = membershipOrderName({
+    kind: isB2b ? "b2b" : "paid",
+    billingCycle: pending?.billingCycle === "annual" ? "annual" : "monthly"
+  });
 
   // 추천인 코드 검증 & 즉시 적용 핸들러
   const handleApplyReferral = async (e) => {
@@ -218,10 +221,13 @@ export default function PaymentModal({
     setError("");
     setPinError("");
     try {
+      const cycle = pending?.billingCycle === "annual" ? "annual" : "monthly";
+      const productKind = isB2b ? "b2b" : "paid";
       const result = await openPaymentGateway({
-        tier: isB2b ? "b2b" : "paid",
+        tier: productKind,
+        kind: productKind,
         amount: finalPrice,
-        billingCycle: pending?.billingCycle === "annual" ? "annual" : "monthly",
+        billingCycle: cycle,
         referralCode: referralApplied && referralInput.trim() ? referralInput.trim() : null
       });
       // 모바일은 PG 페이지로 이동 — 결과는 /app/payment/v2/callback 에서 처리

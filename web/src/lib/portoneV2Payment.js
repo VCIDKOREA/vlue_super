@@ -80,11 +80,13 @@ export async function requestPortoneV2Payment(opts = {}) {
     throw new Error("결제 금액(totalAmount)이 올바르지 않습니다.");
   }
 
-  // KPN 결제창은 비ASCII 라틴 문자를 HTML 엔티티(VLU&#201;)로 그대로 노출함
+  // KPN 결제창: É→HTML엔티티(VLU&#201;), NFD 한글 자모→&#4363; 등으로 깨짐
+  // 한글은 NFC(완성형) 유지, 라틴 악센트만 ASCII로 치환
   const orderName = String(opts.orderName || "")
     .replace(/&#?\w+;/g, "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[Éé]/g, "E")
+    .normalize("NFC")
+    .replace(/\s+/g, " ")
     .trim();
   if (!orderName) throw new Error("주문명(orderName)이 필요합니다.");
 

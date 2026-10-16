@@ -118,7 +118,7 @@ export default function MembershipModal({
   // 선택된 결제 상품 상세
   const [targetItem, setTargetItem] = useState({
     kind: "paid",
-    name: "VLUÉ 유료 플랜 (Paid)",
+    name: "VLUE 유료 플랜",
     basePrice: PAID_EVENT_MONTHLY_KRW,
     annualPrice: PAID_EVENT_ANNUAL_KRW,
     allowsReferral: true
@@ -344,10 +344,13 @@ export default function MembershipModal({
     setPinError("");
 
     const cycle = billingCycle === "annual" ? "annual" : "monthly";
-    const newTier = targetItem.kind === "b2b" ? "b2b" : "paid";
+    const productKind = targetItem.kind || "paid";
+    const newTier = productKind === "b2b" ? "b2b" : "paid";
+    const orderName = membershipOrderName({ kind: productKind, billingCycle: cycle });
     try {
       const result = await openPaymentGateway({
         tier: newTier,
+        kind: productKind,
         amount: finalPrice,
         billingCycle: cycle,
         referralCode: referralApplied && referralInput.trim() ? referralInput.trim() : null
@@ -358,7 +361,7 @@ export default function MembershipModal({
       onMembershipTierChange?.(newTier);
       setSuccessInfo({
         tier: newTier,
-        planName: membershipOrderName(newTier),
+        planName: orderName,
         amountKrw: finalPrice,
         billingCycle: cycle
       });
@@ -636,7 +639,7 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "paid",
-                        name: "VLUÉ 유료 플랜 (Paid)",
+                        name: "VLUE 유료 플랜",
                         basePrice: PAID_EVENT_MONTHLY_KRW,
                         annualPrice: PAID_EVENT_ANNUAL_KRW,
                         allowsReferral: true
@@ -722,7 +725,7 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "b2b",
-                        name: "비즈니스 / B2B 풀 패키지 (모바일 회선)",
+                        name: "VLUE 비즈니스 플랜",
                         basePrice: B2B_STAFF_EVENT_MONTHLY_KRW,
                         annualPrice: B2B_STAFF_EVENT_MONTHLY_KRW * 12,
                         allowsReferral: true
@@ -775,7 +778,7 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "extension_line",
-                        name: "내선·대표번호 추가 회선",
+                        name: "VLUE 내선 대표번호 추가 회선",
                         basePrice: EXTENSION_LINE_MONTHLY_KRW,
                         annualPrice: EXTENSION_LINE_MONTHLY_KRW * 12,
                         allowsReferral: false
@@ -818,7 +821,7 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "multi_profile",
-                        name: "멀티 프로필+ 추가 슬롯",
+                        name: "VLUE 멀티 프로필 추가 슬롯",
                         basePrice: MULTI_PROFILE_ADDON_MONTHLY_KRW,
                         annualPrice: MULTI_PROFILE_ADDON_MONTHLY_KRW * 12,
                         allowsReferral: false
