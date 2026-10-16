@@ -204,28 +204,20 @@ export async function copyShowcaseShareUrl(card, opts = {}) {
     /* ignore */
   }
 
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(viewUrl);
-    } else {
-      const ta = document.createElement("textarea");
-      ta.value = viewUrl;
-      ta.setAttribute("readonly", "");
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
-    return { ok: true, channel: "copy_showcase_url", viewUrl };
-  } catch (e) {
+  const { copyTextToClipboard } = await import("./copyTextToClipboard.js");
+  const copied = await copyTextToClipboard(viewUrl);
+  if (copied.ok) {
     return {
-      ok: false,
-      error: e instanceof Error ? e.message : "주소를 복사하지 못했습니다.",
+      ok: true,
+      channel: copied.channel || "copy_showcase_url",
       viewUrl
     };
   }
+  return {
+    ok: false,
+    error: copied.error || "주소를 복사하지 못했습니다.",
+    viewUrl
+  };
 }
 
 /**

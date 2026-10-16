@@ -148,9 +148,12 @@ export default function LetteringBizcardSharePanel({
     setBusy("copy");
     try {
       const r = await copyShowcaseShareUrl(card, { membershipTier });
-      if (!r.ok && r.error) {
-        onToast?.(r.error);
-        if (r.viewUrl) onToast?.(`주소: ${r.viewUrl}`);
+      if (!r.ok) {
+        onToast?.(r.error || "주소를 복사하지 못했습니다.");
+        /* 복사 실패 시 URL만 토스트로 노출 — 사용자가 길게 눌러 수동 복사 가능 */
+        if (r.viewUrl) {
+          onToast?.(`복사 실패 · 수동 복사: ${r.viewUrl}`);
+        }
         return;
       }
       onToast?.(

@@ -2,6 +2,8 @@ package kr.vlue.calloverlay
 
 import android.annotation.SuppressLint
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -1456,6 +1458,24 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             if (CallOverlayService.isCompanionSurfaceVisible()) return "1"
             if (LetteringCallCoordinator.isIncomingRingingActive()) return "1"
             return "0"
+        }
+
+        /**
+         * 웹 → 시스템 클립보드. Android WebView 의 navigator.clipboard 가
+         * NotAllowedError 로 실패하는 경우를 보완한다. 성공 "1" / 실패 "0".
+         */
+        @android.webkit.JavascriptInterface
+        fun copyText(text: String?): String {
+            val value = text.orEmpty()
+            if (value.isEmpty()) return "0"
+            return try {
+                val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("vlue", value))
+                "1"
+            } catch (e: Exception) {
+                Log.w("MainJsBridge", "copyText failed", e)
+                "0"
+            }
         }
 
         /** 웹 로그인 세션 → 네이티브 (알림·통화 감지 자동 무장) */
