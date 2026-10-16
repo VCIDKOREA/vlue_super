@@ -1,4 +1,4 @@
-import { Mail, MapPin } from 'lucide-react';
+import { Mail, MapPin, Phone } from 'lucide-react';
 import { VlueBrandLogo } from '../../../components/VlueBrandLogo.jsx';
 import type { View } from '../types';
 import { isWebViewV1Enabled } from '../../../lib/v1ReleaseScope.js';
@@ -61,16 +61,21 @@ export default function Footer({ onNavigate }: FooterProps) {
             </p>
             <div className="mkt-footer-contact flex flex-col gap-1.5 sm:gap-2">
               <div className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs text-gray-400">
+                <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary-400 flex-shrink-0" />
+                <span>대표문의: 010-8014-4666</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs text-gray-400">
                 <Mail className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary-400 flex-shrink-0" />
                 <span>support@vlue.kr</span>
               </div>
-              <div className="mkt-footer-address flex items-start gap-1.5 text-[0.6875rem] sm:text-xs text-gray-400">
+              <div className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs text-gray-400">
                 <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary-400 flex-shrink-0 mt-0.5" />
                 <span>경북 구미시 인동23길 4</span>
               </div>
               <div className="mt-1 space-y-0.5 text-[0.625rem] sm:text-[0.6875rem] leading-relaxed text-gray-500">
                 <p>상호: 브이씨아이디코리아(VCID KOREA)</p>
                 <p>대표자: 이종근</p>
+                <p>대표문의: 010-8014-4666</p>
                 <p>사업자: 884-08-03191</p>
                 <p>통신판매업: 제 2026-경북구미-0551호</p>
               </div>
