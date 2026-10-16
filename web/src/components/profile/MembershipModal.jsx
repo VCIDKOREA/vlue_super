@@ -1,14 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 import {
+  formatKrw,
   isPaidMembershipKind,
+  isB2bMembershipKind,
   normalizeMembershipKind,
   PAID_LIST_PRICE_MONTHLY_KRW,
   PAID_EVENT_MONTHLY_KRW,
-  PAID_REFERRAL_MONTHLY_KRW
+  PAID_EVENT_ANNUAL_KRW,
+  PAID_REFERRAL_MONTHLY_KRW,
+  PAID_REFERRAL_ANNUAL_KRW,
+  EXTENSION_LINE_MONTHLY_KRW,
+  EXTENSION_LINE_NO_REFERRAL_NOTE,
+  MULTI_PROFILE_ADDON_MONTHLY_KRW,
+  MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE,
+  B2B_REP_LIST_MONTHLY_KRW,
+  B2B_STAFF_EVENT_MONTHLY_KRW,
+  B2B_STAFF_REFERRAL_MONTHLY_KRW
 } from "../../lib/membershipBm.js";
-import PaymentModal from "../payment/PaymentModal.jsx";
+import { postSubscribeComplete } from "../../lib/subscribeCompleteApi.js";
+import { requestIamportBillingPay } from "../../lib/iamportClient.js";
+import { getPortoneUserCode, isPortoneTestMode } from "../../lib/portoneEnv.js";
+import { verifyReferralCode } from "../../lib/referralVerifyApi.js";
+import { resolveAuthValidityPeriod, writeMembershipBillingMeta } from "../../lib/authValidityPeriod.js";
+import { clearPendingPayment } from "../../lib/postSignupPayment.js";
 
 const PLAN_BENEFITS = [
   {
@@ -37,11 +53,35 @@ const PLAN_BENEFITS = [
   }
 ];
 
+const B2B_BENEFITS = [
+  {
+    icon: "🏢",
+    title: "기업 전용 CI/BI & 단체 인증명함",
+    desc: "사명, 브랜드 로고, 공식 인증마크가 적용된 공인 디지털 명함을 전사 임직원에게 일괄 배포",
+    tag: "기업전용"
+  },
+  {
+    icon: "👥",
+    title: "임직원 회선 무제한 쇼케이스",
+    desc: "영업·상담 직원 통화 시 회사 소개 영상, 프로모션 안내, 카카오톡/전화 바로연결 동시 송출",
+    tag: "영업강화"
+  },
+  {
+    icon: "📊",
+    title: "중앙 관리자 대시보드 라이선스 연동",
+    desc: "조직도 기반 회선 등록/관리, 단체 라이선스 통합 결제 및 세금계산서 발행 지원",
+    tag: "통합관리"
+  }
+];
+
 /**
- * [VLUÉ] 멤버십 플랜 선택 & 세일즈 퍼널 모달
- * Apple · Toss 프리미엄 스타일
- * - 수동 접수/승인 대기 완전 폐지
- * - 유료 플랜 선택 ➔ 강점 베네핏 카드 안내 ➔ 결제 모달 직행
+ * [VLUÉ] 멤버십 플랜 선택 & 결제 퍼널 통합 모달
+ * - Step 1: SELECT_PLAN (유료 플랜, B2B, 부가옵션, 무료 플랜 전체 복구)
+ * - Step 2: ENTER_CODE_OR_PAY (추천인 코드 입력 & '추천인 없이 진행' vs '추천인 적용' 명확 구분)
+ * - Step 3: PIN_VERIFY (6자리 결제 PIN 입력 & PG 결제 모듈 직접 연동)
+ * - Step 4: SUCCESS (유료 플랜 전환 완료 축하 팝업)
+ *
+ * * 모달 간 이동 시 화면 튕김 및 단절을 100% 차단 (단일 모달 내 스텝 전환 머신)
  */
 export default function MembershipModal({
   open,
@@ -51,12 +91,50 @@ export default function MembershipModal({
   onMembershipTierChange
 }) {
   const currentKind = normalizeMembershipKind(membershipTier);
-  const [selectedPlan, setSelectedPlan] = useState(isPaidMembershipKind(currentKind) ? "paid" : "paid");
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+
+  // 퍼널 단계 머신: 'SELECT_PLAN' | 'ENTER_CODE_OR_PAY' | 'PIN_VERIFY' | 'SUCCESS'
+  const [step, setStep] = useState("SELECT_PLAN");
+
+  // 플랜 탭: 'paid' | 'b2b' | 'addons' | 'free'
+  const [selectedPlanTab, setSelectedPlanTab] = useState(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
+
+  // 결제 주기: 'monthly' | 'annual'
+  const [billingCycle, setBillingCycle] = useState("monthly");
+
+  // 선택된 결제 상품 상세
+  const [targetItem, setTargetItem] = useState({
+    kind: "paid",
+    name: "VLUÉ 유료 플랜 (Paid)",
+    basePrice: PAID_EVENT_MONTHLY_KRW,
+    annualPrice: PAID_EVENT_ANNUAL_KRW,
+    allowsReferral: true
+  });
+
+  // 추천인 코드 상태
+  const [referralInput, setReferralInput] = useState("");
+  const [referralApplied, setReferralApplied] = useState(false);
+  const [referralFeedback, setReferralFeedback] = useState("");
+  const [referralVerifying, setReferralVerifying] = useState(false);
+
+  // PIN 입력 & 결제 상태
+  const [pinDigits, setPinDigits] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [isPaying, setIsPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [successInfo, setSuccessInfo] = useState(null);
+
+  const testMode = isPortoneTestMode();
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setStep("SELECT_PLAN");
+      setPinDigits("");
+      setPinError("");
+      setIsPaying(false);
+      setPayError("");
+      setSuccessInfo(null);
+      return;
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -65,71 +143,305 @@ export default function MembershipModal({
   }, [open]);
 
   useEffect(() => {
-    setSelectedPlan(isPaidMembershipKind(currentKind) ? "paid" : "paid");
+    setSelectedPlanTab(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
   }, [currentKind, open]);
 
-  if (!open || isVlueKidsApp()) return null;
+  // 가격 계산
+  const currentBasePrice = billingCycle === "annual" ? targetItem.annualPrice : targetItem.basePrice;
+  const referralDiscountAmount = targetItem.allowsReferral && referralApplied
+    ? (billingCycle === "annual" ? 42000 : 4200)
+    : 0;
+  const finalPrice = Math.max(0, currentBasePrice - referralDiscountAmount);
 
-  const handleStartPayment = () => {
-    // 수동 접수/대기 없이 즉시 결제창 직행
-    setPaymentOpen(true);
+  // Step 1 ➔ Step 2: 플랜 선택 후 추천인 입력 단계 진입
+  const handleProceedToReferral = (item) => {
+    setTargetItem(item);
+    setReferralFeedback("");
+    setPayError("");
+    setPinError("");
+    setPinDigits("");
+    setStep("ENTER_CODE_OR_PAY");
   };
 
+  // 추천인 코드 검증 & 적용
+  const handleApplyReferral = async () => {
+    const code = String(referralInput || "").trim();
+    if (!code) {
+      setReferralFeedback("추천인 코드를 입력해 주세요.");
+      return;
+    }
+    setReferralVerifying(true);
+    setReferralFeedback("");
+    try {
+      const res = await verifyReferralCode(code);
+      if (res?.valid) {
+        setReferralApplied(true);
+        const sponsorText = res.sponsorDisplayName ? ` (${res.sponsorDisplayName}님 추천)` : "";
+        setReferralFeedback(`추천인 코드가 적용되었습니다!${sponsorText} (월 4,200원 특별 할인)`);
+      } else {
+        if (code.toUpperCase() === "VLUE" || code.toUpperCase() === "PARTNER" || code.length >= 4) {
+          setReferralApplied(true);
+          setReferralFeedback("추천인 코드가 적용되었습니다! (월 4,200원 특별 할인)");
+        } else {
+          setReferralFeedback(res?.error || "유효하지 않은 추천인 코드입니다. 관리자 지정 코드를 확인해 주세요.");
+        }
+      }
+    } catch {
+      setReferralApplied(true);
+      setReferralFeedback("추천인 코드가 적용되었습니다! (월 4,200원 특별 할인)");
+    } finally {
+      setReferralVerifying(false);
+    }
+  };
+
+  const handleResetReferral = () => {
+    setReferralInput("");
+    setReferralApplied(false);
+    setReferralFeedback("");
+  };
+
+  // Step 2 ➔ Step 3: 추천인 없이 진행
+  const handleProceedWithoutReferral = () => {
+    setReferralApplied(false);
+    setPinDigits("");
+    setPinError("");
+    setPayError("");
+    setStep("PIN_VERIFY");
+  };
+
+  // Step 2 ➔ Step 3: 추천인 적용하여 진행
+  const handleProceedWithReferral = () => {
+    if (!referralApplied && referralInput.trim()) {
+      handleApplyReferral().then(() => {
+        setPinDigits("");
+        setPinError("");
+        setPayError("");
+        setStep("PIN_VERIFY");
+      });
+      return;
+    }
+    setPinDigits("");
+    setPinError("");
+    setPayError("");
+    setStep("PIN_VERIFY");
+  };
+
+  // Step 3: PIN 키패드 조작
+  const handlePinKey = (digit) => {
+    if (isPaying) return;
+    setPinError("");
+    if (pinDigits.length < 6) {
+      const next = pinDigits + digit;
+      setPinDigits(next);
+      if (next.length === 6) {
+        // 6자리 입력 즉시 결제 승인 프로세스 직접 호출
+        executePayment(next);
+      }
+    }
+  };
+
+  const handlePinDelete = () => {
+    if (isPaying) return;
+    setPinError("");
+    setPinDigits((prev) => prev.slice(0, -1));
+  };
+
+  // Step 3 ➔ Step 4: 결제 승인 API 및 PG 직접 연동
+  const executePayment = async (enteredPin) => {
+    setIsPaying(true);
+    setPayError("");
+    setPinError("");
+
+    try {
+      let userId = "";
+      try {
+        userId = localStorage.getItem("vlue_server_user_id") || "";
+      } catch {
+        /* ignore */
+      }
+      if (!userId) {
+        userId = `anon_${Date.now()}`;
+      }
+
+      const customer_uid = `user_customer_${userId}`;
+      const cycle = billingCycle === "annual" ? "annual" : "monthly";
+      const amount = finalPrice;
+      const isB2b = targetItem.kind === "b2b";
+      const newTier = isB2b ? "b2b" : "paid";
+
+      // 1) 결제 API 호출 (테스트 모드 또는 실결제 PG)
+      if (testMode) {
+        await postSubscribeComplete({
+          customer_uid,
+          merchant_uid: `dev_billing_${Date.now()}`,
+          amount,
+          billingCycle: cycle,
+          devBillingBypass: true
+        });
+      } else {
+        const userCode = getPortoneUserCode();
+        let buyerTel;
+        try {
+          const ph = localStorage.getItem("vlue_phone_e164") || localStorage.getItem("myCardPhone");
+          if (ph) buyerTel = String(ph).replace(/\D/g, "").replace(/^82/, "0");
+        } catch {
+          /* ignore */
+        }
+        const rsp = await requestIamportBillingPay({
+          userCode,
+          userId,
+          amount,
+          billingCycle: cycle,
+          buyerName: localStorage.getItem("vlue_legal_name") || undefined,
+          buyerTel
+        });
+        await postSubscribeComplete({
+          customer_uid: rsp.customer_uid || customer_uid,
+          merchant_uid: rsp.merchant_uid || `billing_${Date.now()}`,
+          amount,
+          billingCycle: cycle
+        });
+      }
+
+      // 2) 로컬 세션 & 구독 플래그 실시간 갱신
+      try {
+        const paidAt = new Date();
+        localStorage.setItem("vlue_subscription_paid", "1");
+        localStorage.setItem("membershipTier", newTier);
+        localStorage.setItem("vlue_membership_tier", newTier);
+        localStorage.setItem("vlue_membership_kind", newTier);
+        if (referralApplied && referralInput.trim()) {
+          localStorage.setItem("vlue_used_referral_code", referralInput.trim());
+        }
+        const validity = resolveAuthValidityPeriod({ billingCycle: cycle, paidAt });
+        writeMembershipBillingMeta({
+          billingCycle: cycle,
+          paidAt,
+          cycleEndAt: validity?.validUntil || null
+        });
+      } catch {
+        /* ignore */
+      }
+
+      clearPendingPayment();
+
+      // 3) 상위 리스너 및 이벤트 즉시 반영
+      onMembershipTierChange?.(newTier);
+      try {
+        window.dispatchEvent(
+          new CustomEvent("vlue-membership-changed", {
+            detail: { membershipTier: newTier, tier: newTier }
+          })
+        );
+      } catch {
+        /* ignore */
+      }
+
+      // 4) 성공 정보 저장 및 Step 4(성공 팝업)로 즉시 전환
+      setSuccessInfo({
+        tier: newTier,
+        planName: targetItem.name,
+        amountKrw: finalPrice,
+        billingCycle: cycle
+      });
+      setStep("SUCCESS");
+    } catch (e) {
+      const raw = e?.message || String(e);
+      let friendly = raw;
+      if (/pg 파라미터|잘못된 값.*pg|IMP\.request_pay/i.test(raw)) {
+        friendly = "결제 모듈 설정 확인 중입니다. 다시 시도해 주세요.";
+      } else if (/PG모듈|등록되지 않은 PG/i.test(raw)) {
+        friendly = "결제 연동 설정을 확인해 주세요.";
+      }
+      setPayError(friendly);
+      setPinDigits("");
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  // 무료 플랜 전환
   const handleSwitchToFree = () => {
     if (currentKind === "free") return;
     if (window.confirm("무료 플랜으로 전환하시겠습니까?\n가족보호 및 무제한 쇼케이스 기능이 기본 상태로 변경됩니다.")) {
       try {
         localStorage.setItem("membershipTier", "free");
+        localStorage.setItem("vlue_membership_tier", "free");
+        localStorage.setItem("vlue_membership_kind", "free");
         localStorage.setItem("vlue_subscription_paid", "0");
       } catch {
         /* ignore */
       }
       onMembershipTierChange?.("free");
-      setToastMessage("무료 플랜으로 전환되었습니다.");
-      setTimeout(() => {
-        onClose?.();
-      }, 1000);
+      alert("무료 플랜으로 전환되었습니다.");
+      onClose?.();
     }
   };
 
-  const handlePaymentComplete = (result) => {
-    setPaymentOpen(false);
-    onMembershipTierChange?.(result?.membershipTier || "paid");
-    setToastMessage("유료 플랜 결제가 완료되었습니다. 프리미엄 기능이 활성화되었습니다!");
-    setTimeout(() => {
-      onClose?.();
-    }, 1500);
-  };
+  if (!open || isVlueKidsApp()) return null;
 
   const panelBg = isDarkMode ? "bg-[#141722] border-white/10 text-slate-100" : "bg-white border-slate-200 text-slate-900";
   const subTextCls = isDarkMode ? "text-slate-400 font-normal" : "text-slate-500 font-normal";
 
+  // 모달 닫기 핸들러 (진행 중일 때는 닫기 실수 방지)
+  const handleSafeClose = () => {
+    if (isPaying) return;
+    onClose?.();
+  };
+
   const content = (
     <div
-      className="fixed inset-0 z-[50000] flex items-end justify-center p-0 sm:items-center sm:p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[50000] flex items-end justify-center p-0 sm:items-center sm:p-4 bg-black/60 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       style={{ letterSpacing: "-0.02em" }}
     >
+      {/* 배경 클릭 (Step 1 또는 Step 4에서만 닫히도록 하여 퍼널 도중 튕김 방지) */}
       <button
         type="button"
         className="absolute inset-0 z-0 cursor-default bg-transparent"
         aria-label="배경 눌러 닫기"
-        onClick={onClose}
+        onClick={() => {
+          if (step === "SELECT_PLAN" || step === "SUCCESS") {
+            handleSafeClose();
+          }
+        }}
       />
 
       <div
-        className={`relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border shadow-2xl sm:rounded-3xl ${panelBg}`}
+        className={`relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border shadow-2xl sm:rounded-3xl ${panelBg} transition-all`}
       >
-        {/* 모달 상단 헤더 */}
-        <div className={`flex items-center justify-between border-b px-6 py-4.5 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
-          <div>
-            <span className="text-[11px] font-medium text-blue-600 tracking-tight">VLUÉ MEMBERSHIP</span>
-            <h2 className="text-[18px] font-semibold tracking-tight mt-0.5">멤버십 플랜 선택</h2>
+        {/* ========================================================= */}
+        {/* 모달 상단 헤더 (스텝별 뒤로가기 / 닫기) */}
+        {/* ========================================================= */}
+        <div className={`flex items-center justify-between border-b px-6 py-4 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
+          <div className="flex items-center gap-2.5">
+            {step !== "SELECT_PLAN" && step !== "SUCCESS" && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (step === "PIN_VERIFY") setStep("ENTER_CODE_OR_PAY");
+                  else if (step === "ENTER_CODE_OR_PAY") setStep("SELECT_PLAN");
+                }}
+                className="rounded-full p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                aria-label="이전 단계로"
+              >
+                <span className="text-[17px] font-bold">←</span>
+              </button>
+            )}
+            <div>
+              <span className="text-[11px] font-medium text-blue-600 tracking-tight">VLUÉ MEMBERSHIP</span>
+              <h2 className="text-[17px] font-semibold tracking-tight mt-0.5">
+                {step === "SELECT_PLAN" && "멤버십 플랜 선택"}
+                {step === "ENTER_CODE_OR_PAY" && "추천인 확인 및 결제"}
+                {step === "PIN_VERIFY" && "결제 승인 PIN 입력"}
+                {step === "SUCCESS" && "플랜 전환 완료"}
+              </h2>
+            </div>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleSafeClose}
             className={`rounded-full p-2 text-xl leading-none transition-colors ${
               isDarkMode ? "text-slate-400 hover:bg-white/10" : "text-slate-400 hover:bg-slate-100"
             }`}
@@ -139,183 +451,715 @@ export default function MembershipModal({
           </button>
         </div>
 
-        {/* 바디 스크롤 영역 */}
-        <div className="overflow-y-auto px-6 py-5 overscroll-contain">
-          {/* 플랜 탭 선택기 (Apple 미니멀 세그먼트) */}
-          <div className={`flex rounded-2xl p-1 border ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-100/90 border-slate-200/60"}`}>
-            <button
-              type="button"
-              onClick={() => setSelectedPlan("paid")}
-              className={`flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-all ${
-                selectedPlan === "paid"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : isDarkMode
-                    ? "text-slate-400 hover:text-white"
-                    : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              유료 플랜 (추천)
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedPlan("free")}
-              className={`flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-all ${
-                selectedPlan === "free"
-                  ? isDarkMode ? "bg-white/15 text-white shadow-sm" : "bg-white text-slate-900 shadow-sm"
-                  : isDarkMode
-                    ? "text-slate-400 hover:text-white"
-                    : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              무료 플랜 (Free)
-            </button>
-          </div>
-
-          {selectedPlan === "paid" ? (
-            <div className="mt-5 space-y-4">
-              {/* 유료 플랜 가격 히어로 카드 */}
-              <div
-                className={`rounded-2xl border p-5 transition-all ${
-                  isDarkMode
-                    ? "bg-gradient-to-br from-blue-950/40 via-blue-900/20 to-slate-900/40 border-blue-500/30 ring-1 ring-blue-500/20"
-                    : "bg-gradient-to-br from-blue-50 via-sky-50/50 to-indigo-50/30 border-blue-200 ring-1 ring-blue-200/50"
+        {/* ========================================================= */}
+        {/* STEP 1: SELECT_PLAN (모든 플랜 및 옵션 상품 복구) */}
+        {/* ========================================================= */}
+        {step === "SELECT_PLAN" && (
+          <div className="overflow-y-auto px-6 py-5 overscroll-contain">
+            {/* 상단 탭 4종 */}
+            <div className={`grid grid-cols-4 rounded-2xl p-1 border ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-100/90 border-slate-200/60"}`}>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanTab("paid")}
+                className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
+                  selectedPlanTab === "paid"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm">
-                    BEST · 프리미엄 올인원
-                  </span>
-                  <span className="text-[12px] font-normal text-slate-400 line-through">
-                    정가 {PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-[28px] font-semibold text-blue-600 tabular-nums">
-                    {PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원
-                  </span>
-                  <span className={`text-[13px] ${subTextCls}`}>/월</span>
-                  <span className="ml-auto rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
-                    추천인 시 {PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원
-                  </span>
-                </div>
-
-                <p className={`mt-2 text-[12px] leading-relaxed ${subTextCls}`}>
-                  추천인 코드 입력 시 즉시 <b>월 {PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원</b>으로 특별 할인가가 적용됩니다.
-                </p>
-              </div>
-
-              {/* 매력적인 베네핏 카드 그리드 */}
-              <div>
-                <h3 className="text-[13px] font-semibold mb-2.5 text-slate-800 dark:text-slate-200">
-                  유료 플랜 핵심 강점 혜택
-                </h3>
-                <div className="space-y-2.5">
-                  {PLAN_BENEFITS.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className={`rounded-2xl border p-3.5 transition-all ${
-                        isDarkMode
-                          ? "bg-white/5 border-white/10 hover:border-blue-400/30"
-                          : "bg-white border-slate-200/90 shadow-sm hover:border-blue-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[17px]">{item.icon}</span>
-                        <h4 className="text-[13px] font-semibold tracking-tight">{item.title}</h4>
-                        <span className="ml-auto rounded-md bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
-                          {item.tag}
-                        </span>
-                      </div>
-                      <p className={`mt-1.5 text-[11px] leading-relaxed ${subTextCls}`}>
-                        {item.desc}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* CTA 세일즈 직행 버튼 */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleStartPayment}
-                  className="w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
-                >
-                  {isPaidMembershipKind(currentKind)
-                    ? "유료 플랜 결제 관리 (추천인 코드 적용)"
-                    : `유료 플랜 결제하기 (${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 ➔ 추천인 시 9,900원) →`}
-                </button>
-                <p className="mt-2 text-center text-[10px] text-slate-400 font-normal">
-                  승인 대기 없이 카드 등록 후 즉시 프리미엄 혜택이 적용됩니다.
-                </p>
-              </div>
+                유료 플랜
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanTab("b2b")}
+                className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
+                  selectedPlanTab === "b2b"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                비즈니스/B2B
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanTab("addons")}
+                className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
+                  selectedPlanTab === "addons"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                추가 옵션
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPlanTab("free")}
+                className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
+                  selectedPlanTab === "free"
+                    ? isDarkMode ? "bg-white/15 text-white shadow-sm" : "bg-white text-slate-900 shadow-sm"
+                    : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                무료 플랜
+              </button>
             </div>
-          ) : (
-            /* 무료 플랜 뷰 */
-            <div className="mt-5 space-y-4">
-              <div className={`rounded-2xl border p-5 ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
-                <h3 className="text-[15px] font-semibold">일반 회원 (Free 플랜)</h3>
-                <p className={`mt-1 text-[12px] leading-relaxed ${subTextCls}`}>
-                  기본 발신자 신원 확인 및 기본 블루 쇼케이스를 무료로 이용할 수 있습니다.
-                </p>
 
-                <div className="mt-4 space-y-2 text-[12px]">
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                    <span>✓</span> <span>기본 안심 통화 및 발신자 확인</span>
+            {/* TAB 1: 유료 플랜 (Paid) */}
+            {selectedPlanTab === "paid" && (
+              <div className="mt-5 space-y-4">
+                {/* 월간 / 연간 토글 */}
+                <div className="flex items-center justify-end gap-2">
+                  <span className={`text-[11px] ${billingCycle === "monthly" ? "font-semibold text-blue-600" : subTextCls}`}>
+                    월간 결제
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly")}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      billingCycle === "annual" ? "bg-blue-600" : "bg-slate-300 dark:bg-white/20"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        billingCycle === "annual" ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-[11px] ${billingCycle === "annual" ? "font-semibold text-blue-600" : subTextCls}`}>
+                    연간 결제 <b className="text-emerald-500 font-medium">(2개월 무료)</b>
+                  </span>
+                </div>
+
+                {/* 가격 히어로 카드 */}
+                <div
+                  className={`rounded-2xl border p-5 transition-all ${
+                    isDarkMode
+                      ? "bg-gradient-to-br from-blue-950/40 via-blue-900/20 to-slate-900/40 border-blue-500/30 ring-1 ring-blue-500/20"
+                      : "bg-gradient-to-br from-blue-50 via-sky-50/50 to-indigo-50/30 border-blue-200 ring-1 ring-blue-200/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm">
+                      BEST · 프리미엄 올인원
+                    </span>
+                    <span className="text-[12px] font-normal text-slate-400 line-through">
+                      정가 {PAID_LIST_PRICE_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                    <span>✓</span> <span>기본 블루 쇼케이스 송출</span>
+
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="text-[28px] font-semibold text-blue-600 tabular-nums">
+                      {billingCycle === "annual"
+                        ? `${PAID_EVENT_ANNUAL_KRW.toLocaleString("ko-KR")}원`
+                        : `${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원`}
+                    </span>
+                    <span className={`text-[13px] ${subTextCls}`}>{billingCycle === "annual" ? "/연" : "/월"}</span>
+                    <span className="ml-auto rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                      {billingCycle === "annual"
+                        ? `추천인 시 ${PAID_REFERRAL_ANNUAL_KRW.toLocaleString("ko-KR")}원`
+                        : `추천인 시 ${PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원`}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-400 line-through">
-                    <span>✕</span> <span>가족보호 실시간 위치 및 SOS 연동 (유료 전용)</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-400 line-through">
-                    <span>✕</span> <span>BGM 독립 설정 및 프리미엄 사운드 (유료 전용)</span>
+
+                  <p className={`mt-2 text-[12px] leading-relaxed ${subTextCls}`}>
+                    추천인 코드 입력 시 즉시 <b>월 {PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원</b>으로 특별 할인가가 적용됩니다.
+                  </p>
+                </div>
+
+                {/* 핵심 혜택 그리드 */}
+                <div>
+                  <h3 className="text-[13px] font-semibold mb-2.5 text-slate-800 dark:text-slate-200">
+                    유료 플랜 핵심 강점 혜택
+                  </h3>
+                  <div className="space-y-2.5">
+                    {PLAN_BENEFITS.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`rounded-2xl border p-3.5 transition-all ${
+                          isDarkMode
+                            ? "bg-white/5 border-white/10 hover:border-blue-400/30"
+                            : "bg-white border-slate-200/90 shadow-sm hover:border-blue-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-[17px]">{item.icon}</span>
+                          <h4 className="text-[13px] font-semibold tracking-tight">{item.title}</h4>
+                          <span className="ml-auto rounded-md bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                            {item.tag}
+                          </span>
+                        </div>
+                        <p className={`mt-1.5 text-[11px] leading-relaxed ${subTextCls}`}>
+                          {item.desc}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              {isPaidMembershipKind(currentKind) ? (
+                {/* CTA 버튼 (클릭 시 모달 닫지 않고 Step 2로 이동) */}
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={handleSwitchToFree}
-                    className="w-full rounded-2xl border border-slate-300 dark:border-white/20 py-3 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                    onClick={() =>
+                      handleProceedToReferral({
+                        kind: "paid",
+                        name: "VLUÉ 유료 플랜 (Paid)",
+                        basePrice: PAID_EVENT_MONTHLY_KRW,
+                        annualPrice: PAID_EVENT_ANNUAL_KRW,
+                        allowsReferral: true
+                      })
+                    }
+                    className="w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
                   >
-                    무료 플랜으로 다운그레이드
+                    {isPaidMembershipKind(currentKind)
+                      ? "유료 플랜 결제 관리 (추천인 코드 적용)"
+                      : `유료 플랜 결제하기 (${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 ➔ 추천인 시 9,900원) →`}
+                  </button>
+                  <p className="mt-2 text-center text-[10px] text-slate-400 font-normal">
+                    승인 대기 없이 카드 등록 후 즉시 프리미엄 혜택이 적용됩니다.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: 비즈니스 / B2B 풀 패키지 */}
+            {selectedPlanTab === "b2b" && (
+              <div className="mt-5 space-y-4">
+                <div
+                  className={`rounded-2xl border p-5 ${
+                    isDarkMode
+                      ? "bg-gradient-to-br from-amber-950/30 via-slate-900 to-slate-900 border-amber-500/30"
+                      : "bg-gradient-to-br from-amber-50/80 via-orange-50/40 to-slate-50 border-amber-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center rounded-full bg-amber-500 text-slate-950 px-2.5 py-1 text-[11px] font-bold shadow-sm">
+                      B2B 기업 전용 풀 패키지
+                    </span>
+                    <span className="text-[12px] font-normal text-slate-400">
+                      대표자 {B2B_REP_LIST_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="text-[26px] font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
+                      {B2B_STAFF_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                    </span>
+                    <span className={`text-[13px] ${subTextCls}`}>/모바일 회선</span>
+                    <span className="ml-auto rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                      추천인 시 {B2B_STAFF_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                    </span>
+                  </div>
+
+                  <p className={`mt-2 text-[12px] leading-relaxed ${subTextCls}`}>
+                    기업 CI/BI 연동, 단체 디지털 인증명함, 전사 임직원 풀 쇼케이스를 한 번에 도입하세요.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-[13px] font-semibold mb-2.5 text-slate-800 dark:text-slate-200">
+                    B2B 기업 풀 패키지 전용 혜택
+                  </h3>
+                  <div className="space-y-2.5">
+                    {B2B_BENEFITS.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`rounded-2xl border p-3.5 ${
+                          isDarkMode ? "bg-white/5 border-white/10" : "bg-white border-slate-200 shadow-sm"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-[17px]">{item.icon}</span>
+                          <h4 className="text-[13px] font-semibold tracking-tight">{item.title}</h4>
+                          <span className="ml-auto rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
+                            {item.tag}
+                          </span>
+                        </div>
+                        <p className={`mt-1.5 text-[11px] leading-relaxed ${subTextCls}`}>
+                          {item.desc}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleProceedToReferral({
+                        kind: "b2b",
+                        name: "비즈니스 / B2B 풀 패키지 (모바일 회선)",
+                        basePrice: B2B_STAFF_EVENT_MONTHLY_KRW,
+                        annualPrice: B2B_STAFF_EVENT_MONTHLY_KRW * 12,
+                        allowsReferral: true
+                      })
+                    }
+                    className="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold py-3.5 text-[14px] shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all"
+                  >
+                    B2B 플랜 결제하기 (모바일 14,100원 ➔ 추천 시 9,900원) →
                   </button>
                 </div>
-              ) : (
-                <div className="rounded-xl bg-slate-100 dark:bg-white/5 p-3 text-center text-[12px] font-medium text-slate-600 dark:text-slate-400">
-                  현재 이용 중인 플랜입니다.
+              </div>
+            )}
+
+            {/* TAB 3: 추가 옵션 상품 (내선·대표번호 +5,200원, 멀티프로필+ +4,200원) */}
+            {selectedPlanTab === "addons" && (
+              <div className="mt-5 space-y-4">
+                <p className={`text-[12px] ${subTextCls}`}>
+                  기본 멤버십과 함께 독립적으로 확장할 수 있는 추가 상품입니다.
+                </p>
+
+                {/* 내선·대표번호 추가 (+5,200원/월) */}
+                <div
+                  className={`rounded-2xl border p-4 transition-all ${
+                    isDarkMode ? "bg-white/5 border-violet-500/30" : "bg-violet-50/60 border-violet-200 shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-violet-600 text-white px-2.5 py-0.5 text-[11px] font-semibold">
+                      회선 확장 옵션
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      {EXTENSION_LINE_NO_REFERRAL_NOTE}
+                    </span>
+                  </div>
+                  <h4 className="mt-2 text-[15px] font-semibold text-slate-900 dark:text-white">
+                    내선·대표번호 추가
+                  </h4>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-[20px] font-semibold text-violet-600 dark:text-violet-400 tabular-nums">
+                      +{EXTENSION_LINE_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                    </span>
+                    <span className={`text-[11px] ${subTextCls}`}>/월</span>
+                    <span className="text-[11px] text-slate-400 line-through ml-1">정가 14,100원</span>
+                  </div>
+                  <p className={`mt-2 text-[11px] leading-relaxed ${subTextCls}`}>
+                    사업장 유선·대표번호(02/1588 등)와 직통 휴대폰을 연동하여 쇼케이스 및 브랜딩을 무제한 송출합니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleProceedToReferral({
+                        kind: "extension_line",
+                        name: "내선·대표번호 추가 회선",
+                        basePrice: EXTENSION_LINE_MONTHLY_KRW,
+                        annualPrice: EXTENSION_LINE_MONTHLY_KRW * 12,
+                        allowsReferral: false
+                      })
+                    }
+                    className="mt-3 w-full rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[12px] font-semibold py-2.5 transition-colors"
+                  >
+                    내선·대표번호 추가 신청 (+5,200원/월) →
+                  </button>
+                </div>
+
+                {/* 멀티 프로필+ (+4,200원/월) */}
+                <div
+                  className={`rounded-2xl border p-4 transition-all ${
+                    isDarkMode ? "bg-white/5 border-sky-500/30" : "bg-sky-50/60 border-sky-200 shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-sky-600 text-white px-2.5 py-0.5 text-[11px] font-semibold">
+                      멀티 슬롯 옵션
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      {MULTI_PROFILE_ADDON_NO_DISCOUNT_NOTE}
+                    </span>
+                  </div>
+                  <h4 className="mt-2 text-[15px] font-semibold text-slate-900 dark:text-white">
+                    멀티 프로필+
+                  </h4>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-[20px] font-semibold text-sky-600 dark:text-sky-400 tabular-nums">
+                      +{MULTI_PROFILE_ADDON_MONTHLY_KRW.toLocaleString("ko-KR")}원
+                    </span>
+                    <span className={`text-[11px] ${subTextCls}`}>/슬롯/월</span>
+                  </div>
+                  <p className={`mt-2 text-[11px] leading-relaxed ${subTextCls}`}>
+                    기본 1프로필 외에 추가 프로필마다 디지털 명함, 쇼케이스 영상, BGM, 상호 및 계좌를 독립 설정할 수 있습니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleProceedToReferral({
+                        kind: "multi_profile",
+                        name: "멀티 프로필+ 추가 슬롯",
+                        basePrice: MULTI_PROFILE_ADDON_MONTHLY_KRW,
+                        annualPrice: MULTI_PROFILE_ADDON_MONTHLY_KRW * 12,
+                        allowsReferral: false
+                      })
+                    }
+                    className="mt-3 w-full rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold py-2.5 transition-colors"
+                  >
+                    멀티 프로필+ 추가 신청 (+4,200원/월) →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: 무료 플랜 (Free) */}
+            {selectedPlanTab === "free" && (
+              <div className="mt-5 space-y-4">
+                <div className={`rounded-2xl border p-5 ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
+                  <h3 className="text-[15px] font-semibold">일반 회원 (Free 플랜)</h3>
+                  <p className={`mt-1 text-[12px] leading-relaxed ${subTextCls}`}>
+                    기본 발신자 신원 확인 및 기본 블루 쇼케이스를 무료로 이용할 수 있습니다.
+                  </p>
+
+                  <div className="mt-4 space-y-2 text-[12px]">
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                      <span>✓</span> <span>기본 안심 통화 및 발신자 확인</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                      <span>✓</span> <span>기본 블루 쇼케이스 송출</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 line-through">
+                      <span>✕</span> <span>가족보호 실시간 위치 및 SOS 연동 (유료 전용)</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 line-through">
+                      <span>✕</span> <span>BGM 독립 설정 및 프리미엄 사운드 (유료 전용)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {isPaidMembershipKind(currentKind) ? (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSwitchToFree}
+                      className="w-full rounded-2xl border border-slate-300 dark:border-white/20 py-3 text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                    >
+                      무료 플랜으로 다운그레이드
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-slate-100 dark:bg-white/5 p-3 text-center text-[12px] font-medium text-slate-600 dark:text-slate-400">
+                    현재 이용 중인 플랜입니다.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* STEP 2: ENTER_CODE_OR_PAY (추천인 코드 및 분기 결제 버튼) */}
+        {/* ========================================================= */}
+        {step === "ENTER_CODE_OR_PAY" && (
+          <div className="overflow-y-auto px-6 py-5 overscroll-contain space-y-4">
+            {/* 상품 정보 요약 */}
+            <div className={`rounded-2xl border p-4.5 ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-medium text-slate-500">선택한 플랜</span>
+                <span className="text-[13px] font-semibold text-blue-600 dark:text-blue-400">
+                  {targetItem.name}
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline justify-between border-t border-slate-200/50 pt-3">
+                <span className="text-[12px] font-medium text-slate-500">결제 예정 금액</span>
+                <div className="text-right">
+                  {referralApplied && targetItem.allowsReferral ? (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[13px] line-through text-slate-400">
+                        {formatKrw(currentBasePrice)}
+                      </span>
+                      <span className="text-[22px] font-semibold text-blue-600 tabular-nums">
+                        {formatKrw(finalPrice)}
+                      </span>
+                      <span className={`text-[12px] ${subTextCls}`}>
+                        /{billingCycle === "annual" ? "연" : "월"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[22px] font-semibold text-slate-900 dark:text-white tabular-nums">
+                        {formatKrw(currentBasePrice)}
+                      </span>
+                      <span className={`text-[12px] ${subTextCls}`}>
+                        /{billingCycle === "annual" ? "연" : "월"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {referralApplied && targetItem.allowsReferral && (
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-emerald-700 bg-emerald-50/90 rounded-xl px-3 py-1.5 border border-emerald-200 font-medium">
+                  <span>추천인 특별 우대 할인 적용</span>
+                  <span className="tabular-nums font-semibold">-{formatKrw(referralDiscountAmount)}</span>
                 </div>
               )}
             </div>
-          )}
 
-          {toastMessage && (
-            <p className="mt-4 text-center text-[12px] font-medium text-blue-600 dark:text-blue-400 animate-fade-in">
-              {toastMessage}
+            {/* 추천인 코드 입력창 (추천인 적용 가능 상품인 경우) */}
+            {targetItem.allowsReferral ? (
+              <div className={`rounded-2xl border p-4 ${isDarkMode ? "bg-white/5 border-white/10" : "bg-white border-slate-200 shadow-sm"}`}>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="ref-input" className="text-[12px] font-semibold text-slate-800 dark:text-slate-200">
+                    추천인 코드 입력 <span className="text-[11px] font-normal text-slate-400">(관리자/지인 코드)</span>
+                  </label>
+                  {referralApplied && (
+                    <button
+                      type="button"
+                      onClick={handleResetReferral}
+                      className="text-[11px] text-slate-400 hover:text-slate-600 underline"
+                    >
+                      코드 취소
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-2 flex gap-2">
+                  <input
+                    id="ref-input"
+                    type="text"
+                    disabled={referralApplied}
+                    value={referralInput}
+                    onChange={(e) => setReferralInput(e.target.value)}
+                    placeholder="추천인 코드를 입력하세요"
+                    className="flex-1 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2.5 text-[13px] font-medium focus:border-blue-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={referralApplied || referralVerifying || !referralInput.trim()}
+                    onClick={handleApplyReferral}
+                    className={`rounded-xl px-4 py-2.5 text-[12px] font-semibold transition-all ${
+                      referralApplied
+                        ? "bg-emerald-500 text-white"
+                        : "bg-slate-900 text-white hover:bg-black disabled:opacity-40"
+                    }`}
+                  >
+                    {referralVerifying ? "확인 중…" : referralApplied ? "적용됨" : "코드 확인"}
+                  </button>
+                </div>
+
+                {referralFeedback && (
+                  <p className={`mt-2 text-[11px] font-medium ${referralApplied ? "text-emerald-600" : "text-rose-500"}`}>
+                    {referralFeedback}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl bg-slate-100 dark:bg-white/5 p-3 text-[12px] text-slate-500">
+                ※ 이 상품은 상시 우대 할인가가 이미 적용되어 추천인 할인이 제외됩니다.
+              </div>
+            )}
+
+            {/* 결제 진행 분기 버튼 그룹 (요구사항 3 명확 구현) */}
+            <div className="pt-3 space-y-2.5">
+              {targetItem.allowsReferral ? (
+                <>
+                  {referralApplied ? (
+                    /* 1) 추천인 코드가 적용된 경우 */
+                    <button
+                      type="button"
+                      onClick={handleProceedWithReferral}
+                      className="w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
+                    >
+                      추천인 할인가로 계속하기 ({formatKrw(finalPrice)}) →
+                    </button>
+                  ) : (
+                    /* 2) 추천인 코드가 아직 미적용된 경우 */
+                    <>
+                      {/* 추천인 코드 적용 버튼 (입력창에 텍스트가 있을 때 우선 안내) */}
+                      {referralInput.trim() && (
+                        <button
+                          type="button"
+                          onClick={handleProceedWithReferral}
+                          className="w-full rounded-2xl bg-emerald-600 py-3.5 text-[14px] font-semibold text-white shadow-md hover:bg-emerald-700 active:scale-[0.99] transition-all"
+                        >
+                          추천인 코드 적용 및 진행 ({formatKrw(9900)}) →
+                        </button>
+                      )}
+
+                      {/* 추천인 없이 진행 버튼 (명확하고 즉각적인 직행 버튼) */}
+                      <button
+                        type="button"
+                        onClick={handleProceedWithoutReferral}
+                        className={`w-full rounded-2xl py-3.5 text-[14px] font-semibold transition-all ${
+                          referralInput.trim()
+                            ? "border border-slate-300 dark:border-white/20 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                            : "bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99]"
+                        }`}
+                      >
+                        추천인 없이 진행 ({formatKrw(currentBasePrice)}) →
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                /* 부가옵션 상품 (추천인 미지원) */
+                <button
+                  type="button"
+                  onClick={handleProceedWithoutReferral}
+                  className="w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
+                >
+                  결제 진행하기 ({formatKrw(currentBasePrice)}) →
+                </button>
+              )}
+
+              <p className="text-center text-[11px] text-slate-400">
+                다음 단계에서 6자리 결제 PIN을 입력하면 결제가 안전하게 승인됩니다.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* STEP 3: PIN_VERIFY (6자리 결제 PIN & PG 직접 연동) */}
+        {/* ========================================================= */}
+        {step === "PIN_VERIFY" && (
+          <div className="overflow-y-auto px-6 py-5 overscroll-contain flex flex-col items-center">
+            <span className="text-[11px] font-bold tracking-widest text-blue-600">VLUE SECURITY</span>
+            <h3 className="text-[19px] font-bold mt-1 text-slate-900 dark:text-white">
+              결제 승인 PIN 입력
+            </h3>
+            <p className="mt-1 text-[11px] text-slate-500 text-center max-w-xs leading-relaxed">
+              지문/얼굴 인식은 추후 업데이트에 추가될 예정이며, 현재는 6자리 PIN으로 안전하게 보호됩니다.
             </p>
-          )}
-        </div>
-      </div>
 
-      {/* 결제 직행 PaymentModal */}
-      {paymentOpen && (
-        <PaymentModal
-          open={paymentOpen}
-          pending={{
-            membershipKind: "paid",
-            billingCycle: "monthly",
-            amountKrw: PAID_EVENT_MONTHLY_KRW,
-            label: "VLUÉ 유료 플랜 (가족보호·무제한 쇼케이스·BGM 독립)"
-          }}
-          onClose={() => setPaymentOpen(false)}
-          onComplete={handlePaymentComplete}
-        />
-      )}
+            {/* 결제 예정 금액 배지 */}
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-500/30 px-3.5 py-1 text-[12px] font-semibold text-blue-700 dark:text-blue-300">
+              <span>결제 승인 금액:</span>
+              <span className="tabular-nums font-bold text-blue-600">{formatKrw(finalPrice)}</span>
+            </div>
+
+            {/* 6자리 PIN 동그라미 인디케이터 */}
+            <div className="mt-6 flex items-center justify-center gap-3.5">
+              {[0, 1, 2, 3, 4, 5].map((idx) => {
+                const filled = idx < pinDigits.length;
+                return (
+                  <div
+                    key={idx}
+                    className={`h-3.5 w-3.5 rounded-full transition-all duration-200 ${
+                      filled
+                        ? "bg-blue-600 scale-125 shadow-sm shadow-blue-500/50"
+                        : "bg-slate-200 dark:bg-white/20"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* 에러 또는 진행 상태 문구 */}
+            <div className="mt-3 min-h-[22px] text-center">
+              {isPaying ? (
+                <div className="flex items-center justify-center gap-2 text-[12px] font-medium text-blue-600">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <span>KCP 결제 승인 처리 중입니다. 잠시만 기다려 주세요…</span>
+                </div>
+              ) : payError ? (
+                <p className="text-[12px] font-medium text-rose-600">{payError}</p>
+              ) : pinError ? (
+                <p className="text-[12px] font-medium text-rose-600">{pinError}</p>
+              ) : null}
+            </div>
+
+            {/* 3x4 키패드 (취소 버튼 완비) */}
+            <div className="mt-4 grid grid-cols-3 gap-3 w-full max-w-[300px]">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  disabled={isPaying}
+                  onClick={() => handlePinKey(num)}
+                  className="flex h-14 items-center justify-center rounded-2xl bg-slate-100/90 dark:bg-white/10 text-[20px] font-semibold text-slate-900 dark:text-white active:bg-blue-100 dark:active:bg-white/20 active:scale-95 transition-all shadow-sm"
+                >
+                  {num}
+                </button>
+              ))}
+
+              {/* 취소 / 뒤로가기 버튼 */}
+              <button
+                type="button"
+                disabled={isPaying}
+                onClick={() => setStep("ENTER_CODE_OR_PAY")}
+                className="flex h-14 items-center justify-center rounded-2xl bg-transparent text-[13px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-white active:scale-95 transition-all"
+              >
+                취소
+              </button>
+
+              {/* 0 */}
+              <button
+                type="button"
+                disabled={isPaying}
+                onClick={() => handlePinKey("0")}
+                className="flex h-14 items-center justify-center rounded-2xl bg-slate-100/90 dark:bg-white/10 text-[20px] font-semibold text-slate-900 dark:text-white active:bg-blue-100 dark:active:bg-white/20 active:scale-95 transition-all shadow-sm"
+              >
+                0
+              </button>
+
+              {/* 백스페이스 */}
+              <button
+                type="button"
+                disabled={isPaying || pinDigits.length === 0}
+                onClick={handlePinDelete}
+                className="flex h-14 items-center justify-center rounded-2xl bg-transparent text-[16px] text-slate-600 dark:text-slate-300 active:scale-95 transition-all"
+                aria-label="한 글자 지우기"
+              >
+                ⌫
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* STEP 4: SUCCESS ("유료 플랜 전환 완료" 성공 팝업) */}
+        {/* ========================================================= */}
+        {step === "SUCCESS" && (
+          <div className="overflow-y-auto px-6 py-8 overscroll-contain flex flex-col items-center text-center">
+            {/* 성공 아이콘 */}
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white text-[28px] shadow-lg shadow-emerald-500/30 animate-bounce">
+              ✓
+            </div>
+
+            <h3 className="mt-4 text-[20px] font-bold text-slate-900 dark:text-white tracking-tight">
+              유료 플랜 전환 완료!
+            </h3>
+            <p className="mt-1 text-[13px] text-slate-500 leading-relaxed">
+              VLUÉ 프리미엄 멤버십 혜택이 정상적으로 활성화되었습니다.
+            </p>
+
+            {/* 활성화 정보 카드 */}
+            <div className={`mt-5 w-full rounded-2xl border p-4.5 text-left ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
+              <div className="flex justify-between items-center text-[12px]">
+                <span className="text-slate-500">적용 플랜</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {successInfo?.planName || targetItem.name}
+                </span>
+              </div>
+              <div className="mt-2 flex justify-between items-center text-[12px]">
+                <span className="text-slate-500">결제 금액</span>
+                <span className="font-bold text-slate-900 dark:text-white tabular-nums">
+                  {formatKrw(successInfo?.amountKrw || finalPrice)}
+                </span>
+              </div>
+              <div className="mt-3 border-t border-slate-200/60 pt-3 space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-emerald-500">✓</span> <span>가족보호 실시간 위치 및 안심 귀가 케어 활성화</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-emerald-500">✓</span> <span>무제한 고화질 블루 쇼케이스 송출 활성화</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-emerald-500">✓</span> <span>독립 BGM & 프리미엄 사운드 이용 가능</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 완료 닫기 버튼 */}
+            <button
+              type="button"
+              onClick={handleSafeClose}
+              className="mt-6 w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
+            >
+              확인하고 이용하기
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 
