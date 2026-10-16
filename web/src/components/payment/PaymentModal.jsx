@@ -52,7 +52,11 @@ export default function PaymentModal({
   const planTitle = isB2b ? "기업 비즈니스 플랜" : "VLUÉ 유료 플랜 (Paid)";
 
   // 추천인 코드 검증 & 즉시 적용 핸들러
-  const handleApplyReferral = async () => {
+  const handleApplyReferral = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const code = String(referralInput || "").trim();
     if (!code) {
       setReferralFeedback("추천인 코드를 입력해 주세요.");
@@ -82,14 +86,22 @@ export default function PaymentModal({
     }
   };
 
-  const handleResetReferral = () => {
+  const handleResetReferral = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setReferralInput("");
     setReferralApplied(false);
     setReferralFeedback("");
   };
 
   // Step 1 ➔ Step 2: 추천인 없이 진행
-  const handleProceedWithoutReferral = () => {
+  const handleProceedWithoutReferral = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setReferralApplied(false);
     setPinDigits("");
     setPinError("");
@@ -98,7 +110,11 @@ export default function PaymentModal({
   };
 
   // Step 1 ➔ Step 2: 추천인 코드로 진행
-  const handleProceedWithReferral = () => {
+  const handleProceedWithReferral = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!referralApplied && referralInput.trim()) {
       handleApplyReferral().then(() => {
         setPinDigits("");
@@ -115,7 +131,11 @@ export default function PaymentModal({
   };
 
   // PIN 키패드 조작
-  const handlePinKey = (digit) => {
+  const handlePinKey = (e, digit) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (busy) return;
     setPinError("");
     if (pinDigits.length < 6) {
@@ -128,7 +148,11 @@ export default function PaymentModal({
     }
   };
 
-  const handlePinDelete = () => {
+  const handlePinDelete = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (busy) return;
     setPinError("");
     setPinDigits((prev) => prev.slice(0, -1));
@@ -239,7 +263,11 @@ export default function PaymentModal({
     }
   };
 
-  const handleFinishSuccess = () => {
+  const handleFinishSuccess = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const targetTier = isB2b ? "b2b" : "paid";
     onComplete?.({
       membershipTier: targetTier,
@@ -252,10 +280,16 @@ export default function PaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[50000] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:items-center sm:p-4">
+    <div
+      className="fixed inset-0 z-[50000] flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:items-center sm:p-4"
+      onClick={(e) => e.stopPropagation()}
+    >
       <div
         className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl border border-slate-100 transition-all"
         style={{ letterSpacing: "-0.02em" }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
         {/* 헤더 */}
@@ -265,7 +299,11 @@ export default function PaymentModal({
             {step === "PIN_VERIFY" && !busy && (
               <button
                 type="button"
-                onClick={() => setStep("PAY_DETAILS")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setStep("PAY_DETAILS");
+                }}
                 className="rounded-full p-1 text-slate-500 hover:text-slate-800 transition-colors"
                 aria-label="이전으로"
               >
@@ -284,9 +322,13 @@ export default function PaymentModal({
           <button
             type="button"
             disabled={busy}
-            onClick={() => {
+            onClick={(e) => {
+              if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
               if (step === "SUCCESS") {
-                handleFinishSuccess();
+                handleFinishSuccess(e);
               } else {
                 clearPendingPayment();
                 onClose ? onClose() : onSkip?.();
@@ -401,7 +443,7 @@ export default function PaymentModal({
               )}
             </div>
 
-            {/* 명확한 2가지 분기 결제 버튼 (요구사항 3) */}
+            {/* 명확한 2가지 분기 결제 버튼 */}
             <div className="mt-5 flex flex-col gap-2">
               {referralApplied ? (
                 <button
@@ -439,7 +481,11 @@ export default function PaymentModal({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => {
+                onClick={(e) => {
+                  if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
                   clearPendingPayment();
                   onClose ? onClose() : onSkip?.();
                 }}
@@ -491,7 +537,7 @@ export default function PaymentModal({
               {busy ? (
                 <div className="flex items-center justify-center gap-2 text-[12px] font-medium text-blue-600">
                   <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                  <span>결제 승인 처리 중입니다. 잠시만 기다려 주세요…</span>
+                  <span>KCP 결제 승인 처리 중입니다. 잠시만 기다려 주세요…</span>
                 </div>
               ) : error ? (
                 <p className="text-[11px] font-medium text-rose-600">{error}</p>
@@ -507,7 +553,7 @@ export default function PaymentModal({
                   key={num}
                   type="button"
                   disabled={busy}
-                  onClick={() => handlePinKey(num)}
+                  onClick={(e) => handlePinKey(e, num)}
                   className="flex h-13 items-center justify-center rounded-2xl bg-slate-100 text-[19px] font-semibold text-slate-900 active:bg-blue-100 active:scale-95 transition-all shadow-sm"
                 >
                   {num}
@@ -517,7 +563,11 @@ export default function PaymentModal({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => setStep("PAY_DETAILS")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setStep("PAY_DETAILS");
+                }}
                 className="flex h-13 items-center justify-center rounded-2xl bg-transparent text-[13px] font-medium text-slate-500 hover:text-slate-800 active:scale-95 transition-all"
               >
                 취소
@@ -526,7 +576,7 @@ export default function PaymentModal({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => handlePinKey("0")}
+                onClick={(e) => handlePinKey(e, "0")}
                 className="flex h-13 items-center justify-center rounded-2xl bg-slate-100 text-[19px] font-semibold text-slate-900 active:bg-blue-100 active:scale-95 transition-all shadow-sm"
               >
                 0

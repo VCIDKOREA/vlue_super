@@ -75,13 +75,14 @@ const B2B_BENEFITS = [
 ];
 
 /**
- * [VLUÉ] 멤버십 플랜 선택 & 결제 퍼널 통합 모달
- * - Step 1: SELECT_PLAN (유료 플랜, B2B, 부가옵션, 무료 플랜 전체 복구)
- * - Step 2: ENTER_CODE_OR_PAY (추천인 코드 입력 & '추천인 없이 진행' vs '추천인 적용' 명확 구분)
- * - Step 3: PIN_VERIFY (6자리 결제 PIN 입력 & PG 결제 모듈 직접 연동)
- * - Step 4: SUCCESS (유료 플랜 전환 완료 축하 팝업)
+ * [VLUÉ] 멤버십 바텀시트 & 원스톱 결제 퍼널 통합 모달
  *
- * * 모달 간 이동 시 화면 튕김 및 단절을 100% 차단 (단일 모달 내 스텝 전환 머신)
+ * ⚠️ 화면 튕김 및 모달 이탈 원천 차단 아키텍처:
+ * 1. 탭 클릭 시 e.preventDefault(), e.stopPropagation() 완벽 적용 + selectedCategory만 변경
+ * 2. [결제하기] 클릭 시 onClose() 호출 없이 step = 'RECOMMEND_CODE' 로 내부 뷰 스위칭
+ * 3. 추천인 입력/선택 ➔ step = 'PIN_VERIFY' (6자리 PIN) ➔ KCP PG 및 결제 API 직결
+ * 4. 결제 완료 ➔ step = 'SUCCESS' (유료 플랜 전환 완료 축하 팝업)
+ * 5. 모달 내부 모든 클릭 이벤트에 stopPropagation() 적용하여 상위 컴포넌트(ProfilePanel 등)로 이벤트 전파 원천 차단
  */
 export default function MembershipModal({
   open,
@@ -92,11 +93,11 @@ export default function MembershipModal({
 }) {
   const currentKind = normalizeMembershipKind(membershipTier);
 
-  // 퍼널 단계 머신: 'SELECT_PLAN' | 'ENTER_CODE_OR_PAY' | 'PIN_VERIFY' | 'SUCCESS'
+  // 퍼널 단계 머신: 'SELECT_PLAN' | 'RECOMMEND_CODE' | 'PIN_VERIFY' | 'SUCCESS'
   const [step, setStep] = useState("SELECT_PLAN");
 
-  // 플랜 탭: 'paid' | 'b2b' | 'addons' | 'free'
-  const [selectedPlanTab, setSelectedPlanTab] = useState(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
+  // 탭 상태: 'paid' | 'b2b' | 'addons' | 'free'
+  const [selectedCategory, setSelectedCategory] = useState(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
 
   // 결제 주기: 'monthly' | 'annual'
   const [billingCycle, setBillingCycle] = useState("monthly");
@@ -143,7 +144,7 @@ export default function MembershipModal({
   }, [open]);
 
   useEffect(() => {
-    setSelectedPlanTab(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
+    setSelectedCategory(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
   }, [currentKind, open]);
 
   // 가격 계산
@@ -153,18 +154,35 @@ export default function MembershipModal({
     : 0;
   const finalPrice = Math.max(0, currentBasePrice - referralDiscountAmount);
 
-  // Step 1 ➔ Step 2: 플랜 선택 후 추천인 입력 단계 진입
-  const handleProceedToReferral = (item) => {
+  // [1] 상단 탭 버튼 클릭 핸들러 (이벤트 전파 및 기본동작 차단, 오직 selectedCategory만 전환)
+  const handleTabClick = (e, category) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setSelectedCategory(category);
+  };
+
+  // [2] 하단 [유료 플랜 결제하기] 클릭 핸들러 (onClose 절대 호출 금지, step = 'RECOMMEND_CODE' 로 전환)
+  const handlePayClick = (e, item) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setTargetItem(item);
     setReferralFeedback("");
     setPayError("");
     setPinError("");
     setPinDigits("");
-    setStep("ENTER_CODE_OR_PAY");
+    setStep("RECOMMEND_CODE");
   };
 
   // 추천인 코드 검증 & 적용
-  const handleApplyReferral = async () => {
+  const handleApplyReferral = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const code = String(referralInput || "").trim();
     if (!code) {
       setReferralFeedback("추천인 코드를 입력해 주세요.");
@@ -194,14 +212,22 @@ export default function MembershipModal({
     }
   };
 
-  const handleResetReferral = () => {
+  const handleResetReferral = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setReferralInput("");
     setReferralApplied(false);
     setReferralFeedback("");
   };
 
-  // Step 2 ➔ Step 3: 추천인 없이 진행
-  const handleProceedWithoutReferral = () => {
+  // 추천인 없이 계속하기 클릭 ➔ PIN 입력 단계로 직행
+  const handleProceedWithoutReferral = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setReferralApplied(false);
     setPinDigits("");
     setPinError("");
@@ -209,8 +235,12 @@ export default function MembershipModal({
     setStep("PIN_VERIFY");
   };
 
-  // Step 2 ➔ Step 3: 추천인 적용하여 진행
-  const handleProceedWithReferral = () => {
+  // 추천인 적용하여 계속하기 클릭 ➔ PIN 입력 단계로 직행
+  const handleProceedWithReferral = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!referralApplied && referralInput.trim()) {
       handleApplyReferral().then(() => {
         setPinDigits("");
@@ -226,27 +256,35 @@ export default function MembershipModal({
     setStep("PIN_VERIFY");
   };
 
-  // Step 3: PIN 키패드 조작
-  const handlePinKey = (digit) => {
+  // [3] PIN 키패드 조작
+  const handlePinKey = (e, digit) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (isPaying) return;
     setPinError("");
     if (pinDigits.length < 6) {
       const next = pinDigits + digit;
       setPinDigits(next);
       if (next.length === 6) {
-        // 6자리 입력 즉시 결제 승인 프로세스 직접 호출
+        // 6자리 입력 완료 즉시 KCP 결제 모듈 / API 직접 호출
         executePayment(next);
       }
     }
   };
 
-  const handlePinDelete = () => {
+  const handlePinDelete = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (isPaying) return;
     setPinError("");
     setPinDigits((prev) => prev.slice(0, -1));
   };
 
-  // Step 3 ➔ Step 4: 결제 승인 API 및 PG 직접 연동
+  // KCP PG 결제 모듈 & 구독 완료 API 직결
   const executePayment = async (enteredPin) => {
     setIsPaying(true);
     setPayError("");
@@ -269,7 +307,7 @@ export default function MembershipModal({
       const isB2b = targetItem.kind === "b2b";
       const newTier = isB2b ? "b2b" : "paid";
 
-      // 1) 결제 API 호출 (테스트 모드 또는 실결제 PG)
+      // 결제 모듈 및 승인 호출
       if (testMode) {
         await postSubscribeComplete({
           customer_uid,
@@ -303,7 +341,7 @@ export default function MembershipModal({
         });
       }
 
-      // 2) 로컬 세션 & 구독 플래그 실시간 갱신
+      // 로컬 세션 및 플랜 메타 실시간 반영
       try {
         const paidAt = new Date();
         localStorage.setItem("vlue_subscription_paid", "1");
@@ -325,7 +363,7 @@ export default function MembershipModal({
 
       clearPendingPayment();
 
-      // 3) 상위 리스너 및 이벤트 즉시 반영
+      // 상위 상태 및 이벤트 즉시 브로드캐스트
       onMembershipTierChange?.(newTier);
       try {
         window.dispatchEvent(
@@ -337,7 +375,7 @@ export default function MembershipModal({
         /* ignore */
       }
 
-      // 4) 성공 정보 저장 및 Step 4(성공 팝업)로 즉시 전환
+      // 성공 화면으로 전환
       setSuccessInfo({
         tier: newTier,
         planName: targetItem.name,
@@ -361,7 +399,11 @@ export default function MembershipModal({
   };
 
   // 무료 플랜 전환
-  const handleSwitchToFree = () => {
+  const handleSwitchToFree = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (currentKind === "free") return;
     if (window.confirm("무료 플랜으로 전환하시겠습니까?\n가족보호 및 무제한 쇼케이스 기능이 기본 상태로 변경됩니다.")) {
       try {
@@ -383,8 +425,12 @@ export default function MembershipModal({
   const panelBg = isDarkMode ? "bg-[#141722] border-white/10 text-slate-100" : "bg-white border-slate-200 text-slate-900";
   const subTextCls = isDarkMode ? "text-slate-400 font-normal" : "text-slate-500 font-normal";
 
-  // 모달 닫기 핸들러 (진행 중일 때는 닫기 실수 방지)
-  const handleSafeClose = () => {
+  // 명시적 닫기 버튼 핸들러 (X 버튼 클릭 시만 동작)
+  const handleCloseExplicit = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (isPaying) return;
     onClose?.();
   };
@@ -395,33 +441,28 @@ export default function MembershipModal({
       role="dialog"
       aria-modal="true"
       style={{ letterSpacing: "-0.02em" }}
+      onClick={(e) => e.stopPropagation()}
     >
-      {/* 배경 클릭 (Step 1 또는 Step 4에서만 닫히도록 하여 퍼널 도중 튕김 방지) */}
-      <button
-        type="button"
-        className="absolute inset-0 z-0 cursor-default bg-transparent"
-        aria-label="배경 눌러 닫기"
-        onClick={() => {
-          if (step === "SELECT_PLAN" || step === "SUCCESS") {
-            handleSafeClose();
-          }
-        }}
-      />
-
+      {/* 바텀시트 컨테이너 (내부 모든 클릭 이벤트의 상위 전파 차단) */}
       <div
         className={`relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border shadow-2xl sm:rounded-3xl ${panelBg} transition-all`}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
-        {/* 모달 상단 헤더 (스텝별 뒤로가기 / 닫기) */}
+        {/* 모달 상단 헤더 */}
         {/* ========================================================= */}
-        <div className={`flex items-center justify-between border-b px-6 py-4 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
+        <div className={`flex items-center justify-between border-b px-6 py-4 shrink-0 ${isDarkMode ? "border-white/10" : "border-slate-100"}`}>
           <div className="flex items-center gap-2.5">
             {step !== "SELECT_PLAN" && step !== "SUCCESS" && (
               <button
                 type="button"
-                onClick={() => {
-                  if (step === "PIN_VERIFY") setStep("ENTER_CODE_OR_PAY");
-                  else if (step === "ENTER_CODE_OR_PAY") setStep("SELECT_PLAN");
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (step === "PIN_VERIFY") setStep("RECOMMEND_CODE");
+                  else if (step === "RECOMMEND_CODE") setStep("SELECT_PLAN");
                 }}
                 className="rounded-full p-1 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                 aria-label="이전 단계로"
@@ -433,15 +474,15 @@ export default function MembershipModal({
               <span className="text-[11px] font-medium text-blue-600 tracking-tight">VLUÉ MEMBERSHIP</span>
               <h2 className="text-[17px] font-semibold tracking-tight mt-0.5">
                 {step === "SELECT_PLAN" && "멤버십 플랜 선택"}
-                {step === "ENTER_CODE_OR_PAY" && "추천인 확인 및 결제"}
+                {step === "RECOMMEND_CODE" && "추천인 코드 및 결제 확인"}
                 {step === "PIN_VERIFY" && "결제 승인 PIN 입력"}
-                {step === "SUCCESS" && "플랜 전환 완료"}
+                {step === "SUCCESS" && "유료 플랜 전환 완료"}
               </h2>
             </div>
           </div>
           <button
             type="button"
-            onClick={handleSafeClose}
+            onClick={handleCloseExplicit}
             className={`rounded-full p-2 text-xl leading-none transition-colors ${
               isDarkMode ? "text-slate-400 hover:bg-white/10" : "text-slate-400 hover:bg-slate-100"
             }`}
@@ -452,17 +493,17 @@ export default function MembershipModal({
         </div>
 
         {/* ========================================================= */}
-        {/* STEP 1: SELECT_PLAN (모든 플랜 및 옵션 상품 복구) */}
+        {/* STEP 1: SELECT_PLAN (상단 탭 & 플랜 옵션 전체) */}
         {/* ========================================================= */}
         {step === "SELECT_PLAN" && (
           <div className="overflow-y-auto px-6 py-5 overscroll-contain">
-            {/* 상단 탭 4종 */}
+            {/* 상단 탭 4종 세그먼트 (클릭 시 튕김 없이 오직 selectedCategory만 변경) */}
             <div className={`grid grid-cols-4 rounded-2xl p-1 border ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-100/90 border-slate-200/60"}`}>
               <button
                 type="button"
-                onClick={() => setSelectedPlanTab("paid")}
+                onClick={(e) => handleTabClick(e, "paid")}
                 className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
-                  selectedPlanTab === "paid"
+                  selectedCategory === "paid"
                     ? "bg-blue-600 text-white shadow-sm"
                     : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
                 }`}
@@ -471,9 +512,9 @@ export default function MembershipModal({
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedPlanTab("b2b")}
+                onClick={(e) => handleTabClick(e, "b2b")}
                 className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
-                  selectedPlanTab === "b2b"
+                  selectedCategory === "b2b"
                     ? "bg-blue-600 text-white shadow-sm"
                     : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
                 }`}
@@ -482,9 +523,9 @@ export default function MembershipModal({
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedPlanTab("addons")}
+                onClick={(e) => handleTabClick(e, "addons")}
                 className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
-                  selectedPlanTab === "addons"
+                  selectedCategory === "addons"
                     ? "bg-blue-600 text-white shadow-sm"
                     : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
                 }`}
@@ -493,9 +534,9 @@ export default function MembershipModal({
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedPlanTab("free")}
+                onClick={(e) => handleTabClick(e, "free")}
                 className={`rounded-xl py-2 text-[12px] font-semibold transition-all ${
-                  selectedPlanTab === "free"
+                  selectedCategory === "free"
                     ? isDarkMode ? "bg-white/15 text-white shadow-sm" : "bg-white text-slate-900 shadow-sm"
                     : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
                 }`}
@@ -505,16 +546,20 @@ export default function MembershipModal({
             </div>
 
             {/* TAB 1: 유료 플랜 (Paid) */}
-            {selectedPlanTab === "paid" && (
+            {selectedCategory === "paid" && (
               <div className="mt-5 space-y-4">
-                {/* 월간 / 연간 토글 */}
+                {/* 월간 / 연간 결제 토글 */}
                 <div className="flex items-center justify-end gap-2">
                   <span className={`text-[11px] ${billingCycle === "monthly" ? "font-semibold text-blue-600" : subTextCls}`}>
                     월간 결제
                   </span>
                   <button
                     type="button"
-                    onClick={() => setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly");
+                    }}
                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                       billingCycle === "annual" ? "bg-blue-600" : "bg-slate-300 dark:bg-white/20"
                     }`}
@@ -566,7 +611,7 @@ export default function MembershipModal({
                   </p>
                 </div>
 
-                {/* 핵심 혜택 그리드 */}
+                {/* 유료 플랜 핵심 강점 혜택 */}
                 <div>
                   <h3 className="text-[13px] font-semibold mb-2.5 text-slate-800 dark:text-slate-200">
                     유료 플랜 핵심 강점 혜택
@@ -596,12 +641,12 @@ export default function MembershipModal({
                   </div>
                 </div>
 
-                {/* CTA 버튼 (클릭 시 모달 닫지 않고 Step 2로 이동) */}
+                {/* 하단 [유료 플랜 결제하기] 클릭 버튼 (튕김 없이 step = 'RECOMMEND_CODE' 로 전환) */}
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      handleProceedToReferral({
+                    onClick={(e) =>
+                      handlePayClick(e, {
                         kind: "paid",
                         name: "VLUÉ 유료 플랜 (Paid)",
                         basePrice: PAID_EVENT_MONTHLY_KRW,
@@ -623,7 +668,7 @@ export default function MembershipModal({
             )}
 
             {/* TAB 2: 비즈니스 / B2B 풀 패키지 */}
-            {selectedPlanTab === "b2b" && (
+            {selectedCategory === "b2b" && (
               <div className="mt-5 space-y-4">
                 <div
                   className={`rounded-2xl border p-5 ${
@@ -686,8 +731,8 @@ export default function MembershipModal({
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      handleProceedToReferral({
+                    onClick={(e) =>
+                      handlePayClick(e, {
                         kind: "b2b",
                         name: "비즈니스 / B2B 풀 패키지 (모바일 회선)",
                         basePrice: B2B_STAFF_EVENT_MONTHLY_KRW,
@@ -704,7 +749,7 @@ export default function MembershipModal({
             )}
 
             {/* TAB 3: 추가 옵션 상품 (내선·대표번호 +5,200원, 멀티프로필+ +4,200원) */}
-            {selectedPlanTab === "addons" && (
+            {selectedCategory === "addons" && (
               <div className="mt-5 space-y-4">
                 <p className={`text-[12px] ${subTextCls}`}>
                   기본 멤버십과 함께 독립적으로 확장할 수 있는 추가 상품입니다.
@@ -739,8 +784,8 @@ export default function MembershipModal({
                   </p>
                   <button
                     type="button"
-                    onClick={() =>
-                      handleProceedToReferral({
+                    onClick={(e) =>
+                      handlePayClick(e, {
                         kind: "extension_line",
                         name: "내선·대표번호 추가 회선",
                         basePrice: EXTENSION_LINE_MONTHLY_KRW,
@@ -782,8 +827,8 @@ export default function MembershipModal({
                   </p>
                   <button
                     type="button"
-                    onClick={() =>
-                      handleProceedToReferral({
+                    onClick={(e) =>
+                      handlePayClick(e, {
                         kind: "multi_profile",
                         name: "멀티 프로필+ 추가 슬롯",
                         basePrice: MULTI_PROFILE_ADDON_MONTHLY_KRW,
@@ -800,7 +845,7 @@ export default function MembershipModal({
             )}
 
             {/* TAB 4: 무료 플랜 (Free) */}
-            {selectedPlanTab === "free" && (
+            {selectedCategory === "free" && (
               <div className="mt-5 space-y-4">
                 <div className={`rounded-2xl border p-5 ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
                   <h3 className="text-[15px] font-semibold">일반 회원 (Free 플랜)</h3>
@@ -845,9 +890,9 @@ export default function MembershipModal({
         )}
 
         {/* ========================================================= */}
-        {/* STEP 2: ENTER_CODE_OR_PAY (추천인 코드 및 분기 결제 버튼) */}
+        {/* STEP 2: RECOMMEND_CODE (추천인 코드 & 결제 선택 화면) */}
         {/* ========================================================= */}
-        {step === "ENTER_CODE_OR_PAY" && (
+        {step === "RECOMMEND_CODE" && (
           <div className="overflow-y-auto px-6 py-5 overscroll-contain space-y-4">
             {/* 상품 정보 요약 */}
             <div className={`rounded-2xl border p-4.5 ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
@@ -893,7 +938,7 @@ export default function MembershipModal({
               )}
             </div>
 
-            {/* 추천인 코드 입력창 (추천인 적용 가능 상품인 경우) */}
+            {/* 추천인 코드 입력창 */}
             {targetItem.allowsReferral ? (
               <div className={`rounded-2xl border p-4 ${isDarkMode ? "bg-white/5 border-white/10" : "bg-white border-slate-200 shadow-sm"}`}>
                 <div className="flex items-center justify-between">
@@ -947,23 +992,20 @@ export default function MembershipModal({
               </div>
             )}
 
-            {/* 결제 진행 분기 버튼 그룹 (요구사항 3 명확 구현) */}
+            {/* 결제 진행 분기 버튼 그룹 (명확한 2가지 버튼) */}
             <div className="pt-3 space-y-2.5">
               {targetItem.allowsReferral ? (
                 <>
                   {referralApplied ? (
-                    /* 1) 추천인 코드가 적용된 경우 */
                     <button
                       type="button"
                       onClick={handleProceedWithReferral}
                       className="w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
                     >
-                      추천인 할인가로 계속하기 ({formatKrw(finalPrice)}) →
+                      추천인 할인가로 결제 진행 ({formatKrw(finalPrice)}) →
                     </button>
                   ) : (
-                    /* 2) 추천인 코드가 아직 미적용된 경우 */
                     <>
-                      {/* 추천인 코드 적용 버튼 (입력창에 텍스트가 있을 때 우선 안내) */}
                       {referralInput.trim() && (
                         <button
                           type="button"
@@ -974,7 +1016,6 @@ export default function MembershipModal({
                         </button>
                       )}
 
-                      {/* 추천인 없이 진행 버튼 (명확하고 즉각적인 직행 버튼) */}
                       <button
                         type="button"
                         onClick={handleProceedWithoutReferral}
@@ -990,7 +1031,6 @@ export default function MembershipModal({
                   )}
                 </>
               ) : (
-                /* 부가옵션 상품 (추천인 미지원) */
                 <button
                   type="button"
                   onClick={handleProceedWithoutReferral}
@@ -1008,7 +1048,7 @@ export default function MembershipModal({
         )}
 
         {/* ========================================================= */}
-        {/* STEP 3: PIN_VERIFY (6자리 결제 PIN & PG 직접 연동) */}
+        {/* STEP 3: PIN_VERIFY (6자리 결제 PIN & KCP PG 직결) */}
         {/* ========================================================= */}
         {step === "PIN_VERIFY" && (
           <div className="overflow-y-auto px-6 py-5 overscroll-contain flex flex-col items-center">
@@ -1020,13 +1060,12 @@ export default function MembershipModal({
               지문/얼굴 인식은 추후 업데이트에 추가될 예정이며, 현재는 6자리 PIN으로 안전하게 보호됩니다.
             </p>
 
-            {/* 결제 예정 금액 배지 */}
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-500/30 px-3.5 py-1 text-[12px] font-semibold text-blue-700 dark:text-blue-300">
               <span>결제 승인 금액:</span>
               <span className="tabular-nums font-bold text-blue-600">{formatKrw(finalPrice)}</span>
             </div>
 
-            {/* 6자리 PIN 동그라미 인디케이터 */}
+            {/* 6자리 PIN 인디케이터 */}
             <div className="mt-6 flex items-center justify-center gap-3.5">
               {[0, 1, 2, 3, 4, 5].map((idx) => {
                 const filled = idx < pinDigits.length;
@@ -1043,7 +1082,6 @@ export default function MembershipModal({
               })}
             </div>
 
-            {/* 에러 또는 진행 상태 문구 */}
             <div className="mt-3 min-h-[22px] text-center">
               {isPaying ? (
                 <div className="flex items-center justify-center gap-2 text-[12px] font-medium text-blue-600">
@@ -1057,41 +1095,42 @@ export default function MembershipModal({
               ) : null}
             </div>
 
-            {/* 3x4 키패드 (취소 버튼 완비) */}
+            {/* 3x4 키패드 */}
             <div className="mt-4 grid grid-cols-3 gap-3 w-full max-w-[300px]">
               {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
                 <button
                   key={num}
                   type="button"
                   disabled={isPaying}
-                  onClick={() => handlePinKey(num)}
+                  onClick={(e) => handlePinKey(e, num)}
                   className="flex h-14 items-center justify-center rounded-2xl bg-slate-100/90 dark:bg-white/10 text-[20px] font-semibold text-slate-900 dark:text-white active:bg-blue-100 dark:active:bg-white/20 active:scale-95 transition-all shadow-sm"
                 >
                   {num}
                 </button>
               ))}
 
-              {/* 취소 / 뒤로가기 버튼 */}
               <button
                 type="button"
                 disabled={isPaying}
-                onClick={() => setStep("ENTER_CODE_OR_PAY")}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setStep("RECOMMEND_CODE");
+                }}
                 className="flex h-14 items-center justify-center rounded-2xl bg-transparent text-[13px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-white active:scale-95 transition-all"
               >
                 취소
               </button>
 
-              {/* 0 */}
               <button
                 type="button"
                 disabled={isPaying}
-                onClick={() => handlePinKey("0")}
+                onClick={(e) => handlePinKey(e, "0")}
                 className="flex h-14 items-center justify-center rounded-2xl bg-slate-100/90 dark:bg-white/10 text-[20px] font-semibold text-slate-900 dark:text-white active:bg-blue-100 dark:active:bg-white/20 active:scale-95 transition-all shadow-sm"
               >
                 0
               </button>
 
-              {/* 백스페이스 */}
               <button
                 type="button"
                 disabled={isPaying || pinDigits.length === 0}
@@ -1110,7 +1149,6 @@ export default function MembershipModal({
         {/* ========================================================= */}
         {step === "SUCCESS" && (
           <div className="overflow-y-auto px-6 py-8 overscroll-contain flex flex-col items-center text-center">
-            {/* 성공 아이콘 */}
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white text-[28px] shadow-lg shadow-emerald-500/30 animate-bounce">
               ✓
             </div>
@@ -1122,7 +1160,6 @@ export default function MembershipModal({
               VLUÉ 프리미엄 멤버십 혜택이 정상적으로 활성화되었습니다.
             </p>
 
-            {/* 활성화 정보 카드 */}
             <div className={`mt-5 w-full rounded-2xl border p-4.5 text-left ${isDarkMode ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
               <div className="flex justify-between items-center text-[12px]">
                 <span className="text-slate-500">적용 플랜</span>
@@ -1149,10 +1186,9 @@ export default function MembershipModal({
               </div>
             </div>
 
-            {/* 완료 닫기 버튼 */}
             <button
               type="button"
-              onClick={handleSafeClose}
+              onClick={handleCloseExplicit}
               className="mt-6 w-full rounded-2xl bg-blue-600 py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-[0.99] transition-all"
             >
               확인하고 이용하기
