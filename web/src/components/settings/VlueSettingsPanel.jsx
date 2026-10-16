@@ -719,7 +719,7 @@ export default function VlueSettingsPanel({
           <SettingsRowButton label="전화번호" sublabel="PASS 본인인증으로 변경" onClick={() => onSubView("contactInfo")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton
-            label="멤버십 등급 및 업그레이드"
+            label="멤버십 플랜 및 변경"
             value={membershipTierLabel}
             onClick={() => onOpenUpgrade?.()}
             isDarkMode={isDarkMode}

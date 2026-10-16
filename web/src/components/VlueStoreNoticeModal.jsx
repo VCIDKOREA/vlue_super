@@ -27,12 +27,12 @@ export default function VlueStoreNoticeModal({ open, isDarkMode = false, onClose
         <p className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
           VLUÉ Store
         </p>
-        <h2 id="vlue-store-notice-title" className={`mt-0.5 text-[17px] font-black ${textStrong}`}>
+        <h2 id="vlue-store-notice-title" className={`mt-0.5 text-[17px] font-semibold ${textStrong}`}>
           입점 스토어 · 공동 구매
         </h2>
         <p className={`mt-2 text-[12px] leading-relaxed ${textSub}`}>
-          인증된 입점사가 상품을 등록하고, 회원이 구매·라이브 방송으로 만나는 공간입니다. 멤버십 등급·요금제는{" "}
-          <b className={textStrong}>마이페이지 → 등급 업그레이드</b>에서 확인하세요.
+          인증된 입점사가 상품을 등록하고, 회원이 구매·라이브 방송으로 만나는 공간입니다. 멤버십 플랜·요금제는{" "}
+          <b className={textStrong}>마이페이지 → 플랜 변경</b>에서 확인하세요.
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
           <button type="button" onClick={onDismissToday} className={`flex-1 rounded-xl px-3 py-2.5 text-[13px] font-bold ${btnPrimary}`}>

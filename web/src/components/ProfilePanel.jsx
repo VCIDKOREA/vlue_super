@@ -4,7 +4,6 @@ import DigitalCardEditorView from "./DigitalCardEditorView.jsx";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
 import LetteringSettingsSection from "./LetteringSettingsSection.jsx";
 import LetteringBizcardSettingsView from "./LetteringBizcardSettingsView.jsx";
-import VluerPartnerSection from "./VluerPartnerSection.jsx";
 import { useB2bMembership } from "../context/B2bMembershipContext.jsx";
 import ModalCloseButton from "./common/ModalCloseButton";
 import AccountWithdrawalFlow from "./settings/AccountWithdrawalFlow.jsx";
@@ -58,9 +57,11 @@ function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
   return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
 }
 
-/** 등급 칸 — 유료/무료만 (가족보호는 별도 버튼) */
+/** 플랜 칸 — 유료 플랜/무료 플랜 */
 function MembershipTierLabelText({ parts, className = "" }) {
-  return <span className={className}>{parts?.base || parts?.label || ""}</span>;
+  const base = parts?.base || parts?.label || "";
+  const label = base === "유료" ? "유료 플랜" : base === "무료" ? "무료 플랜" : base ? `${base} 플랜` : "";
+  return <span className={className}>{label}</span>;
 }
 
 /** 가족보호 상태 버튼 — 작동중 / 이용가능(유료) / 유료전용(무료) */
@@ -72,7 +73,7 @@ function FamilyProtectionActionButton({ status = "locked", isDarkMode, onClick }
     <button
       type="button"
       onClick={() => onClick?.()}
-      className={`vlue-family-protect-btn mt-3 flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-[13px] font-black tracking-tight shadow-sm transition-all duration-300 active:scale-[0.98] ${
+      className={`vlue-family-protect-btn mt-3 flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-[13px] font-semibold tracking-tight shadow-sm transition-all duration-300 active:scale-[0.98] ${
         active
           ? isDarkMode
             ? "bg-emerald-500 text-white ring-1 ring-emerald-300/50"
@@ -492,10 +493,6 @@ function ProfilePanel({
       Boolean(membershipCtx?.corporate_active || membershipCtx?.override_by_company),
     [isEnterpriseMember, vluerLocked, membershipCtx]
   );
-  const showVluerPartner = useMemo(
-    () => v1AppShell.vluerPartnerSection && enterpriseLineAccessChecked && !isCorporateAccount,
-    [enterpriseLineAccessChecked, isCorporateAccount]
-  );
   const headerName = useMemo(
     () => getProfileHeaderName(String(myCard?.name || "").trim()),
     [myCard?.name, nickTick, open]
@@ -841,7 +838,7 @@ function ProfilePanel({
             >
               <BackButton variant="inline" onBack={() => setPanelView("main")} isDarkMode={isDarkMode} />
               <div className="min-w-0 flex-1">
-                <p className={`text-[17px] font-black ${headText}`}>영업용 명함 송출</p>
+                <p className={`text-[17px] font-semibold ${headText}`}>영업용 명함 송출</p>
                 <p className={`text-[11px] ${subText}`}>발신번호 등록 · 송출 옵션</p>
               </div>
             </div>
@@ -897,6 +894,32 @@ function ProfilePanel({
         ) : panelView === "main" ? (
         <>
         <div className={`px-5 py-2 ${isDarkMode ? "text-gray-300" : ""}`}>
+          {/* 모달 최상단: 플랜 상태 표시 및 플랜 변경 버튼 (Apple · Toss 스타일) */}
+          <div
+            className={`mb-3.5 flex items-center justify-between gap-2 rounded-2xl border px-3.5 py-2.5 shadow-sm transition-all ${
+              isDarkMode
+                ? "border-white/10 bg-white/5"
+                : "border-blue-100/80 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-blue-50/50"
+            }`}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={`text-[12px] font-medium ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
+                플랜:
+              </span>
+              <MembershipTierLabelText
+                parts={tierUi.parts}
+                className={`truncate text-[13px] font-semibold ${tierUi.className}`}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setUpgradeOpen(true)}
+              className="shrink-0 rounded-full bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 text-[11px] font-medium tracking-tight text-white transition-all active:scale-95 shadow-sm"
+            >
+              플랜 변경
+            </button>
+          </div>
+
           <div className="vlue-profile-info">
             <div className="vlue-profile-info__row">
               <div className="vlue-profile-info__cell">
@@ -910,10 +933,10 @@ function ProfilePanel({
             </div>
             <div className="vlue-profile-info__row">
               <div className="vlue-profile-info__cell">
-                <span className={`vlue-profile-info__label transition-colors duration-300 ${profileFieldLabelText}`}>등급</span>
+                <span className={`vlue-profile-info__label transition-colors duration-300 ${profileFieldLabelText}`}>플랜</span>
                 <MembershipTierLabelText
                   parts={tierUi.parts}
-                  className={`vlue-profile-info__value font-extrabold ${tierUi.className}`}
+                  className={`vlue-profile-info__value font-semibold ${tierUi.className}`}
                 />
               </div>
               <label className="vlue-profile-info__cell vlue-profile-info__cell--right cursor-pointer">
@@ -1005,8 +1028,8 @@ function ProfilePanel({
               }`}
             >
               <div className="min-w-0 flex-1">
-                <p className={`text-[15px] font-black leading-tight ${headText}`}>기업 관리</p>
-                <p className={`mt-0.5 text-[11px] font-semibold ${subText}`}>
+                <p className={`text-[15px] font-semibold leading-tight ${headText}`}>기업 관리</p>
+                <p className={`mt-0.5 text-[11px] font-medium ${subText}`}>
                   {enterpriseLineAccess
                     ? "회선·직원 목록 등록 · 수정 · 추가"
                     : "대표(또는 대리인) 전용 — 권한이 없으면 숨겨집니다"}
@@ -1028,8 +1051,8 @@ function ProfilePanel({
             }`}
           >
             <div className="min-w-0 flex-1">
-              <p className={`text-[15px] font-black leading-tight ${headText}`}>기업·대표번호 인증명함</p>
-              <p className={`mt-0.5 text-[11px] font-semibold ${subText}`}>
+              <p className={`text-[15px] font-semibold leading-tight ${headText}`}>기업·대표번호 인증명함</p>
+              <p className={`mt-0.5 text-[11px] font-medium ${subText}`}>
                 사업자 검증 · 관계자 인증 · 승인 후 발급·결제
               </p>
             </div>
@@ -1048,8 +1071,8 @@ function ProfilePanel({
             }`}
           >
             <div className="min-w-0 flex-1">
-              <p className={`text-[15px] font-black leading-tight ${headText}`}>영업용 명함 송출</p>
-              <p className={`mt-0.5 text-[11px] font-semibold ${subText}`}>
+              <p className={`text-[15px] font-semibold leading-tight ${headText}`}>영업용 명함 송출</p>
+              <p className={`mt-0.5 text-[11px] font-medium ${subText}`}>
                 발신번호 등록 · 월 {broadcastMonthlyKrw.toLocaleString("ko-KR")}원(부가세 포함)
               </p>
             </div>
@@ -1112,7 +1135,7 @@ function ProfilePanel({
               </div>
               <div className="min-w-0">
                 <p
-                  className={`text-[14px] font-black leading-tight ${
+                  className={`text-[14px] font-semibold leading-tight ${
                     canUseShoppingCartHub ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -1131,7 +1154,7 @@ function ProfilePanel({
                   )}
                 </p>
                 <p
-                  className={`mt-1 text-[9px] font-bold ${
+                  className={`mt-1 text-[9px] font-medium ${
                     canUseShoppingCartHub ? "text-white/85" : "text-indigo-700"
                   }`}
                 >
@@ -1152,12 +1175,12 @@ function ProfilePanel({
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-[14px] font-black leading-tight text-gray-900">
+                <p className="text-[14px] font-semibold leading-tight text-gray-900">
                   개인
                   <br />
                   케이스
                 </p>
-                <p className="mt-1 text-[9px] font-bold text-orange-700">명함저장 · 내문서</p>
+                <p className="mt-1 text-[9px] font-medium text-orange-700">명함저장 · 내문서</p>
               </div>
             </button>
             ) : null}
@@ -1175,8 +1198,8 @@ function ProfilePanel({
               🖨
             </div>
             <div className="min-w-0 flex-1">
-              <p className={`text-[14px] font-black ${headText}`}>복합기 리모컨</p>
-              <p className={`text-[10px] font-semibold ${subText}`}>PC 연동 · 인쇄 · 팩스</p>
+              <p className={`text-[14px] font-semibold ${headText}`}>복합기 리모컨</p>
+              <p className={`text-[10px] font-medium ${subText}`}>PC 연동 · 인쇄 · 팩스</p>
             </div>
             <span className={`shrink-0 text-lg ${subText}`}>›</span>
           </button>
@@ -1213,8 +1236,8 @@ function ProfilePanel({
                 }}
                 className="flex min-w-0 flex-1 cursor-pointer flex-col active:opacity-60 transition-all group"
               >
-                <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-blue-400">Personal Mail</p>
-                <p className="truncate text-[15px] font-black tracking-tight text-gray-800 border-b-2 border-blue-200/50 group-hover:border-blue-400 transition-colors dark:text-gray-100">
+                <p className="mb-0.5 text-[10px] font-medium uppercase tracking-widest text-blue-400">Personal Mail</p>
+                <p className="truncate text-[15px] font-semibold tracking-tight text-gray-800 border-b-2 border-blue-200/50 group-hover:border-blue-400 transition-colors dark:text-gray-100">
                   {displayMailAddress}
                 </p>
                 {!virtualEmailConfigured && displayMailAddress !== "메일 설정 필요" ? (
@@ -1238,13 +1261,6 @@ function ProfilePanel({
           </div>
           ) : null}
 
-          {showVluerPartner ? (
-            <VluerPartnerSection
-              isDarkMode={isDarkMode}
-              onForceMainView={() => setPanelView("main")}
-            />
-          ) : null}
-
           <div className="mt-6 px-1">
             <button
               type="button"
@@ -1261,42 +1277,21 @@ function ProfilePanel({
                 📍
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[18px] font-black tracking-tight">위치</span>
-                <span className="mt-0.5 block text-[12px] font-bold text-blue-100">가족 위치확인 · V-MAP</span>
-                <span className="mt-0.5 block truncate text-[12px] font-bold text-white/90">
+                <span className="block text-[18px] font-semibold tracking-tight">위치</span>
+                <span className="mt-0.5 block text-[12px] font-medium text-blue-100">가족 위치확인 · V-MAP</span>
+                <span className="mt-0.5 block truncate text-[12px] font-medium text-white/90">
                   {activeRegionBusy ? "위치 확인 중…" : activeRegionLabel}
                 </span>
               </span>
               <span className="ml-auto text-[22px] text-white">›</span>
             </button>
-            <button type="button" onClick={refreshActiveRegion} className={`mt-1 px-2 text-[11px] font-bold ${isDarkMode ? "text-slate-400" : "text-slate-400"}`}>
+            <button type="button" onClick={refreshActiveRegion} className={`mt-1 px-2 text-[11px] font-medium ${isDarkMode ? "text-slate-400" : "text-slate-400"}`}>
               현재 위치 다시 읽기
             </button>
           </div>
 
-          <div
-            className={`mt-6 mx-1 flex items-center justify-between gap-2 rounded-[28px] border-2 p-5 shadow-sm transition-all active:scale-[0.98] ${
-              isDarkMode ? "border-white/10 bg-white/5" : "border-gray-50 bg-white"
-            }`}
-          >
-            <div className="flex min-w-0 flex-nowrap items-baseline gap-x-2">
-              <span className={`shrink-0 text-[14px] font-black ${headText}`}>등급:</span>
-              <MembershipTierLabelText
-                parts={tierUi.parts}
-                className={`min-w-0 truncate text-[clamp(13px,3.5vw,14px)] font-extrabold ${tierUi.className}`}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setUpgradeOpen(true)}
-              className="shrink-0 rounded-full bg-[#1a1c21] px-3 py-2 text-[10px] font-black tracking-tight text-white transition-colors hover:bg-black"
-            >
-              등급 변경
-            </button>
-          </div>
-
           <div className={`mx-1 mt-4 rounded-2xl border p-3 ${isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-gray-50/90"}`}>
-            <p className={`text-[12px] font-black ${headText}`}>프로필 이미지</p>
+            <p className={`text-[12px] font-semibold ${headText}`}>프로필 이미지</p>
             <p className={`mt-0.5 text-[10px] ${subText}`}>
               프로필 사진은 헤더·쇼케이스·마이케이스에 함께 반영됩니다. 회사 로고는 디지털인증명함 설정에서 바꿔 주세요.
             </p>
@@ -1304,7 +1299,7 @@ function ProfilePanel({
               {AVATAR_IMAGE_GUIDE.uploadHint}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-bold ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
+              <label className={`cursor-pointer rounded-lg border px-2 py-1.5 text-[10px] font-medium ${isDarkMode ? "border-white/20 text-gray-200" : "border-gray-200 text-gray-700"}`}>
                 프로필 사진
                 <input
                   type="file"
@@ -1336,7 +1331,7 @@ function ProfilePanel({
                 onClose?.();
                 onOpenCalendar?.();
               }}
-              className={`relative flex w-full items-center justify-center rounded-[20px] border py-2.5 text-center text-[12px] font-black shadow-sm active:scale-[0.98] ${
+              className={`relative flex w-full items-center justify-center rounded-[20px] border py-2.5 text-center text-[12px] font-medium shadow-sm active:scale-[0.98] ${
                 isDarkMode
                   ? "border-white/15 bg-white/5 text-gray-100 hover:bg-white/10"
                   : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
@@ -1344,7 +1339,7 @@ function ProfilePanel({
             >
               내 일정 · 그룹 캘린더
               {calendarBadgeCount > 0 ? (
-                <span className="absolute right-3 top-1/2 flex h-5 min-w-[20px] -translate-y-1/2 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-black text-white">
+                <span className="absolute right-3 top-1/2 flex h-5 min-w-[20px] -translate-y-1/2 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-medium text-white">
                   {calendarBadgeCount > 9 ? "9+" : calendarBadgeCount}
                 </span>
               ) : null}
@@ -1354,7 +1349,7 @@ function ProfilePanel({
             <button
               type="button"
               onClick={() => onOpenPageManager?.()}
-              className="flex w-full items-center justify-center rounded-[20px] border border-blue-100 bg-blue-50 py-2.5 text-center text-[12px] font-black text-blue-700 shadow-sm active:scale-[0.98]"
+              className="flex w-full items-center justify-center rounded-[20px] border border-blue-100 bg-blue-50 py-2.5 text-center text-[12px] font-medium text-blue-700 shadow-sm active:scale-[0.98]"
             >
               페이지관리
             </button>
@@ -1374,15 +1369,15 @@ function ProfilePanel({
                     : "border-sky-100 bg-gradient-to-br from-orange-50 via-white to-sky-50 text-slate-700 shadow-sm hover:border-sky-200"
                 }`}
               >
-                <span className="block text-[13px] font-black tracking-tight">VLUÉ가 전하는 편지</span>
-                <span className={`mt-0.5 block text-[10px] font-semibold ${isDarkMode ? "text-sky-200/70" : "text-slate-400"}`}>
+                <span className="block text-[13px] font-semibold tracking-tight">VLUÉ가 전하는 편지</span>
+                <span className={`mt-0.5 block text-[10px] font-medium ${isDarkMode ? "text-sky-200/70" : "text-slate-400"}`}>
                   다시 읽어보기 💙
                 </span>
               </button>
             ) : null}
-            <p className="text-[11px] font-bold text-gray-300 uppercase tracking-[0.2em]">Official Website</p>
+            <p className="text-[11px] font-medium text-gray-300 uppercase tracking-[0.2em]">Official Website</p>
             <a href="https://www.vlue.kr" target="_blank" rel="noreferrer" className="group flex items-center gap-1.5 active:scale-95 transition-all">
-              <span className="text-[14px] font-black text-gray-400 group-hover:text-blue-500 transition-colors border-b border-gray-200 group-hover:border-blue-200">www.vlue.kr</span>
+              <span className="text-[14px] font-semibold text-gray-400 group-hover:text-blue-500 transition-colors border-b border-gray-200 group-hover:border-blue-200">www.vlue.kr</span>
             </a>
             <p className="text-[10px] text-gray-300 mt-1">© VCID KOREA All rights reserved.</p>
             <p className="mt-2 max-w-[280px] px-2 text-center text-[9px] leading-relaxed text-gray-300">
@@ -1416,7 +1411,7 @@ function ProfilePanel({
             role="status"
             aria-live="polite"
           >
-            <p className="mx-auto max-w-[min(100%,20rem)] rounded-2xl bg-[#121212] px-4 py-2.5 text-center text-[12px] font-bold leading-snug text-white shadow-[0_8px_24px_rgba(0,0,0,0.38)] ring-1 ring-black/15 break-keep">
+            <p className="mx-auto max-w-[min(100%,20rem)] rounded-2xl bg-[#121212] px-4 py-2.5 text-center text-[12px] font-medium leading-snug text-white shadow-[0_8px_24px_rgba(0,0,0,0.38)] ring-1 ring-black/15 break-keep">
               {settingNotice}
             </p>
           </div>
@@ -1431,7 +1426,7 @@ function ProfilePanel({
             onMouseDown={(e) => e.stopPropagation()}
           >
             <ModalCloseButton variant={isDarkMode ? "subtle" : "default"} onClick={() => setLogoutConfirmOpen(false)} />
-            <p className="text-[15px] font-black">로그아웃 하시겠어요?</p>
+            <p className="text-[15px] font-semibold">로그아웃 하시겠어요?</p>
             <p className={`mt-1 text-[12px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               현재 기기에서 로그인 상태가 종료됩니다.
             </p>
@@ -1439,7 +1434,7 @@ function ProfilePanel({
               <button
                 type="button"
                 onClick={() => setLogoutConfirmOpen(false)}
-                className={`flex-1 rounded-xl py-2.5 text-[12px] font-bold ${
+                className={`flex-1 rounded-xl py-2.5 text-[12px] font-medium ${
                   isDarkMode ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-600"
                 }`}
               >
@@ -1452,7 +1447,7 @@ function ProfilePanel({
                   onLogout?.();
                   onClose?.();
                 }}
-                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-[12px] font-bold text-white"
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-[12px] font-medium text-white"
               >
                 확인
               </button>
@@ -1481,15 +1476,15 @@ function ProfilePanel({
             onMouseDown={(e) => e.stopPropagation()}
           >
             <ModalCloseButton variant={isDarkMode ? "subtle" : "default"} onClick={() => setPartnerInquiryOpen(false)} />
-            <p className="text-[15px] font-black">제휴문의</p>
+            <p className="text-[15px] font-semibold">제휴문의</p>
             <button
               type="button"
               onClick={() => window.open("tel:01080144666", "_self")}
-              className="mt-3 w-full rounded-xl border border-blue-200 bg-blue-50 py-2.5 text-[12px] font-black text-blue-700 active:scale-[0.99]"
+              className="mt-3 w-full rounded-xl border border-blue-200 bg-blue-50 py-2.5 text-[12px] font-medium text-blue-700 active:scale-[0.99]"
             >
               상담 전화 예약하기
             </button>
-            <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <label className={`mt-3 block text-[11px] font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
               문의 내용
               <textarea
                 value={partnerInquiryBody}
@@ -1507,7 +1502,7 @@ function ProfilePanel({
               <button
                 type="button"
                 onClick={() => setPartnerInquiryOpen(false)}
-                className={`flex-1 rounded-xl py-2.5 text-[12px] font-bold ${
+                className={`flex-1 rounded-xl py-2.5 text-[12px] font-medium ${
                   isDarkMode ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-600"
                 }`}
               >
@@ -1516,7 +1511,7 @@ function ProfilePanel({
               <button
                 type="button"
                 onClick={submitPartnerInquiry}
-                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-[12px] font-black text-white"
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-[12px] font-medium text-white"
               >
                 확인
               </button>
@@ -1526,7 +1521,7 @@ function ProfilePanel({
       )}
       {partnerInquiryNotice ? (
         <div className="fixed inset-x-0 bottom-[calc(54px+env(safe-area-inset-bottom,0px)+12px)] z-[98] flex justify-center px-4">
-          <p className="rounded-full bg-blue-600 px-4 py-2 text-center text-[11px] font-bold text-white shadow-lg">
+          <p className="rounded-full bg-blue-600 px-4 py-2 text-center text-[11px] font-medium text-white shadow-lg">
             {partnerInquiryNotice}
           </p>
         </div>
@@ -1542,7 +1537,7 @@ function ProfilePanel({
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${isDarkMode ? "bg-white/20" : "bg-slate-200"}`} />
-                <p className="px-2 text-[17px] font-black">위치</p>
+                <p className="px-2 text-[17px] font-semibold">위치</p>
                 <p className={`px-2 pb-3 pt-1 text-[12px] ${isDarkMode ? "text-white/55" : "text-slate-500"}`}>가족 안심과 약속을 각각 엽니다.</p>
                 <button
                   type="button"
@@ -1571,9 +1566,9 @@ function ProfilePanel({
                     }
                   }}
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[16px] font-black text-white">가</span>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[16px] font-semibold text-white">가</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-black">가족 위치확인</span>
+                    <span className="block text-[15px] font-semibold">가족 위치확인</span>
                     <span className={`block text-[12px] ${isDarkMode ? "text-white/55" : "text-slate-500"}`}>지금 접속한 사람만 컬러로 표시</span>
                   </span>
                 </button>
@@ -1590,13 +1585,13 @@ function ProfilePanel({
                     window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "vmap" } }));
                   }}
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[13px] font-black text-white">V</span>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[13px] font-semibold text-white">V</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-black">V-MAP 개설</span>
+                    <span className="block text-[15px] font-semibold">V-MAP 개설</span>
                     <span className={`block text-[12px] ${isDarkMode ? "text-white/55" : "text-slate-500"}`}>도착 핀과 길안내가 있는 약속</span>
                   </span>
                 </button>
-                <button type="button" className={`mt-1 w-full py-2 text-[13px] font-bold ${isDarkMode ? "text-white/50" : "text-slate-400"}`} onClick={() => setLocationMenuOpen(false)}>
+                <button type="button" className={`mt-1 w-full py-2 text-[13px] font-medium ${isDarkMode ? "text-white/50" : "text-slate-400"}`} onClick={() => setLocationMenuOpen(false)}>
                   닫기
                 </button>
               </div>

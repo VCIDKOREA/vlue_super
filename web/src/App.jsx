@@ -3047,27 +3047,18 @@ function App() {
   const handleRequestTierChange = useCallback(async (tier) => {
     const nextTier = String(tier || "").trim();
     if (!nextTier) return false;
-    const uid = localStorage.getItem("vlue_server_user_id") || "";
     try {
-      const res = await vlueAuthFetch(apiUrl("/api/auth/membership-change/request"), {
-        method: "POST",
-        headers: vlueAuthHeaders(),
-        body: JSON.stringify({ targetTier: nextTier, via: "ai_consult" })
-      });
-      if (!res.ok) throw new Error();
-      localStorage.setItem(TIER_CHANGE_TARGET_KEY, nextTier);
-      localStorage.setItem(TIER_CHANGE_STATE_KEY, "pending");
-      setBottomToast("등급 변경 승인 요청이 접수되었습니다. 승인 후 로그인 시 결제 안내가 표시됩니다.");
-      setTimeout(() => setBottomToast(""), 3200);
+      applyMembershipTierFromHub(nextTier);
+      localStorage.setItem("membershipTier", nextTier);
+      setBottomToast("플랜 변경이 적용되었습니다.");
+      setTimeout(() => setBottomToast(""), 2600);
       return true;
     } catch {
-      localStorage.setItem(TIER_CHANGE_TARGET_KEY, nextTier);
-      localStorage.setItem(TIER_CHANGE_STATE_KEY, "pending");
-      setBottomToast("승인 요청이 등록되었습니다. 관리자 승인 후 로그인 시 결제 안내가 표시됩니다.");
-      setTimeout(() => setBottomToast(""), 3200);
+      setBottomToast("플랜 변경이 적용되었습니다.");
+      setTimeout(() => setBottomToast(""), 2600);
       return true;
     }
-  }, []);
+  }, [applyMembershipTierFromHub]);
 
   const handleLogout = useCallback(() => {
     try {
@@ -6422,17 +6413,17 @@ function App() {
         <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/45 px-6" onMouseDown={() => setTierBillingPrompt({ open: false, targetTier: "" })}>
           <div className="relative w-full max-w-sm rounded-2xl border border-blue-100 bg-white p-5 pt-12 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
             <ModalCloseButton variant="default" onClick={() => setTierBillingPrompt({ open: false, targetTier: "" })} />
-            <p className="text-[15px] font-black text-gray-900">등급 변경 승인 완료</p>
+            <p className="text-[15px] font-semibold text-gray-900">플랜 변경 안내</p>
             <p className="mt-1 text-[12px] leading-relaxed text-gray-600">
               {tierBillingPrompt.targetTier === "paid" || tierBillingPrompt.targetTier === "premium" || tierBillingPrompt.targetTier === "standard"
                 ? "유료"
-                : "일반"} 멤버십 결제를 진행하면 변경이 적용됩니다.
+                : "일반"} 플랜 결제를 진행하면 변경이 적용됩니다.
             </p>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setTierBillingPrompt({ open: false, targetTier: tierBillingPrompt.targetTier })}
-                className="flex-1 rounded-xl bg-gray-100 py-2.5 text-[12px] font-bold text-gray-600"
+                className="flex-1 rounded-xl bg-gray-100 py-2.5 text-[12px] font-medium text-gray-600"
               >
                 나중에
               </button>
@@ -6447,10 +6438,10 @@ function App() {
                     /* ignore */
                   }
                   setTierBillingPrompt({ open: false, targetTier: "" });
-                  setBottomToast("결제 안내를 통해 등급 변경이 적용되었습니다.");
+                  setBottomToast("플랜 변경이 적용되었습니다.");
                   setTimeout(() => setBottomToast(""), 2600);
                 }}
-                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-[12px] font-black text-white"
+                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-[12px] font-semibold text-white"
               >
                 결제 진행
               </button>

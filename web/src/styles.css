@@ -1,3 +1,4 @@
+@import "./index.css";
 @import "./styles/vlue-typography.css";
 @import "./styles/showcase-fonts.css";
 
@@ -5,6 +6,8 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
@@ -19,14 +22,13 @@ body,
 }
 
 body {
-  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "San Francisco", system-ui, sans-serif;
   font-size: calc(1rem * var(--vlue-ui-font-scale, 1));
-  /* antialiased????? UI??? ????? ??? ??????? ?? ??Windows/??? ?? ?????????????? */
-  -webkit-font-smoothing: auto;
-  -moz-osx-font-smoothing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.02em;
   text-rendering: optimizeLegibility;
   scrollbar-gutter: stable;
-  /* ?? ??? ?? ??? ?? ??? ???? ?? ?? */
   word-break: keep-all;
   overflow-wrap: break-word;
   line-break: strict;

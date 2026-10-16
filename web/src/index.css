@@ -1,0 +1,89 @@
+/**
+ * VLUÉ Global Design System - Typography & Premium Style
+ * Apple · Toss · Netflix Premium Design System
+ * 
+ * Rules:
+ * 1. Font-family: Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, San Francisco
+ * 2. Smoothing: -webkit-font-smoothing: antialiased, -moz-osx-font-smoothing: grayscale
+ * 3. Weights clamped: max 600 (semibold) for titles/headings, 400~500 for body/labels
+ * 4. Tracking: -0.02em (tracking-tight) default
+ */
+
+:root {
+  --vlue-font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "SF Pro Text", "SF Pro Display", "San Francisco", system-ui, sans-serif;
+  --vlue-letter-spacing-default: -0.02em;
+}
+
+/* Global Font Smoothing & Anti-Aliasing */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body {
+  font-family: var(--vlue-font-sans);
+  letter-spacing: var(--vlue-letter-spacing-default);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* Universal typography defaults */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--vlue-font-sans);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+p, span, div, label, button, input, select, textarea {
+  font-family: var(--vlue-font-sans);
+  letter-spacing: var(--vlue-letter-spacing-default);
+}
+
+/* 
+ * Global Font Weight Clamp (초등학생 스타일 둔탁함 완벽 제거)
+ * font-black(900), font-extrabold(800), font-bold(700) -> 600(semibold) 이하로 제한
+ */
+.font-black,
+.font-extrabold {
+  font-weight: 600 !important;
+}
+
+.font-bold {
+  font-weight: 600 !important;
+}
+
+/* Premium Apple / Toss Glass & Card Utilities */
+.vlue-premium-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vlue-premium-card-dark {
+  background: rgba(23, 27, 38, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
+}
+
+.vlue-premium-pill {
+  border-radius: 9999px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  transition: all 0.15s ease;
+}

@@ -14,6 +14,7 @@ import { isAdminConsoleEntry } from "./lib/adminRoute.js";
 import { resolveSiteShell } from "./lib/siteMode.js";
 import BrowserAppBlockedPage from "./components/BrowserAppBlockedPage.jsx";
 import WwwStagingLockGate from "./components/WwwStagingLockGate.jsx";
+import "./index.css";
 import "./styles.css";
 import "./styles/vlue-wide-shell.css";
 import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
