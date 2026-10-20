@@ -83,8 +83,8 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
           <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-3" style={{ letterSpacing: '-0.035em' }}>V1 멤버십 · 요금제</h1>
           <p className="text-gray-500 text-base max-w-lg mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
             블루 쇼케이스·디지털 인증명함·가족보호 중심의 V1 요금제입니다.<br />
-            유료 월 14,100원(정가 28,300원 · 모바일 이벤트) · 연 141,000원(2개월 추가 무료).
-            최초 가입+추천인 코드 시 월 9,900원 / 연 99,000원(본인인증 CI 기준 1회).
+            유료 월 14,100원(정가 28,300원 · 모바일 이벤트).
+            최초 가입+추천인 코드 시 월 9,900원(본인인증 CI 기준 1회).
           </p>
           <p className="mt-4 text-sm font-semibold text-primary-700 max-w-xl mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
             가입과 결제는 VLUÉ 앱을 다운로드하여 진행해 주세요. (웹 결제는 지원하지 않습니다)
@@ -341,7 +341,8 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center text-[11px] leading-relaxed text-slate-600">
-          <p className="font-semibold text-slate-800">유료 구독은 자동 갱신될 수 있으며, 해지·환불·청약철회는 아래 규정을 따릅니다.</p>
+          <p className="font-semibold text-slate-800">본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.</p>
+          <p className="mt-1 text-slate-600">유료 구독은 월 단위로 제공되며, 해지·환불·청약철회는 아래 규정을 따릅니다.</p>
           <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
             <a href="#terms" className="font-bold text-primary-600 underline-offset-2 hover:underline">
               이용약관

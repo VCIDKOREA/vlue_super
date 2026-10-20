@@ -828,6 +828,13 @@ export default function AboutPage({ onSearch, onNavigate }: AboutPageProps) {
           <p className="text-xs font-black text-slate-500 uppercase tracking-wider mt-8 mb-3">상세 설명</p>
           <ServiceAccordion items={PRICING_TIER_FEATURES} forceOpenId={forceOpenId} className="mb-5" />
 
+          {/* 서비스 제공기간 및 소진 규정 안내 (NHN KCP PG 심사 필수) */}
+          <div className="mb-6 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 text-center">
+            <p className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed" style={{ wordBreak: "keep-all" }}>
+              본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+            </p>
+          </div>
+
           <button type="button" onClick={() => onNavigate('pricing')} className="btn-primary w-full sm:w-auto">
             인증신청 페이지로 이동
             <ArrowRight className="w-4 h-4" />

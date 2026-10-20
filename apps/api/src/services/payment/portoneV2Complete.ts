@@ -49,10 +49,12 @@ function buildPaymentReceiptBody(orderName: string, amountKrw: number, paymentId
     "구매해 주셔서 진심으로 감사합니다.",
     "",
     `구매 상품: ${orderName}`,
+    `제공 기간: 구매일로부터 1개월`,
     `상품 설명: ${productDetail}`,
     `결제 금액: ${formatAmountKrw(amountKrw)}`,
     `결제 번호: ${paymentId}`,
     "",
+    "본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.",
     "아래 [구매확인]을 눌러 주시면 구매가 확정됩니다.",
     "환불이 필요하시면 [환불 문의]로 고객센터(support@vlue.kr)에 신청해 주세요."
   ].join("\n");

@@ -716,7 +716,7 @@ export async function chargeLineSubscription(
           customer_uid: customerUid,
           merchant_uid: merchantUid,
           amount,
-          name: `VLUE 회선 구독 ${formatPhoneDisplayKR(row.businessCard.phoneE164)}`,
+          name: `VLUE 회선 구독 ${formatPhoneDisplayKR(row.businessCard.phoneE164)} (1개월)`,
           buyer_email: user?.email || undefined,
           buyer_tel: user?.phoneE164?.replace(/^\+82/, "0") || undefined
         }

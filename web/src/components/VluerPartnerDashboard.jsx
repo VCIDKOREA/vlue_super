@@ -162,7 +162,7 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
   const [error, setError] = useState("");
   const [simPersonalCount, setSimPersonalCount] = useState(0);
   const [simB2bLines, setSimB2bLines] = useState(0);
-  const [billingCycle, setBillingCycle] = useState("monthly");
+  const billingCycle = "monthly";
   const [simChannel, setSimChannel] = useState("friend");
   const [simResult, setSimResult] = useState(null);
   const [simBusy, setSimBusy] = useState(false);
@@ -395,24 +395,9 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
             {tab === "sim" && (
               <div className="space-y-2.5 pt-1">
                 <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle("monthly")}
-                    className={`flex-1 rounded-lg py-1.5 text-[10px] font-black ${
-                      billingCycle === "monthly" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"
-                    }`}
-                  >
+                  <div className="flex-1 rounded-lg py-1.5 text-[10px] font-black bg-white text-indigo-700 shadow-sm text-center">
                     월간 결제
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle("annual")}
-                    className={`flex-1 rounded-lg py-1.5 text-[10px] font-black ${
-                      billingCycle === "annual" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"
-                    }`}
-                  >
-                    연간 결제 (2개월 무료)
-                  </button>
+                  </div>
                 </div>
 
                 <label className="block text-[10px] font-bold text-slate-500">
@@ -539,6 +524,12 @@ function VluerPartnerDashboardInner({ onOpenFamilyProtection, layout = "compact"
                 {simResult?.error && (
                   <p className="text-[11px] font-semibold text-red-600">{simResult.error}</p>
                 )}
+
+                <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-2.5 text-center">
+                  <p className="text-[10px] leading-relaxed text-slate-500 font-medium">
+                    본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+                  </p>
+                </div>
               </div>
             )}
 

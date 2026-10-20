@@ -103,13 +103,44 @@ export async function requestPortoneV2Payment(opts = {}) {
     channelKey,
     paymentId,
     orderName,
+    goods_name: opts.goods_name || opts.good_name || orderName,
+    good_name: opts.good_name || opts.goods_name || orderName,
     totalAmount,
     currency: "CURRENCY_KRW",
     payMethod,
+    // NHN KCP / KPN 심사 보완: 서비스 제공기간 파라미터 명시 ("구매일로부터 1개월")
+    period: opts.period || "구매일로부터 1개월",
+    service_period: opts.service_period || "구매일로부터 1개월",
+    servicePeriod: opts.servicePeriod || "구매일로부터 1개월",
+    offerPeriod: opts.offerPeriod || { interval: "1m" },
     ...(opts.customer ? { customer: opts.customer } : {}),
     ...(opts.customData ? { customData: opts.customData } : {}),
     ...(opts.redirectUrl ? { redirectUrl: opts.redirectUrl } : {}),
-    ...(opts.forceRedirect != null ? { forceRedirect: Boolean(opts.forceRedirect) } : {})
+    ...(opts.forceRedirect != null ? { forceRedirect: Boolean(opts.forceRedirect) } : {}),
+    bypass: {
+      kcp_v2: {
+        good_expr: "1M",
+        good_name: opts.goods_name || opts.good_name || orderName,
+        goods_name: opts.goods_name || opts.good_name || orderName,
+        service_period: opts.service_period || "구매일로부터 1개월",
+        period: opts.period || "구매일로부터 1개월"
+      },
+      kcp: {
+        good_expr: "1M",
+        good_name: opts.goods_name || opts.good_name || orderName,
+        goods_name: opts.goods_name || opts.good_name || orderName,
+        service_period: opts.service_period || "구매일로부터 1개월",
+        period: opts.period || "구매일로부터 1개월"
+      },
+      kpn: {
+        good_expr: "1M",
+        good_name: opts.goods_name || opts.good_name || orderName,
+        goods_name: opts.goods_name || opts.good_name || orderName,
+        service_period: opts.service_period || "구매일로부터 1개월",
+        period: opts.period || "구매일로부터 1개월"
+      },
+      ...(opts.bypass || {})
+    }
   };
 
   const paymentResponse = await PortOne.requestPayment(request);

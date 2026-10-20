@@ -17,8 +17,8 @@ function parseBillingCycle(raw: string | undefined | null): PaidBillingCycle {
   return s === "annual" || s === "yearly" ? "annual" : "monthly";
 }
 
-function subscribeProductName(cycle: PaidBillingCycle): string {
-  return `VLUE 멤버십 구독 (${cycle === "annual" ? "1년" : "1월"})`;
+function subscribeProductName(_cycle: PaidBillingCycle): string {
+  return "VLUE 유료 플랜 (1개월)";
 }
 
 const DEV_BILLING_PREFIX = "dev_billing_";

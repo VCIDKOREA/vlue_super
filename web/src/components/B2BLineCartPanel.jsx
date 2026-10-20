@@ -250,8 +250,8 @@ export default function B2BLineCartPanel({ onToast, onActivated }) {
             </p>
             <p className="mt-1 break-words text-[10px] leading-snug">
               {invoice?.hasReferral
-                ? `전 회선 ${billingCycle === "annual" ? "연 99,000원" : "월 9,900원"}(최초+추천인 CI) · 연동비 0원`
-                : `대표 ${billingCycle === "annual" ? "연 283,000원" : "월 28,300원"} · 모바일 회선 ${billingCycle === "annual" ? "연 141,000원" : "월 14,100원"}/대 · 내선·대표번호 ${billingCycle === "annual" ? "연 52,000원" : "월 5,200원"} · 연동비 0원`}
+                ? `전 회선 월 9,900원(최초+추천인 CI) · 연동비 0원`
+                : `대표 월 28,300원 · 모바일 회선 월 14,100원/대 · 내선·대표번호 월 5,200원 · 연동비 0원`}
             </p>
             <p className="mt-2 break-words text-[10px] font-semibold leading-snug text-indigo-900/90">
               개인 유료 이용 중 전환 시, B2B 모바일 회선 요금(14,100원 · 추천인+CI 9,900원)은 등록·승인 완료 후 <b>익월</b> 결제부터 적용됩니다.
@@ -293,24 +293,9 @@ export default function B2BLineCartPanel({ onToast, onActivated }) {
               </select>
             </label>
             <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setBillingCycle("monthly")}
-                className={`flex-1 rounded-lg py-2 text-[11px] font-black ${
-                  billingCycle === "monthly" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                월간권
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle("annual")}
-                className={`flex-1 rounded-lg py-2 text-[11px] font-black ${
-                  billingCycle === "annual" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                연간권
-              </button>
+              <div className="flex-1 rounded-lg py-2 text-[11px] font-black bg-slate-900 text-white text-center">
+                월간권 (1개월)
+              </div>
             </div>
           </section>
 
@@ -475,6 +460,9 @@ export default function B2BLineCartPanel({ onToast, onActivated }) {
             >
               {busy ? "처리 중…" : "기업 가입 신청 제출"}
             </button>
+            <p className="mt-2 text-center text-[10px] text-slate-500 font-medium">
+              본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+            </p>
             {!canSubmitNow && !isPendingVerification ? (
               <p className="text-center text-[10px] text-slate-500">
                 위 항목을 모두 완료하면 제출할 수 있습니다.

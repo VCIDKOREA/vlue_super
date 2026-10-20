@@ -8,9 +8,7 @@ import {
   normalizeMembershipKind,
   PAID_LIST_PRICE_MONTHLY_KRW,
   PAID_EVENT_MONTHLY_KRW,
-  PAID_EVENT_ANNUAL_KRW,
   PAID_REFERRAL_MONTHLY_KRW,
-  PAID_REFERRAL_ANNUAL_KRW,
   EXTENSION_LINE_MONTHLY_KRW,
   EXTENSION_LINE_NO_REFERRAL_NOTE,
   MULTI_PROFILE_ADDON_MONTHLY_KRW,
@@ -112,15 +110,14 @@ export default function MembershipModal({
   // 탭 상태: 'paid' | 'b2b' | 'addons' | 'free'
   const [selectedCategory, setSelectedCategory] = useState(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
 
-  // 결제 주기: 'monthly' | 'annual'
-  const [billingCycle, setBillingCycle] = useState("monthly");
+  // 결제 주기: 월간 결제 전용 고정 (NHN KCP 심사 기준)
+  const billingCycle = "monthly";
 
-  // 선택된 결제 상품 상세
+  // 선택된 결제 상품 상세 (월간 결제 전용)
   const [targetItem, setTargetItem] = useState({
     kind: "paid",
-    name: "VLUE 유료 플랜",
+    name: "VLUE 유료 플랜 (1개월)",
     basePrice: PAID_EVENT_MONTHLY_KRW,
-    annualPrice: PAID_EVENT_ANNUAL_KRW,
     allowsReferral: true
   });
 
@@ -162,10 +159,10 @@ export default function MembershipModal({
     setSelectedCategory(isB2bMembershipKind(currentKind) ? "b2b" : "paid");
   }, [currentKind, open]);
 
-  // 가격 계산
-  const currentBasePrice = billingCycle === "annual" ? targetItem.annualPrice : targetItem.basePrice;
+  // 가격 계산 (월간 결제 전용)
+  const currentBasePrice = targetItem.basePrice;
   const referralDiscountAmount = targetItem.allowsReferral && referralApplied
-    ? (billingCycle === "annual" ? 42000 : 4200)
+    ? 4200
     : 0;
   const finalPrice = Math.max(0, currentBasePrice - referralDiscountAmount);
 
@@ -343,7 +340,7 @@ export default function MembershipModal({
     setPayError("");
     setPinError("");
 
-    const cycle = billingCycle === "annual" ? "annual" : "monthly";
+    const cycle = "monthly";
     const productKind = targetItem.kind || "paid";
     const newTier = productKind === "b2b" ? "b2b" : "paid";
     const orderName = membershipOrderName({ kind: productKind, billingCycle: cycle });
@@ -539,30 +536,10 @@ export default function MembershipModal({
             {/* TAB 1: 유료 플랜 (Paid) */}
             {selectedCategory === "paid" && (
               <div className="mt-5 space-y-4">
-                {/* 월간 / 연간 결제 토글 */}
-                <div className="flex items-center justify-end gap-2">
-                  <span className={`text-[11px] ${billingCycle === "monthly" ? "font-semibold text-blue-600" : subTextCls}`}>
-                    월간 결제
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly");
-                    }}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      billingCycle === "annual" ? "bg-blue-600" : "bg-slate-300 dark:bg-white/20"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        billingCycle === "annual" ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                  <span className={`text-[11px] ${billingCycle === "annual" ? "font-semibold text-blue-600" : subTextCls}`}>
-                    연간 결제 <b className="text-emerald-500 font-medium">(2개월 무료)</b>
+                {/* 월간 결제 전용 뱃지 (연간 결제 토글 전면 제거) */}
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-2.5 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                    월간 결제 전용 (1개월)
                   </span>
                 </div>
 
@@ -585,15 +562,11 @@ export default function MembershipModal({
 
                   <div className="mt-3 flex items-baseline gap-2">
                     <span className="text-[28px] font-semibold text-blue-600 tabular-nums">
-                      {billingCycle === "annual"
-                        ? `${PAID_EVENT_ANNUAL_KRW.toLocaleString("ko-KR")}원`
-                        : `${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원`}
+                      {`${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원`}
                     </span>
-                    <span className={`text-[13px] ${subTextCls}`}>{billingCycle === "annual" ? "/연" : "/월"}</span>
+                    <span className={`text-[13px] ${subTextCls}`}>/월</span>
                     <span className="ml-auto rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
-                      {billingCycle === "annual"
-                        ? `추천인 시 ${PAID_REFERRAL_ANNUAL_KRW.toLocaleString("ko-KR")}원`
-                        : `추천인 시 ${PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원`}
+                      {`추천인 시 ${PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원`}
                     </span>
                   </div>
 
@@ -639,9 +612,8 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "paid",
-                        name: "VLUE 유료 플랜",
+                        name: "VLUE 유료 플랜 (1개월)",
                         basePrice: PAID_EVENT_MONTHLY_KRW,
-                        annualPrice: PAID_EVENT_ANNUAL_KRW,
                         allowsReferral: true
                       })
                     }
@@ -725,9 +697,8 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "b2b",
-                        name: "VLUE 비즈니스 플랜",
+                        name: "VLUE 비즈니스 플랜 (1개월)",
                         basePrice: B2B_STAFF_EVENT_MONTHLY_KRW,
-                        annualPrice: B2B_STAFF_EVENT_MONTHLY_KRW * 12,
                         allowsReferral: true
                       })
                     }
@@ -778,9 +749,8 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "extension_line",
-                        name: "VLUE 내선 대표번호 추가 회선",
+                        name: "VLUE 내선 대표번호 추가 회선 (1개월)",
                         basePrice: EXTENSION_LINE_MONTHLY_KRW,
-                        annualPrice: EXTENSION_LINE_MONTHLY_KRW * 12,
                         allowsReferral: false
                       })
                     }
@@ -821,9 +791,8 @@ export default function MembershipModal({
                     onClick={(e) =>
                       handlePayClick(e, {
                         kind: "multi_profile",
-                        name: "VLUE 멀티 프로필 추가 슬롯",
+                        name: "VLUE 멀티 프로필 추가 슬롯 (1개월)",
                         basePrice: MULTI_PROFILE_ADDON_MONTHLY_KRW,
-                        annualPrice: MULTI_PROFILE_ADDON_MONTHLY_KRW * 12,
                         allowsReferral: false
                       })
                     }
@@ -877,6 +846,13 @@ export default function MembershipModal({
                 )}
               </div>
             )}
+
+            {/* NHN KCP PG 심사 필수 안내 문구: 서비스 제공기간 및 소진 규정 */}
+            <div className="mt-5 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 p-3.5 text-center">
+              <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
+                본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+              </p>
+            </div>
           </div>
         )}
 
@@ -905,7 +881,7 @@ export default function MembershipModal({
                         {formatKrw(finalPrice)}
                       </span>
                       <span className={`text-[12px] ${subTextCls}`}>
-                        /{billingCycle === "annual" ? "연" : "월"}
+                        /월
                       </span>
                     </div>
                   ) : (
@@ -914,11 +890,18 @@ export default function MembershipModal({
                         {formatKrw(currentBasePrice)}
                       </span>
                       <span className={`text-[12px] ${subTextCls}`}>
-                        /{billingCycle === "annual" ? "연" : "월"}
+                        /월
                       </span>
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="flex justify-between items-center py-1.5 border-t border-slate-200/60 dark:border-white/10 mt-1 pt-2">
+                <span className="text-[13px] font-medium text-slate-500 shrink-0">서비스 제공기간</span>
+                <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 text-right">
+                  구매일로부터 1개월
+                </span>
               </div>
 
               {referralApplied && targetItem.allowsReferral && (
@@ -1031,6 +1014,13 @@ export default function MembershipModal({
                 </button>
               )}
 
+              {/* NHN KCP PG 심사 필수 안내 문구 */}
+              <div className="rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/30 p-3 text-center">
+                <p className="text-[11px] leading-relaxed text-blue-900 dark:text-blue-300 font-medium">
+                  본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+                </p>
+              </div>
+
               <p className="text-center text-[11px] text-slate-400">
                 다음 단계에서 6자리 결제 PIN을 입력하면 결제가 안전하게 승인됩니다.
               </p>
@@ -1061,7 +1051,7 @@ export default function MembershipModal({
 
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-500/30 px-3.5 py-1 text-[12px] font-semibold text-blue-700 dark:text-blue-300">
               <span>결제 승인 금액:</span>
-              <span className="tabular-nums font-bold text-blue-600">{formatKrw(finalPrice)}</span>
+              <span className="tabular-nums font-bold text-blue-600">{formatKrw(finalPrice)} (1개월)</span>
             </div>
 
             {/* 6자리 PIN 인디케이터 */}
@@ -1146,6 +1136,12 @@ export default function MembershipModal({
                 ⌫
               </button>
             </div>
+
+            <div className="mt-4 max-w-[300px] text-center">
+              <p className="text-[11px] leading-relaxed text-slate-400 font-medium">
+                본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+              </p>
+            </div>
           </div>
         )}
 
@@ -1176,7 +1172,13 @@ export default function MembershipModal({
               <div className="flex justify-between items-center gap-2 py-1 text-[13px] border-t border-slate-200/60 dark:border-white/10 mt-1 pt-1.5">
                 <span className="text-slate-500 shrink-0">결제 금액</span>
                 <span className="min-w-0 text-right font-bold text-slate-900 dark:text-white tabular-nums">
-                  {formatKrw(successInfo?.amountKrw || finalPrice)}
+                  {formatKrw(successInfo?.amountKrw || finalPrice)} / 1개월
+                </span>
+              </div>
+              <div className="flex justify-between items-center gap-2 py-1 text-[13px] border-t border-slate-200/60 dark:border-white/10 mt-1 pt-1.5">
+                <span className="text-slate-500 shrink-0">서비스 제공기간</span>
+                <span className="min-w-0 text-right font-medium text-slate-700 dark:text-slate-300">
+                  구매일로부터 1개월 (자동 소진)
                 </span>
               </div>
               <div className="mt-2.5 border-t border-slate-200/60 dark:border-white/10 pt-2.5 space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400">

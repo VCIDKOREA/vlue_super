@@ -48,8 +48,7 @@ export const B2B_MOBILE_LINE_PRICING_NOTE =
   "모바일 회선(직원·개인 무관) 월 14,100원 · 최초 가입(CI)+추천인 코드 시 월 9,900원";
 export const PAID_LAUNCH_DISCOUNT_NOTE =
   "모바일 이벤트가 월 14,100원(정가 28,300원) · 최초 가입+추천인 시 월 9,900원";
-export const PAID_ANNUAL_BENEFIT_NOTE =
-  "(연간 구독 시 2개월 추가 무료: 이벤트 연 141,000원 / 추천인 연 99,000원)";
+export const PAID_ANNUAL_BENEFIT_NOTE = "";
 
 /** @deprecated 별칭 — 모바일 이벤트가 */
 export const PAID_MONTHLY_DISCOUNTED_KRW = PAID_EVENT_MONTHLY_KRW;
@@ -76,7 +75,7 @@ export const REFERRAL_PROGRAM_NOTICES = [REFERRAL_FRIEND_DISCOUNT_NOTICE, REFERR
 export const ENTERPRISE_REFERRAL_POLICY_NOTE =
   "내선·대표번호 추가(월 5,200원)에는 추천인 할인(4,200원)이 적용되지 않습니다. 대표자 기본 플랜 결제 후에만 추가 발급 가능합니다.";
 
-export const PAID_MEMBERSHIP_SUBLINE = `월 ${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 연 ${PAID_EVENT_ANNUAL_KRW.toLocaleString("ko-KR")}원 · 추천인 최초가입 월 ${PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원`;
+export const PAID_MEMBERSHIP_SUBLINE = `월 ${PAID_EVENT_MONTHLY_KRW.toLocaleString("ko-KR")}원 · 추천인 최초가입 월 ${PAID_REFERRAL_MONTHLY_KRW.toLocaleString("ko-KR")}원`;
 
 export const B2B_REP_LIST_MONTHLY_KRW = 28300;
 export const B2B_STAFF_LIST_MONTHLY_KRW = 14700;

@@ -287,6 +287,13 @@ export default function PricingSection({
         })}
       </div>
 
+      {/* 서비스 제공기간 및 소진 규정 안내 (NHN KCP PG 심사 필수) */}
+      <div className="mt-8 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 text-center">
+        <p className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed" style={{ wordBreak: "keep-all" }}>
+          본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+        </p>
+      </div>
+
       {/* [상세 혜택 보기] 팝업 모달 */}
       <PricingDetailModal
         isOpen={modalOpen}

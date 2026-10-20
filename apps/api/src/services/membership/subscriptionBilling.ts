@@ -159,8 +159,8 @@ export async function resolveSubscriptionChargeAmount(
   };
 }
 
-export function subscribeRenewalProductName(cycle: PaidBillingCycle): string {
-  return `VLUE 멤버십 정기결제 (${cycle === "annual" ? "1년" : "1월"})`;
+export function subscribeRenewalProductName(_cycle: PaidBillingCycle): string {
+  return "VLUE 유료 플랜 (1개월)";
 }
 
 export function buildRenewalMerchantUid(subscriptionId: string, asOf: Date): string {

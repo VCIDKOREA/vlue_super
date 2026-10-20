@@ -44,6 +44,27 @@ export async function requestSubscribePaymentAgain(
       merchant_uid: params.merchant_uid,
       amount: params.amount,
       name: params.name,
+      goods_name: params.name,
+      good_name: params.name,
+      period: "구매일로부터 1개월",
+      service_period: "구매일로부터 1개월",
+      servicePeriod: "구매일로부터 1개월",
+      bypass: {
+        kcp_v2: {
+          good_expr: "1M",
+          good_name: params.name,
+          goods_name: params.name,
+          service_period: "구매일로부터 1개월",
+          period: "구매일로부터 1개월"
+        },
+        kcp: {
+          good_expr: "1M",
+          good_name: params.name,
+          goods_name: params.name,
+          service_period: "구매일로부터 1개월",
+          period: "구매일로부터 1개월"
+        }
+      },
       buyer_email: params.buyer_email,
       buyer_tel: params.buyer_tel
     })

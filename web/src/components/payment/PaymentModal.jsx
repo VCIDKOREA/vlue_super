@@ -69,7 +69,7 @@ export default function PaymentModal({
   const isB2b = isB2bMembershipKind(pending?.membershipKind);
   const planTitle = membershipOrderName({
     kind: isB2b ? "b2b" : "paid",
-    billingCycle: pending?.billingCycle === "annual" ? "annual" : "monthly"
+    billingCycle: "monthly"
   });
 
   // 추천인 코드 검증 & 즉시 적용 핸들러
@@ -221,7 +221,7 @@ export default function PaymentModal({
     setError("");
     setPinError("");
     try {
-      const cycle = pending?.billingCycle === "annual" ? "annual" : "monthly";
+      const cycle = "monthly";
       const productKind = isB2b ? "b2b" : "paid";
       const result = await openPaymentGateway({
         tier: productKind,
@@ -250,7 +250,7 @@ export default function PaymentModal({
     const targetTier = isB2b ? "b2b" : "paid";
     onComplete?.({
       membershipTier: targetTier,
-      billingCycle: pending?.billingCycle || "monthly",
+      billingCycle: "monthly",
       amountKrw: finalPrice,
       referralCode: referralApplied ? referralInput.trim() : null,
       testMode
@@ -389,6 +389,13 @@ export default function PaymentModal({
                   <span className="tabular-nums font-semibold">-{formatKrw(discountAmount)}</span>
                 </div>
               )}
+
+              <div className="flex justify-between items-center py-1.5 border-t border-slate-200/60 mt-1 pt-2">
+                <span className="text-[13px] font-medium text-slate-500 shrink-0">서비스 제공기간</span>
+                <span className="text-[13px] font-semibold text-slate-800 text-right">
+                  구매일로부터 1개월
+                </span>
+              </div>
             </div>
 
             {/* 추천인 코드 입력 섹션 */}
@@ -439,6 +446,13 @@ export default function PaymentModal({
 
             {/* 명확한 2가지 분기 결제 버튼 */}
             <div className="mt-4 flex flex-col gap-2">
+              {/* 서비스 제공기간 및 소진 규정 안내 (NHN KCP PG 심사 필수) */}
+              <div className="rounded-xl bg-blue-50/60 border border-blue-200/60 p-3 text-center">
+                <p className="text-[11px] leading-relaxed text-blue-900 font-medium">
+                  본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+                </p>
+              </div>
+
               {referralApplied ? (
                 <button
                   type="button"
@@ -514,7 +528,7 @@ export default function PaymentModal({
 
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3.5 py-1 text-[12px] font-semibold text-blue-700">
               <span>결제 승인 금액:</span>
-              <span className="tabular-nums font-bold text-blue-600">{formatKrw(finalPrice)}</span>
+              <span className="tabular-nums font-bold text-blue-600">{formatKrw(finalPrice)} (1개월)</span>
             </div>
 
             {/* 6자리 PIN 동그라미 */}
@@ -600,6 +614,12 @@ export default function PaymentModal({
                 ⌫
               </button>
             </div>
+
+            <div className="mt-4 max-w-[280px] text-center">
+              <p className="text-[11px] leading-relaxed text-slate-400 font-medium">
+                본 서비스는 결제일로부터 1개월 동안 제공되며, 기간 경과 시 서비스 이용 권한이 자동 소진/종료됩니다.
+              </p>
+            </div>
           </div>
         )}
 
@@ -627,7 +647,11 @@ export default function PaymentModal({
               </div>
               <div className="flex justify-between items-center gap-2 py-1 text-[13px] border-t border-slate-200/60 mt-1 pt-1.5">
                 <span className="text-slate-500 shrink-0">결제 금액</span>
-                <span className="min-w-0 text-right font-bold text-slate-900 tabular-nums">{formatKrw(finalPrice)}</span>
+                <span className="min-w-0 text-right font-bold text-slate-900 tabular-nums">{formatKrw(finalPrice)} / 1개월</span>
+              </div>
+              <div className="flex justify-between items-center gap-2 py-1 text-[13px] border-t border-slate-200/60 mt-1 pt-1.5">
+                <span className="text-slate-500 shrink-0">서비스 제공기간</span>
+                <span className="min-w-0 text-right font-medium text-slate-700">구매일로부터 1개월 (자동 소진)</span>
               </div>
               <div className="mt-2.5 border-t border-slate-200/60 pt-2.5 space-y-1.5 text-[11px] text-slate-600">
                 <div className="flex items-center gap-1.5">

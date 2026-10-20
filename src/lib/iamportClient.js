@@ -257,7 +257,7 @@ export async function requestIamportBillingPay({
   const merchant_uid = merchantUidOverride || `billing_${Date.now()}`;
   const pg = buildIamportBillingPg();
   const cycleLabel = billingCycle === "annual" ? "1년" : "1월";
-  const name = nameOverride || `VLUE 멤버십 구독 (${cycleLabel})`;
+  const name = nameOverride || "VLUE 유료 플랜 (1개월)";
   const payAmount = Math.max(0, Math.floor(Number(amount) || 0));
 
   if (typeof import.meta !== "undefined" && import.meta.env?.DEV) {
@@ -272,7 +272,12 @@ export async function requestIamportBillingPay({
         merchant_uid,
         customer_uid,
         name,
+        goods_name: name,
+        good_name: name,
         amount: payAmount,
+        period: "구매일로부터 1개월",
+        service_period: "구매일로부터 1개월",
+        servicePeriod: "구매일로부터 1개월",
         buyer_name: buyerName || undefined,
         buyer_tel: buyerTel || undefined,
         buyer_email: buyerEmail || undefined

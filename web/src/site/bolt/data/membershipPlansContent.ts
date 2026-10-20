@@ -10,11 +10,8 @@ import {
 import {
   PAID_LIST_PRICE_MONTHLY_KRW,
   PAID_EVENT_MONTHLY_KRW,
-  PAID_EVENT_ANNUAL_KRW,
   PAID_REFERRAL_MONTHLY_KRW,
-  PAID_REFERRAL_ANNUAL_KRW,
   PAID_LAUNCH_DISCOUNT_NOTE,
-  PAID_ANNUAL_BENEFIT_NOTE,
   PAID_MEMBERSHIP_SUBLINE,
   B2B_REP_LIST_MONTHLY_KRW,
   B2B_STAFF_LIST_MONTHLY_KRW,
@@ -63,7 +60,7 @@ export const MARKETING_PRICING_TIERS = [
     color: 'blue' as const,
     recommended: true,
     features: MEMBERSHIP_PLAN_DETAILS.paid.bullets,
-    priceNote: `${PAID_LAUNCH_DISCOUNT_NOTE} / ${PAID_ANNUAL_BENEFIT_NOTE}`,
+    priceNote: PAID_LAUNCH_DISCOUNT_NOTE,
     promoBadge: '모바일 이벤트',
   },
   {
@@ -114,7 +111,6 @@ export const MEMBERSHIP_PRICING_FEATURES: ServiceAccordionItem[] = [
     detail: [
       ...MEMBERSHIP_PLAN_DETAILS.paid.bullets,
       `가족보호: ${FAMILY_PROTECTION_SUMMARY_SHORT}`,
-      `연간 구독: 이벤트 ${PAID_EVENT_ANNUAL_KRW.toLocaleString('ko-KR')}원 · 추천인 ${PAID_REFERRAL_ANNUAL_KRW.toLocaleString('ko-KR')}원 · ${PAID_ANNUAL_BENEFIT_NOTE}`,
       `최초 가입+추천인 코드: 월 ${PAID_REFERRAL_MONTHLY_KRW.toLocaleString('ko-KR')}원(본인인증 CI 기준 1회)`,
     ],
   },
