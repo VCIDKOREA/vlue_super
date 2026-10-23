@@ -138,10 +138,14 @@ function isOgScraperUserAgent(uaRaw) {
   );
 }
 
-/** `/showcase/010…` · `/s/010…` — 문자 OG 카드용. 관리 화면 `/showcase` 는 제외 */
+/** `/showcase/010…` · `/s/010…` · `/site/web/showcase/010...` — 문자/카톡 OG 카드용 */
 function matchPublicShowcaseShare(pathname) {
-  const m = String(pathname || "").match(/^\/(?:showcase|s)\/(\d{8,15})\/?$/);
-  return m ? m[1] : "";
+  const m = String(pathname || "").match(/^\/(?:site\/web\/showcase|showcase|s)\/(\d{8,15})(?:\/t\/([^/]+))?(?:\/.*)?$/);
+  if (!m) return null;
+  return {
+    phone: m[1],
+    fullSubpath: m[2] ? `/showcase/${m[1]}/t/${m[2]}` : `/showcase/${m[1]}`
+  };
 }
 
 function serveShowcaseShortBounce(response, phone) {
@@ -167,8 +171,8 @@ function serveShowcaseShortBounce(response, phone) {
   return true;
 }
 
-async function serveShowcaseOgShare(_request, response, phone) {
-  const dest = `${VLUE_SHARE_ORIGIN}/showcase/${encodeURIComponent(phone)}`;
+async function serveShowcaseOgShare(_request, response, matchInfo) {
+  const dest = `${VLUE_SHARE_ORIGIN}${matchInfo.fullSubpath}`;
   response.writeHead(302, {
     Location: dest,
     "Cache-Control": "public, max-age=120"
@@ -264,11 +268,11 @@ const server = createServer((request, response) => {
     return;
   }
 
-  const showcasePhone = matchPublicShowcaseShare(pathname);
-  if (showcasePhone) {
+  const showcaseMatch = matchPublicShowcaseShare(pathname);
+  if (showcaseMatch) {
     const ua = request.headers["user-agent"] || "";
     if (isOgScraperUserAgent(ua)) {
-      void serveShowcaseOgShare(request, response, showcasePhone);
+      void serveShowcaseOgShare(request, response, showcaseMatch);
       return;
     }
     /* 실사용자 브라우저 진입: SSR 블로킹 및 302 리다이렉트 지연 없이 정적 셸(SPA) 즉시 서빙 (0.1초 내 렌더) */

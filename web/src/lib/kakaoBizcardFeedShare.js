@@ -17,6 +17,8 @@ import { withLetteringBizcardPreviewFallback } from "./letteringBizcardProfile.j
 import { scrubLetteringDemoPollution } from "./letteringDemoPollution.js";
 import { readLetteringFixedIdentity, readLetteringBizcardEditable } from "./letteringBizcardStorage.js";
 import { buildShowcaseShareCacheKey } from "./letteringBizcardShare.js";
+import { extractShowcaseCoverUrl } from "./showcase/showcaseCover.js";
+import { readActiveShowcaseStyle, readShowcaseStyle } from "./showcase/showcaseStyleStorage.js";
 
 const KAKAO_PUBLIC_ORIGIN = "https://www.vlue.kr";
 export const KAKAO_FEED_IMAGE_WIDTH = 800;
@@ -100,6 +102,18 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
       : `${KAKAO_PUBLIC_ORIGIN}/membership`;
   const snap = scrubLetteringDemoPollution(withLetteringBizcardPreviewFallback(card || {}));
   const ed = readLetteringBizcardEditable();
+
+  const pickHttp = (...vals) => {
+    for (const v of vals) {
+      const s = String(v || "").trim();
+      if (/^https:\/\//i.test(s)) return s;
+    }
+    return "";
+  };
+
+  const activeStyle = card?.showcaseStyle || readActiveShowcaseStyle?.() || readShowcaseStyle?.() || null;
+  const styleCover = extractShowcaseCoverUrl(activeStyle);
+
   const titlePhotoHint = ed.noTitlePhoto
     ? ""
     : String(
@@ -112,6 +126,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
   const coverHint = String(
     snap.shareCoverUrl ||
       card?.shareCoverUrl ||
+      styleCover ||
       ed.kakaoFeedBgDataUrl ||
       ed.kakaoFeedBgUrl ||
       titlePhotoHint ||
@@ -120,6 +135,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
   const phone = String(
     readLetteringFixedIdentity()?.phone || snap.phone || card?.phone || ""
   ).trim();
+
   /* Date.now() 금지 — 카카오가 매번 새 URL 스크랩하다 실패 로그가 쌓임 */
   const coverKey = buildShowcaseShareCacheKey({
     titlePhotoUrl: titlePhotoHint,
@@ -129,11 +145,29 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
     title: snap.title || card?.title,
     phone
   });
-  /* 카톡 SDK: 검증된 m.vlue.kr/cover.jpg 만 사용 (R2 직접 URL 금지) */
+
+  const directCover = pickHttp(
+    card?.shareCoverUrl,
+    snap.shareCoverUrl,
+    card?.titlePhotoUrl,
+    snap.titlePhotoUrl,
+    styleCover,
+    ed.kakaoFeedBgUrl,
+    ed.titlePhotoUrl,
+    card?.photoUrl,
+    snap.photoUrl
+  );
+
+  /* 카톡 SDK: 직접 DB/스토리지 커버 URL(https://...) 우선, 또는 m.vlue.kr/cover.jpg 프록시 사용 */
   const showcaseCover = getKakaoShowcaseCoverImageUrl(phone, coverKey);
+  const directPublicCover = isKakaoPublicImageUrl(directCover) ? directCover : "";
+  const proxyPublicCover = isKakaoPublicImageUrl(showcaseCover) ? showcaseCover : "";
+
   const feedImageUrl =
-    (isKakaoPublicImageUrl(showcaseCover) ? showcaseCover : "") ||
+    directPublicCover ||
+    proxyPublicCover ||
     (cardId ? getKakaoFeedCardPublicImageUrl(cardId, coverKey) : getKakaoShareButtonImageUrl());
+
   /* 카카오 버튼은 www 도메인 공개 쇼케이스. api.vlue.kr 는 콘솔 미등록이라 홈으로 떨어짐 */
   const showcaseUrl = phone ? buildPublicShowcaseSpaUrl(phone) : "";
   const viewUrl = showcaseUrl || `${KAKAO_PUBLIC_ORIGIN}/s/`;
@@ -162,7 +196,7 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
     createUrl,
     feedTitle: `${String(snap.name || "회원").trim()}님의 VLUÉ 쇼케이스`,
     feedDescription: feedDescParts.slice(0, 3).join(" · ").slice(0, 100) || "VLUÉ 디지털 쇼케이스",
-    shareCoverUrl: showcaseCover || feedImageUrl
+    shareCoverUrl: directPublicCover || proxyPublicCover || feedImageUrl
   };
 }
 
@@ -202,6 +236,10 @@ function withTimeout(promise, ms, label) {
  * → prepareKakaoBizcardShare 로 미리 준비하고, openPreparedKakaoBizcardShare 로 즉시 연다.
  */
 export async function prepareKakaoBizcardShare(card) {
+  if (!card) {
+    return { ok: false, error: "쇼케이스 데이터를 불러오는 중입니다..." };
+  }
+
   const originBlock = kakaoShareOriginBlockedMessage();
   if (originBlock) {
     return { ok: false, error: originBlock };
@@ -228,13 +266,19 @@ export async function prepareKakaoBizcardShare(card) {
     }
     return "";
   };
+
+  const activeStyle = card?.showcaseStyle || readActiveShowcaseStyle?.() || readShowcaseStyle?.() || null;
+  const styleCover = extractShowcaseCoverUrl(activeStyle);
+
   const localCover = pickHttp(
     card?.shareCoverUrl,
     card?.titlePhotoUrl,
-    ed.kakaoFeedBgDataUrl,
+    styleCover,
     ed.kakaoFeedBgUrl,
+    ed.titlePhotoUrl,
+    ed.kakaoFeedBgDataUrl,
     ed.titlePhotoDataUrl,
-    ed.titlePhotoUrl
+    card?.photoUrl
   );
 
   /* 라이트 동기화 — 실패/타임아웃이어도 공개 cover 프록시(전화번호)로 공유 계속 */
@@ -281,8 +325,10 @@ export async function prepareKakaoBizcardShare(card) {
       card?.shareCoverUrl ||
       sync?.titlePhotoUrl ||
       card?.titlePhotoUrl ||
+      styleCover ||
       "",
-    titlePhotoUrl: sync?.titlePhotoUrl || card?.titlePhotoUrl || localCover || ""
+    titlePhotoUrl: sync?.titlePhotoUrl || card?.titlePhotoUrl || localCover || styleCover || "",
+    showcaseStyle: activeStyle || card?.showcaseStyle || null
   };
   const urls = buildKakaoBizcardPublicUrls(cardId, mergedCard);
   if (!isKakaoPublicImageUrl(urls.buttonImageUrl)) {
@@ -292,7 +338,7 @@ export async function prepareKakaoBizcardShare(card) {
     };
   }
 
-  /* CDN 업로드는 최대 3초 — 실패해도 cover 프록시 URL 로 공유 */
+  /* CDN 업로드는 최대 3초 — 실패해도 원래 이미지 URL 로 공유 */
   let feedImageUrl = urls.buttonImageUrl;
   try {
     const hosted = await withTimeout(

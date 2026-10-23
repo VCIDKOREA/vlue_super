@@ -11,6 +11,65 @@ export type ShowcaseOgShareMeta = {
   shareCover: string;
 };
 
+/** 쇼케이스 스타일(live / draft)에서 대표 커버 이미지 URL 추출 */
+export function extractCoverFromShowcaseStyle(style: unknown): string {
+  if (!style || typeof style !== "object" || Array.isArray(style)) return "";
+  const st = style as Record<string, unknown>;
+
+  const tryUrl = (u: unknown) => {
+    const s = String(u || "").trim();
+    if (!s) return "";
+    if (s.startsWith("blob:") || s.startsWith("data:")) return "";
+    if (/^https?:\/\//i.test(s)) return s;
+    return "";
+  };
+
+  const direct = tryUrl(st.shareCoverUrl) || tryUrl(st.titlePhotoUrl) || tryUrl(st.photoUrl);
+  if (direct) return direct;
+
+  const pages = Array.isArray(st.pages) ? st.pages : [];
+  for (const page of pages) {
+    if (!page || typeof page !== "object") continue;
+    const p = page as Record<string, unknown>;
+    const gallery = p.gallery as Record<string, unknown> | undefined;
+    const photos = (gallery?.photos || p.photos || []) as unknown[];
+    if (Array.isArray(photos)) {
+      for (const ph of photos) {
+        if (!ph) continue;
+        const phObj = ph as Record<string, unknown>;
+        const url = tryUrl(phObj.url || phObj.src || ph);
+        if (url) return url;
+      }
+    }
+    const ig = p.instagramMedia as Record<string, unknown> | undefined;
+    if (ig) {
+      const url = tryUrl(ig.thumbnailUrl || ig.mediaUrl || ig.url);
+      if (url) return url;
+    }
+    const pageImg = tryUrl(p.imageUrl || p.mediaUrl || p.coverUrl);
+    if (pageImg) return pageImg;
+  }
+
+  const legacyGallery = st.gallery as Record<string, unknown> | undefined;
+  const legacyPhotos = legacyGallery?.photos;
+  if (Array.isArray(legacyPhotos)) {
+    for (const ph of legacyPhotos) {
+      if (!ph) continue;
+      const phObj = ph as Record<string, unknown>;
+      const url = tryUrl(phObj.url || phObj.src || ph);
+      if (url) return url;
+    }
+  }
+
+  const feed = st.platformFeed as Record<string, unknown> | undefined;
+  if (feed) {
+    const av = tryUrl(feed.avatarUrl || feed.instagramAvatarUrl || feed.kakaoAvatarUrl);
+    if (av) return av;
+  }
+
+  return "";
+}
+
 const FRESH_MS = 10 * 60 * 1000;
 const STALE_MS = 6 * 60 * 60 * 1000;
 const CACHE_MAX = 400;
@@ -165,6 +224,9 @@ async function fetchShowcaseOgShareMetaFromDb(
         share_cover: string | null;
         kakao_bg: string | null;
         title_photo: string | null;
+        snap_photo: string | null;
+        showcase_live: unknown | null;
+        showcase_style: unknown | null;
       }>
     >`
       SELECT
@@ -176,7 +238,10 @@ async function fetchShowcaseOgShareMetaFromDb(
         NULLIF(TRIM(dc.photo_url), '') AS photo_url,
         NULLIF(TRIM(dc.export_snapshot_json->>'shareCoverUrl'), '') AS share_cover,
         NULLIF(TRIM(dc.export_snapshot_json->>'kakaoFeedBgUrl'), '') AS kakao_bg,
-        NULLIF(TRIM(dc.export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo
+        NULLIF(TRIM(dc.export_snapshot_json->>'titlePhotoUrl'), '') AS title_photo,
+        NULLIF(TRIM(dc.export_snapshot_json->>'photoUrl'), '') AS snap_photo,
+        u.showcase_live_style_json AS showcase_live,
+        u.showcase_style_json AS showcase_style
       FROM users u
       LEFT JOIN digital_cards dc ON dc.user_id = u.id
       LEFT JOIN user_business_profiles bp ON bp.user_id = u.id
@@ -191,18 +256,23 @@ async function fetchShowcaseOgShareMetaFromDb(
 
     const rows = await Promise.race([queryPromise, timeoutPromise]);
     const row = rows[0];
-    const meta: ShowcaseOgShareMeta = row
-      ? {
-          name: String(row.name || "").trim(),
-          org: String(row.org || "").trim(),
-          role: String(row.role || "").trim(),
-          handle: String(row.handle || "").trim().replace(/^@/, ""),
-          cardId: String(row.card_id || "").trim(),
-          photo: pickHttpUrl(row.photo_url),
-          /* 타이틀사진 우선 — 예전 카톡 커버(shareCover)가 남아 있어도 OG에 옛 사진이 고정되지 않게 */
-          shareCover: pickHttpUrl(row.title_photo, row.share_cover, row.kakao_bg)
-        }
-      : empty;
+    if (!row) return empty;
+
+    const liveCover = extractCoverFromShowcaseStyle(row.showcase_live);
+    const styleCover = extractCoverFromShowcaseStyle(row.showcase_style);
+    const snapCover = pickHttpUrl(row.title_photo, row.share_cover, row.kakao_bg);
+    const photo = pickHttpUrl(row.photo_url, row.snap_photo);
+    const resolvedCover = liveCover || styleCover || snapCover || photo;
+
+    const meta: ShowcaseOgShareMeta = {
+      name: String(row.name || "").trim(),
+      org: String(row.org || "").trim(),
+      role: String(row.role || "").trim(),
+      handle: String(row.handle || "").trim().replace(/^@/, ""),
+      cardId: String(row.card_id || "").trim(),
+      photo,
+      shareCover: resolvedCover
+    };
 
     const now = Date.now();
     touchMeta(digits, {
@@ -257,16 +327,12 @@ export function clearCachedOgCover(phone: string) {
 
 export function isAllowedOgImageHost(url: string): boolean {
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    return (
-      host === "m.vlue.kr" ||
-      host === "www.vlue.kr" ||
-      host === "vlue.kr" ||
-      host === "api.vlue.kr" ||
-      host.endsWith(".r2.dev") ||
-      host.endsWith(".up.railway.app") ||
-      host.endsWith(".r2.cloudflarestorage.com")
-    );
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    if (!host || host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.|169\.254\.)/.test(host)) return false;
+    return true;
   } catch {
     return false;
   }

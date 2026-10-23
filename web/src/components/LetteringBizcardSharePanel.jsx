@@ -8,6 +8,10 @@ import {
   readLetteringFixedIdentity,
   LETTERING_BIZCARD_CHANGED_EVENT
 } from "../lib/letteringBizcardStorage.js";
+import {
+  SHOWCASE_STYLE_CHANGED_EVENT,
+  SHOWCASE_LIVE_STYLE_CHANGED_EVENT
+} from "../lib/showcase/showcaseStyleStorage.js";
 import { ensureDigitalCardId } from "../lib/digitalCardApi.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
 import {
@@ -63,11 +67,17 @@ export default function LetteringBizcardSharePanel({
     return () => window.removeEventListener(VLUE_VERIFIED_BADGE_CHANGED_EVENT, sync);
   }, []);
 
-  /* 명함·타이틀사진·커버 변경 즉시 카톡 공유 페이로드 재준비 */
+  /* 명함·타이틀사진·커버·쇼케이스 스타일 변경 즉시 카톡 공유 페이로드 재준비 */
   useEffect(() => {
     const onBizcardChanged = () => setPrepTick((n) => n + 1);
     window.addEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcardChanged);
-    return () => window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcardChanged);
+    window.addEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onBizcardChanged);
+    window.addEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onBizcardChanged);
+    return () => {
+      window.removeEventListener(LETTERING_BIZCARD_CHANGED_EVENT, onBizcardChanged);
+      window.removeEventListener(SHOWCASE_STYLE_CHANGED_EVENT, onBizcardChanged);
+      window.removeEventListener(SHOWCASE_LIVE_STYLE_CHANGED_EVENT, onBizcardChanged);
+    };
   }, []);
 
   const sharePhone = useMemo(() => {
@@ -132,6 +142,7 @@ export default function LetteringBizcardSharePanel({
     isPaid,
     sharePhone,
     prepTick,
+    card,
     card?.name,
     card?.organization,
     card?.phone,
@@ -139,6 +150,7 @@ export default function LetteringBizcardSharePanel({
     card?.department,
     card?.titlePhotoUrl,
     card?.shareCoverUrl,
+    card?.showcaseStyle,
     card?.companyIntro,
     card?.customBackText
   ]);

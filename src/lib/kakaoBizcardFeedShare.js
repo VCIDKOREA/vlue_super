@@ -51,13 +51,21 @@ export function buildKakaoBizcardPublicUrls(cardId, card) {
       ? viral.createUrl
       : `${origin}/membership`;
   const snap = withLetteringBizcardPreviewFallback(card || {});
-  const feedImageUrl = cardId ? getKakaoFeedCardPublicImageUrl(cardId) : getKakaoShareButtonImageUrl();
+  const directCover = [
+    card?.shareCoverUrl,
+    card?.titlePhotoUrl,
+    snap.shareCoverUrl,
+    snap.titlePhotoUrl,
+    card?.photoUrl,
+    snap.photoUrl
+  ].find((u) => typeof u === "string" && /^https:\/\//i.test(u)) || "";
+  const feedImageUrl = directCover || (cardId ? getKakaoFeedCardPublicImageUrl(cardId) : getKakaoShareButtonImageUrl());
   return {
     buttonImageUrl: feedImageUrl,
     buttonPreviewUrl: cardId ? getKakaoFeedCardPreviewUrl(cardId) : getKakaoShareButtonImageUrl(),
     viewUrl: `${origin}/api/v1/card/view/${id}`,
     createUrl,
-    feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 인증명함`,
+    feedTitle: `${String(snap.name || "회원").trim()}님의 VLUE 쇼케이스`,
     feedDescription: [snap.organization, snap.title, snap.department].filter(Boolean).join(" · ").slice(0, 80)
   };
 }

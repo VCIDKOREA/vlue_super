@@ -134,8 +134,8 @@ async function resolveUpstreamCoverUrl(c: Context, digits: string): Promise<stri
   const imageApiBase = imageApiBaseFromRequest(c);
   return (
     toAsciiOgImageUrl(meta.shareCover) ||
-    (meta.cardId ? kakaoFeedCardImageUrl(imageApiBase, meta.cardId) : "") ||
     toAsciiOgImageUrl(meta.photo) ||
+    (meta.cardId ? kakaoFeedCardImageUrl(imageApiBase, meta.cardId) : "") ||
     getKakaoShareButtonImageUrl(imageApiBase)
   );
 }
@@ -251,6 +251,9 @@ export async function respondShowcaseOgCover(c: Context) {
     const target = await resolveUpstreamCoverUrl(c, digits);
     let fetched = await fetchOgCoverBytes(target);
     if (!fetched) {
+      if (target && /^https?:\/\//i.test(target) && !target.includes("/api/v1/card/share-button.png")) {
+        return c.redirect(target, 302);
+      }
       const fallback = getKakaoShareButtonImageUrl(imageApiBaseFromRequest(c));
       fetched = await fetchOgCoverBytes(fallback);
       if (!fetched) {
