@@ -1,0 +1,50 @@
+name: Fly Deploy (API + Web)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: fly-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-api:
+    name: Deploy API (vlue-api)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy API to Fly.io
+        run: flyctl deploy --config fly.toml --primary-region nrt --remote-only --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-web:
+    name: Deploy Web (vlue-web)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Restore web production env
+        env:
+          WEB_ENV_CONTENT: ${{ secrets.WEB_ENV_PRODUCTION }}
+        run: |
+          if [ -n "$WEB_ENV_CONTENT" ]; then
+            printf "%s\n" "$WEB_ENV_CONTENT" > web/.env.production
+          fi
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Web to Fly.io
+        run: flyctl deploy --config fly.web.toml --primary-region nrt --remote-only --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

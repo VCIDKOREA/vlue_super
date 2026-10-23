@@ -1,0 +1,47 @@
+# Ignore everything by default
+*
+
+# Re-include config and root files
+!package.json
+!package-lock.json
+!tsconfig.json
+!Dockerfile
+!Dockerfile.web
+!fly.toml
+!fly.web.toml
+
+# Re-include backend & frontend source trees
+!packages
+!packages/**
+!apps
+!apps/api
+!apps/api/**
+!web
+!web/**
+!scripts
+!scripts/**
+!src
+!src/**
+
+# Exclude large apps and caches
+apps/android
+apps/android/**
+apps/pc-agent
+apps/pc-agent/**
+apps/electron
+apps/electron/**
+**/.gradle
+**/.gradle/**
+**/build
+**/build/**
+
+# Exclude build artifacts and secrets from included directories
+packages/**/node_modules
+packages/**/dist
+apps/api/node_modules
+apps/api/dist
+web/node_modules
+web/dist
+**/.env*
+!web/.env.production
+**/*.log
