@@ -10,7 +10,29 @@ export function isSesIdentityVerificationError(err: unknown): boolean {
   );
 }
 
+/** AWS IAM 키 만료·폐기·오타 — InvalidClientTokenId / SignatureDoesNotMatch 등 */
+export function isSesCredentialError(err: unknown): boolean {
+  const name = String((err as { name?: string })?.name || "").toLowerCase();
+  const msg = String((err as Error)?.message || err || "").toLowerCase();
+  return (
+    name === "invalidclienttokenid" ||
+    name === "unrecognizedclientexception" ||
+    name === "signaturedoesnotmatch" ||
+    name === "expiredtoken" ||
+    name === "invalidtoken" ||
+    msg.includes("security token included in the request is invalid") ||
+    msg.includes("the security token included in the request is expired") ||
+    msg.includes("the request signature we calculated does not match") ||
+    msg.includes("unable to locate credentials")
+  );
+}
+
 export function mapAuthEmailSendError(err: unknown): Error {
+  if (isSesCredentialError(err)) {
+    return new Error(
+      "이메일 발송 인증(AWS SES) 설정이 올바르지 않습니다. 잠시 후 다시 시도하거나 고객센터 support@vlue.kr 로 문의해 주세요."
+    );
+  }
   if (isSesIdentityVerificationError(err)) {
     return new Error(
       "이메일 발송 서비스 설정이 완료되지 않았습니다. 잠시 후 다시 시도하거나 고객센터 support@vlue.kr 로 문의해 주세요."

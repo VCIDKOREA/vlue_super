@@ -16,15 +16,20 @@ export type SesSendResult = {
 };
 
 let sesClient: SESClient | null = null;
+let sesClientFingerprint = "";
 
 function getSesClient(): SESClient {
-  if (sesClient) return sesClient;
   const region = (process.env.AWS_REGION || process.env.AWS_SES_REGION || "ap-northeast-2").trim();
+  const accessKeyId = String(process.env.AWS_ACCESS_KEY_ID || "").trim();
+  const secretAccessKey = String(process.env.AWS_SECRET_ACCESS_KEY || "").trim();
+  const fingerprint = `${region}|${accessKeyId}|${secretAccessKey.length}`;
+  if (sesClient && sesClientFingerprint === fingerprint) return sesClient;
+  sesClientFingerprint = fingerprint;
   sesClient = new SESClient({
     region,
     credentials: {
-      accessKeyId: String(process.env.AWS_ACCESS_KEY_ID || "").trim(),
-      secretAccessKey: String(process.env.AWS_SECRET_ACCESS_KEY || "").trim()
+      accessKeyId,
+      secretAccessKey
     }
   });
   return sesClient;
