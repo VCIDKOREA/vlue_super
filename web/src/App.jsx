@@ -2715,16 +2715,18 @@ function App() {
       setSnsUnlinkedToast(UNREGISTERED_SNS_TOAST_MESSAGE);
       setSignupHighlightTrigger(Date.now());
       setSnsUnlinkedAlert("");
+      // 미가입자가 소셜 로그인 시도 시 곧바로 최초 본인인증 회원가입 화면으로 전환
+      handleSignup("general");
       const t = setTimeout(() => {
         setBottomToast("");
         setSnsUnlinkedToast("");
-      }, 4000);
+      }, 4500);
       return () => clearTimeout(t);
     }
     setBottomToast(formatted || "소셜 로그인에 실패했습니다. 다시 시도해 주세요.");
     const t = setTimeout(() => setBottomToast(""), 3200);
     return () => clearTimeout(t);
-  }, [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyLoginMembershipTier]);
+  }, [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyLoginMembershipTier, handleSignup]);
 
   const handleLogin = useCallback(
     async (payload) => {
@@ -2980,10 +2982,11 @@ function App() {
           setSnsUnlinkedToast(UNREGISTERED_SNS_TOAST_MESSAGE);
           setSignupHighlightTrigger(Date.now());
           setSnsUnlinkedAlert("");
+          handleSignup("general");
           setTimeout(() => {
             setBottomToast("");
             setSnsUnlinkedToast("");
-          }, 4000);
+          }, 4500);
           return false;
         }
         throw new Error(formatted);

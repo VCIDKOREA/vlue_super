@@ -40,6 +40,10 @@ secretsMap.set("NODE_ENV", "production");
 secretsMap.set("PORT", "8788");
 secretsMap.set("APP_BASE_URL", "https://api.vlue.kr");
 secretsMap.set("FRONTEND_URL", "https://www.vlue.kr");
+secretsMap.set("GOOGLE_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/google/callback");
+secretsMap.set("KAKAO_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/kakao/callback");
+secretsMap.set("NAVER_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/naver/callback");
+secretsMap.set("INSTAGRAM_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/instagram/callback");
 secretsMap.set(
   "CORS_ORIGIN",
   "https://www.vlue.kr,https://vlue.kr,https://m.vlue.kr,https://api.vlue.kr,https://vlueweb-production.up.railway.app,https://vlue-api.fly.dev"

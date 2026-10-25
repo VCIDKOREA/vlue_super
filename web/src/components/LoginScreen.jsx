@@ -302,6 +302,21 @@ function LoginScreen({
             </div>
           ) : null}
 
+          {/* 미가입 상태에서 소셜 시도 후 복귀 시 상단 알림 배너 */}
+          {Boolean(isSignupHighlighted || toastMessage) && (
+            <div className="mb-4 w-full max-w-[320px] rounded-2xl border border-blue-200 bg-blue-50/95 p-3.5 shadow-xs text-center animate-fade-in [word-break:keep-all]">
+              <div className="flex items-center justify-center gap-1.5 text-blue-900 font-bold text-[13px]">
+                <svg className="w-4 h-4 text-blue-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <span>가입된 계정이 없습니다</span>
+              </div>
+              <p className="mt-1 text-[11.5px] leading-relaxed text-blue-800">
+                VLUÉ는 안전한 연결을 위해 최초 1회 <strong>본인인증 가입</strong>이 필수입니다. 아래 버튼을 눌러 회원가입을 완료해 주세요.
+              </p>
+            </div>
+          )}
+
           {/* VLUÉ 브랜드 헤더 */}
           <div className="flex w-full flex-col items-center px-1">
             <img
@@ -692,13 +707,33 @@ function LoginScreen({
               </button>
             </div>
 
-            {/* 안내 문구 박스 */}
-            <div className="mt-3.5 rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 text-[11.5px] leading-relaxed text-amber-900 [word-break:keep-all]">
-              ⚠️ 간편 로그인은 휴대폰 본인인증으로 가입한 뒤, 마이페이지에서 SNS를 연동해야 사용할 수 있습니다.
+            {/* 미가입자를 위한 최초 회원가입 우선 안내 박스 및 버튼 */}
+            <div className="mt-3.5 rounded-xl border border-blue-200 bg-blue-50/90 p-3.5 text-center [word-break:keep-all]">
+              <p className="text-[12.5px] font-bold text-blue-950">
+                처음 설치하셨거나 가입 전이신가요?
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-blue-800">
+                소셜 로그인은 가입 후 마이페이지에서 연동한 회원만 가능합니다.
+              </p>
+              <button
+                type="button"
+                onClick={handleStartSignup}
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#4F46E5] py-2.5 px-3 text-[13px] font-bold text-white shadow-md shadow-blue-500/20 hover:from-[#1D4ED8] hover:to-[#4338CA] active:scale-[0.99] transition"
+              >
+                <span>최초 본인인증 회원가입하기</span>
+                <span aria-hidden>→</span>
+              </button>
+            </div>
+
+            {/* 구분선 */}
+            <div className="mt-4 flex items-center gap-2">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[11px] font-medium text-slate-400">기존 연동 회원 간편로그인</span>
+              <div className="h-px flex-1 bg-slate-200" />
             </div>
 
             {/* 소셜 로그인 버튼 리스트 (카카오, 구글, 네이버, 인스타그램) */}
-            <div className="mt-4 flex flex-col gap-2.5">
+            <div className="mt-3 flex flex-col gap-2.5">
               <KakaoLoginButton
                 disabled={Boolean(socialBusy)}
                 pending={socialBusy === "kakao"}
@@ -719,21 +754,6 @@ function LoginScreen({
                 pending={socialBusy === "instagram"}
                 onBeforeNavigate={() => setSocialBusy("instagram")}
               />
-            </div>
-
-            {/* 미가입자를 위한 최초 회원가입 안내 */}
-            <div className="mt-4 pt-3.5 border-t border-slate-100 text-center">
-              <p className="text-[11.5px] text-slate-500 [word-break:keep-all]">
-                아직 VLUÉ에 가입하지 않으셨나요?
-              </p>
-              <button
-                type="button"
-                onClick={handleStartSignup}
-                className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
-              >
-                <span>최초 회원가입 (본인인증) 하러 가기</span>
-                <span aria-hidden>→</span>
-              </button>
             </div>
           </div>
         </div>

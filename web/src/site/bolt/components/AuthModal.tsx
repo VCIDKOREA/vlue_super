@@ -269,32 +269,33 @@ export default function AuthModal({
           ) : null}
 
           {!generalAuthOpen ? (
-            <div className="mt-7 flex w-full max-w-[300px] flex-col items-center">
-              <p className="w-full text-center text-[12px] leading-relaxed text-slate-600 [word-break:keep-all]">
-                카카오 · Google · 네이버 · Instagram · VLUÉ 가입과 로그인이 가능합니다.
-              </p>
-              <div className="mt-4 flex w-full flex-col gap-2.5">
-                <KakaoLoginButton disabled={loading} />
-                <GoogleLoginButton disabled={loading} />
-                <NaverLoginButton disabled={loading} />
-                <InstagramLoginButton disabled={loading} />
-              </div>
+            <div className="mt-6 flex w-full max-w-[300px] flex-col items-center">
               <button
                 type="button"
                 onClick={() => {
                   setError('');
                   setGeneralAuthOpen(true);
                 }}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-[#2563EB] to-[#4F46E5] py-3 text-[15px] font-semibold text-white shadow-sm transition hover:brightness-105 active:scale-[0.99]"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#4F46E5] py-3.5 text-[15px] font-bold text-white shadow-md shadow-blue-500/20 transition hover:brightness-105 active:scale-[0.99]"
               >
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-sm" aria-hidden>
-                  <img src={VLUE_BRAND_LOGO} alt="" className="h-5 w-5 rounded" />
-                </span>
-                <span>VLUÉ 로그인 · 회원가입</span>
+                <span>최초 회원가입 / VLUÉ 로그인</span>
               </button>
-              <p className="mt-3 w-full text-center text-[11px] leading-snug text-slate-500 [word-break:keep-all]">
-                VLUÉ 내부 기능 중 본인인증이 필요할 수 있습니다.
+              <p className="mt-1.5 w-full text-center text-[11px] font-medium text-blue-700 [word-break:keep-all]">
+                처음 이용하시는 경우 휴대폰 본인인증으로 가입해 주세요.
               </p>
+
+              <div className="my-3 flex w-full items-center gap-2">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[11px] font-medium text-slate-400">SNS 연동 회원 로그인</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              <div className="flex w-full flex-col gap-2">
+                <KakaoLoginButton disabled={loading} />
+                <GoogleLoginButton disabled={loading} />
+                <NaverLoginButton disabled={loading} />
+                <InstagramLoginButton disabled={loading} />
+              </div>
             </div>
           ) : (
             <div className="mt-6 w-full max-w-[300px]">

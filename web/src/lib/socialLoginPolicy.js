@@ -5,7 +5,7 @@ export const SOCIAL_NOT_LINKED_MESSAGE =
 
 /** 미가입 유저 간편로그인 시도 시 안내 토스트 문구 */
 export const UNREGISTERED_SNS_TOAST_MESSAGE =
-  "가입된 VLUÉ 계정이 없습니다. [최초 회원가입]을 먼저 진행해 주세요.";
+  "가입된 VLUÉ 계정이 없습니다. 최초 1회 휴대폰 본인인증 회원가입을 진행해 주세요.";
 
 export function isSnsUnlinkedError(raw) {
   const msg = String(raw || "");
