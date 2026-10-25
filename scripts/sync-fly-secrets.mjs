@@ -44,10 +44,17 @@ secretsMap.set("GOOGLE_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/google/ca
 secretsMap.set("KAKAO_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/kakao/callback");
 secretsMap.set("NAVER_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/naver/callback");
 secretsMap.set("INSTAGRAM_REDIRECT_URI", "https://api.vlue.kr/api/v1/auth/instagram/callback");
+/** 인증번호 메일 — Resend 고정 (AWS SES 폴백 비활성) */
+secretsMap.set("SMTP_PROVIDER", "resend");
 secretsMap.set(
   "CORS_ORIGIN",
   "https://www.vlue.kr,https://vlue.kr,https://m.vlue.kr,https://api.vlue.kr,https://vlueweb-production.up.railway.app,https://vlue-api.fly.dev"
 );
+if (!secretsMap.get("RESEND_API_KEY")?.trim()) {
+  console.warn(
+    "[warn] RESEND_API_KEY 가 apps/api/.env 에 없습니다. Fly에 별도로 등록해야 인증 메일이 발송됩니다."
+  );
+}
 
 if (!secretsMap.has("FILE_STORAGE_PROVIDER")) {
   secretsMap.set("FILE_STORAGE_PROVIDER", "mock");

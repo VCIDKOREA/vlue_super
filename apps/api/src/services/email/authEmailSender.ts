@@ -27,13 +27,24 @@ export function isSesCredentialError(err: unknown): boolean {
   );
 }
 
+function isResendAuthError(err: unknown): boolean {
+  const msg = String((err as Error)?.message || err || "").toLowerCase();
+  return (
+    msg.includes("resend") ||
+    msg.includes("api key is invalid") ||
+    msg.includes("invalid api key") ||
+    msg.includes("unauthorized") ||
+    msg.includes("missing_api_key")
+  );
+}
+
 export function mapAuthEmailSendError(err: unknown): Error {
   if (isSesCredentialError(err)) {
     return new Error(
-      "이메일 발송 인증(AWS SES) 설정이 올바르지 않습니다. 잠시 후 다시 시도하거나 고객센터 support@vlue.kr 로 문의해 주세요."
+      "이메일 발송 설정이 올바르지 않습니다. 잠시 후 다시 시도하거나 고객센터 support@vlue.kr 로 문의해 주세요."
     );
   }
-  if (isSesIdentityVerificationError(err)) {
+  if (isSesIdentityVerificationError(err) || isResendAuthError(err)) {
     return new Error(
       "이메일 발송 서비스 설정이 완료되지 않았습니다. 잠시 후 다시 시도하거나 고객센터 support@vlue.kr 로 문의해 주세요."
     );
@@ -54,11 +65,23 @@ function formatFromForSmtp(from: string): string {
   return `VLUE <${from}>`;
 }
 
-export function isAuthEmailDeliveryConfigured(): boolean {
-  return isRealSmtpDeliveryConfigured() || isSesConfigured();
+function allowSesFallback(): boolean {
+  return (
+    process.env.AUTH_EMAIL_ALLOW_SES_FALLBACK === "1" ||
+    String(process.env.AUTH_EMAIL_ALLOW_SES_FALLBACK || "").toLowerCase() === "true"
+  );
 }
 
-/** 가입·탈퇴·비밀번호 등 인증번호 메일 — Resend 우선, SES 폴백 */
+export function isAuthEmailDeliveryConfigured(): boolean {
+  // 운영 OTP는 Resend 고정. SES는 명시적 폴백만.
+  if (isRealSmtpDeliveryConfigured()) return true;
+  return allowSesFallback() && isSesConfigured();
+}
+
+/**
+ * 가입·탈퇴·비밀번호 등 인증번호 메일.
+ * 기본: Resend 전용. SES는 AUTH_EMAIL_ALLOW_SES_FALLBACK=1 일 때만 폴백.
+ */
 export async function sendAuthEmail(input: Omit<SesSendInput, "from"> & { from?: string }) {
   const fromPlain = input.from || authFromEmail();
   const fromSmtp = formatFromForSmtp(fromPlain);
@@ -83,16 +106,18 @@ export async function sendAuthEmail(input: Omit<SesSendInput, "from"> & { from?:
         replyTo: input.replyTo
       });
     } catch (resendErr) {
-      if (!isSesConfigured()) throw mapAuthEmailSendError(resendErr);
-      try {
-        return await sendEmailViaSes(sesPayload);
-      } catch {
-        throw mapAuthEmailSendError(resendErr);
+      if (allowSesFallback() && isSesConfigured()) {
+        try {
+          return await sendEmailViaSes(sesPayload);
+        } catch {
+          throw mapAuthEmailSendError(resendErr);
+        }
       }
+      throw mapAuthEmailSendError(resendErr);
     }
   }
 
-  if (isSesConfigured()) {
+  if (allowSesFallback() && isSesConfigured()) {
     try {
       return await sendEmailViaSes(sesPayload);
     } catch (err) {

@@ -53,6 +53,10 @@ export const PRODUCTION_ENV_RECOMMENDED: ProductionEnvManifestEntry[] = [
     key: "GEMINI_API_KEY",
     aliases: ["GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_AI_API_KEY"],
     description: "Gemini — Vming·사기 분석·캘린더 파싱"
+  },
+  {
+    key: "RESEND_API_KEY",
+    description: "Resend — 가입·로그인 OTP 이메일 발송 (SMTP_PROVIDER=resend)"
   }
 ];
 

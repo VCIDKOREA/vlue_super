@@ -78,15 +78,21 @@ export class ResendSmtpProvider implements SmtpProviderPort {
   }
 }
 
+/** RESEND_API_KEY 가 있으면 SMTP_PROVIDER 미설정이어도 Resend로 간주 */
+export function resolveSmtpProviderName(): string {
+  const explicit = (process.env.SMTP_PROVIDER || "").trim().toLowerCase();
+  if (explicit === "resend" || explicit === "mock") return explicit;
+  if (String(process.env.RESEND_API_KEY || "").trim()) return "resend";
+  return explicit || "mock";
+}
+
 export function resolveSmtpProvider(): SmtpProviderPort {
-  const provider = (process.env.SMTP_PROVIDER || "mock").trim().toLowerCase();
-  if (provider === "resend") return new ResendSmtpProvider();
+  if (resolveSmtpProviderName() === "resend") return new ResendSmtpProvider();
   return new MockSmtpProvider();
 }
 
 /** 실제 수신함으로 메일이 나가는 제공자인지 (mock이면 false) */
 export function isRealSmtpDeliveryConfigured(): boolean {
-  const provider = (process.env.SMTP_PROVIDER || "mock").trim().toLowerCase();
-  if (provider !== "resend") return false;
+  if (resolveSmtpProviderName() !== "resend") return false;
   return Boolean(String(process.env.RESEND_API_KEY || "").trim());
 }
