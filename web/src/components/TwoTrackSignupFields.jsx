@@ -50,12 +50,13 @@ export default function TwoTrackSignupFields({
     }
     setOtpSending(true);
     setOtpHint("");
+    onEmailVerifyChange({ status: "idle", message: "", token: "" });
     try {
       const data = await sendAuthCode({ email, purpose: "signup" });
       if (data.devCode) {
-        setOtpHint(`개발 모드 인증번호: ${data.devCode}`);
+        setOtpHint(`인증번호가 발송되었습니다. 개발 모드 인증번호: ${data.devCode}`);
       } else {
-        setOtpHint(`인증번호를 메일함(또는 스팸함)에서 확인해 주세요. 5분 내에 입력해 주세요.`);
+        setOtpHint("인증번호가 발송되었습니다. 메일함(또는 스팸함)에서 확인해 주세요. 5분 내에 입력해 주세요.");
       }
     } catch (e) {
       setOtpHint("");
@@ -181,7 +182,11 @@ export default function TwoTrackSignupFields({
             확인
           </button>
         </div>
-        {otpHint ? <p className="text-[10px] text-slate-500">{otpHint}</p> : null}
+        {otpHint ? (
+          <p className="text-[12px] font-semibold leading-snug text-blue-600 [word-break:keep-all]">
+            {otpHint}
+          </p>
+        ) : null}
         <p className="text-[10px] leading-snug text-slate-400" style={{ wordBreak: "keep-all" }}>
           {EMAIL_AUTH_SUPPORT}
         </p>
