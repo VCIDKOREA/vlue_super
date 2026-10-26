@@ -33,6 +33,13 @@ class LetteringCallReceiver : BroadcastReceiver() {
                 )
             }
 
+            if (!LetteringAuthGate.canRunCallOverlay(context)) {
+                if (state == TelephonyManager.EXTRA_STATE_RINGING) {
+                    VlueBigPushTrace.skip(1, "auth_gate=${LetteringAuthGate.denyReason(context)}")
+                }
+                ReleaseDebugGate.d(TAG, "skip: auth_gate=${LetteringAuthGate.denyReason(context)} state=$state")
+                return
+            }
             if (!LetteringPrefs.isLetteringEnabled(context)) {
                 if (state == TelephonyManager.EXTRA_STATE_RINGING) {
                     VlueBigPushTrace.skip(1, "lettering_enabled=false")

@@ -1490,7 +1490,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             return copyToClipboard(text)
         }
 
-        /** 웹 로그인 세션 → 네이티브 (알림·통화 감지 자동 무장) */
+        /** 웹 로그인 세션 → 네이티브 (알림·통화 감지 — PASS/온보딩 완료 후에만 무장) */
         @android.webkit.JavascriptInterface
         fun bindUserSession(userId: String?, accessToken: String?) {
             LetteringIntegration.bindUserSession(
@@ -1502,8 +1502,43 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             kr.vlue.calloverlay.push.VlueFcmRegistrar.syncTokenAsync(activity, "bindUserSession")
             activity.runOnUiThread {
                 activity.notifyWebPermissionStatus()
-                /* 웹 localStorage 도 ON 으로 맞춤 — 재실행 시 false 로 덮어쓰지 않게 */
-                if (LetteringPrefs.isLetteringEnabled(activity)) {
+                if (LetteringAuthGate.canRunCallOverlay(activity) &&
+                    LetteringPrefs.isLetteringEnabled(activity)
+                ) {
+                    activity.dispatchWebCustomEvent(
+                        "vlue-lettering-settings-changed",
+                        """{"enabled":true}"""
+                    )
+                    activity.injectLetteringEnabledLocalStorage()
+                }
+            }
+        }
+
+        /**
+         * PASS 본인인증·온보딩 완료 상태 → 네이티브 오버레이 가드.
+         * identityVerified / onboardingComplete: "1"|"true"|"yes" 이면 true.
+         */
+        @android.webkit.JavascriptInterface
+        fun setCallOverlayAuthGate(
+            identityVerified: String?,
+            accountStatus: String?,
+            onboardingComplete: String?
+        ) {
+            fun truthy(v: String?): Boolean {
+                val s = v?.trim()?.lowercase().orEmpty()
+                return s == "1" || s == "true" || s == "yes"
+            }
+            LetteringIntegration.applyAuthGate(
+                activity,
+                identityVerified = truthy(identityVerified),
+                onboardingComplete = truthy(onboardingComplete),
+                accountStatus = accountStatus?.trim()?.ifEmpty { null }
+            )
+            activity.runOnUiThread {
+                activity.notifyWebPermissionStatus()
+                if (LetteringAuthGate.canRunCallOverlay(activity) &&
+                    LetteringPrefs.isLetteringEnabled(activity)
+                ) {
                     activity.dispatchWebCustomEvent(
                         "vlue-lettering-settings-changed",
                         """{"enabled":true}"""
@@ -1522,7 +1557,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
         @android.webkit.JavascriptInterface
         fun clearUserSession() {
-            LetteringPrefs.setSession(activity, null, null)
+            LetteringIntegration.clearUserSession(activity)
             LetteringPrefs.setDeviceToken(activity, null)
             kr.vlue.calloverlay.push.VlueFcmRegistrar.clearUploadCache(activity)
         }

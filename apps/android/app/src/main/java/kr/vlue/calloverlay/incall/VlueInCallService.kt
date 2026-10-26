@@ -41,6 +41,7 @@ class VlueInCallService : InCallService() {
         callbacks[call] = cb
         call.registerCallback(cb, mainHandler)
 
+        if (!kr.vlue.calloverlay.LetteringAuthGate.canRunCallOverlay(this)) return
         if (!LetteringPrefs.isLetteringEnabled(this)) return
 
         val phone = VlueInCallController.extractPhoneNumber(call)

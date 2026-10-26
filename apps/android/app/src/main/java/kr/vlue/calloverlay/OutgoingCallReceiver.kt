@@ -11,6 +11,7 @@ class OutgoingCallReceiver : BroadcastReceiver() {
         try {
             if (intent == null) return
             if (intent.action != Intent.ACTION_NEW_OUTGOING_CALL) return
+            if (!LetteringAuthGate.canRunCallOverlay(context)) return
             if (!LetteringPrefs.isLetteringEnabled(context)) return
             val number = intent.getStringExtra(Intent.EXTRA_PHONE_NUMBER)
             LetteringCallCoordinator.onRinging(context, number, outgoing = true)

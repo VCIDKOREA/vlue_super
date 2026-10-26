@@ -32,6 +32,45 @@ export function clearVlueSessionTokens() {
   }
 }
 
+function readNativeAuthGateFlags() {
+  let identityVerified = false;
+  let onboardingComplete = false;
+  let accountStatus = "";
+  try {
+    onboardingComplete = localStorage.getItem("vlue_onboarding_complete_v1") === "1";
+  } catch {
+    /* ignore */
+  }
+  try {
+    accountStatus = String(localStorage.getItem("vlue_account_status") || "").trim();
+  } catch {
+    /* ignore */
+  }
+  try {
+    const raw = String(localStorage.getItem("vlue_identity_verified") || "").trim().toLowerCase();
+    identityVerified = raw === "1" || raw === "true" || raw === "yes";
+  } catch {
+    /* ignore */
+  }
+  /* 가입 완료 = PASS 포함 플로우 완료로 간주 */
+  if (onboardingComplete) identityVerified = true;
+  return { identityVerified, onboardingComplete, accountStatus };
+}
+
+function pushNativeAuthGate(bridge) {
+  if (!bridge?.setCallOverlayAuthGate) return;
+  const gate = readNativeAuthGateFlags();
+  try {
+    bridge.setCallOverlayAuthGate(
+      gate.identityVerified ? "1" : "0",
+      gate.accountStatus || "",
+      gate.onboardingComplete ? "1" : "0"
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Android 알림 수락/거절용 — WebView 로그인 토큰·기기 토큰을 네이티브에 복사 */
 export function syncNativeAuthSession() {
   try {
@@ -48,26 +87,26 @@ export function syncNativeAuthSession() {
     } catch {
       /* ignore */
     }
-    if (window.Android?.bindUserSession) {
-      window.Android.bindUserSession(userId, token);
-      if (deviceToken) window.Android.bindDeviceToken?.(deviceToken);
-      try {
-        localStorage.setItem("vlue_lettering_enabled", "1");
-      } catch {
-        /* ignore */
-      }
-      return true;
+    const bridge = window.Android?.bindUserSession
+      ? window.Android
+      : window.VlueAndroid?.bindUserSession
+        ? window.VlueAndroid
+        : null;
+    if (!bridge) return false;
+
+    bridge.bindUserSession(userId, token);
+    pushNativeAuthGate(bridge);
+    if (deviceToken) bridge.bindDeviceToken?.(deviceToken);
+
+    const gate = readNativeAuthGateFlags();
+    const overlayReady = Boolean(userId && token && gate.onboardingComplete);
+    try {
+      if (overlayReady) localStorage.setItem("vlue_lettering_enabled", "1");
+      else if (!userId || !token) localStorage.removeItem("vlue_lettering_enabled");
+    } catch {
+      /* ignore */
     }
-    if (window.VlueAndroid?.bindUserSession) {
-      window.VlueAndroid.bindUserSession(userId, token);
-      if (deviceToken) window.VlueAndroid.bindDeviceToken?.(deviceToken);
-      try {
-        localStorage.setItem("vlue_lettering_enabled", "1");
-      } catch {
-        /* ignore */
-      }
-      return true;
-    }
+    return true;
   } catch {
     /* ignore */
   }

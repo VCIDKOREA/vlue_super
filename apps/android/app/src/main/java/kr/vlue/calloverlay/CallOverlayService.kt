@@ -354,6 +354,19 @@ class CallOverlayService : Service() {
             "ON_START_COMMAND",
             "action=${intent?.action ?: "(null)"}"
         )
+        val action = intent?.action
+        /* DISMISS / probe 는 인증과 무관. 그 외 BigPush·Showcase 진입은 인증 필수. */
+        if (action != ACTION_DISMISS &&
+            action != ACTION_NORMAL_OVERLAY_PROBE &&
+            !LetteringAuthGate.canRunCallOverlay(this)
+        ) {
+            val reason = LetteringAuthGate.denyReason(this)
+            VlueBigPushTrace.skip(5, "auth_gate=$reason — CallOverlayService blocked")
+            android.util.Log.w("CallOverlayService", "blocked overlay: auth_gate=$reason action=$action")
+            dismissOverlay()
+            stopSelfTraced("auth_gate_$reason")
+            return START_NOT_STICKY
+        }
         when (intent?.action) {
             ACTION_NORMAL_OVERLAY_PROBE -> {
                 if (!ReleaseDebugGate.allowDiagProbe()) {

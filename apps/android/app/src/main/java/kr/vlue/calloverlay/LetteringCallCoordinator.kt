@@ -79,6 +79,13 @@ object LetteringCallCoordinator {
     fun onRinging(context: Context, number: String?, outgoing: Boolean = false) {
         try {
             val app = context.applicationContext
+            if (!LetteringAuthGate.canRunCallOverlay(app)) {
+                val reason = LetteringAuthGate.denyReason(app)
+                VlueBigPushTrace.skip(1, "auth_gate=$reason (coordinator)")
+                Log.w(TAG, "skip ringing: auth_gate=$reason")
+                LetteringPrefs.setLastOverlayError(app, "auth_gate=$reason")
+                return
+            }
             if (!LetteringPrefs.isLetteringEnabled(app)) {
                 VlueBigPushTrace.skip(1, "lettering_enabled=false (coordinator)")
                 Log.w(TAG, "skip ringing: lettering_enabled=false")
@@ -728,6 +735,7 @@ object LetteringCallCoordinator {
 
     fun ensureOverlayOnly(context: Context, number: String, outgoing: Boolean) {
         val app = context.applicationContext
+        if (!LetteringAuthGate.canRunCallOverlay(app)) return
         if (!LetteringPrefs.isLetteringEnabled(app)) return
         if (!LetteringPermissionHelper.canDrawOverlays(app)) {
             OverlayDiagTracker.recordOverlayFailure(
@@ -796,6 +804,13 @@ object LetteringCallCoordinator {
         dcpRoute: String = ""
     ) {
         try {
+            if (!LetteringAuthGate.canRunCallOverlay(context)) {
+                val reason = LetteringAuthGate.denyReason(context)
+                VlueBigPushTrace.skip(3, "auth_gate=$reason — startOverlay blocked")
+                Log.w(TAG, "startOverlay blocked: auth_gate=$reason")
+                LetteringPrefs.setLastOverlayError(context, "auth_gate=$reason")
+                return
+            }
             /* FGS 를 diag/step 보다 먼저 — Incoming→BigPush 임계 경로 */
             val intent = Intent(context, CallOverlayService::class.java).apply {
                 putExtra(CallOverlayService.EXTRA_PHONE, number)

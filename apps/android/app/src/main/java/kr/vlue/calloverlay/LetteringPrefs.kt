@@ -2,7 +2,7 @@ package kr.vlue.calloverlay
 
 import android.content.Context
 
-/** 레터링 on/off · API 토큰 · WebView URL */
+/** 레터링 on/off · API 토큰 · WebView URL · 인증 가드 */
 object LetteringPrefs {
     private const val NAME = "vlue_lettering_prefs"
     private const val KEY_ENABLED = "lettering_enabled"
@@ -12,6 +12,9 @@ object LetteringPrefs {
     private const val KEY_ACCESS_TOKEN = "vlue_access_token"
     private const val KEY_DEVICE_TOKEN = "vlue_device_token"
     private const val KEY_MEMBER_PHONE = "vlue_member_phone"
+    private const val KEY_IDENTITY_VERIFIED = "vlue_identity_verified"
+    private const val KEY_ONBOARDING_COMPLETE = "vlue_onboarding_complete"
+    private const val KEY_ACCOUNT_STATUS = "vlue_account_status"
     private const val KEY_LAST_CALL = "last_call_event"
     private const val KEY_LAST_ERR = "last_overlay_error"
 
@@ -24,12 +27,13 @@ object LetteringPrefs {
     /**
      * 통화 감지 ON 여부.
      * - 사용자가 명시적으로 끈 경우만 OFF
-     * - 전화·오버레이 권한이 준비되면 자동 ON (다른 유저·재설치 후 수동 맞춤 불필요)
-     * - 그 외에는 저장 플래그
+     * - **로그인+PASS/온보딩 완료** 후에만 권한 준비 시 자동 ON
+     * - 미가입·미인증 상태에서는 권한만 있어도 OFF
      */
     fun isLetteringEnabled(context: Context): Boolean {
         val p = prefs(context)
         if (p.getBoolean(KEY_USER_OPTED_OUT, false)) return false
+        if (!LetteringAuthGate.canRunCallOverlay(context)) return false
         if (LetteringPermissionHelper.hasCallOverlayReady(context)) return true
         return p.getBoolean(KEY_ENABLED, false)
     }
@@ -62,9 +66,70 @@ object LetteringPrefs {
     fun setSession(context: Context, userId: String?, accessToken: String?) {
         prefs(context)
             .edit()
-            .putString(KEY_USER_ID, userId)
-            .putString(KEY_ACCESS_TOKEN, accessToken)
+            .putString(KEY_USER_ID, userId?.trim()?.ifEmpty { null })
+            .putString(KEY_ACCESS_TOKEN, accessToken?.trim()?.ifEmpty { null })
             .apply()
+    }
+
+    fun setAuthGate(
+        context: Context,
+        identityVerified: Boolean,
+        onboardingComplete: Boolean,
+        accountStatus: String?
+    ) {
+        prefs(context)
+            .edit()
+            .putBoolean(KEY_IDENTITY_VERIFIED, identityVerified)
+            .putBoolean(KEY_ONBOARDING_COMPLETE, onboardingComplete)
+            .putString(KEY_ACCOUNT_STATUS, accountStatus?.trim()?.ifEmpty { null })
+            .apply()
+    }
+
+    fun clearAuthSession(context: Context) {
+        prefs(context)
+            .edit()
+            .remove(KEY_USER_ID)
+            .remove(KEY_ACCESS_TOKEN)
+            .remove(KEY_DEVICE_TOKEN)
+            .putBoolean(KEY_IDENTITY_VERIFIED, false)
+            .putBoolean(KEY_ONBOARDING_COMPLETE, false)
+            .remove(KEY_ACCOUNT_STATUS)
+            .apply()
+    }
+
+    fun isIdentityVerified(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_IDENTITY_VERIFIED, false)
+
+    fun isOnboardingComplete(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_ONBOARDING_COMPLETE, false)
+
+    fun getAccountStatus(context: Context): String =
+        prefs(context).getString(KEY_ACCOUNT_STATUS, "").orEmpty()
+
+    /** userId + accessToken 모두 존재 */
+    fun hasAuthenticatedSession(context: Context): Boolean {
+        val uid = getUserId(context)?.trim().orEmpty()
+        val token = getAccessToken(context)?.trim().orEmpty()
+        return uid.isNotEmpty() && token.isNotEmpty()
+    }
+
+    /**
+     * 가입(온보딩) 완료 + PASS 본인인증 완료.
+     * 온보딩 미완료·pending_identity 는 거부.
+     * 게이트 키가 한 번도 동기화되지 않은 레거시 설치(이미 로그인)만 임시 허용.
+     */
+    fun isIdentityReadyForOverlay(context: Context): Boolean {
+        val p = prefs(context)
+        val status = getAccountStatus(context).trim().lowercase()
+        if (status == "pending_identity" || status == "pending" || status == "rejected") {
+            return false
+        }
+        /* 가입 플로우 완료가 최우선 — PASS 후 가입 API만 끝난 중간 상태는 차단 */
+        if (isOnboardingComplete(context)) return true
+        if (isIdentityVerified(context) && status.isNotEmpty()) return true
+        val gateNeverSynced =
+            !p.contains(KEY_ONBOARDING_COMPLETE) && !p.contains(KEY_IDENTITY_VERIFIED)
+        return gateNeverSynced && hasAuthenticatedSession(context)
     }
 
     fun getMemberPhone(context: Context): String =
@@ -98,7 +163,6 @@ object LetteringPrefs {
         prefs(context).getString(KEY_LAST_ERR, "") ?: ""
 
     fun hasAnySession(context: Context): Boolean =
-        !getUserId(context).isNullOrBlank() ||
-            getMemberPhone(context).isNotBlank() ||
-            !getAccessToken(context).isNullOrBlank()
+        hasAuthenticatedSession(context) ||
+            getMemberPhone(context).isNotBlank()
 }

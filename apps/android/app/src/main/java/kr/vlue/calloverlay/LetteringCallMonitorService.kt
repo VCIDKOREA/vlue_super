@@ -128,6 +128,12 @@ class LetteringCallMonitorService : Service() {
     }
 
     private fun handleState(state: Int) {
+        if (!LetteringAuthGate.canRunCallOverlay(this)) {
+            if (state == TelephonyManager.CALL_STATE_RINGING) {
+                VlueBigPushTrace.skip(2, "auth_gate=${LetteringAuthGate.denyReason(this)}")
+            }
+            return
+        }
         if (!LetteringPrefs.isLetteringEnabled(this)) {
             if (state == TelephonyManager.CALL_STATE_RINGING) {
                 VlueBigPushTrace.skip(2, "lettering_enabled=false")
@@ -225,8 +231,8 @@ class LetteringCallMonitorService : Service() {
             val app = context.applicationContext
             val intent = Intent(app, LetteringCallMonitorService::class.java)
             try {
-                /* 오버레이 없어도 통화 감지는 돌린다 — 알림/액티비티 폴백용 */
-                if (LetteringPrefs.isLetteringEnabled(app)) {
+                /* 인증+레터링 ON 일 때만 통화 감지 FGS — 미가입/미인증은 완전 비활성 */
+                if (LetteringAuthGate.canRunCallOverlay(app) && LetteringPrefs.isLetteringEnabled(app)) {
                     ContextCompat.startForegroundService(app, intent)
                 } else {
                     app.stopService(intent)

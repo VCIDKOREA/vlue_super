@@ -11,6 +11,19 @@
 
 ---
 
+## 0. Auth gate (before any phase)
+
+| Condition | Overlay |
+|-----------|---------|
+| No `userId` + `accessToken` | **Block all** — BigPush / Showcase / Mini / outgoing logo / monitor FGS |
+| `accountStatus` = `pending_identity` / onboarding incomplete | **Block all** |
+| PASS + onboarding complete (`LetteringAuthGate.canRunCallOverlay`) | Allow call detection & overlay |
+
+Entry points must return early: `LetteringCallReceiver`, `OutgoingCallReceiver`, `LetteringCallMonitorService`, `LetteringCallCoordinator`, `CallOverlayService.onStartCommand`, `VlueInCallService`.  
+Permissions alone must **never** arm overlays on a fresh install.
+
+---
+
 ## 1. Phases
 
 | Phase | Meaning |

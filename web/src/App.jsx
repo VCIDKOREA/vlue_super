@@ -2485,12 +2485,23 @@ function App() {
     }
     localStorage.setItem(ONBOARDING_DONE_KEY, "1");
     localStorage.setItem(SESSION_KEY, "1");
+    try {
+      localStorage.setItem("vlue_identity_verified", "1");
+    } catch {
+      /* ignore */
+    }
     markContactSyncPending();
     setDigitalCardActive(readDigitalCardActive());
     setOnboardingComplete(true);
     setSignupOnboardingOpen(false);
     setIsLoggedIn(true);
     setCardFieldsTick((n) => n + 1);
+    /* PASS·가입 완료 후에만 네이티브 BigPush/Showcase 오버레이 무장 */
+    try {
+      syncNativeAuthSession();
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
