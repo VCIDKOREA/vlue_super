@@ -49,6 +49,7 @@ object DcpAbnormalWarningView {
     const val TIP_INPUT_TAG = "dcp_tip_input"
     const val TIP_RESULT_TAG = "dcp_tip_result"
     const val TIP_ERROR_TAG = "dcp_tip_error"
+    const val HERO_NAME_TAG = "dcp_hero_name"
     private const val BANNER_HOST_TAG = "dcp_popup_ad_banner"
 
     data class Spec(
@@ -69,7 +70,14 @@ object DcpAbnormalWarningView {
         val reasonLine: String = "",
         val pathVerify: Boolean = false,
         /** 미등록 번호 안심팝업 — 2줄 문구 + 제보/신고 버튼 ([UnregisteredNumberPopup]) */
-        val unregistered: Boolean = false
+        val unregistered: Boolean = false,
+        /**
+         * VLUE DB/공공/포털로 식별된 번호 — 주소록에 없어도 상호명이 뜬 경우.
+         * 예: "VLUE 스마트 인텔리전스로 찾은 번호입니다"
+         */
+        val intelligenceBadge: String = "",
+        /** 유저 제보 명칭 (저장 직후·서버 topLabel) */
+        val communityTipLabel: String = ""
     )
 
     data class Built(
@@ -112,12 +120,88 @@ object DcpAbnormalWarningView {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
+
+        /* 1) 식별 이름/상호 — 최상단 중앙 히어로 (시선 최우선) */
+        val heroName = spec.agencyName.trim().ifBlank { spec.communityTipLabel.trim() }
+        if (heroName.isNotBlank()) {
+            val nameRow = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, dp(ctx, 6))
+            }
+            nameRow.addView(
+                TextView(ctx).apply {
+                    tag = HERO_NAME_TAG
+                    text = heroName
+                    setTextColor(Color.WHITE)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    gravity = Gravity.CENTER
+                    maxLines = 2
+                    setLineSpacing(0f, 1.05f)
+                }
+            )
+            if (spec.cyanBadge) {
+                nameRow.addView(
+                    ImageView(ctx).apply {
+                        setImageResource(R.drawable.vlue_cyan_verified_seal)
+                        contentDescription = "VLUÉ 인증"
+                        layoutParams = LinearLayout.LayoutParams(dp(ctx, 22), dp(ctx, 22)).apply {
+                            marginStart = dp(ctx, 6)
+                            gravity = Gravity.CENTER_VERTICAL
+                        }
+                    }
+                )
+            }
+            card.addView(nameRow)
+        }
+
+        /* 2) VLUE 스마트 인텔리전스 뱃지 (주소록 외 DB/포털 식별) */
+        if (spec.intelligenceBadge.isNotBlank()) {
+            card.addView(
+                TextView(ctx).apply {
+                    text = "✨ ${spec.intelligenceBadge}"
+                    setTextColor(Color.parseColor("#04121A"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#00D2FF"))
+                        cornerRadius = dp(ctx, 999).toFloat()
+                    }
+                    setPadding(dp(ctx, 12), dp(ctx, 7), dp(ctx, 12), dp(ctx, 7))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        bottomMargin = dp(ctx, 8)
+                    }
+                }
+            )
+        } else if (spec.communityTipLabel.isNotBlank() &&
+            spec.agencyName.isBlank()
+        ) {
+            card.addView(
+                TextView(ctx).apply {
+                    text = "제보 명칭 반영"
+                    setTextColor(Color.parseColor("#FDE68A"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    setPadding(0, 0, 0, dp(ctx, 6))
+                }
+            )
+        }
+
+        /* 3) 경로 상태 칩 (보조) */
         card.addView(
             TextView(ctx).apply {
                 text = when {
                     spec.expired -> "인증기간 만료"
                     spec.abnormal -> "경로 검증 · 비정상"
                     spec.vlueAuthMember -> "경로 검증 · 정상"
+                    spec.intelligenceBadge.isNotBlank() -> "경로 검증 · VLUE 식별"
                     else -> "경로 검증 · 정상"
                 }
                 setTextColor(
@@ -134,6 +218,8 @@ object DcpAbnormalWarningView {
                 gravity = Gravity.CENTER
             }
         )
+
+        /* 4) 안내 본문 (이름보다 덜 강조) */
         card.addView(
             TextView(ctx).apply {
                 text = when {
@@ -142,75 +228,49 @@ object DcpAbnormalWarningView {
                     spec.abnormal && spec.pathVerify ->
                         "비정상 경로로 확인된 전화입니다."
                     spec.abnormal -> NationalAgencyWhitelist.ABNORMAL_WARNING
+                    spec.unregistered && heroName.isNotBlank() ->
+                        "• 발신경로 정상 (명칭 확인됨)\n• 유선상 금전요구는 주의바랍니다."
                     spec.unregistered -> UnregisteredNumberPopup.BODY
                     spec.vlueAuthMember -> VLUE_AUTH_MEMBER_MESSAGE
+                    spec.contactSafeCare && spec.intelligenceBadge.isNotBlank() ->
+                        "VLUE가 상호·기관명을 식별했습니다.\n발신 상태 정상 경로입니다."
                     spec.contactSafeCare -> CONTACT_NORMAL_MESSAGE
                     else -> NORMAL_MESSAGE
                 }
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#CBD5E1"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                typeface = Typeface.DEFAULT
                 gravity = Gravity.CENTER
-                setPadding(0, dp(ctx, 10), 0, 0)
+                setPadding(0, dp(ctx, 8), 0, 0)
                 if (spec.contactSafeCare || spec.unregistered) {
                     setLineSpacing(0f, 1.15f)
                 }
-                if (spec.unregistered) {
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                }
             }
         )
-        if (spec.agencyName.isNotBlank()) {
-            val nameRow = LinearLayout(ctx).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                setPadding(0, dp(ctx, 10), 0, 0)
-            }
-            nameRow.addView(
-                TextView(ctx).apply {
-                    text = spec.agencyName
-                    setTextColor(Color.WHITE)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                    typeface = Typeface.DEFAULT_BOLD
-                    gravity = Gravity.CENTER
-                }
-            )
-            if (spec.cyanBadge) {
-                nameRow.addView(
-                    ImageView(ctx).apply {
-                        setImageResource(R.drawable.vlue_cyan_verified_seal)
-                        contentDescription = "VLUÉ 인증"
-                        layoutParams = LinearLayout.LayoutParams(dp(ctx, 16), dp(ctx, 16)).apply {
-                            marginStart = dp(ctx, 4)
-                        }
-                    }
-                )
-            }
-            card.addView(nameRow)
-        }
+
         if (spec.shortNumber.isNotBlank()) {
             card.addView(
                 TextView(ctx).apply {
                     text = spec.shortNumber
                     setTextColor(Color.parseColor("#93C5FD"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
                     paint.isUnderlineText = true
-                    setPadding(0, dp(ctx, 6), 0, 0)
+                    setPadding(0, dp(ctx, 8), 0, 0)
                     setOnClickListener { openUri(ctx, "tel:${spec.shortNumber}") }
                 }
             )
         }
-        if (spec.vlueNonMember && !spec.contactSafeCare) {
+        if (spec.vlueNonMember && !spec.contactSafeCare && spec.intelligenceBadge.isBlank()) {
             card.addView(
                 TextView(ctx).apply {
                     text = "VLUÉ 비회원"
                     setTextColor(Color.parseColor("#FDE047"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
-                    setPadding(0, dp(ctx, 8), 0, 0)
+                    setPadding(0, dp(ctx, 6), 0, 0)
                 }
             )
         }
@@ -469,7 +529,7 @@ object DcpAbnormalWarningView {
         return input
     }
 
-    /** 저장이 끝나면 입력칸을 접고, 제보 문구를 안심팝업 본문에 남긴다. */
+    /** 저장이 끝나면 입력칸을 접고, 제보 명칭을 최상단 히어로로 즉시 반영한다. */
     fun showSavedTip(root: View, label: String) {
         val card = root.findViewWithTag<LinearLayout>(TAG) ?: return
         card.findViewWithTag<View>(TIP_COMPOSER_TAG)?.let { card.removeView(it) }
@@ -477,20 +537,41 @@ object DcpAbnormalWarningView {
         card.findViewWithTag<View>(TIP_ROW_TAG)?.visibility = View.VISIBLE
         val shown = label.trim()
         if (shown.isEmpty()) return
+
+        val hero = card.findViewWithTag<TextView>(HERO_NAME_TAG)
+        if (hero != null) {
+            hero.text = shown
+            hero.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+            hero.setTextColor(Color.WHITE)
+        } else {
+            val ctx = card.context
+            val heroView = TextView(ctx).apply {
+                tag = HERO_NAME_TAG
+                text = shown
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                gravity = Gravity.CENTER
+                maxLines = 2
+                setPadding(0, 0, 0, dp(ctx, 6))
+            }
+            card.addView(heroView, 0)
+        }
+
         val existing = card.findViewWithTag<TextView>(TIP_RESULT_TAG)
         if (existing != null) {
-            existing.text = shown
+            existing.text = "제보 명칭 「$shown」이 반영되었습니다"
             return
         }
         val ctx = card.context
         val result = TextView(ctx).apply {
             tag = TIP_RESULT_TAG
-            text = shown
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            text = "제보 명칭 「$shown」이 반영되었습니다"
+            setTextColor(Color.parseColor("#FDE68A"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, dp(ctx, 12), 0, 0)
+            setPadding(0, dp(ctx, 8), 0, 0)
         }
         val row = card.findViewWithTag<View>(TIP_ROW_TAG)
         val at = if (row != null) card.indexOfChild(row) else card.childCount

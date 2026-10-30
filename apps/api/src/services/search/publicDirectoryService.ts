@@ -75,9 +75,12 @@ function mapRow(row: {
   };
 }
 
-/** 수신 매칭 — 전화 있는 디렉터리 행만 */
-export async function lookupPublicDirectoryByPhone(raw: string): Promise<PublicDirectoryHit | null> {
-  if (!isPublicDirectoryRuntimeEnabled()) return null;
+/** 수신 매칭 — 전화 있는 디렉터리 행만. force=true 이면 런타임 스위치와 무관하게 조회(통화 오버레이). */
+export async function lookupPublicDirectoryByPhone(
+  raw: string,
+  opts: { force?: boolean } = {}
+): Promise<PublicDirectoryHit | null> {
+  if (!opts.force && !isPublicDirectoryRuntimeEnabled()) return null;
   const e164 = normalizeToE164KR(String(raw || "").trim());
   const cands = phoneDigitCandidates(raw);
   if (!e164 && cands.length === 0) return null;

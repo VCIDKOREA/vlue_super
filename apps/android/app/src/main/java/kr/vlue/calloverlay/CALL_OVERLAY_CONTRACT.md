@@ -64,7 +64,7 @@ Decision order (first match wins):
 
 1. User already Mini / auth confirmed → stay `MINI_CASE` (no re-open popup/showcase)
 2. **Path abnormal** (`dcp_route=abnormal` / `pathVerify` / `CallPathSession` 비정상) → `CENTER_SAFE_POPUP` only — **FULL_SHOWCASE 금지** (회원 DCC·쇼케이스·미인증 신고 패널 포함)
-3. `profileKind == contact_safe_care` **or** `public_directory_safe` → `CENTER_SAFE_POPUP` (안심팝업 · 신고/제보 없음)
+3. `profileKind == contact_safe_care` **or** `public_directory_safe` (공공 디렉터리 · 네이버/카카오 플레이스 · 커뮤니티 제보 식별 포함, `vlueIntelligenceFound`) → `CENTER_SAFE_POPUP` (안심팝업 · 신고/제보 없음). **식별 이름/상호는 팝업 최상단 중앙 히어로(최대 굵기)** 로 표시하고, 주소록 외 VLUE/공공/포털 식별 시 `✨ VLUE 스마트 인텔리전스로 찾은 번호입니다` 뱃지를 노출한다.
 4. Auth-member-only (verified + **explicit** broadcast OFF, or no DCC/showcase content) → `CENTER_AUTH_POPUP`
 5. Verified member with real DCC **or** showcase content, unless `includeDigitalCard:false` → `FULL_SHOWCASE`
    (missing `includeDigitalCard` key must **not** be treated as OFF when a digital card exists)

@@ -24,6 +24,10 @@ import {
   buildPublicDirectorySafeLookupBody,
   lookupPublicDirectoryByPhone
 } from "./search/publicDirectoryService.js";
+import {
+  buildIntelligenceSafeLookupBody,
+  resolvePhoneIntelligence
+} from "./search/phoneIntelligenceLookup.js";
 
 const EXPIRED_SUBTITLE = "??????????????????";
 const EXPIRED_DETAIL = "?????????????????? ?? ??? ????????";
@@ -1061,12 +1065,28 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
     };
   }
 
-  /* VLUÉ 비회원 — 공공·학교·우체국 등 디렉터리 매칭 시 안심팝업 */
+  /* Layer 2–3: 공공 디렉터리 → 네이버/카카오 플레이스 → 커뮤니티 제보 */
+  const intelligence = await resolvePhoneIntelligence(e164).catch(() => null);
+  if (intelligence?.displayName) {
+    return {
+      status: 200 as const,
+      body: attachPeerPath(buildIntelligenceSafeLookupBody(intelligence), peer)
+    };
+  }
+
+  /* 폴백: 런타임 디렉터리만 (env ON) */
   const directoryHit = await lookupPublicDirectoryByPhone(e164).catch(() => null);
   if (directoryHit) {
     return {
       status: 200 as const,
-      body: attachPeerPath(buildPublicDirectorySafeLookupBody(directoryHit), peer)
+      body: attachPeerPath(
+        {
+          ...buildPublicDirectorySafeLookupBody(directoryHit),
+          vlueIntelligenceFound: true,
+          intelligenceBadge: "VLUE 스마트 인텔리전스로 찾은 번호입니다"
+        },
+        peer
+      )
     };
   }
 

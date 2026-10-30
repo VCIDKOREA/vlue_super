@@ -3123,6 +3123,7 @@ class CallOverlayService : Service() {
             }
             val contactName = parseDcpAgencyName(cardJson).ifBlank { currentPhone }
             val pathAbnormal = route == "abnormal"
+            val intelBadge = parseIntelligenceBadge(cardJson)
             val spec = DcpAbnormalWarningView.Spec(
                 abnormal = pathAbnormal,
                 agencyName = contactName,
@@ -3133,6 +3134,7 @@ class CallOverlayService : Service() {
                 vlueNonMember = true,
                 showShareShowcase = true,
                 pathVerify = pathAbnormal,
+                intelligenceBadge = intelBadge,
                 reasonLine = if (pathAbnormal) {
                     parseDcpWarning(cardJson).ifBlank {
                         CallPathReasonCopy.summary(
@@ -3216,14 +3218,16 @@ class CallOverlayService : Service() {
                 return
             }
             val hadPopupBefore = dcpPopupView?.isAttachedToWindow == true
+            val tipLabel = parseCommunityTipLabel(cardJson)
             attachDcpPopupWindow(
                 DcpAbnormalWarningView.Spec(
                     abnormal = false,
-                    agencyName = "",
+                    agencyName = tipLabel,
                     shortNumber = parseDcpPhone(cardJson).ifBlank { currentPhone },
                     officialWebsite = "",
                     fromMock = dcpPopupOnly,
-                    unregistered = true
+                    unregistered = true,
+                    communityTipLabel = tipLabel
                 )
             )
             /* dcpPopupView 는 addView 성공 뒤에만 세팅된다 — isAttachedToWindow 는 첫 트래버설 전 false */
@@ -3446,6 +3450,39 @@ class CallOverlayService : Service() {
                 .ifBlank { json.optString("displayName") }
                 .ifBlank { json.optString("contactName") }
                 .ifBlank { json.optString("companyName") }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun parseIntelligenceBadge(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optString("intelligenceBadge").orEmpty()
+                .ifBlank { json.optJSONObject("dcp")?.optString("intelligenceBadge").orEmpty() }
+                .ifBlank { json.optJSONObject("directory")?.optString("intelligenceBadge").orEmpty() }
+                .ifBlank {
+                    if (json.optBoolean("vlueIntelligenceFound", false) ||
+                        json.optJSONObject("dcp")?.optBoolean("vlueIntelligenceFound", false) == true
+                    ) {
+                        "VLUE 스마트 인텔리전스로 찾은 번호입니다"
+                    } else {
+                        ""
+                    }
+                }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun parseCommunityTipLabel(cardJson: String?): String {
+        if (cardJson.isNullOrBlank()) return ""
+        return try {
+            val json = org.json.JSONObject(cardJson)
+            json.optString("communityTipLabel").orEmpty()
+                .ifBlank { json.optString("topLabel").orEmpty() }
+                .ifBlank { json.optJSONObject("tip")?.optString("topLabel").orEmpty() }
         } catch (_: Exception) {
             ""
         }

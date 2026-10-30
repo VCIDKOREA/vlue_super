@@ -91,11 +91,42 @@ export default function UnregisteredSafePopup({ open = false, phone = "", onClos
     >
       <div className="vlue-auth-member-popup-stack">
         <article className="vlue-auth-member-popup vlue-unregistered-popup">
+          {savedTip ? (
+            <>
+              <p
+                className="vlue-auth-member-popup__name"
+                style={{
+                  fontSize: "1.75rem",
+                  fontWeight: 900,
+                  lineHeight: 1.15,
+                  textAlign: "center",
+                  margin: "0 0 0.35rem",
+                  letterSpacing: "-0.02em"
+                }}
+              >
+                {savedTip}
+              </p>
+              <p
+                style={{
+                  margin: "0 0 0.65rem",
+                  textAlign: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: 800,
+                  color: "#fde68a"
+                }}
+              >
+                제보 명칭 「{savedTip}」이 반영되었습니다
+              </p>
+            </>
+          ) : null}
           <p className="vlue-auth-member-popup__badge">경로 검증 · 정상</p>
           <p className="vlue-auth-member-popup__msg vlue-unregistered-popup__body">
-            <span>{UNREGISTERED_POPUP_COPY.linePathNormal}</span>
+            <span>
+              {savedTip
+                ? "• 발신경로 정상 (명칭 확인됨)"
+                : UNREGISTERED_POPUP_COPY.linePathNormal}
+            </span>
             <span>{UNREGISTERED_POPUP_COPY.lineMoneyCaution}</span>
-            {savedTip ? <span>{savedTip}</span> : null}
           </p>
 
           {tipOpen ? (

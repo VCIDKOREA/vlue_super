@@ -206,7 +206,12 @@ object CallPrefetchCache {
             val source = json.optString("source").trim()
             if (kind == "public_directory_safe" ||
                 kind == "contact_safe_care" ||
-                source == "public_directory_local"
+                source == "public_directory_local" ||
+                source == "public_directory" ||
+                source == "portal_kakao" ||
+                source == "portal_naver" ||
+                source == "community_tip" ||
+                json.optBoolean("vlueIntelligenceFound", false)
             ) {
                 Tier.PUBLIC_DB
             } else {
