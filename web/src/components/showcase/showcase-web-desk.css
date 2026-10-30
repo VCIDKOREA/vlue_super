@@ -278,9 +278,10 @@
 .showcase-web-desk .lettering-home-push-embed--web-inline .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
   display: flex;
   flex-direction: column;
-  height: 620px;
-  max-height: 620px;
-  min-height: 620px;
+  /* DCC 앞/뒷면 + 하단 배너까지 잘리지 않도록 프레임 확대 */
+  height: min(860px, 82dvh);
+  max-height: min(860px, 82dvh);
+  min-height: min(760px, 72dvh);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -298,7 +299,7 @@
   bottom: calc(22px + var(--showcase-profile-dock-height, 56px) + 6px);
 }
 
-/* www 미리보기 + 통화화면 보기 — 프레임(620px) 안에서 캐러셀 축소 + 하단 CTA (앱과 동일) */
+/* www 미리보기 + 통화화면 보기 — 프레임 안에서 캐러셀 축소 + 하단 CTA (앱과 동일) */
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome {
   overflow: hidden;
 }
@@ -306,9 +307,9 @@
 .showcase-web-desk .lettering-home-push-embed--web-inline.is-call-chrome .lettering-ongoing-expand-slot__inner > .lettering-ongoing-reception {
   display: flex;
   flex-direction: column;
-  height: 620px;
-  max-height: 620px;
-  min-height: 620px;
+  height: min(860px, 82dvh);
+  max-height: min(860px, 82dvh);
+  min-height: min(760px, 72dvh);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -369,12 +370,14 @@
   flex: 1 1 auto;
   min-height: 0 !important;
   max-height: none !important;
-  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 }
 
 .showcase-web-desk .lettering-home-push-embed--web-inline .ldr-auth-social-dock,
 .showcase-web-desk .lettering-home-push-embed--web-inline .vlue-push-auth-seal,
-.showcase-web-desk .lettering-home-push-embed--web-inline .ldr-face-tabs {
+.showcase-web-desk .lettering-home-push-embed--web-inline .ldr-face-tabs,
+.showcase-web-desk .lettering-home-push-embed--web-inline .showcase-dcc-bottom-banner {
   flex-shrink: 0;
 }
 

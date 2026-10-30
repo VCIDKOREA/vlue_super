@@ -24,15 +24,23 @@ export default function AdMobBannerSlot({
   preferredSize = "ADAPTIVE"
 }) {
   const ref = useRef(null);
-  const [nativeReady, setNativeReady] = useState(false);
+  /** idle | unsupported | loading | ready */
+  const [phase, setPhase] = useState("idle");
 
   useEffect(() => {
     const bridge = window.VlueLettering || window.Android;
-    if (!enabled || !ref.current || typeof bridge?.showBannerAd !== "function") {
-      setNativeReady(false);
+    if (!enabled) {
+      setPhase("idle");
       hideSlot(bridge, slotId);
       return undefined;
     }
+    if (!ref.current || typeof bridge?.showBannerAd !== "function") {
+      /* www 브라우저 등 네이티브 브릿지 없음 — 무한 로딩 문구 금지 */
+      setPhase("unsupported");
+      hideSlot(bridge, slotId);
+      return undefined;
+    }
+    setPhase("loading");
     let frame = 0;
     const sync = () => {
       cancelAnimationFrame(frame);
@@ -47,7 +55,7 @@ export default function AdMobBannerSlot({
           rect.height > 8;
         if (!visible) {
           hideSlot(bridge, slotId);
-          setNativeReady(false);
+          setPhase("loading");
           return;
         }
         try {
@@ -71,15 +79,15 @@ export default function AdMobBannerSlot({
           } catch {
             parsed = { ok: false };
           }
-          setNativeReady(Boolean(parsed?.ok || parsed?.accepted));
+          setPhase(parsed?.ok || parsed?.accepted ? "ready" : "loading");
         } catch {
-          setNativeReady(false);
+          setPhase("loading");
         }
       });
     };
     const onHideAll = () => {
       hideSlot(bridge, slotId);
-      setNativeReady(false);
+      setPhase("loading");
     };
     const onResume = () => {
       sync();
@@ -101,7 +109,7 @@ export default function AdMobBannerSlot({
       window.removeEventListener("vlue-resume-ads", onResume);
       document.removeEventListener("visibilitychange", sync);
       hideSlot(bridge, slotId);
-      setNativeReady(false);
+      setPhase("idle");
     };
   }, [slotId, unitId, enabled, preferredSize]);
 
@@ -112,9 +120,15 @@ export default function AdMobBannerSlot({
       style={{ height: heightPx, minHeight: heightPx }}
       data-vlue-ad-slot={slotId}
       data-ad-unit={unitId}
+      data-ad-phase={phase}
       aria-label={label}
     >
-      {!nativeReady ? (
+      {phase === "unsupported" ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800">
+          <span className="text-[10px] font-bold tracking-wide text-white/55">광고 영역</span>
+        </div>
+      ) : null}
+      {phase === "loading" ? (
         <div className="vlue-ad-banner-slot__skeleton absolute inset-0 flex items-center justify-center gap-2 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100">
           <span className="vlue-ad-test-badge" aria-hidden>
             Test Ad
