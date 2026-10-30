@@ -48,38 +48,62 @@ import {
   GROUP_SIGNUP_MIN_LINES
 } from "../lib/groupSignupBm.js";
 
-const PASS_CERT_DRAFT_KEY = "vlue_pass_cert_draft_v1";
+/** Android WebView PASS redirect 시 sessionStorage 가 비는 OEM 이 있어 localStorage 사용 */
+export const PASS_CERT_DRAFT_KEY = "vlue_pass_cert_draft_v1";
 
-function savePassCertDraft(draft) {
+function passCertDraftStores() {
+  const out = [];
   try {
-    sessionStorage.setItem(PASS_CERT_DRAFT_KEY, JSON.stringify({ ...draft, at: Date.now() }));
+    if (typeof localStorage !== "undefined") out.push(localStorage);
   } catch {
     /* ignore */
+  }
+  try {
+    if (typeof sessionStorage !== "undefined") out.push(sessionStorage);
+  } catch {
+    /* ignore */
+  }
+  return out;
+}
+
+function savePassCertDraft(draft) {
+  const payload = JSON.stringify({ ...draft, at: Date.now() });
+  for (const store of passCertDraftStores()) {
+    try {
+      store.setItem(PASS_CERT_DRAFT_KEY, payload);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 function readPassCertDraft() {
-  try {
-    const raw = sessionStorage.getItem(PASS_CERT_DRAFT_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    /* 30분 초과 초안 폐기 */
-    if (parsed.at && Date.now() - Number(parsed.at) > 30 * 60 * 1000) {
-      sessionStorage.removeItem(PASS_CERT_DRAFT_KEY);
-      return null;
+  for (const store of passCertDraftStores()) {
+    try {
+      const raw = store.getItem(PASS_CERT_DRAFT_KEY);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") continue;
+      /* 30분 초과 초안 폐기 */
+      if (parsed.at && Date.now() - Number(parsed.at) > 30 * 60 * 1000) {
+        store.removeItem(PASS_CERT_DRAFT_KEY);
+        continue;
+      }
+      return parsed;
+    } catch {
+      /* try next store */
     }
-    return parsed;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function clearPassCertDraft() {
-  try {
-    sessionStorage.removeItem(PASS_CERT_DRAFT_KEY);
-  } catch {
-    /* ignore */
+  for (const store of passCertDraftStores()) {
+    try {
+      store.removeItem(PASS_CERT_DRAFT_KEY);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -263,11 +287,59 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     captureProtectionInviteFromLocation();
   }, []);
 
+  /** PASS redirect 후 WebView 리마운트 시 — 초안에서 가입 폼 상태 복원 */
+  const restoreSignupFromDraft = useCallback((draft) => {
+    if (!draft || typeof draft !== "object") return;
+    if (draft.slug) {
+      setDesiredMemberId(String(draft.slug));
+      setIdCheck({ status: "ok", message: "사용 가능한 아이디입니다." });
+    }
+    if (draft.password) {
+      setSignupPassword(String(draft.password));
+      setSignupPasswordConfirm(String(draft.password));
+    }
+    if (draft.signupEmail) {
+      setSignupEmail(String(draft.signupEmail));
+      if (draft.emailVerificationToken) {
+        setEmailVerify({
+          status: "ok",
+          message: "이메일 인증 완료",
+          token: String(draft.emailVerificationToken)
+        });
+      }
+    }
+    if (draft.membershipKind) setMembershipKind(draft.membershipKind);
+    if (draft.paidBillingCycle) setPaidBillingCycle(draft.paidBillingCycle);
+    if (typeof draft.passBusinessMember === "boolean") setPassBusinessMember(draft.passBusinessMember);
+    if (typeof draft.requestDigitalCard === "boolean") setRequestDigitalCard(draft.requestDigitalCard);
+    if (draft.digitalCardDocKind) setDigitalCardDocKind(String(draft.digitalCardDocKind));
+    if (draft.digitalCardDocName) setDigitalCardDocName(String(draft.digitalCardDocName));
+    if (draft.digitalCardDocDataUrl) setDigitalCardDocDataUrl(String(draft.digitalCardDocDataUrl));
+    if (draft.digitalCardDocIssuedAt) setDigitalCardDocIssuedAt(String(draft.digitalCardDocIssuedAt));
+    if (draft.passBusinessRegNo) setPassBusinessRegNo(String(draft.passBusinessRegNo));
+    if (draft.passBusinessJobTitle) setPassBusinessJobTitle(String(draft.passBusinessJobTitle));
+    if (typeof draft.passBusinessNoJobTitle === "boolean") {
+      setPassBusinessNoJobTitle(draft.passBusinessNoJobTitle);
+    }
+    if (draft.passBusinessRepName) setPassBusinessRepName(String(draft.passBusinessRepName));
+    if (draft.passBusinessOpenDate) setPassBusinessOpenDate(String(draft.passBusinessOpenDate));
+    if (draft.passBusinessMember) setBizVerified(true);
+  }, []);
+
+  useEffect(() => {
+    /** 앱 재진입·리마운트 시 남아 있는 PASS 초안 복원 (재시도용) */
+    const draft = readPassCertDraft();
+    if (draft?.slug || draft?.password) {
+      restoreSignupFromDraft(draft);
+    }
+  }, [restoreSignupFromDraft]);
+
   useEffect(() => {
     /** PASS redirect 복귀 — WebView에서 popup 대신 m_redirect_url 로 돌아옴 */
     const redirect = consumeIamportCertRedirectResult();
     if (!redirect) return undefined;
     const draft = readPassCertDraft();
+    restoreSignupFromDraft(draft);
     if (!redirect.success || !redirect.imp_uid) {
       setStep("pass");
       setVerifyZone({
@@ -280,7 +352,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
       setStep("pass");
       setVerifyZone({
         ok: false,
-        text: "본인인증은 완료됐으나 가입 정보가 유실되었습니다. 계정 단계에서 다시 진행해 주세요."
+        text: "본인인증은 완료됐으나 가입 정보가 유실되었습니다. 이전 단계(아이디·비밀번호)로 돌아가 다시 진행해 주세요."
       });
       return undefined;
     }
@@ -548,25 +620,40 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
     setBusy(true);
     setVerifyZone(null);
     try {
-      const slug = normalizeMemberHandleSlug(desiredMemberId);
-      if (!isValidMemberHandleSlug(slug)) {
-        throw new Error("회원 ID는 영문 소문자로 시작하는 3~20자(소문자·숫자·_)이며 숫자를 한 글자 이상 포함해야 합니다.");
+      /* redirect 복귀 후 상태가 비었을 때 초안으로 보강 */
+      const draft = readPassCertDraft();
+      if (draft && (!desiredMemberId || !signupPassword || !emailVerify.token)) {
+        restoreSignupFromDraft(draft);
       }
-      if (idCheck.status === "taken" || idCheck.status === "invalid") {
+      const slug = normalizeMemberHandleSlug(desiredMemberId || draft?.slug || "");
+      if (!isValidMemberHandleSlug(slug)) {
+        throw new Error(
+          desiredMemberId || draft?.slug
+            ? "회원 ID는 영문 소문자로 시작하는 3~20자(소문자·숫자·_)이며 숫자를 한 글자 이상 포함해야 합니다."
+            : "가입 정보가 유실되었습니다. 이전 단계(아이디·비밀번호)로 돌아가 다시 입력해 주세요."
+        );
+      }
+      const idStatus = idCheck.status === "idle" && draft?.slug ? "ok" : idCheck.status;
+      if (idStatus === "taken" || idStatus === "invalid") {
         throw new Error(idCheck.message || "아이디를 다시 확인해 주세요. 이전 단계로 돌아가 「중복확인」을 눌러 주세요.");
       }
-      const email = String(signupEmail || "").trim();
+      const email = String(signupEmail || draft?.signupEmail || "").trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         throw new Error("이메일 주소를 올바르게 입력해 주세요.");
       }
-      if (emailVerify.status !== "ok" || !emailVerify.token) {
+      const emailToken = emailVerify.token || draft?.emailVerificationToken || "";
+      if ((!emailVerify.status || emailVerify.status !== "ok") && !emailToken) {
+        throw new Error("이메일 인증을 완료해 주세요. 이전 단계로 돌아가 인증을 다시 진행해 주세요.");
+      }
+      if (!emailToken) {
         throw new Error("이메일 인증을 완료해 주세요.");
       }
-      const pw = String(signupPassword || "");
+      const pw = String(signupPassword || draft?.password || "");
       if (!isValidMemberPassword(pw)) {
         throw new Error(MEMBER_PASSWORD_INVALID_MESSAGE);
       }
-      if (pw !== String(signupPasswordConfirm || "")) {
+      const pwConfirm = String(signupPasswordConfirm || draft?.password || "");
+      if (pw !== pwConfirm) {
         throw new Error("비밀번호 확인이 일치하지 않습니다.");
       }
       const adminDeviceKeyPre =
@@ -653,7 +740,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             paidBillingCycle,
             referralCodeForApi: referralMeta.codeForApi || null,
             signupEmail: email,
-            emailVerificationToken: emailVerify.token,
+            emailVerificationToken: emailToken,
             isB2b,
             groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
             passBusinessRegNo: String(passBusinessRegNo || "").replace(/\D/g, "").slice(0, 10),
@@ -697,7 +784,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
         termsVersion: TERMS_VERSION,
         desiredPublicHandle: slug,
         businessEmail: email,
-        emailVerificationToken: emailVerify.token,
+        emailVerificationToken: emailToken,
         password: pw,
         groupSignup: isB2b ? serializeGroupSignupForApi(groupSignupDraft) : null,
         ...(allowBizCardOpts && passBusinessMember
@@ -1194,7 +1281,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             멤버십 선택 → 약관 → 아이디·비밀번호 → PASS 본인확인 → 주소 확인 → 완료
           </p>
           <div className={`${progressWrap} mt-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm leading-relaxed text-white/90 [word-break:keep-all]`}>
-            <b>회원가입</b>으로만 계정이 생성됩니다. 카카오·네이버는 가입 완료 후 마이페이지 「소셜 로그인 연동」에서 1:1로 연결하세요.
+            카카오·네이버·Google <b>간편 가입</b>도 가능합니다. 아이디 가입은 아래에서 본인인증으로 진행합니다. DCC 발급 시에도 본인인증이 필요합니다.
           </div>
         </div>
       ) : (
@@ -1215,7 +1302,7 @@ export default function VlueOnboarding({ onComplete, onCancel, signupIntent = "g
             멤버십 선택 → 약관 → 아이디·비밀번호 → PASS 본인확인 → 주소 확인 → 완료
           </p>
           <div className={`${progressWrap} mt-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[10px] leading-relaxed text-indigo-950 [word-break:keep-all]`}>
-            <b>회원가입</b>으로만 계정이 생성됩니다. 카카오·네이버는 가입 완료 후 마이페이지 「소셜 로그인 연동」에서 1:1로 연결하세요.
+            카카오·네이버·Google <b>간편 가입</b>도 가능합니다. 아이디 가입은 아래에서 본인인증으로 진행합니다. DCC 발급 시에도 본인인증이 필요합니다.
           </div>
         </div>
       )}

@@ -233,6 +233,11 @@ export async function completePortoneIdentity(params: {
   businessEmail?: string | null;
   /** 이메일 OTP 검증 후 발급 토큰 */
   emailVerificationToken?: string | null;
+  /**
+   * 이미 로그인된 소셜/미인증 계정에 본인인증을 연결할 때 사용.
+   * CI가 다른 활성 계정에 있으면 거부. DCC 발급 직전 PASS용.
+   */
+  attachToUserId?: string | null;
 }): Promise<IdentityCompleteResult> {
   let parsed: Awaited<ReturnType<typeof fetchAndParseIamportCertification>>;
   if (isDevLocalImpUid(params.impUid)) {
@@ -366,6 +371,42 @@ export async function completePortoneIdentity(params: {
   >;
   let publicHandle: string;
 
+  const attachToUserId = String(params.attachToUserId || "").trim();
+
+  if (existing && attachToUserId && existing.id !== attachToUserId) {
+    throw new Error(
+      "이미 다른 VLUÉ 계정에 등록된 본인인증입니다. 해당 계정으로 로그인해 주세요."
+    );
+  }
+
+  if (!existing && attachToUserId) {
+    const attachUser = await prisma.user.findUnique({
+      where: { id: attachToUserId },
+      select: {
+        id: true,
+        legalName: true,
+        accountStatus: true,
+        status: true,
+        phoneE164: true,
+        publicHandle: true,
+        identityVerified: true,
+        legalNameLockedAt: true
+      }
+    });
+    if (!attachUser || String(attachUser.status || "") === "DELETED") {
+      throw new Error("로그인 계정을 찾을 수 없습니다. 다시 로그인해 주세요.");
+    }
+    /* 소셜 미인증 → PASS 연결 */
+    existing = {
+      id: attachUser.id,
+      legalName: attachUser.legalName,
+      accountStatus: attachUser.accountStatus,
+      status: attachUser.status,
+      phoneE164: attachUser.phoneE164,
+      publicHandle: attachUser.publicHandle
+    };
+  }
+
   if (existing) {
     const st = existing.accountStatus;
     const mapped: Extract<AccountStatus, "active" | "pending_approval"> =
@@ -383,6 +424,27 @@ export async function completePortoneIdentity(params: {
       existing.publicHandle,
       desiredSlug
     );
+    /* 본인인증 실명으로 확정·잠금 (소셜 임시 닉네임 교체) */
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          legalName: legalName.trim(),
+          legalNameLockedAt: new Date(),
+          identityVerified: true,
+          identityVerifiedAt: new Date(),
+          portoneIdentityId: params.impUid,
+          ciHash: ciPrisma,
+          accountStatus: mapped === "pending_approval" ? "pending_approval" : "active",
+          ...(phoneE164 ? { phoneE164 } : {}),
+          ...(birthDate ? { birthDate } : {}),
+          ...(gender ? { gender } : {})
+        }
+      });
+      base.legalName = legalName.trim();
+    } catch (e) {
+      console.warn("[identityPortone] attach identity update failed", userId, e);
+    }
   } else {
     if (!signupEmailNorm) {
       throw new Error("이메일을 입력해 주세요.");

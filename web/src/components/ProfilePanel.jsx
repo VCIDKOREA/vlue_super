@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import DigitalCardEditorView from "./DigitalCardEditorView.jsx";
 import MembershipUpgradeModal from "./MembershipUpgradeModal.jsx";
-import LetteringSettingsSection from "./LetteringSettingsSection.jsx";
 import LetteringBizcardSettingsView from "./LetteringBizcardSettingsView.jsx";
 import { useB2bMembership } from "../context/B2bMembershipContext.jsx";
 import ModalCloseButton from "./common/ModalCloseButton";
@@ -39,9 +38,8 @@ import {
   readCachedActiveRegion,
   resolveActiveRegion
 } from "../lib/activeRegion.js";
-import { openNativeAppSettings, ensureCallDetectionForBroadcast } from "../lib/letteringSettings.js";
+import { openNativeAppSettings, syncCallDetectionWithShowcase } from "../lib/letteringSettings.js";
 import LocationPermissionSheet, { nativeLocationDenied } from "./location/LocationPermissionSheet.jsx";
-import CallDetectionStatusBanner from "./CallDetectionStatusBanner.jsx";
 import { useDccFeatureAccess } from "../hooks/useDccFeatureAccess.js";
 import { isDccSettingsDisabled } from "../lib/dccAccessPolicy.js";
 import { isVlueKidsApp } from "../lib/vlueKidsApp.js";
@@ -52,6 +50,11 @@ import {
 } from "../lib/v1PaidPackageGate.js";
 import { formatClientMembershipPathLabel, readFamilyPlanBeneficiary } from "../lib/effectiveMembership.js";
 import { readDccBroadcastOn, readVcidBroadcastOn } from "../lib/bizcardAccountSync.js";
+import {
+  ensureIdentityForDcc,
+  isLocalIdentityVerified
+} from "../lib/dccIdentityGate.js";
+import DccIdentityGuideModal from "./DccIdentityGuideModal.jsx";
 
 function tierLabelStyle(tier, isDarkMode, familyProtectionActive = false) {
   return membershipTierStyleClass(tier, isDarkMode, { familyProtectionActive });
@@ -195,6 +198,9 @@ function ProfilePanel({
   const [activeRegionBusy, setActiveRegionBusy] = useState(false);
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
   const [locationPermissionOpen, setLocationPermissionOpen] = useState(false);
+  const [dccIdentityGuideOpen, setDccIdentityGuideOpen] = useState(false);
+  const [dccIdentityBusy, setDccIdentityBusy] = useState(false);
+  const dccIdentityResolverRef = useRef(null);
   const { access: dccAccess } = useDccFeatureAccess();
   const dccBlocked = isDccSettingsDisabled(dccAccess);
 
@@ -624,7 +630,8 @@ function ProfilePanel({
     const paidDcc = canUseV1PaidDccFeatures(membershipTier);
     setIsVCIDOn(next);
     localStorage.setItem("vcid", String(next));
-    if (next) ensureCallDetectionForBroadcast(true);
+    /* 쇼케이스 ON/OFF = 통화 감지 ON/OFF (단일 토글) */
+    const detect = syncCallDetectionWithShowcase(Boolean(next));
     try {
       import("../lib/bizcardAccountSync.js").then((m) => {
         try {
@@ -663,7 +670,15 @@ function ProfilePanel({
     } catch {
       /* ignore */
     }
-    showSettingNotice(next ? "통화 중 쇼케이스가 송출됩니다." : "통화 중 쇼케이스 송출이 꺼졌습니다. 이름 표시만 선택할 수 있습니다.");
+    if (next) {
+      showSettingNotice(
+        detect.needsPermissions
+          ? "쇼케이스·통화 감지가 켜졌습니다. 필요한 권한을 허용해 주세요."
+          : "쇼케이스·통화 감지가 켜졌습니다."
+      );
+    } else {
+      showSettingNotice("쇼케이스·통화 감지가 꺼졌습니다. 이름 표시만 선택할 수 있습니다.");
+    }
   };
 
   const onToggleDccBroadcast = useCallback(
@@ -673,7 +688,7 @@ function ProfilePanel({
         return;
       }
       setDccBroadcastOn(Boolean(next));
-      if (next) ensureCallDetectionForBroadcast(true);
+      if (next) syncCallDetectionWithShowcase(true);
       try {
         import("../lib/bizcardAccountSync.js").then((m) => {
           m.writeDccBroadcastOn?.(Boolean(next));
@@ -702,7 +717,23 @@ function ProfilePanel({
     [membershipTier, showSettingNotice]
   );
 
-  const openLetteringBizcardHub = useCallback(() => {
+  const promptDccIdentityGuide = useCallback(
+    () =>
+      new Promise((resolve) => {
+        dccIdentityResolverRef.current = resolve;
+        setDccIdentityGuideOpen(true);
+      }),
+    []
+  );
+
+  const closeDccIdentityGuide = useCallback((proceed) => {
+    setDccIdentityGuideOpen(false);
+    const resolve = dccIdentityResolverRef.current;
+    dccIdentityResolverRef.current = null;
+    resolve?.(Boolean(proceed));
+  }, []);
+
+  const openLetteringBizcardHub = useCallback(async () => {
     if (isVlueKidsApp()) return;
     if (dccBlocked) {
       showSettingNotice(dccAccess?.message || "디지털인증명함을 이용할 수 없습니다.");
@@ -712,8 +743,32 @@ function ProfilePanel({
       requestV1PaidPackageGate();
       return;
     }
+    /* 소셜 미인증 유저 → DCC 발급 직전 본인인증 가드 */
+    if (!isLocalIdentityVerified()) {
+      setDccIdentityBusy(true);
+      try {
+        const result = await ensureIdentityForDcc({
+          openGuideModal: promptDccIdentityGuide,
+          onToast: showSettingNotice
+        });
+        if (!result.ok) {
+          if (!result.cancelled) {
+            showSettingNotice(result.error || "본인인증 후 DCC를 발급할 수 있습니다.");
+          }
+          return;
+        }
+      } finally {
+        setDccIdentityBusy(false);
+      }
+    }
     setPanelView("letteringBizcard");
-  }, [dccBlocked, dccAccess?.message, membershipTier, showSettingNotice]);
+  }, [
+    dccBlocked,
+    dccAccess?.message,
+    membershipTier,
+    showSettingNotice,
+    promptDccIdentityGuide
+  ]);
 
   const handleApplyDigitalCard = useCallback(() => {
     if (dccBlocked) {
@@ -724,7 +779,7 @@ function ProfilePanel({
       requestV1PaidPackageGate();
       return;
     }
-    openLetteringBizcardHub();
+    void openLetteringBizcardHub();
   }, [dccBlocked, dccAccess?.message, membershipTier, openLetteringBizcardHub, showSettingNotice]);
 
   const handleDarkModeToggle = (next) => {
@@ -970,16 +1025,6 @@ function ProfilePanel({
               </label>
             </div>
           </div>
-          {isVCIDOn || dccBroadcastOn ? (
-            <div className="mt-3 px-1">
-              <CallDetectionStatusBanner
-                isDarkMode={isDarkMode}
-                broadcastOn
-                compact
-                onNotice={showSettingNotice}
-              />
-            </div>
-          ) : null}
           {v1AppShell.familyProtection && tierUi.parts?.familyStatus ? (
             <FamilyProtectionActionButton
               status={
@@ -1624,6 +1669,17 @@ function ProfilePanel({
         onMembershipTierChange={onMembershipTierChange}
         onRequestTierChange={onRequestTierChange}
       />
+      {typeof document !== "undefined"
+        ? createPortal(
+            <DccIdentityGuideModal
+              open={dccIdentityGuideOpen}
+              busy={dccIdentityBusy}
+              onContinue={() => closeDccIdentityGuide(true)}
+              onCancel={() => closeDccIdentityGuide(false)}
+            />,
+            document.body
+          )
+        : null}
     </div>
   );
 }

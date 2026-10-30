@@ -3,11 +3,12 @@ import { prisma } from "../db/client.js";
 import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
 import { fetchGoogleUserFromAccessToken } from "../integrations/google/googleOAuth.js";
 import { fetchInstagramProfile } from "../integrations/instagram/instagramOAuth.js";
+import { resolvePublicHandleForNewUser } from "../lib/publicHandle.js";
 import { issueTokenPair, type TokenPair } from "./authSessions.js";
 
-/** SRT형 — SNS는 휴대폰 본인인증 가입 후 마이페이지 연동된 계정만 로그인 */
+/** @deprecated 소셜 즉시 가입으로 전환됨 — 하위 호환용 */
 export const SOCIAL_NOT_LINKED_MESSAGE =
-  "이 SNS 계정과 연동되어 있지 않습니다. 최초 1회 휴대폰 본인인증으로 가입한 뒤, [마이페이지 > 소셜 로그인 연동]에서 SNS 계정을 연결하면 간편 로그인할 수 있습니다.";
+  "이 SNS 계정과 연동되어 있지 않습니다. 카카오·네이버·Google로 간편 가입하거나, 아이디 회원가입을 이용해 주세요.";
 
 export class SocialAuthError extends Error {
   statusCode: number;
@@ -35,6 +36,8 @@ export type SocialLoginResponse = {
   phoneE164: string | null;
   linkedProvider: SocialLoginProvider;
   isNewUser?: boolean;
+  /** 휴대폰 본인인증(PASS) 완료 여부 — DCC 발급 시 필요 */
+  identityVerified: boolean;
 } & TokenPair;
 
 type HonoLikeReq = { header: (name: string) => string | undefined };
@@ -138,7 +141,8 @@ async function findUserBySocialMapping(identity: ResolvedSocialIdentity) {
           legalName: true,
           publicHandle: true,
           accountStatus: true,
-          phoneE164: true
+          phoneE164: true,
+          identityVerified: true
         }
       }
     }
@@ -155,7 +159,8 @@ async function findUserBySocialMapping(identity: ResolvedSocialIdentity) {
       legalName: true,
       publicHandle: true,
       accountStatus: true,
-      phoneE164: true
+      phoneE164: true,
+      identityVerified: true
     }
   });
   if (!legacy && identity.provider === "kakao") {
@@ -168,7 +173,8 @@ async function findUserBySocialMapping(identity: ResolvedSocialIdentity) {
             legalName: true,
             publicHandle: true,
             accountStatus: true,
-            phoneE164: true
+            phoneE164: true,
+            identityVerified: true
           }
         }
       }
@@ -223,6 +229,7 @@ async function loginMappedUser(
     publicHandle: string | null;
     accountStatus: AccountStatus;
     phoneE164: string | null;
+    identityVerified?: boolean;
   },
   identity: ResolvedSocialIdentity,
   req: HonoLikeReq,
@@ -233,6 +240,15 @@ async function loginMappedUser(
     data: { lastLoginAt: new Date() }
   });
 
+  let identityVerified = Boolean(user.identityVerified);
+  if (user.identityVerified === undefined) {
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { identityVerified: true }
+    });
+    identityVerified = Boolean(row?.identityVerified);
+  }
+
   const pair = await issueTokenPair(user.id, req);
   return {
     userId: user.id,
@@ -242,13 +258,87 @@ async function loginMappedUser(
     phoneE164: user.phoneE164,
     linkedProvider: identity.provider,
     isNewUser,
+    identityVerified,
     ...pair
   };
 }
 
 /**
- * 소셜 간편 로그인 — 마이페이지에서 연동된 계정만 통과.
- * 연동 없으면 신규 가입하지 않는다 (휴대폰 본인인증 가입 필수).
+ * 소셜 최소 정보로 즉시 가입 — 본인인증(PASS)은 DCC 발급 시점으로 지연.
+ */
+async function createSocialUser(
+  identity: ResolvedSocialIdentity
+): Promise<{
+  id: string;
+  legalName: string | null;
+  publicHandle: string | null;
+  accountStatus: AccountStatus;
+  phoneE164: string | null;
+  identityVerified: boolean;
+}> {
+  const publicHandle = await resolvePublicHandleForNewUser(prisma, null);
+  const provisionalName =
+    String(identity.displayName || "").trim().slice(0, 40) ||
+    `${identity.provider}회원`;
+  const email =
+    identity.providerEmail && identity.emailVerified
+      ? identity.providerEmail.trim().toLowerCase().slice(0, 190)
+      : null;
+
+  if (email) {
+    const emailTaken = await prisma.user.findFirst({
+      where: { email },
+      select: { id: true }
+    });
+    if (emailTaken) {
+      throw new SocialAuthError(
+        "이 이메일로 이미 가입된 계정이 있습니다. 아이디·비밀번호로 로그인한 뒤 마이페이지에서 SNS를 연동해 주세요.",
+        409,
+        "EMAIL_TAKEN"
+      );
+    }
+  }
+
+  const created = await prisma.user.create({
+    data: {
+      legalName: provisionalName,
+      publicHandle,
+      email,
+      signupMethod: identity.provider,
+      socialProvider: identity.provider,
+      socialId: identity.providerUserId,
+      identityVerified: false,
+      accountStatus: "active",
+      status: "ACTIVE",
+      currentDiscountRate: 30,
+      requiresParentalConsent: false
+    },
+    select: {
+      id: true,
+      legalName: true,
+      publicHandle: true,
+      accountStatus: true,
+      phoneE164: true,
+      identityVerified: true
+    }
+  });
+
+  await prisma.userSocialLoginLink.create({
+    data: {
+      userId: created.id,
+      provider: identity.provider,
+      providerUserId: identity.providerUserId,
+      providerEmail: identity.providerEmail,
+      lastLoginAt: new Date()
+    }
+  });
+
+  return created;
+}
+
+/**
+ * 소셜 간편 로그인 — 연동 계정이 없으면 최소 정보로 즉시 가입.
+ * 본인인증(PASS)은 VLUE DCC 발급 시점에만 요구한다.
  */
 export async function completeSocialLogin(
   body: SocialLoginRequestBody,
@@ -266,7 +356,8 @@ export async function completeSocialLogin(
     return loginMappedUser(mapped.user, identity, req, false);
   }
 
-  throw new SocialAuthError(SOCIAL_NOT_LINKED_MESSAGE);
+  const created = await createSocialUser(identity);
+  return loginMappedUser(created, identity, req, true);
 }
 
 /**
@@ -288,9 +379,13 @@ export async function linkSocialAccountToUser(
     select: { id: true, signupMethod: true, identityVerified: true }
   });
   if (!user) throw new Error("사용자를 찾을 수 없습니다.");
-  if (!user.identityVerified) {
+  /* 소셜 즉시 가입 유저도 추가 SNS 연동 허용. 미인증·미소셜 계정만 제한. */
+  const isSocialSignup = ["kakao", "naver", "google", "instagram"].includes(
+    String(user.signupMethod || "")
+  );
+  if (!user.identityVerified && !isSocialSignup) {
     throw new SocialAuthError(
-      "휴대폰 본인인증으로 가입한 뒤에 SNS 계정을 연동할 수 있습니다.",
+      "휴대폰 본인인증 또는 소셜 가입 후에 SNS 계정을 연동할 수 있습니다.",
       403,
       "IDENTITY_REQUIRED"
     );

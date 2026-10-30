@@ -36,6 +36,8 @@ function readNativeAuthGateFlags() {
   let identityVerified = false;
   let onboardingComplete = false;
   let accountStatus = "";
+  let userId = "";
+  let hasAccessToken = false;
   try {
     onboardingComplete = localStorage.getItem("vlue_onboarding_complete_v1") === "1";
   } catch {
@@ -46,14 +48,54 @@ function readNativeAuthGateFlags() {
   } catch {
     /* ignore */
   }
+  let identityExplicit = null;
   try {
     const raw = String(localStorage.getItem("vlue_identity_verified") || "").trim().toLowerCase();
-    identityVerified = raw === "1" || raw === "true" || raw === "yes";
+    if (raw === "0" || raw === "false" || raw === "no") {
+      identityVerified = false;
+      identityExplicit = false;
+    } else if (raw === "1" || raw === "true" || raw === "yes") {
+      identityVerified = true;
+      identityExplicit = true;
+    }
   } catch {
     /* ignore */
   }
-  /* 가입 완료 = PASS 포함 플로우 완료로 간주 */
-  if (onboardingComplete) identityVerified = true;
+  try {
+    userId = String(localStorage.getItem("vlue_server_user_id") || "").trim();
+  } catch {
+    /* ignore */
+  }
+  try {
+    hasAccessToken = Boolean(getAccessToken());
+  } catch {
+    /* ignore */
+  }
+  /*
+   * 소셜 즉시 가입: onboardingComplete=true 이어도 identityVerified=false 가능.
+   * 명시적 "0" 이 있으면 절대 승격하지 않는다.
+   */
+  if (identityExplicit === false) {
+    identityVerified = false;
+  } else if (identityExplicit === true) {
+    identityVerified = true;
+  } else if (onboardingComplete) {
+    /* 레거시 PASS 가입 완료 — 키 미설정 시 본인인증 완료로 간주 */
+    identityVerified = true;
+  }
+  /*
+   * 레거시 로그인: onboarding·identity 키 없고 세션만 있으면
+   * 통화 감지 유지를 위해 온보딩만 완료로 본다. 본인인증은 명시값 없으면 true(레거시).
+   */
+  const statusLower = accountStatus.toLowerCase();
+  const pending =
+    statusLower === "pending_identity" ||
+    statusLower === "pending" ||
+    statusLower === "rejected";
+  if (identityExplicit == null && !onboardingComplete && userId && hasAccessToken && !pending) {
+    onboardingComplete = true;
+    identityVerified = true;
+  }
   return { identityVerified, onboardingComplete, accountStatus };
 }
 

@@ -370,10 +370,10 @@ function LoginScreen({
                     />
                   </svg>
                 </span>
-                <span>최초 회원가입 (본인인증)</span>
+                <span>아이디 회원가입</span>
               </button>
               <p className="mt-1.5 text-center text-[11px] font-medium leading-tight text-blue-700/80 [word-break:keep-all]">
-                VLUÉ를 처음 설치하셨다면 휴대폰 본인인증으로 가입해 주세요.
+                카카오·네이버·Google로 바로 간편 가입할 수 있습니다. DCC 발급 시에만 본인인증이 필요합니다.
               </p>
             </div>
 

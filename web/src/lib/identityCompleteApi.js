@@ -8,12 +8,22 @@ export function makeDevLocalImpUid(handleSlug = "e2e") {
 
 /**
  * 본인인증(IMP.certification) 성공 후 imp_uid 로 가입·로그인 완료
+ * 또는 로그인된 소셜 계정에 본인인증 연결(attachToUserId)
  * @returns {Promise<object>} userId, accessToken, refreshToken, legalName, phoneE164, …
  */
 export async function postPortoneIdentityComplete(payload) {
+  const headers = { "Content-Type": "application/json" };
+  try {
+    const uid = String(payload?.attachToUserId || localStorage.getItem("vlue_server_user_id") || "").trim();
+    const token = String(localStorage.getItem("vlue_access_token") || "").trim();
+    if (uid) headers["X-VLUE-User-Id"] = uid;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    /* ignore */
+  }
   const res = await fetch(apiUrl("/api/identity/portone/complete"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload || {})
   });
   const data = await res.json().catch(() => ({}));

@@ -177,6 +177,8 @@ identityRoutes.post("/portone/complete", async (c) => {
       } | null;
       businessEmail?: string | null;
       emailVerificationToken?: string | null;
+      /** 로그인된 미인증(소셜) 계정에 본인인증 연결 — DCC 발급용 */
+      attachToUserId?: string | null;
     }>();
     const impUid = body?.impUid?.trim();
     if (!impUid) {
@@ -185,6 +187,9 @@ identityRoutes.post("/portone/complete", async (c) => {
     const isBusinessMember = Boolean(body?.isBusinessMember);
     const requestDigitalCard = Boolean(body?.requestDigitalCard);
     const membershipKind = body?.membershipKind ?? body?.membershipTier;
+    const headerUserId = String(c.req.header("X-VLUE-User-Id") || "").trim();
+    const attachToUserId =
+      String(body?.attachToUserId || "").trim() || headerUserId || null;
     const result = await completePortoneIdentity({
       impUid,
       isBusinessMember,
@@ -202,6 +207,7 @@ identityRoutes.post("/portone/complete", async (c) => {
       businessOpenDate: body?.businessOpenDate,
       companyName: body?.companyName,
       passwordPlain: body?.password,
+      attachToUserId,
       groupSignup: body?.groupSignup
         ? {
             companyName: String(body.groupSignup.companyName || "").trim(),
@@ -258,6 +264,7 @@ identityRoutes.post("/portone/complete", async (c) => {
       accountStatus: result.accountStatus,
       alreadyExisted: result.alreadyExisted,
       identityMatchedByCi: result.identityMatchedByCi,
+      identityVerified: true,
       phoneE164: result.phoneE164,
       birthDate: result.birthDate,
       gender: result.gender,

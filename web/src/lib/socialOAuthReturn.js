@@ -152,7 +152,13 @@ export function consumeSocialOAuthReturn() {
     const userId = hash.get("userId") || "";
     const publicHandle = hash.get("publicHandle") || "";
     const legalName = hash.get("legalName") || "";
-    const accountStatus = hash.get("accountStatus") || "pending_identity";
+    const accountStatus = hash.get("accountStatus") || "active";
+    const identityVerifiedRaw = String(hash.get("identityVerified") || "").trim();
+    const identityVerified =
+      identityVerifiedRaw === "1" || identityVerifiedRaw.toLowerCase() === "true";
+    const isNewUser =
+      String(hash.get("isNewUser") || "").trim() === "1" ||
+      String(hash.get("isNewUser") || "").toLowerCase() === "true";
     const providerFromHash = (hash.get("provider") || provider).toLowerCase();
 
     stripOAuthFromUrl();
@@ -171,6 +177,9 @@ export function consumeSocialOAuthReturn() {
       localStorage.removeItem(SAVED_PASSWORD_KEY);
       localStorage.removeItem(REMEMBER_KEY);
       localStorage.setItem("vlue_social_login_provider", providerFromHash);
+      localStorage.setItem("vlue_identity_verified", identityVerified ? "1" : "0");
+      /* 소셜 즉시 가입도 온보딩 완료로 표시 — PASS는 DCC 시점에 */
+      localStorage.setItem("vlue_onboarding_complete_v1", "1");
     } catch {
       /* ignore */
     }
@@ -182,10 +191,12 @@ export function consumeSocialOAuthReturn() {
       refreshToken,
       publicHandle,
       legalName,
-      accountStatus
+      accountStatus,
+      identityVerified,
+      isNewUser
     };
 
-    return { handled: true, success: true, provider: providerFromHash, session };
+    return { handled: true, success: true, provider: providerFromHash, session, isNewUser };
   }
 
   stripOAuthFromUrl();

@@ -116,6 +116,8 @@ function redirectAuthSuccess(
     publicHandle: string;
     legalName: string;
     accountStatus: string;
+    identityVerified?: boolean;
+    isNewUser?: boolean;
   }
 ): Response {
   return redirectWebMarketingResponse(
@@ -137,6 +139,8 @@ function redirectAuthSuccess(
       publicHandle: payload.publicHandle,
       legalName: payload.legalName,
       accountStatus: payload.accountStatus,
+      identityVerified: payload.identityVerified ? "1" : "0",
+      isNewUser: payload.isNewUser ? "1" : "0",
       provider
     }
   );
@@ -236,7 +240,9 @@ authV1Routes.get("/kakao/callback", async (c) => {
       userId: result.userId,
       publicHandle: result.publicHandle,
       legalName: result.legalName,
-      accountStatus: String(result.accountStatus)
+      accountStatus: String(result.accountStatus),
+      identityVerified: Boolean(result.identityVerified),
+      isNewUser: Boolean(result.isNewUser)
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "카카오 로그인 처리에 실패했습니다.";
@@ -348,7 +354,9 @@ authV1Routes.get("/google/callback", async (c) => {
       userId: result.userId,
       publicHandle: result.publicHandle,
       legalName: result.legalName,
-      accountStatus: String(result.accountStatus)
+      accountStatus: String(result.accountStatus),
+      identityVerified: Boolean(result.identityVerified),
+      isNewUser: Boolean(result.isNewUser)
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Google 로그인 처리에 실패했습니다.";
@@ -434,7 +442,9 @@ authV1Routes.get("/naver/callback", async (c) => {
       userId: result.userId,
       publicHandle: result.publicHandle,
       legalName: result.legalName,
-      accountStatus: String(result.accountStatus)
+      accountStatus: String(result.accountStatus),
+      identityVerified: Boolean(result.identityVerified),
+      isNewUser: Boolean(result.isNewUser)
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "네이버 로그인 처리에 실패했습니다.";
@@ -578,7 +588,9 @@ authV1Routes.get("/instagram/callback", async (c) => {
       userId: result.userId,
       publicHandle: result.publicHandle,
       legalName: result.legalName,
-      accountStatus: String(result.accountStatus)
+      accountStatus: String(result.accountStatus),
+      identityVerified: Boolean(result.identityVerified),
+      isNewUser: Boolean(result.isNewUser)
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Instagram 로그인 처리에 실패했습니다.";

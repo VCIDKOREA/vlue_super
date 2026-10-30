@@ -2545,6 +2545,43 @@ function App() {
     });
   }, []);
 
+  /** 가입/소셜 로그인 직후 대기 중인 V-Map 초대 토큰 자동 수락 */
+  const consumePendingVmapInviteAfterAuth = useCallback(() => {
+    try {
+      const raw = sessionStorage.getItem("vlue_pending_vmap_invite");
+      if (!raw) return;
+      sessionStorage.removeItem("vlue_pending_vmap_invite");
+      const pending = JSON.parse(raw);
+      if (!pending?.token || Date.now() - (pending.at || 0) >= 24 * 60 * 60 * 1000) return;
+      window.setTimeout(async () => {
+        try {
+          const accepted = await acceptVmapInviteToken(pending.token);
+          if (accepted?.ok && accepted.roomId) {
+            setBottomToast("V-Map 방에 자동 입장되었습니다!");
+            window.setTimeout(() => setBottomToast(""), 3000);
+            window.setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("vlue-open-location", {
+                  detail: {
+                    mode: "vmap",
+                    roomId: accepted.roomId,
+                    join: true,
+                    expandChat: true
+                  }
+                })
+              );
+            }, 500);
+          }
+        } catch (e) {
+          setBottomToast(e?.message || "V-Map 입장에 실패했습니다.");
+          window.setTimeout(() => setBottomToast(""), 4000);
+        }
+      }, 800);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const finishOnboarding = useCallback((payload) => {
     const tier = normalizeMembershipKind(payload?.membershipKind || payload?.membershipTier);
     setMembershipTier(tier);
@@ -2576,44 +2613,8 @@ function App() {
       /* ignore */
     }
 
-    /* V-Map 초대 토큰이 있으면 자동 입장 */
-    try {
-      const raw = sessionStorage.getItem("vlue_pending_vmap_invite");
-      if (raw) {
-        sessionStorage.removeItem("vlue_pending_vmap_invite");
-        const pending = JSON.parse(raw);
-        /* 24시간 이내 초대만 유효 */
-        if (pending?.token && Date.now() - (pending.at || 0) < 24 * 60 * 60 * 1000) {
-          window.setTimeout(async () => {
-            try {
-              const accepted = await acceptVmapInviteToken(pending.token);
-              if (accepted?.ok && accepted.roomId) {
-                setBottomToast("V-Map 방에 자동 입장되었습니다!");
-                window.setTimeout(() => setBottomToast(""), 3000);
-                window.setTimeout(() => {
-                  window.dispatchEvent(
-                    new CustomEvent("vlue-open-location", {
-                      detail: {
-                        mode: "vmap",
-                        roomId: accepted.roomId,
-                        join: true,
-                        expandChat: true
-                      }
-                    })
-                  );
-                }, 500);
-              }
-            } catch (e) {
-              setBottomToast(e?.message || "V-Map 입장에 실패했습니다.");
-              window.setTimeout(() => setBottomToast(""), 4000);
-            }
-          }, 800);
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
+    consumePendingVmapInviteAfterAuth();
+  }, [consumePendingVmapInviteAfterAuth]);
 
   useEffect(() => {
     if (!isLoggedIn || signupOnboardingOpen) return;
@@ -2706,6 +2707,10 @@ function App() {
     if (data.publicHandle) localStorage.setItem("vlue_member_handle", `@${String(data.publicHandle)}`);
     if (data.legalName) localStorage.setItem("vlue_legal_name", String(data.legalName).trim());
     if (data.accountStatus != null) localStorage.setItem("vlue_account_status", String(data.accountStatus));
+    /* 소셜 즉시 가입: identityVerified=false 명시. PASS 가입만 true */
+    if (typeof data.identityVerified === "boolean") {
+      localStorage.setItem("vlue_identity_verified", data.identityVerified ? "1" : "0");
+    }
     persistDccAccessHintsFromSession(data);
     localStorage.setItem(SESSION_KEY, "1");
     setIsLoggedIn(true);
@@ -2772,9 +2777,22 @@ function App() {
     if (result.success && result.session) {
       const nextUid = String(result.session.userId || result.session.id || "").trim();
       clearLocalStorageForLogin(nextUid, { keepRememberLogin: false, keepOnboarding: true });
-      persistAuthSessionAfterLogin(result.session);
+      try {
+        localStorage.setItem("vlue_onboarding_complete_v1", "1");
+        setOnboardingComplete(true);
+      } catch {
+        /* ignore */
+      }
+      persistAuthSessionAfterLogin({
+        ...result.session,
+        identityVerified:
+          typeof result.session.identityVerified === "boolean"
+            ? result.session.identityVerified
+            : false
+      });
       processTierChangeFromLoginData(result.session);
       applyLoginMembershipTier(result.session);
+      consumePendingVmapInviteAfterAuth();
       void (async () => {
         try {
           const { hydrateBizcardFromLoginPayload, syncBizcardAccountFromApi } = await import(
@@ -2818,37 +2836,25 @@ function App() {
               : result.provider === "instagram"
                 ? "Instagram"
                 : "소셜";
-      setBottomToast(`${label}로 로그인되었습니다.`);
+      setBottomToast(
+        result.isNewUser || result.session?.isNewUser
+          ? `${label}로 간편 가입되었습니다.`
+          : `${label}로 로그인되었습니다.`
+      );
       const t = setTimeout(() => setBottomToast(""), 2200);
       return () => clearTimeout(t);
     }
     const formatted = formatSocialLoginError(result.message);
-    if (result.unlinked || isSnsUnlinkedError(result.message || formatted)) {
-      try {
-        clearLocalStorageForLogin("", { keepRememberLogin: true, keepOnboarding: false });
-        localStorage.removeItem("vlue_temp_social_token");
-        localStorage.removeItem("vlue_social_login_provider");
-        sessionStorage.removeItem("vlue_oauth_state");
-      } catch {
-        /* ignore */
-      }
-      setIsLoggedIn(false);
-      setBottomToast(UNREGISTERED_SNS_TOAST_MESSAGE);
-      setSnsUnlinkedToast(UNREGISTERED_SNS_TOAST_MESSAGE);
-      setSignupHighlightTrigger(Date.now());
-      setSnsUnlinkedAlert("");
-      // 미가입자가 소셜 로그인 시도 시 곧바로 최초 본인인증 회원가입 화면으로 전환
-      handleSignup("general");
-      const t = setTimeout(() => {
-        setBottomToast("");
-        setSnsUnlinkedToast("");
-      }, 4500);
-      return () => clearTimeout(t);
-    }
+    /* 소셜 즉시 가입 전환 후 unlinked는 거의 없음 — PASS 강제 가입 유도 제거 */
     setBottomToast(formatted || "소셜 로그인에 실패했습니다. 다시 시도해 주세요.");
     const t = setTimeout(() => setBottomToast(""), 3200);
     return () => clearTimeout(t);
-  }, [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyLoginMembershipTier, handleSignup]);
+  }, [
+    persistAuthSessionAfterLogin,
+    processTierChangeFromLoginData,
+    applyLoginMembershipTier,
+    consumePendingVmapInviteAfterAuth
+  ]);
 
   const handleLogin = useCallback(
     async (payload) => {
@@ -3089,29 +3095,7 @@ function App() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const formatted = formatSocialLoginError(data?.error);
-        if (isSnsUnlinkedError(data?.error || formatted)) {
-          try {
-            clearLocalStorageForLogin("", { keepRememberLogin: true, keepOnboarding: false });
-            localStorage.removeItem("vlue_temp_social_token");
-            localStorage.removeItem("vlue_social_login_provider");
-            sessionStorage.removeItem("vlue_oauth_state");
-          } catch {
-            /* ignore */
-          }
-          setIsLoggedIn(false);
-          setBottomToast(UNREGISTERED_SNS_TOAST_MESSAGE);
-          setSnsUnlinkedToast(UNREGISTERED_SNS_TOAST_MESSAGE);
-          setSignupHighlightTrigger(Date.now());
-          setSnsUnlinkedAlert("");
-          handleSignup("general");
-          setTimeout(() => {
-            setBottomToast("");
-            setSnsUnlinkedToast("");
-          }, 4500);
-          return false;
-        }
-        throw new Error(formatted);
+        throw new Error(formatSocialLoginError(data?.error));
       }
       try {
         localStorage.removeItem(SAVED_LOGIN_ID_KEY);
@@ -3126,12 +3110,18 @@ function App() {
       });
       try {
         localStorage.setItem("vlue_social_login_provider", "kakao");
+        localStorage.setItem("vlue_onboarding_complete_v1", "1");
+        setOnboardingComplete(true);
       } catch {
         /* ignore */
       }
-      persistAuthSessionAfterLogin(data);
+      persistAuthSessionAfterLogin({
+        ...data,
+        identityVerified: Boolean(data.identityVerified)
+      });
       processTierChangeFromLoginData(data);
       applyLoginMembershipTier(data);
+      consumePendingVmapInviteAfterAuth();
       try {
         const { hydrateBizcardFromLoginPayload, syncBizcardAccountFromApi } = await import(
           "./lib/bizcardAccountSync.js"
@@ -3162,11 +3152,18 @@ function App() {
       } catch {
         /* ignore — 네트워크 실패 시 명함 플래그 유지 */
       }
-      setBottomToast(`${labels.kakao}로 로그인되었습니다.`);
+      setBottomToast(
+        data.isNewUser ? `${labels.kakao}로 간편 가입되었습니다.` : `${labels.kakao}로 로그인되었습니다.`
+      );
       setTimeout(() => setBottomToast(""), 2200);
       return true;
     },
-    [persistAuthSessionAfterLogin, processTierChangeFromLoginData, applyLoginMembershipTier]
+    [
+      persistAuthSessionAfterLogin,
+      processTierChangeFromLoginData,
+      applyLoginMembershipTier,
+      consumePendingVmapInviteAfterAuth
+    ]
   );
 
   const handleRequestTierChange = useCallback(async (tier) => {
