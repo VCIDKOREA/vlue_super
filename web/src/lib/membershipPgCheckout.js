@@ -26,7 +26,7 @@ export function membershipOrderName(opts = {}) {
     case "b2b":
       return `VLUE B2B 플랜 (${cycleLabel})`;
     case "b2b_admin":
-      return `VLUE B2B 대표 관리자 (${cycleLabel})`;
+      return `VLUE B2B 대표자 계정 (${cycleLabel})`;
     case "extension_line":
       return `VLUE 내선 대표번호 추가 회선 (${cycleLabel})`;
     case "multi_profile":

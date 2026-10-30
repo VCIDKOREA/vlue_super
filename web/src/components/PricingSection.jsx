@@ -92,7 +92,7 @@ export const COMPACT_PRICING_TIERS = [
     price: 14100,
     listPrice: 28300,
     discountBadge: "임직원 50%",
-    discountSubNote: "대표 관리자 월 99,000원",
+    discountSubNote: "대표자 계정 월 28,300원",
     period: "모바일 회선/월",
     shortDesc: "기업 CI/BI 연동 & 전사 임직원 일괄 인증",
     bullets: [

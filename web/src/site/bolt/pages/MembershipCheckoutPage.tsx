@@ -8,6 +8,7 @@ import {
   PAID_EVENT_MONTHLY_KRW,
   PAID_LIST_PRICE_MONTHLY_KRW,
   PAID_REFERRAL_MONTHLY_KRW,
+  B2B_REP_LIST_MONTHLY_KRW,
   B2B_STAFF_EVENT_MONTHLY_KRW,
   B2B_STAFF_REFERRAL_MONTHLY_KRW
 } from "../../../lib/membershipBm.js";
@@ -24,9 +25,6 @@ type Props = {
   /** hash `#checkout/paid` 등에서 전달 */
   initialPlanId?: string | null;
 };
-
-/** 요금제 카드의 대표 관리자 월액 (KCP: 월간 정기만) */
-const B2B_ADMIN_MONTHLY_KRW = 99000;
 
 const PLAN_CATALOG: {
   id: CheckoutPlanId;
@@ -102,9 +100,9 @@ const PLAN_CATALOG: {
   },
   {
     id: "b2b_admin",
-    tab: "B2B 관리자",
-    name: "B2B 대표 관리자",
-    price: B2B_ADMIN_MONTHLY_KRW,
+    tab: "B2B 대표자",
+    name: "B2B 대표자 계정",
+    price: B2B_REP_LIST_MONTHLY_KRW,
     listPrice: undefined,
     referralPrice: null,
     period: "월",
@@ -112,7 +110,7 @@ const PLAN_CATALOG: {
     bullets: [
       "관리자 대시보드·조직도 연동",
       "단체 라이선스·명함 배포",
-      "추천인 할인 미적용"
+      "월 28,300원 (추천인 할인 미적용)"
     ],
     allowsReferral: false,
     tier: "b2b",
