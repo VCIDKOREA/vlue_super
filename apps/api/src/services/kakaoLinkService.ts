@@ -69,8 +69,11 @@ export async function completeKakaoLinkForUser(userId: string, code: string) {
     String(profile.nickname || "").trim() ||
     String(prev?.nickname || "").trim() ||
     `카카오${profile.id.slice(-4)}`;
+  const { normalizeSocialPhotoUrl } = await import("../lib/socialPhotoUrl.js");
   const profileImageUrl =
-    String(profile.profileImageUrl || "").trim() || String(prev?.profileImageUrl || "").trim() || null;
+    normalizeSocialPhotoUrl(profile.profileImageUrl) ||
+    normalizeSocialPhotoUrl(prev?.profileImageUrl) ||
+    null;
   const profilePageUrl =
     normalizeKakaoProfilePageUrl(prev?.profilePageUrl) ||
     (await resolveKakaoProfilePageUrlForUser(userId)) ||

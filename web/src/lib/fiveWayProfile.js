@@ -73,12 +73,43 @@ export function getDisplayNameMode() {
   }
 }
 
+/** 상대 프록시 경로·CDN URL → 브라우저에서 바로 쓸 절대 URL */
+export function resolveFiveWayPhotoSrc(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:image/")) return s;
+  if (s.startsWith("/api/")) return apiUrl(s);
+  if (/^https?:\/\//i.test(s)) {
+    /* 소셜 CDN은 API 프록시로 우회 (핫링크·http 혼합 차단) */
+    try {
+      const host = new URL(s).hostname.toLowerCase();
+      if (
+        /kakaocdn\.net$|kakao\.co\.kr$|daumcdn\.net$|pstatic\.net$|googleusercontent\.com$|cdninstagram\.com$|fbcdn\.net$/i.test(
+          host
+        ) ||
+        host.endsWith(".kakaocdn.net") ||
+        host.endsWith(".pstatic.net") ||
+        host.endsWith(".googleusercontent.com") ||
+        host.endsWith(".cdninstagram.com") ||
+        host.endsWith(".fbcdn.net")
+      ) {
+        return apiUrl(`/api/app/social-avatar?u=${encodeURIComponent(s.replace(/^http:\/\//i, "https://"))}`);
+      }
+    } catch {
+      /* fall through */
+    }
+    return s;
+  }
+  return "";
+}
+
 /** 서버 상태 → 로컬 아바타·닉 즉시 반영 (DCC 실명 필드는 건드리지 않음) */
 export function applyFiveWayProfileLocally(state) {
   if (!state || typeof state !== "object") return;
-  writeCachedFiveWayProfile(state);
-  const photo = String(state.activePhotoUrl || "").trim();
-  if (photo && /^https?:\/\//i.test(photo)) {
+  const normalized = normalizeFiveWayState(state);
+  writeCachedFiveWayProfile(normalized);
+  const photo = String(normalized.activePhotoUrl || "").trim();
+  if (photo && (/^https?:\/\//i.test(photo) || photo.startsWith("data:image/"))) {
     try {
       const current = readProfilePhotoAvatar();
       if (current !== photo) writeProfilePhoto(photo);
@@ -87,11 +118,24 @@ export function applyFiveWayProfileLocally(state) {
     }
   }
   try {
-    window.dispatchEvent(new CustomEvent(CHANGED_EVENT, { detail: state }));
+    window.dispatchEvent(new CustomEvent(CHANGED_EVENT, { detail: normalized }));
     window.dispatchEvent(new Event("vlue-nicknames-changed"));
   } catch {
     /* ignore */
   }
+}
+
+function normalizeFiveWayState(state) {
+  if (!state || typeof state !== "object") return state;
+  const slots = Array.isArray(state.slots)
+    ? state.slots.map((slot) => ({
+        ...slot,
+        photoUrl: resolveFiveWayPhotoSrc(slot?.photoUrl) || String(slot?.photoUrl || "").trim()
+      }))
+    : state.slots;
+  const activePhotoUrl =
+    resolveFiveWayPhotoSrc(state.activePhotoUrl) || String(state.activePhotoUrl || "").trim();
+  return { ...state, slots, activePhotoUrl };
 }
 
 export async function fetchFiveWayProfile() {
@@ -100,8 +144,9 @@ export async function fetchFiveWayProfile() {
   if (!res.ok) {
     throw new Error(data?.error || "프로필 표시 정보를 불러오지 못했습니다.");
   }
-  applyFiveWayProfileLocally(data);
-  return data;
+  const normalized = normalizeFiveWayState(data);
+  applyFiveWayProfileLocally(normalized);
+  return normalized;
 }
 
 export async function patchFiveWayProfile(body) {
@@ -114,8 +159,9 @@ export async function patchFiveWayProfile(body) {
   if (!res.ok) {
     throw new Error(data?.error || "프로필 표시 설정에 실패했습니다.");
   }
-  applyFiveWayProfileLocally(data);
-  return data;
+  const normalized = normalizeFiveWayState(data);
+  applyFiveWayProfileLocally(normalized);
+  return normalized;
 }
 
 export { CHANGED_EVENT as FIVE_WAY_PROFILE_CHANGED_EVENT };

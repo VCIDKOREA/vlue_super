@@ -204,18 +204,24 @@ export default function FiveWayProfilePanel({ isDarkMode = false, onToast }) {
                   <img
                     src={slot.photoUrl}
                     alt=""
-                    className="h-8 w-8 rounded-full object-cover"
+                    className="h-8 w-8 shrink-0 rounded-full object-cover bg-slate-200"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      el.style.display = "none";
+                      const fallback = el.nextElementSibling;
+                      if (fallback) fallback.hidden = false;
+                    }}
                   />
-                ) : (
-                  <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-black ${
-                      isDarkMode ? "bg-white/10 text-gray-200" : "bg-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {(slot.label || "?").slice(0, 2)}
-                  </span>
-                )}
+                ) : null}
+                <span
+                  hidden={Boolean(slot.photoUrl)}
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                    isDarkMode ? "bg-white/10 text-gray-200" : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {(slot.label || "?").slice(0, 2)}
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className={`truncate text-[11px] font-black ${title}`}>
                     {slot.label}

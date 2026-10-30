@@ -1,5 +1,8 @@
 import type { SocialLoginProvider } from "@prisma/client";
 import { prisma } from "../db/client.js";
+import { normalizeSocialPhotoUrl, resolveDisplaySocialPhotoUrl } from "../lib/socialPhotoUrl.js";
+import { fetchKakaoUserFromAccessToken } from "../integrations/kakao/kakaoUserMe.js";
+import { fetchInstagramProfile } from "../integrations/instagram/instagramOAuth.js";
 
 export const PROFILE_SOURCES = ["kakao", "naver", "google", "instagram", "vlue"] as const;
 export type ProfileSource = (typeof PROFILE_SOURCES)[number];
@@ -94,8 +97,9 @@ function nickFromLink(
   if (provider === "kakao") {
     const nickname =
       scrubNick(link?.providerNickname) || scrubNick(kakao?.nickname) || "";
-    const photoUrl =
-      String(link?.providerProfileImageUrl || kakao?.profileImageUrl || "").trim();
+    const photoUrl = normalizeSocialPhotoUrl(
+      link?.providerProfileImageUrl || kakao?.profileImageUrl || ""
+    );
     return { nickname, photoUrl };
   }
   if (provider === "instagram") {
@@ -103,13 +107,76 @@ function nickFromLink(
       scrubNick(link?.providerNickname) || scrubNick(ig?.username) || "";
     return {
       nickname,
-      photoUrl: String(link?.providerProfileImageUrl || "").trim()
+      photoUrl: normalizeSocialPhotoUrl(link?.providerProfileImageUrl || "")
     };
   }
   return {
     nickname: scrubNick(link?.providerNickname) || "",
-    photoUrl: String(link?.providerProfileImageUrl || "").trim()
+    photoUrl: normalizeSocialPhotoUrl(link?.providerProfileImageUrl || "")
   };
+}
+
+/** 저장된 토큰으로 카카오·인스타 프로필 사진을 최신화 (실패해도 무시) */
+async function refreshLinkedSocialPhotos(userId: string): Promise<void> {
+  const [kakao, ig] = await Promise.all([
+    prisma.userKakaoLink.findUnique({
+      where: { userId },
+      select: { accessToken: true, profileImageUrl: true }
+    }),
+    prisma.userInstagramLink.findUnique({
+      where: { userId },
+      select: { accessToken: true }
+    })
+  ]);
+
+  if (kakao?.accessToken) {
+    try {
+      const profile = await fetchKakaoUserFromAccessToken(kakao.accessToken);
+      const photo = normalizeSocialPhotoUrl(profile.profileImageUrl);
+      const nick = scrubNick(profile.nickname);
+      if (photo) {
+        await prisma.userKakaoLink.update({
+          where: { userId },
+          data: {
+            profileImageUrl: photo,
+            ...(nick ? { nickname: nick.slice(0, 120) } : {})
+          }
+        });
+        await prisma.userSocialLoginLink
+          .updateMany({
+            where: { userId, provider: "kakao" },
+            data: {
+              providerProfileImageUrl: photo,
+              ...(nick ? { providerNickname: nick.slice(0, 120) } : {})
+            }
+          })
+          .catch(() => undefined);
+      }
+    } catch {
+      /* 토큰 만료 등 — 캐시 URL 유지 */
+    }
+  }
+
+  if (ig?.accessToken) {
+    try {
+      const profile = await fetchInstagramProfile(ig.accessToken);
+      const photo = normalizeSocialPhotoUrl(profile.profilePictureUrl);
+      const nick = scrubNick(profile.username);
+      if (photo || nick) {
+        await prisma.userSocialLoginLink
+          .updateMany({
+            where: { userId, provider: "instagram" },
+            data: {
+              ...(photo ? { providerProfileImageUrl: photo } : {}),
+              ...(nick ? { providerNickname: nick.slice(0, 120) } : {})
+            }
+          })
+          .catch(() => undefined);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export function resolvePublicDisplayName(input: {
@@ -133,6 +200,9 @@ export function resolvePublicDisplayName(input: {
 }
 
 export async function getProfileDisplayState(userId: string): Promise<ProfileDisplayState> {
+  /* 연동 토큰이 있으면 CDN 사진을 먼저 갱신 — 깨진/만료 URL 교체 */
+  await refreshLinkedSocialPhotos(userId).catch(() => undefined);
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -180,7 +250,7 @@ export async function getProfileDisplayState(userId: string): Promise<ProfileDis
     scrubNick(user.nickFeed) ||
     scrubNick(user.nickChat) ||
     "";
-  const vluePhoto = String(user.vlueProfilePhotoUrl || "").trim();
+  const vluePhoto = resolveDisplaySocialPhotoUrl(user.vlueProfilePhotoUrl || "");
   const vlueLocked = Boolean(user.vlueProfileNicknameLockedAt) || Boolean(scrubNick(user.vlueProfileNickname));
 
   const slots: ProfileSlotDto[] = (PROFILE_SOURCES as readonly ProfileSource[]).map((source) => {
@@ -209,7 +279,7 @@ export async function getProfileDisplayState(userId: string): Promise<ProfileDis
       linked,
       selectable: linked,
       nickname,
-      photoUrl,
+      photoUrl: resolveDisplaySocialPhotoUrl(photoUrl),
       isDefault: defaultSource === source,
       isActive: active === source
     };

@@ -53,7 +53,8 @@ type ResolvedSocialIdentity = {
 
 async function upsertSocialLoginLink(userId: string, identity: ResolvedSocialIdentity) {
   const nick = String(identity.displayName || "").trim().slice(0, 120) || null;
-  const photo = String(identity.profileImageUrl || "").trim() || null;
+  const { normalizeSocialPhotoUrl } = await import("../lib/socialPhotoUrl.js");
+  const photo = normalizeSocialPhotoUrl(identity.profileImageUrl) || null;
   return prisma.userSocialLoginLink.upsert({
     where: {
       userId_provider: { userId, provider: identity.provider }
