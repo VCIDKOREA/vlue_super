@@ -148,16 +148,9 @@ export default function AuthModal({
     const user = restoreMarketingAuthUser();
     if (user) onSuccess(user);
     if (!needsPayment) {
-      if (billable && !webPayEnabled) {
+      if (billable && webPayEnabled) {
         try {
-          window.alert(
-            '가입이 완료되었습니다.\n유료 멤버십 결제는 VLUÉ 앱을 다운로드하여 진행해 주세요.'
-          );
-        } catch {
-          /* ignore */
-        }
-        try {
-          window.location.hash = 'download';
+          window.location.hash = 'checkout';
         } catch {
           /* ignore */
         }

@@ -144,11 +144,11 @@ export function FamilyFolderSwitcher({ folders, dark, onNotice, expanded = false
             </div>
             <p className="mt-2 text-center text-[13px] font-bold">월 {(count * SLOT_PRICE_KRW).toLocaleString("ko-KR")}원</p>
             <button type="button" disabled={busy} className="mt-3 w-full rounded-2xl bg-[#00D2FF] py-3 text-[14px] font-black text-[#04121a] disabled:opacity-50" onClick={() => void pay()}>
-              {busy ? "처리 중…" : "결제하고 슬롯 추가"}
+              {busy ? "처리 중…" : "슬롯 추가 요청"}
             </button>
-            <a href="https://www.vlue.kr/#pricing" target="_blank" rel="noreferrer" className="mt-2 block w-full py-2 text-center text-[12px] font-bold text-blue-600 underline">
-              인증신청 요금 정책 보기
-            </a>
+            <p className={`mt-2 text-center text-[11px] ${dark ? "text-white/50" : "text-slate-500"}`}>
+              멤버십·결제 상태는 계정 권한으로 확인됩니다.
+            </p>
           </div>
         </div>
       ) : null}

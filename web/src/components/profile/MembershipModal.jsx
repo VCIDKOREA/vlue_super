@@ -20,6 +20,7 @@ import {
 import { verifyReferralCode } from "../../lib/referralVerifyApi.js";
 import { getAppLockStatus } from "../../lib/appLockBridge.js";
 import { membershipOrderName, openPaymentGateway } from "../../lib/membershipPgCheckout.js";
+import { canShowInAppPaymentUi } from "../../lib/playStorePolicy.js";
 
 const PLAN_BENEFITS = [
   {
@@ -339,6 +340,11 @@ export default function MembershipModal({
     setIsPaying(true);
     setPayError("");
     setPinError("");
+
+    if (!canShowInAppPaymentUi()) {
+      setPayError("이 앱에서는 결제를 진행할 수 없습니다. 계정 권한은 자동으로 동기화됩니다.");
+      return;
+    }
 
     const cycle = "monthly";
     const productKind = targetItem.kind || "paid";

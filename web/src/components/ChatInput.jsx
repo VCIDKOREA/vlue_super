@@ -638,8 +638,7 @@ const ChatInput = forwardRef(function ChatInput(
               <span className="text-blue-600 font-bold">{paywallFeature}</span>은 스탠다드/프리미엄 전용입니다.
             </p>
             <div className="mt-4 flex gap-2">
-              <button onClick={() => setPaywallFeature("")} className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-bold text-gray-600">닫기</button>
-              <button onClick={() => window.open("https://www.vlue.kr/membership", "_blank", "noopener,noreferrer")} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white">전환하기</button>
+              <button onClick={() => setPaywallFeature("")} className="flex-1 rounded-xl bg-gray-100 py-2.5 text-sm font-bold text-gray-600">확인</button>
             </div>
           </div>
         </div>

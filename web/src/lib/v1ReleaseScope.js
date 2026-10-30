@@ -131,12 +131,12 @@ export const v1WebShell = {
   familyProtection: true,
   resources: true,
   pricing: true,
+  checkout: true,
   download: true,
   /**
-   * V1 — www 웹 구독 결제(PostSignupPaymentModal) 비활성.
-   * 가입·결제는 VLUÉ 앱에서만. 웹 결제는 V2.
+   * www 마케팅 호스트 — 웹 PG 구독 결제 활성 (Play WebView 내 결제 UI는 playStorePolicy로 차단).
    */
-  webSubscribePayment: false,
+  webSubscribePayment: true,
   /** V2 — PC 설치형 (채팅 연동 시 지원 예정) */
   pcInstaller: false,
   vlueStore: false,
@@ -160,6 +160,7 @@ const WEB_VIEW_SHELL_KEY = Object.freeze({
   exceleditor: "aiExcel",
   resources: "resources",
   pricing: "pricing",
+  checkout: "checkout",
   download: "download",
   family: "familyProtection"
 });

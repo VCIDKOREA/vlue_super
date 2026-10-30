@@ -99,9 +99,66 @@ export async function handlePortonePaymentWebhook(body: PortoneWebhookPayload) {
             rawResponse: body as object
           }
         });
-        result.subscription = { synced: true, merchantUid };
+      }
+      const userId = String(pay?.userId || "").trim();
+      if (userId) {
+        const now = new Date();
+        await prisma.userSubscription.updateMany({
+          where: { userId, status: { in: ["pending_payment", "active", "cancelled"] } },
+          data: {
+            status: "active",
+            cycleStartAt: now
+          }
+        });
+        await prisma.digitalCard.upsert({
+          where: { userId },
+          create: { userId, membershipTierSnapshot: "paid" },
+          update: { membershipTierSnapshot: "paid" }
+        });
+        try {
+          const { evaluateAndGrantVlueVerifiedBadge } = await import(
+            "../membership/vlueVerifiedBadgeService.js"
+          );
+          await evaluateAndGrantVlueVerifiedBadge(userId).catch(() => undefined);
+        } catch {
+          /* optional */
+        }
+        try {
+          const { notifyPaidMembershipApplied } = await import(
+            "../membership/paidMembershipNotify.js"
+          );
+          await notifyPaidMembershipApplied({ userId, source: "payment", months: 1 });
+        } catch (e) {
+          console.warn("[portone webhook] paid notify", userId, e);
+        }
+        try {
+          const { syncCertifiedLineFromUserSubscription, restoreLineFromPayment } = await import(
+            "../billing/lineBillingService.js"
+          );
+          const lineId = await syncCertifiedLineFromUserSubscription(userId);
+          if (lineId) {
+            await restoreLineFromPayment(lineId, {
+              amountKrw: Number(pay?.amountKrw || 0) || undefined,
+              impUid,
+              merchantUid
+            });
+          }
+        } catch (e) {
+          console.warn("[portone webhook] line sync", userId, e);
+        }
+        result.subscription = {
+          synced: true,
+          merchantUid,
+          userId,
+          membershipTier: "paid",
+          realtime: true
+        };
       } else {
-        result.subscription = { synced: false, reason: pay ? "already_paid" : "not_found" };
+        result.subscription = {
+          synced: Boolean(pay),
+          reason: pay ? "missing_user" : "not_found",
+          merchantUid
+        };
       }
     } else if (status === "failed" || status === "cancelled") {
       await prisma.subscriptionPayment.updateMany({

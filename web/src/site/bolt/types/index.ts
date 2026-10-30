@@ -1,4 +1,5 @@
 export type View =
+  | "checkout"
   | "home"
   | "search"
   | "shopping"

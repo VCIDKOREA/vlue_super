@@ -16,8 +16,9 @@ import { DEFAULT_DIALER_GUIDE } from '../data/serviceIntroContent';
 interface PricingPageProps {
   user?: { email: string } | null;
   onLoginClick?: () => void;
-  /** V1 — 가입·결제는 앱: 요금제 CTA → 다운로드 */
+  /** @deprecated 웹 결제 전환 — checkout 우선 */
   onDownloadClick?: () => void;
+  onCheckoutClick?: () => void;
 }
 
 const CARD_PART_GUIDE: Record<ShowcaseDemoGrade, { title: string; intro: string; parts: { label: string; desc: string }[] }> = {
@@ -52,16 +53,17 @@ const CARD_PART_GUIDE: Record<ShowcaseDemoGrade, { title: string; intro: string;
     ],
   },
 };
-export default function PricingPage({ user, onLoginClick, onDownloadClick }: PricingPageProps) {
-  const goAppForJoinPay = () => {
-    if (onDownloadClick) {
-      onDownloadClick();
+export default function PricingPage({ user, onLoginClick, onDownloadClick, onCheckoutClick }: PricingPageProps) {
+  const goWebCheckout = () => {
+    if (onCheckoutClick) {
+      onCheckoutClick();
       return;
     }
     try {
-      window.location.hash = 'download';
+      window.location.hash = 'checkout';
     } catch {
       if (!user && onLoginClick) onLoginClick();
+      else if (onDownloadClick) onDownloadClick();
     }
   };
   const [activeGrade, setActiveGrade] = useState<ShowcaseDemoGrade>('fss1332');
@@ -73,22 +75,35 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
   }, [activeGrade]);
 
   return (
-    <main className="min-h-screen bg-gray-50 pt-16">
-      <div className="bg-white border-b border-gray-100">
+    <main className="min-h-screen bg-[#0b0b0f] pt-16 text-white">
+      <div
+        className="border-b border-white/10"
+        style={{
+          background:
+            "radial-gradient(900px 360px at 50% 0%, rgba(229,9,20,0.28), transparent 55%), #141414"
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-4 rounded-full bg-primary-50 border border-primary-200 text-primary-600 text-xs font-semibold">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-4 rounded-full border border-white/15 bg-white/5 text-white/80 text-xs font-semibold">
             <VlueBrandMark size={14} />
-            인증신청
+            VLUE MEMBERSHIP
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-3" style={{ letterSpacing: '-0.035em' }}>V1 멤버십 · 요금제</h1>
-          <p className="text-gray-500 text-base max-w-lg mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-            블루 쇼케이스·디지털 인증명함·가족보호 중심의 V1 요금제입니다.<br />
+          <h1 className="text-3xl sm:text-4xl font-black text-white mb-3" style={{ letterSpacing: '-0.035em' }}>멤버십 · 요금제</h1>
+          <p className="text-white/60 text-base max-w-lg mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+            블루 쇼케이스·디지털 인증명함·가족보호 중심 요금제입니다.<br />
             유료 월 14,100원(정가 28,300원 · 모바일 이벤트).
             최초 가입+추천인 코드 시 월 9,900원(본인인증 CI 기준 1회).
           </p>
-          <p className="mt-4 text-sm font-semibold text-primary-700 max-w-xl mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-            가입과 결제는 VLUÉ 앱을 다운로드하여 진행해 주세요. (웹 결제는 지원하지 않습니다)
+          <p className="mt-4 text-sm font-semibold text-white/80 max-w-xl mx-auto leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+            구독·결제는 웹에서 진행하며, 완료 즉시 앱 계정 권한·인증배지가 동기화됩니다.
           </p>
+          <button
+            type="button"
+            onClick={goWebCheckout}
+            className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#e50914] px-6 py-3 text-sm font-extrabold text-white"
+          >
+            플랜 선택 · 결제하기
+          </button>
         </div>
       </div>
 
@@ -125,7 +140,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
             user={user}
             onLoginClick={onLoginClick}
             onDownloadClick={onDownloadClick}
-            onApplyTier={() => goAppForJoinPay()}
+            onApplyTier={() => goWebCheckout()}
           />
         </div>
 
@@ -321,11 +336,11 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick }: Pri
             <div className="flex-shrink-0">
               <button
                 type="button"
-                onClick={goAppForJoinPay}
+                onClick={goWebCheckout}
                 className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-gray-900 font-bold text-sm rounded-2xl transition-all whitespace-nowrap flex items-center gap-2"
               >
                 <Building2 className="w-4 h-4" />
-                앱에서 B2B 상담·가입
+                웹에서 B2B 플랜 결제
               </button>
             </div>
           </div>

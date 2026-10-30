@@ -1495,6 +1495,49 @@ function App() {
           setBottomToast("직장내선 권한이 해제되어 개인모드로 전환되었습니다.");
           setTimeout(() => setBottomToast(""), 3200);
         }
+        if (data?.type === "vlue-paid-membership" || data?.type === "vlue-line-billing") {
+          /* 웹 PG 결제·웹훅 → 앱 권한/배지 즉시 반영 (재부팅 불필요) */
+          void (async () => {
+            try {
+              const { refreshMembershipFromServer } = await import("./lib/membershipRealtimeSync.js");
+              const result = await refreshMembershipFromServer({
+                onToast: (msg) => {
+                  setBottomToast(msg);
+                  setTimeout(() => setBottomToast(""), 3600);
+                }
+              });
+              if (result.ok) {
+                const raw = String(
+                  result.data?.membershipTier || result.data?.membershipKind || "paid"
+                )
+                  .trim()
+                  .toLowerCase();
+                const next =
+                  raw === "b2b"
+                    ? "b2b"
+                    : raw === "standard" || raw === "premium" || raw === "paid"
+                      ? "paid"
+                      : "free";
+                setMembershipTier(next);
+                try {
+                  localStorage.setItem("membershipTier", next);
+                  localStorage.setItem("vlue_membership_tier", next);
+                  localStorage.setItem("vlue_membership_kind", next);
+                } catch {
+                  /* ignore */
+                }
+                setCardFieldsTick((n) => n + 1);
+                addPushNotification({
+                  category: "멤버십",
+                  title: String(data.title || "유료 회원 적용"),
+                  body: String(data.body || "유료 권한이 동기화되었습니다.")
+                });
+              }
+            } catch {
+              /* ignore */
+            }
+          })();
+        }
         if (data?.type === "vlue-onboarding-auto-approved") {
           setBottomToast(String(data.message || "사업자 가입이 자동 승인되었습니다."));
           setTimeout(() => setBottomToast(""), 4200);

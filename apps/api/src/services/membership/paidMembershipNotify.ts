@@ -31,6 +31,9 @@ export async function notifyPaidMembershipApplied(opts: {
     type: "vlue-paid-membership",
     category: "멤버십",
     source: opts.source || "other",
+    membershipTier: "paid",
+    isPremium: true,
+    badgeType: "cyan_verified",
     ...(months ? { months } : {}),
     title,
     body
@@ -66,6 +69,9 @@ export async function notifyPaidMembershipApplied(opts: {
       type: "vlue-paid-membership",
       category: "멤버십",
       source: String(opts.source || "other"),
+      membershipTier: "paid",
+      isPremium: "1",
+      badgeType: "cyan_verified",
       ...(notificationId ? { notificationId } : {}),
       ...(months ? { months: String(months) } : {})
     });

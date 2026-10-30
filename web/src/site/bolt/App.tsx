@@ -14,6 +14,7 @@ import AuctionPage from './pages/AuctionPage';
 import ResourcesPage from './pages/ResourcesPage';
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 import PricingPage from './pages/PricingPage';
+import MembershipCheckoutPage from './pages/MembershipCheckoutPage';
 import SafeZonePage from './pages/SafeZonePage';
 import SecureMailPage from './pages/SecureMailPage';
 import MarketingEmailSettingsPage from './pages/MarketingEmailSettingsPage';
@@ -45,7 +46,7 @@ import { consumeMarketingOAuthReturn } from '../../lib/marketingOAuthReturn.js';
 import { coerceWebViewForV1, isWebViewV1Enabled, v1WebShell } from '../../lib/v1ReleaseScope.js';
 
 const VALID_VIEWS: View[] = [
-  'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'safezone',
+  'home', 'search', 'shopping', 'auction', 'about', 'resources', 'pricing', 'checkout', 'safezone',
   'mail', 'mail-settings', 'download', 'news', 'events', 'jobs', 'support', 'exceleditor', 'family', 'mypage', 'bizcard',
   'showcase', 'casebox', 'biz',
   'terms', 'privacy', 'refund', 'account-deletion',
@@ -370,9 +371,25 @@ export default function App() {
                 user={user}
                 onLoginClick={handleLoginRequired}
                 onDownloadClick={() => handleNavigate('download')}
+                onCheckoutClick={() => handleNavigate('checkout')}
               />
             </div>
           </div>
+        )}
+
+        {view === 'checkout' && (
+          <MembershipCheckoutPage
+            user={user}
+            onLoginClick={() => {
+              try {
+                sessionStorage.setItem(AFTER_LOGIN_KEY, 'checkout');
+              } catch {
+                /* ignore */
+              }
+              handleLoginRequired();
+            }}
+            onNavigate={handleNavigate}
+          />
         )}
 
         {view === 'family' && (
