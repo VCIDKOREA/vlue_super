@@ -58,7 +58,7 @@ export const COMPACT_PRICING_TIERS = [
       "온가족 안심 '가족보호' 시스템 (최대 4인 등록)",
       "풀 BGM 플레이어, 비즈니스 링크 & 커스텀 스타일"
     ],
-    ctaText: "웹에서 가입·결제하기",
+    ctaText: "가입·결제 계속하기",
     ctaStyle: "bg-primary-600 hover:bg-primary-700 text-white shadow-md shadow-primary-500/20",
     isRecommended: true
   },

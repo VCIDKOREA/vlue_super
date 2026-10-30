@@ -76,6 +76,7 @@ import Splash from "./components/Splash";
 import VlueOnboarding from "./components/VlueOnboarding";
 import PostSignupPaymentModal from "./components/PostSignupPaymentModal.jsx";
 import LineBillingGraceModal from "./components/LineBillingGraceModal.jsx";
+import { canShowInAppPaymentUi } from "./lib/playStorePolicy.js";
 import ParentalConsentApproveModal from "./components/ParentalConsentApproveModal.jsx";
 import { fetchPendingParentalConsents } from "./lib/parentalConsentApi.js";
 import ProtectionInviteRedeem from "./components/ProtectionInviteRedeem.jsx";
@@ -4849,7 +4850,7 @@ function App() {
       )}
 
       <PostSignupPaymentModal
-        open={postSignupPaymentOpen && Boolean(postSignupPending)}
+        open={canShowInAppPaymentUi() && postSignupPaymentOpen && Boolean(postSignupPending)}
         pending={postSignupPending}
         onComplete={(result) => {
           const tier = result?.membershipTier === "b2b" ? "b2b" : "paid";

@@ -50,6 +50,7 @@ import {
   requestPortoneV2Payment
 } from "../../lib/portoneV2Payment.js";
 import { getPortoneV2ChannelKey, getPortoneV2StoreId } from "../../lib/portoneV2Env.js";
+import { canShowInAppPaymentUi } from "../../lib/playStorePolicy.js";
 
 const BLOCKED_USER_DIRECTORY = [
   { id: "u-minsu", name: "민수", handle: "@minsu" },
@@ -962,74 +963,76 @@ export default function VlueSettingsPanel({
           />
         </SettingsSection>
 
-        <SettingsSection title="결제 테스트" isDarkMode={isDarkMode}>
-          <SettingsRowButton
-            label="KPN 테스트 결제 (1,000원)"
-            sublabel="포트원 V2 · 테스트 채널"
-            onClick={async () => {
-              if (!getPortoneV2StoreId() || !getPortoneV2ChannelKey()) {
-                showSettingNotice?.(
-                  "결제 설정(Store/Channel)이 없습니다. 웹 배포 환경변수를 확인해 주세요."
-                );
-                return;
-              }
-              showSettingNotice?.("결제창을 여는 중…");
-              try {
-                sessionStorage.setItem("vlue_v2_pay_amount", "1000");
-                sessionStorage.setItem("vlue_v2_pay_order_name", "VLUE V2 테스트");
-                const result = await requestPortoneV2Payment({
-                  orderName: "VLUE V2 테스트",
-                  totalAmount: 1000,
-                  payMethod: "CARD",
-                  redirectUrl: defaultPortoneV2RedirectUrl(),
-                  customData: { source: "settings_pay_test" }
-                });
-                if (result.redirected) return;
-                try {
-                  const { addPushNotification, buildPaymentReceiptBody } = await import(
-                    "../../lib/pushNotificationInbox.js"
+        {canShowInAppPaymentUi() ? (
+          <SettingsSection title="결제 테스트" isDarkMode={isDarkMode}>
+            <SettingsRowButton
+              label="KPN 테스트 결제 (1,000원)"
+              sublabel="포트원 V2 · 테스트 채널"
+              onClick={async () => {
+                if (!getPortoneV2StoreId() || !getPortoneV2ChannelKey()) {
+                  showSettingNotice?.(
+                    "결제 설정(Store/Channel)이 없습니다. 웹 배포 환경변수를 확인해 주세요."
                   );
-                  const amount = Number(result.complete?.amountTotal || 1000);
-                  const paymentId = String(result.complete?.paymentId || result.paymentId || "");
-                  const productName = "VLUE V2 테스트";
-                  const productDetail =
-                    "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다.";
-                  addPushNotification({
-                    category: "결제",
-                    kind: "payment",
-                    title: "결제 완료 · 구매확인 안내",
-                    body: buildPaymentReceiptBody({
+                  return;
+                }
+                showSettingNotice?.("결제창을 여는 중…");
+                try {
+                  sessionStorage.setItem("vlue_v2_pay_amount", "1000");
+                  sessionStorage.setItem("vlue_v2_pay_order_name", "VLUE V2 테스트");
+                  const result = await requestPortoneV2Payment({
+                    orderName: "VLUE V2 테스트",
+                    totalAmount: 1000,
+                    payMethod: "CARD",
+                    redirectUrl: defaultPortoneV2RedirectUrl(),
+                    customData: { source: "settings_pay_test" }
+                  });
+                  if (result.redirected) return;
+                  try {
+                    const { addPushNotification, buildPaymentReceiptBody } = await import(
+                      "../../lib/pushNotificationInbox.js"
+                    );
+                    const amount = Number(result.complete?.amountTotal || 1000);
+                    const paymentId = String(result.complete?.paymentId || result.paymentId || "");
+                    const productName = "VLUE V2 테스트";
+                    const productDetail =
+                      "포트원 V2(KPN) 결제 연동 테스트 상품입니다. 실제 서비스 이용 금액이 아니며, 결제 승인·알림·구매확인 흐름 검증용으로 제공됩니다.";
+                    addPushNotification({
+                      category: "결제",
+                      kind: "payment",
+                      title: "결제 완료 · 구매확인 안내",
+                      body: buildPaymentReceiptBody({
+                        productName,
+                        productDetail,
+                        amountKrw: amount,
+                        paymentId
+                      }),
                       productName,
                       productDetail,
                       amountKrw: amount,
-                      paymentId
-                    }),
-                    productName,
-                    productDetail,
-                    amountKrw: amount,
-                    paymentId,
-                    needsPurchaseConfirm: true
-                  });
-                } catch {
-                  /* ignore */
+                      paymentId,
+                      needsPurchaseConfirm: true
+                    });
+                  } catch {
+                    /* ignore */
+                  }
+                  showSettingNotice?.(
+                    result.complete?.status === "PAID"
+                      ? "결제 승인 완료 · 알림함에서 구매확인해 주세요"
+                      : `결제 처리됨 (${result.complete?.status || result.paymentId})`
+                  );
+                } catch (e) {
+                  const msg = e?.message || "결제에 실패했습니다.";
+                  if (/취소|9000|FAILURE/i.test(msg)) {
+                    showSettingNotice?.("결제를 취소했습니다.");
+                  } else {
+                    showSettingNotice?.(msg);
+                  }
                 }
-                showSettingNotice?.(
-                  result.complete?.status === "PAID"
-                    ? "결제 승인 완료 · 알림함에서 구매확인해 주세요"
-                    : `결제 처리됨 (${result.complete?.status || result.paymentId})`
-                );
-              } catch (e) {
-                const msg = e?.message || "결제에 실패했습니다.";
-                if (/취소|9000|FAILURE/i.test(msg)) {
-                  showSettingNotice?.("결제를 취소했습니다.");
-                } else {
-                  showSettingNotice?.(msg);
-                }
-              }
-            }}
-            isDarkMode={isDarkMode}
-          />
-        </SettingsSection>
+              }}
+              isDarkMode={isDarkMode}
+            />
+          </SettingsSection>
+        ) : null}
 
         <SettingsSection title="기타" isDarkMode={isDarkMode}>
           <SettingsRowButton

@@ -58,7 +58,7 @@ const PLANS: {
 ];
 
 /**
- * 넷플릭스 감성 다크 요금제·결제 — www 마케팅 전용 (Play WebView 비노출 권장)
+ * 요금제 선택 → 결제 심리스 UX (마케팅 www 전용 · VLUE 라이트 테마)
  */
 export default function MembershipCheckoutPage({ user, onLoginClick, onNavigate }: Props) {
   const [planId, setPlanId] = useState<PlanId>("monthly");
@@ -93,30 +93,31 @@ export default function MembershipCheckoutPage({ user, onLoginClick, onNavigate 
   }, [playGuard, user, onLoginClick, plan, planId]);
 
   return (
-    <main className="min-h-screen bg-[#0b0b0f] text-white">
-      <div
-        className="relative overflow-hidden border-b border-white/10"
-        style={{
-          background:
-            "radial-gradient(1200px 480px at 50% -10%, rgba(229,9,20,0.35), transparent 60%), linear-gradient(180deg, #141414 0%, #0b0b0f 70%)"
-        }}
-      >
-        <div className="mx-auto max-w-5xl px-4 pb-14 pt-24 text-center sm:px-6">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold tracking-wide text-white/80">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-blue-50/40 text-slate-900">
+      <div className="relative overflow-hidden border-b border-slate-200/80 bg-white">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(900px 420px at 50% -20%, rgba(37,99,235,0.12), transparent 55%), radial-gradient(600px 280px at 85% 10%, rgba(14,165,233,0.08), transparent 50%)"
+          }}
+        />
+        <div className="relative mx-auto max-w-5xl px-4 pb-14 pt-24 text-center sm:px-6">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-bold tracking-wide text-primary-700">
             <VlueBrandMark size={14} />
             VLUE MEMBERSHIP
           </div>
           <h1
-            className="text-4xl font-black tracking-tight sm:text-5xl"
+            className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl"
             style={{ letterSpacing: "-0.04em" }}
           >
             원하는 플랜을 고르고
             <br />
             바로 구독하세요
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-white/65">
-            웹에서 가입·결제가 완료되면 앱 계정 권한과 인증배지가 즉시 동기화됩니다. 앱 재설치나 재부팅은
-            필요 없습니다.
+          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-slate-600">
+            가입·결제가 완료되면 앱 계정 권한과 인증배지가 즉시 동기화됩니다. 앱 재설치나 재부팅은 필요
+            없습니다.
           </p>
         </div>
       </div>
@@ -132,30 +133,32 @@ export default function MembershipCheckoutPage({ user, onLoginClick, onNavigate 
                 onClick={() => setPlanId(p.id)}
                 className={`relative rounded-2xl border p-5 text-left transition ${
                   active
-                    ? "border-[#e50914] bg-[#1a1a1f] shadow-[0_0_0_1px_rgba(229,9,20,0.4)]"
-                    : "border-white/10 bg-[#141416] hover:border-white/25"
+                    ? "border-primary-500 bg-white shadow-[0_0_0_1px_rgba(37,99,235,0.35)] ring-2 ring-primary-500/15"
+                    : "border-slate-200 bg-white hover:border-primary-300 hover:shadow-sm"
                 }`}
               >
                 {p.badge ? (
-                  <span className="absolute right-3 top-3 rounded bg-[#e50914] px-2 py-0.5 text-[10px] font-black">
+                  <span className="absolute right-3 top-3 rounded-md bg-primary-600 px-2 py-0.5 text-[10px] font-black text-white">
                     {p.badge}
                   </span>
                 ) : null}
-                <p className="text-[13px] font-bold text-white/70">{p.name}</p>
+                <p className="text-[13px] font-bold text-slate-500">{p.name}</p>
                 <p className="mt-2 flex items-end gap-1">
-                  <span className="text-3xl font-black">{p.price.toLocaleString("ko-KR")}</span>
-                  <span className="pb-1 text-sm text-white/50">원/{p.period}</span>
+                  <span className="text-3xl font-black text-slate-900">
+                    {p.price.toLocaleString("ko-KR")}
+                  </span>
+                  <span className="pb-1 text-sm text-slate-500">원/{p.period}</span>
                 </p>
                 {p.listPrice ? (
-                  <p className="text-[11px] text-white/40 line-through">
+                  <p className="text-[11px] text-slate-400 line-through">
                     {p.listPrice.toLocaleString("ko-KR")}원
                   </p>
                 ) : null}
-                <p className="mt-2 text-[12px] leading-snug text-white/55">{p.blurb}</p>
+                <p className="mt-2 text-[12px] leading-snug text-slate-600">{p.blurb}</p>
                 <ul className="mt-3 space-y-1.5">
                   {p.bullets.map((b) => (
-                    <li key={b} className="flex gap-2 text-[11px] text-white/75">
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#e50914]" />
+                    <li key={b} className="flex gap-2 text-[11px] text-slate-700">
+                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600" />
                       <span>{b}</span>
                     </li>
                   ))}
@@ -165,11 +168,11 @@ export default function MembershipCheckoutPage({ user, onLoginClick, onNavigate 
           })}
         </div>
 
-        <div className="mt-8 rounded-2xl border border-white/10 bg-[#141416] p-5 sm:p-6">
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[12px] font-bold text-white/50">선택 플랜</p>
-              <p className="text-lg font-black">
+              <p className="text-[12px] font-bold text-slate-500">선택 플랜</p>
+              <p className="text-lg font-black text-slate-900">
                 {plan.name} · {plan.price.toLocaleString("ko-KR")}원/{plan.period}
               </p>
             </div>
@@ -177,22 +180,22 @@ export default function MembershipCheckoutPage({ user, onLoginClick, onNavigate 
               type="button"
               disabled={busy || playGuard}
               onClick={() => void startPay()}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#e50914] px-6 py-3 text-[14px] font-extrabold text-white disabled:opacity-45"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-[14px] font-extrabold text-white shadow-md shadow-primary-500/20 disabled:opacity-45 hover:bg-primary-700"
             >
               <Lock className="h-4 w-4" />
               {busy ? "결제창 여는 중…" : user ? "결제 계속하기" : "로그인 후 결제"}
             </button>
           </div>
-          {error ? <p className="mt-3 text-[12px] font-bold text-rose-400">{error}</p> : null}
-          <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-white/45">
-            <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {error ? <p className="mt-3 text-[12px] font-bold text-rose-600">{error}</p> : null}
+          <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-slate-500">
+            <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600" />
             카드·간편결제(카카오페이/네이버페이 등 PG 지원 수단)는 포트원 보안 결제창에서 처리됩니다.
             결제 완료 웹훅이 수신되면 유료 권한·인증배지가 앱에 실시간 반영됩니다.
           </p>
           {onNavigate ? (
             <button
               type="button"
-              className="mt-4 text-[12px] font-semibold text-white/50 underline"
+              className="mt-4 text-[12px] font-semibold text-primary-600 underline"
               onClick={() => onNavigate("pricing")}
             >
               요금제 안내로 돌아가기

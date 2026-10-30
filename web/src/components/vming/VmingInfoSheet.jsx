@@ -4,6 +4,7 @@ import { VMING_CONSENT_LEGAL } from "../../lib/vmingConsentApi.js";
 import { fetchVmingUserStatus, confirmVmingUnlimitedPayment, purchaseVmingUnlimited } from "../../lib/vmingApi.js";
 import { requestIamportBillingPay } from "../../lib/iamportClient.js";
 import { getPortoneUserCode } from "../../lib/portoneEnv.js";
+import { canShowInAppPaymentUi } from "../../lib/playStorePolicy.js";
 
 function VmingRobotIcon({ className = "h-5 w-5" }) {
   return (
@@ -118,55 +119,65 @@ export default function VmingInfoSheet({
             </div>
           ) : null}
         </div>
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-          커피 한 잔 값으로 한 달 내내 제한 없이 사용하기
-        </div>
-        <button
-          type="button"
-          className="mt-2 w-full rounded-xl bg-violet-600 py-3 text-[14px] font-black text-white disabled:opacity-60"
-          disabled={buying || usage?.tier === "UNLIMITED"}
-          onClick={async () => {
-            try {
-              setBuying(true);
-              let userId = "";
-              try {
-                userId = localStorage.getItem("vlue_server_user_id") || "";
-              } catch {
-                /* ignore */
-              }
-              if (!userId) throw new Error("로그인 정보가 없습니다.");
+        {canShowInAppPaymentUi() ? (
+          <>
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+              커피 한 잔 값으로 한 달 내내 제한 없이 사용하기
+            </div>
+            <button
+              type="button"
+              className="mt-2 w-full rounded-xl bg-violet-600 py-3 text-[14px] font-black text-white disabled:opacity-60"
+              disabled={buying || usage?.tier === "UNLIMITED"}
+              onClick={async () => {
+                try {
+                  setBuying(true);
+                  let userId = "";
+                  try {
+                    userId = localStorage.getItem("vlue_server_user_id") || "";
+                  } catch {
+                    /* ignore */
+                  }
+                  if (!userId) throw new Error("로그인 정보가 없습니다.");
 
-              const userCode = getPortoneUserCode();
-              if (userCode) {
-                const merchantUid = `vming_unlimited_${userId}_${Date.now()}`;
-                const rsp = await requestIamportBillingPay({
-                  userCode,
-                  userId,
-                  amount: 4900,
-                  billingCycle: "monthly",
-                  merchantUidOverride: merchantUid,
-                  nameOverride: "브이밍 무제한 패키지(월)"
-                });
-                await confirmVmingUnlimitedPayment({
-                  merchantUid: rsp?.merchant_uid || merchantUid,
-                  impUid: rsp?.imp_uid || "",
-                  provider: "portone"
-                });
-              } else {
-                await purchaseVmingUnlimited();
-              }
-              const latest = await fetchVmingUserStatus();
-              setUsage(latest);
-              setNotice("⚡ 월 4,900원 무제한 패키지 적용 완료");
-            } catch {
-              setNotice("결제 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-            } finally {
-              setBuying(false);
-            }
-          }}
-        >
-          {usage?.tier === "UNLIMITED" ? "⚡ 무제한 이용 중" : "월 4,900원 무제한 패키지 결제하기"}
-        </button>
+                  const userCode = getPortoneUserCode();
+                  if (userCode) {
+                    const merchantUid = `vming_unlimited_${userId}_${Date.now()}`;
+                    const rsp = await requestIamportBillingPay({
+                      userCode,
+                      userId,
+                      amount: 4900,
+                      billingCycle: "monthly",
+                      merchantUidOverride: merchantUid,
+                      nameOverride: "브이밍 무제한 패키지(월)"
+                    });
+                    await confirmVmingUnlimitedPayment({
+                      merchantUid: rsp?.merchant_uid || merchantUid,
+                      impUid: rsp?.imp_uid || "",
+                      provider: "portone"
+                    });
+                  } else {
+                    await purchaseVmingUnlimited();
+                  }
+                  const latest = await fetchVmingUserStatus();
+                  setUsage(latest);
+                  setNotice("⚡ 월 4,900원 무제한 패키지 적용 완료");
+                } catch {
+                  setNotice("결제 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+                } finally {
+                  setBuying(false);
+                }
+              }}
+            >
+              {usage?.tier === "UNLIMITED" ? "⚡ 무제한 이용 중" : "월 4,900원 무제한 패키지 결제하기"}
+            </button>
+          </>
+        ) : (
+          <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-[12px] text-violet-900">
+            {usage?.tier === "UNLIMITED"
+              ? "⚡ 무제한 패키지 이용 중"
+              : "브이밍 이용 한도는 계정 권한 상태를 따릅니다."}
+          </div>
+        )}
         {notice ? <p className="mt-1 text-[11px] font-semibold text-violet-700 dark:text-violet-200">{notice}</p> : null}
         {isHost ? (
           <div className="mt-4 flex gap-2">

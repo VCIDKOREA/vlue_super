@@ -6,6 +6,7 @@ import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 import { verifyReferralCode } from "../../lib/referralVerifyApi.js";
 import { getAppLockStatus } from "../../lib/appLockBridge.js";
 import { membershipOrderName, openPaymentGateway } from "../../lib/membershipPgCheckout.js";
+import { canShowInAppPaymentUi } from "../../lib/playStorePolicy.js";
 
 function checkHasPinSet() {
   try {
@@ -59,7 +60,7 @@ export default function PaymentModal({
 
   const testMode = isPortoneTestMode();
 
-  if (isVlueKidsApp() || !open) return null;
+  if (isVlueKidsApp() || !open || !canShowInAppPaymentUi()) return null;
 
   const basePrice = Number(pending?.amountKrw) || 14100;
   // 추천인 코드 적용 시 14,100원 ➔ 9,900원 즉시 적용

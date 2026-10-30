@@ -6,6 +6,7 @@ import {
   fetchLineBillingStatus
 } from "../lib/lineBillingApi.js";
 import { syncOwnerInboxFromServer } from "../lib/ownerInboxSync.js";
+import { canShowInAppPaymentUi } from "../lib/playStorePolicy.js";
 import "../styles/showcase-call-glass.css";
 
 const DISMISS_KEY = "vlue_line_grace_popup_dismissed_v1";
@@ -107,7 +108,7 @@ export default function LineBillingGraceModal({ enabled = false }) {
       <article className="agency-dcp-card is-expired" style={{ maxWidth: 320, padding: 20 }}>
         <p className="agency-dcp-card__badge">인증기간 만료</p>
         <p className="agency-dcp-card__warn">
-          {line.phoneDisplay} 회선의 인증기간이 만료되었습니다. 유예 기간 안에 결제하면 즉시 복구됩니다.
+          {line.phoneDisplay} 회선의 인증기간이 만료되었습니다. 유예 기간 동안 계정 권한 상태를 확인할 수 있습니다.
         </p>
         {graceLabel ? (
           <p className="agency-dcp-card__web-empty">유예 마감 {graceLabel}</p>
@@ -118,23 +119,31 @@ export default function LineBillingGraceModal({ enabled = false }) {
           </p>
         ) : null}
         {error ? <p className="agency-dcp-card__warn">{error}</p> : null}
-        <button
-          type="button"
-          className="agency-dcp-card__close is-danger"
-          disabled={Boolean(busy)}
-          onClick={onCancel}
-        >
-          {busy === "cancel" ? "해지 중…" : "구독 해지하기"}
-        </button>
-        <button
-          type="button"
-          className="agency-dcp-card__close"
-          style={{ marginTop: 8 }}
-          disabled={Boolean(busy)}
-          onClick={onPay}
-        >
-          {busy === "pay" ? "결제 중…" : "결제하러 가기"}
-        </button>
+        {canShowInAppPaymentUi() ? (
+          <>
+            <button
+              type="button"
+              className="agency-dcp-card__close is-danger"
+              disabled={Boolean(busy)}
+              onClick={onCancel}
+            >
+              {busy === "cancel" ? "해지 중…" : "구독 해지하기"}
+            </button>
+            <button
+              type="button"
+              className="agency-dcp-card__close"
+              style={{ marginTop: 8 }}
+              disabled={Boolean(busy)}
+              onClick={onPay}
+            >
+              {busy === "pay" ? "결제 중…" : "결제 계속하기"}
+            </button>
+          </>
+        ) : (
+          <p className="agency-dcp-card__web-empty" style={{ marginTop: 8 }}>
+            회선 권한은 계정에 동기화된 상태를 따릅니다.
+          </p>
+        )}
         <button
           type="button"
           className="agency-dcp-card__close"

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchVmingUserStatus, purchaseVmingUnlimited } from "../../lib/vmingApi.js";
+import { canShowInAppPaymentUi } from "../../lib/playStorePolicy.js";
 
 const DAILY_CHAT_EXCEEDED_MESSAGE = `오늘 저와 나눌 수 있는 무료 대화 용량을 모두 소모하셨어요! 💬 오늘의 이야기는 아쉽게 공식 종료되지만, 내일 오전 0시(자정)가 되면 새로운 대화 용량이 가득 충전되니 내일 다시 시도해 주세요!
 
@@ -34,6 +35,7 @@ export default function VmingUpgradePromptModal({
     : isProjectExceeded
       ? PROJECT_LIMIT_EXCEEDED_MESSAGE
       : message || PROJECT_LIMIT_EXCEEDED_MESSAGE;
+  const allowPay = canShowInAppPaymentUi();
   const primaryCtaLabel = isProjectExceeded ? "⚡ 무제한 패키지 결제하기" : "⚡ 월 4,900원 무제한 패키지 업그레이드";
 
   return (
@@ -42,42 +44,55 @@ export default function VmingUpgradePromptModal({
       <div className="relative z-[1] w-full max-w-md rounded-2xl border border-violet-200 bg-white p-5 shadow-2xl">
         <p className="text-[16px] font-black text-slate-900">⚡ 브이밍 무제한 패키지 안내</p>
         <p className="mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-slate-700">
-          {displayMessage}
+          {allowPay
+            ? displayMessage
+            : isDailyChatExceeded
+              ? "오늘 무료 대화 용량을 모두 사용했습니다. 내일 자정에 다시 충전됩니다."
+              : "오늘 제공된 무료 체험 한도를 모두 사용했습니다. 계정 권한 상태에 따라 기능이 제공됩니다."}
         </p>
         <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-[12px] text-violet-900">
           {usage?.statusLabel || "상태 조회 중..."}
         </div>
         {notice ? <p className="mt-2 text-[11px] font-semibold text-violet-700">{notice}</p> : null}
         <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            disabled={busy || usage?.tier === "UNLIMITED"}
-            onClick={async () => {
-              try {
-                setBusy(true);
-                await purchaseVmingUnlimited();
-                const latest = await fetchVmingUserStatus();
-                setUsage(latest);
-                setNotice("⚡ 월 4,900원 무제한 패키지가 적용되었습니다.");
-              } catch {
-                setNotice("결제 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="flex-1 rounded-xl bg-violet-600 py-2.5 text-[13px] font-black text-white disabled:opacity-60"
-          >
-            {usage?.tier === "UNLIMITED" ? "무제한 이용 중" : primaryCtaLabel}
-          </button>
-          {isProjectExceeded ? null : (
+          {allowPay && usage?.tier !== "UNLIMITED" ? (
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-[13px] font-bold text-slate-600"
+              disabled={busy}
+              onClick={async () => {
+                try {
+                  setBusy(true);
+                  await purchaseVmingUnlimited();
+                  const latest = await fetchVmingUserStatus();
+                  setUsage(latest);
+                  setNotice("⚡ 월 4,900원 무제한 패키지가 적용되었습니다.");
+                } catch {
+                  setNotice("결제 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="flex-1 rounded-xl bg-violet-600 py-2.5 text-[13px] font-black text-white disabled:opacity-60"
             >
-              확인 (내일 올래요)
+              {primaryCtaLabel}
             </button>
-          )}
+          ) : null}
+          {usage?.tier === "UNLIMITED" ? (
+            <button
+              type="button"
+              disabled
+              className="flex-1 rounded-xl bg-violet-600 py-2.5 text-[13px] font-black text-white disabled:opacity-60"
+            >
+              무제한 이용 중
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-[13px] font-bold text-slate-600"
+          >
+            {allowPay && isProjectExceeded ? "닫기" : "확인"}
+          </button>
         </div>
       </div>
     </div>

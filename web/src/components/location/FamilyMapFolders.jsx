@@ -4,7 +4,6 @@ import { isVlueKidsApp } from "../../lib/vlueKidsApp.js";
 import {
   fetchJoinedProtectionGroups,
   fetchOwnedProtectionGroup,
-  purchaseProtectionSlots,
   sendProtectionSos,
   setProtectionLocationSharing
 } from "../../lib/familyProtectionApi.js";
@@ -57,9 +56,6 @@ export function useFamilyMapFolders(enabled) {
 }
 
 export function FamilyFolderSwitcher({ folders, dark, onNotice, expanded = false, onExpandedChange }) {
-  const [payOpen, setPayOpen] = useState(false);
-  const [count, setCount] = useState(1);
-  const [busy, setBusy] = useState(false);
   const slots = folders.owned?.slots;
   const used = slots?.used ?? 0;
   const capacity = slots?.capacity ?? 0;
@@ -72,20 +68,6 @@ export function FamilyFolderSwitcher({ folders, dark, onNotice, expanded = false
           ? "text-white/75"
           : "text-slate-600"
     }`;
-
-  const pay = async () => {
-    setBusy(true);
-    try {
-      const result = await purchaseProtectionSlots(count);
-      await folders.reload();
-      setPayOpen(false);
-      onNotice?.(`보호 슬롯 ${result.added || count}명을 추가했습니다. 월 ${((result.added || count) * SLOT_PRICE_KRW).toLocaleString("ko-KR")}원`);
-    } catch (err) {
-      onNotice?.(err?.message || "슬롯 결제에 실패했습니다.");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   if (!expanded) {
     return (
@@ -123,35 +105,13 @@ export function FamilyFolderSwitcher({ folders, dark, onNotice, expanded = false
                 : "등록된 가족 0명 · 초대 코드를 먼저 만들어 주세요"}
             </p>
             {full ? (
-              <button type="button" className="rounded-full bg-[#00D2FF] px-2.5 py-1 text-[10px] font-black text-[#04121a]" onClick={() => setPayOpen(true)}>
-                + 보호자 추가하기 (월 {SLOT_PRICE_KRW.toLocaleString("ko-KR")}원/명)
-              </button>
+              <p className={`text-[10px] font-bold ${dark ? "text-white/60" : "text-slate-500"}`}>
+                보호 슬롯이 가득 찼습니다 · 계정 권한으로 용량이 반영됩니다
+              </p>
             ) : null}
           </div>
         ) : null}
       </div>
-      {payOpen && !isVlueKidsApp() ? (
-        <div className="fixed inset-0 z-[640] flex items-end justify-center bg-black/50 p-4" onClick={() => setPayOpen(false)}>
-          <div className={`w-full max-w-md rounded-3xl p-4 ${dark ? "bg-[#0c1220] text-white" : "bg-white text-slate-900"}`} onClick={(event) => event.stopPropagation()}>
-            <p className="text-[16px] font-black">보호 슬롯 추가</p>
-            <p className={`mt-1 text-[12px] ${dark ? "text-white/70" : "text-slate-500"}`}>
-              1명당 월 {SLOT_PRICE_KRW.toLocaleString("ko-KR")}원. 결제 후 가족 보호 인원이 늘어납니다.
-            </p>
-            <div className="mt-3 flex items-center justify-center gap-3">
-              <button type="button" className="h-9 w-9 rounded-full bg-slate-200 font-black text-slate-900" onClick={() => setCount((n) => Math.max(1, n - 1))}>−</button>
-              <span className="text-[18px] font-black">{count}명</span>
-              <button type="button" className="h-9 w-9 rounded-full bg-slate-200 font-black text-slate-900" onClick={() => setCount((n) => Math.min(10, n + 1))}>+</button>
-            </div>
-            <p className="mt-2 text-center text-[13px] font-bold">월 {(count * SLOT_PRICE_KRW).toLocaleString("ko-KR")}원</p>
-            <button type="button" disabled={busy} className="mt-3 w-full rounded-2xl bg-[#00D2FF] py-3 text-[14px] font-black text-[#04121a] disabled:opacity-50" onClick={() => void pay()}>
-              {busy ? "처리 중…" : "슬롯 추가 요청"}
-            </button>
-            <p className={`mt-2 text-center text-[11px] ${dark ? "text-white/50" : "text-slate-500"}`}>
-              멤버십·결제 상태는 계정 권한으로 확인됩니다.
-            </p>
-          </div>
-        </div>
-      ) : null}
     </>
   );
 }
