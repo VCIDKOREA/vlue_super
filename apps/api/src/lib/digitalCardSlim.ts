@@ -70,8 +70,15 @@ export function slimExportSnapshot(snap: unknown): Record<string, unknown> | nul
   if (website && !isDataUrl(website)) out.website = website;
   const fax = text(s.fax, 40);
   if (fax) out.fax = fax;
-  const address = text(s.address, 300);
+  const address = text(s.address || s.hqAddress, 300);
   if (address) out.address = address;
+  const hqAddress = text(s.hqAddress || s.address, 300);
+  if (hqAddress) out.hqAddress = hqAddress;
+  const workplaceAddress = text(s.workplaceAddress, 300);
+  if (workplaceAddress) out.workplaceAddress = workplaceAddress;
+  if (typeof s.workplaceVerified === "boolean") out.workplaceVerified = s.workplaceVerified;
+  const workplaceVerifiedAt = text(s.workplaceVerifiedAt, 40);
+  if (workplaceVerifiedAt) out.workplaceVerifiedAt = workplaceVerifiedAt;
   const addressRoad = text(s.addressRoad, 200);
   if (addressRoad) out.addressRoad = addressRoad;
   const addressDetail = text(s.addressDetail, 200);

@@ -115,7 +115,10 @@ export async function reviewOwnerDccApproval(applicationId, payload) {
 }
 
 /** 시나리오 B — 증빙 서류 메타 저장 */
-export async function uploadEnterpriseDccDocuments(applicationId, { documents, workplaceAddress } = {}) {
+export async function uploadEnterpriseDccDocuments(
+  applicationId,
+  { documents, workplaceAddress, hqAddress, workplaceSameAsHq } = {}
+) {
   const res = await vlueAuthFetch(
     apiUrl(`/api/cards/enterprise-dcc/${encodeURIComponent(applicationId)}/documents`),
     {
@@ -123,7 +126,9 @@ export async function uploadEnterpriseDccDocuments(applicationId, { documents, w
       headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
         documents: documents || [],
-        workplaceAddress: workplaceAddress || undefined
+        hqAddress: hqAddress || undefined,
+        workplaceAddress: workplaceAddress || undefined,
+        workplaceSameAsHq: workplaceSameAsHq != null ? Boolean(workplaceSameAsHq) : undefined
       })
     }
   );

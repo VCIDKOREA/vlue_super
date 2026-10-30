@@ -283,6 +283,9 @@ type ExportSnapLite = {
   fax: string;
   address: string;
   addressDetail: string;
+  hqAddress: string;
+  workplaceAddress: string;
+  workplaceVerified: boolean;
   department: string;
   companyIntro: string;
   salesContent: string;
@@ -316,6 +319,9 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       fax: string | null;
       address: string | null;
       address_detail: string | null;
+      hq_address: string | null;
+      workplace_address: string | null;
+      workplace_verified: boolean | null;
       department: string | null;
       company_intro: string | null;
       sales_content: string | null;
@@ -342,6 +348,13 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
       NULLIF(TRIM(export_snapshot_json->>'fax'), '') AS fax,
       NULLIF(TRIM(export_snapshot_json->>'address'), '') AS address,
       NULLIF(TRIM(export_snapshot_json->>'addressDetail'), '') AS address_detail,
+      NULLIF(TRIM(export_snapshot_json->>'hqAddress'), '') AS hq_address,
+      NULLIF(TRIM(export_snapshot_json->>'workplaceAddress'), '') AS workplace_address,
+      CASE
+        WHEN export_snapshot_json ? 'workplaceVerified'
+          THEN (export_snapshot_json->>'workplaceVerified')::boolean
+        ELSE NULL
+      END AS workplace_verified,
       NULLIF(TRIM(export_snapshot_json->>'department'), '') AS department,
       NULLIF(TRIM(export_snapshot_json->>'companyIntro'), '') AS company_intro,
       NULLIF(TRIM(export_snapshot_json->>'salesContent'), '') AS sales_content,
@@ -383,8 +396,11 @@ async function loadExportSnapLite(userId: string): Promise<ExportSnapLite | null
     email: firstStr(s.email),
     website: firstStr(s.website),
     fax: firstStr(s.fax),
-    address: firstStr(s.address),
+    address: firstStr(s.address, s.hq_address),
     addressDetail: firstStr(s.address_detail),
+    hqAddress: firstStr(s.hq_address, s.address),
+    workplaceAddress: firstStr(s.workplace_address),
+    workplaceVerified: Boolean(s.workplace_verified),
     department: firstStr(s.department),
     companyIntro: firstStr(s.company_intro),
     salesContent: firstStr(s.sales_content),
@@ -437,12 +453,29 @@ function buildContactProfile(opts: {
     pj.landline
   );
   const address = firstStr(
+    (snap as ExportSnapLite).hqAddress,
     (snap as ExportSnapLite).address,
+    (snap as Record<string, unknown>).hqAddress,
     (snap as Record<string, unknown>).address,
     pj.address,
     pj.businessAddress,
     pj.companyAddress,
     pj.roadAddress
+  );
+  const hqAddress = firstStr(
+    (snap as ExportSnapLite).hqAddress,
+    (snap as Record<string, unknown>).hqAddress,
+    address
+  );
+  const workplaceAddress = firstStr(
+    (snap as ExportSnapLite).workplaceAddress,
+    (snap as Record<string, unknown>).workplaceAddress,
+    pj.workplaceAddress
+  );
+  const workplaceVerified = Boolean(
+    (snap as ExportSnapLite).workplaceVerified ||
+      (snap as Record<string, unknown>).workplaceVerified ||
+      pj.workplaceVerified
   );
   const department = firstStr(
     (snap as ExportSnapLite).department,
@@ -484,6 +517,9 @@ function buildContactProfile(opts: {
     website,
     fax,
     address,
+    hqAddress,
+    workplaceAddress,
+    workplaceVerified,
     department,
     title,
     jobTitle: title || firstStr(pj.jobTitle),

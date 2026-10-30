@@ -33,7 +33,12 @@ function resolveBizcardDepartment(card) {
 
 function resolveBizcardAddress(card) {
   const primary = String(
-    card.address || card.businessAddress || card.companyAddress || card.officeAddress || ""
+    card.hqAddress ||
+      card.address ||
+      card.businessAddress ||
+      card.companyAddress ||
+      card.officeAddress ||
+      ""
   ).trim();
   if (primary) return primary;
 
@@ -41,6 +46,14 @@ function resolveBizcardAddress(card) {
   const detail = String(card.addressDetail || "").trim();
   if (road && detail) return `${road} ${detail}`;
   return road || detail;
+}
+
+function resolveVerifiedWorkplaceAddress(card) {
+  const work = String(card.workplaceAddress || card.verifiedWorkplaceAddress || "").trim();
+  if (!work) return "";
+  const hq = resolveBizcardAddress(card);
+  if (hq && work === hq && !card.workplaceVerified) return "";
+  return work;
 }
 
 function buildBizcardContactRows(card) {
@@ -191,6 +204,10 @@ function CardFront({ card, securityOverlay, officialBadgeActive }) {
 function CardBack({ card, securityOverlay }) {
   const intro = (card.companyIntro || "").trim();
   const address = resolveBizcardAddress(card);
+  const workplace = resolveVerifiedWorkplaceAddress(card);
+  const showWorkplace =
+    Boolean(workplace) &&
+    (Boolean(card.workplaceVerified) || (address && workplace !== address) || !address);
   const backOverlay = securityOverlay ? (
     <LetteringBizcardSecurityOverlayBack
       card={card}
@@ -212,12 +229,23 @@ function CardBack({ card, securityOverlay }) {
 
       {address ? (
         <p className="lettering-bizcard__back-address">
-          <span className="lettering-bizcard__back-address-label">{"\uC0AC\uC5C5\uC7A5"}</span>
+          <span className="lettering-bizcard__back-address-label">
+            {showWorkplace ? "본사" : "사업장"}
+          </span>
           {address}
         </p>
       ) : null}
 
-      {!intro && !address ? (
+      {showWorkplace ? (
+        <p className="lettering-bizcard__back-address">
+          <span className="lettering-bizcard__back-address-label">
+            {card.workplaceVerified ? "실근무지 ✓" : "실근무지"}
+          </span>
+          {workplace}
+        </p>
+      ) : null}
+
+      {!intro && !address && !showWorkplace ? (
         <p className="lettering-bizcard__back-empty-hint">
           {"\uD68C\uC0AC \uC18C\uAC1C\uC640 \uC0AC\uC5C5\uC7A5\uC744 \uC124\uC815\uD558\uBA74 \uB4B7\uBA74\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4. \uC0AC\uC6A9\uC720\uD6A8\uAE30\uAC04\uC740 \uD558\uB2E8\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4."}
         </p>

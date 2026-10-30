@@ -186,13 +186,17 @@ enterpriseDccRoutes.post("/:id/documents", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     documents?: Array<{ kind: string; url: string; fileName?: string }>;
     workplaceAddress?: string;
+    hqAddress?: string;
+    workplaceSameAsHq?: boolean;
   };
   try {
     const result = await saveEnterpriseDccDocuments({
       applicationId: c.req.param("id"),
       applicantUserId: userId,
       documents: Array.isArray(body.documents) ? body.documents : [],
-      workplaceAddress: body.workplaceAddress
+      workplaceAddress: body.workplaceAddress,
+      hqAddress: body.hqAddress,
+      workplaceSameAsHq: body.workplaceSameAsHq
     });
     return c.json(result);
   } catch (e) {
@@ -204,17 +208,25 @@ enterpriseDccRoutes.post("/:id/documents", async (c) => {
 enterpriseDccRoutes.post("/:id/workplace", async (c) => {
   const userId = c.get("vlueUserId");
   const body = (await c.req.json().catch(() => ({}))) as {
+    hqAddress?: string;
     workplaceAddress?: string;
+    workplaceSameAsHq?: boolean;
     workplaceLat?: number;
     workplaceLng?: number;
+    hqLat?: number;
+    hqLng?: number;
   };
   try {
     const result = await saveEnterpriseWorkplace({
       applicationId: c.req.param("id"),
       applicantUserId: userId,
-      workplaceAddress: String(body.workplaceAddress || ""),
+      hqAddress: body.hqAddress,
+      workplaceAddress: body.workplaceAddress,
+      workplaceSameAsHq: Boolean(body.workplaceSameAsHq),
       workplaceLat: body.workplaceLat,
-      workplaceLng: body.workplaceLng
+      workplaceLng: body.workplaceLng,
+      hqLat: body.hqLat,
+      hqLng: body.hqLng
     });
     return c.json(result);
   } catch (e) {

@@ -206,8 +206,8 @@ export async function collectDccSecurityAttestation() {
 
 export const DCC_SECURITY_COPY = {
   locationMismatch:
-    "등록된 사업장/직장 위치 근처(반경 150m 이내)에서 인증을 진행해 주세요.",
-  locationApproved: "정상 승인되었습니다.",
+    "등록된 실제 근무지 위치 근처(반경 150m 이내)에서 인증을 진행해 주세요.",
+  locationApproved: "실제 근무지 위치 인증이 승인되었습니다.",
   vpnOrRemote: "현재 기기 VPN 또는 원격프로그램이 작동중입니다. 잠시 작동을 중지하고 인증신청하세요.",
   wifi: "와이파이(Wi-Fi) 환경에서는 위치 인증을 할 수 없습니다. 모바일 데이터로 전환한 뒤 다시 시도해 주세요."
 };

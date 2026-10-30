@@ -6,17 +6,25 @@ import {
 import { attestEnterpriseDccSecurity, saveEnterpriseWorkplace } from "../lib/enterpriseDccApi.js";
 
 /**
- * DCC 3단계 — GPS 위치 대조 상세 인증 UI
- * 로딩 → 역지오코딩 주소 쌍 + 반경 성공/실패 결과
+ * DCC 3단계 — GPS 위치 대조 (실제 근무지 기준)
+ * 본사 주소 + 실근무지 이원화, 동일 체크박스, 상세 결과 패널
  */
 export default function DccSecurityLocationGate({
   applicationId,
-  workplaceAddress = "",
+  hqAddress: hqAddressProp = "",
+  workplaceAddress: workplaceAddressProp = "",
+  workplaceSameAsHq: sameAsHqProp = false,
   isDarkMode = false,
   onPassed,
   onToast
 }) {
-  const [addr, setAddr] = useState(workplaceAddress || "");
+  const [hqAddr, setHqAddr] = useState(hqAddressProp || "");
+  const [workAddr, setWorkAddr] = useState(workplaceAddressProp || "");
+  const [sameAsHq, setSameAsHq] = useState(
+    Boolean(sameAsHqProp) ||
+      (!workplaceAddressProp && Boolean(hqAddressProp)) ||
+      (hqAddressProp && workplaceAddressProp && hqAddressProp === workplaceAddressProp)
+  );
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState("idle"); // idle | loading | success | fail
   const [gate, setGate] = useState(null);
@@ -31,8 +39,16 @@ export default function DccSecurityLocationGate({
   const labelCls = isDarkMode ? "text-slate-300" : "text-slate-700";
 
   useEffect(() => {
-    setAddr(workplaceAddress || "");
-  }, [workplaceAddress]);
+    setHqAddr(hqAddressProp || "");
+    setWorkAddr(workplaceAddressProp || hqAddressProp || "");
+    if (sameAsHqProp || (!workplaceAddressProp && hqAddressProp) || hqAddressProp === workplaceAddressProp) {
+      setSameAsHq(true);
+    }
+  }, [hqAddressProp, workplaceAddressProp, sameAsHqProp]);
+
+  useEffect(() => {
+    if (sameAsHq) setWorkAddr(hqAddr);
+  }, [sameAsHq, hqAddr]);
 
   const refreshClientHints = async () => {
     try {
@@ -62,16 +78,21 @@ export default function DccSecurityLocationGate({
       ? DCC_SECURITY_COPY.wifi
       : "";
 
+  const effectiveWork = sameAsHq ? hqAddr.trim() : workAddr.trim();
+  const canSubmit = Boolean(hqAddr.trim() && effectiveWork);
+
   const runAttest = async () => {
-    if (!applicationId || buttonBlocked) return;
+    if (!applicationId || buttonBlocked || !canSubmit) return;
     setBusy(true);
     setPhase("loading");
     setError("");
     setGate(null);
     try {
-      if (addr.trim()) {
-        await saveEnterpriseWorkplace(applicationId, { workplaceAddress: addr.trim() });
-      }
+      await saveEnterpriseWorkplace(applicationId, {
+        hqAddress: hqAddr.trim(),
+        workplaceAddress: effectiveWork,
+        workplaceSameAsHq: sameAsHq
+      });
       const attestation = await collectDccSecurityAttestation();
       setClientHint(attestation.clientHints);
       if (attestation.clientHints.wifiBlocked) {
@@ -114,7 +135,7 @@ export default function DccSecurityLocationGate({
           /* ignore */
         }
       }
-      onToast?.("위치확인 인증이 정상 승인되었습니다.");
+      onToast?.("실제 근무지 위치 인증이 승인되었습니다.");
       onPassed?.(res);
     } catch (e) {
       const msg = e?.message || "위치 인증에 실패했습니다.";
@@ -126,8 +147,8 @@ export default function DccSecurityLocationGate({
     }
   };
 
-  const registeredAddress =
-    String(gate?.checks?.workplaceAddress || addr || workplaceAddress || "").trim() || "—";
+  const hqShown = String(gate?.checks?.hqAddress || hqAddr || "").trim() || "—";
+  const workShown = String(gate?.checks?.workplaceAddress || effectiveWork || "").trim() || "—";
   const currentAddress = String(gate?.checks?.currentAddress || "").trim() || "—";
   const radiusM = Number(gate?.checks?.radiusMeters) || 150;
   const distanceM = gate?.checks?.distanceMeters;
@@ -137,17 +158,45 @@ export default function DccSecurityLocationGate({
     <div className={`space-y-3 rounded-xl border p-4 ${panel}`}>
       <p className="text-[13px] font-black">3단계 · 위치확인 인증</p>
       <p className={`text-[11px] leading-relaxed ${muted}`}>
-        등록된 사업장/직장 주소와 현재 GPS 위치를 대조합니다. 모바일 데이터로, VPN·원격제어를 끈 뒤
-        사업장 근처(반경 {radiusM}m 이내)에서 인증해 주세요.
+        GPS는 <strong>실제 근무지/매장/지점</strong> 주소와 대조합니다(반경 {radiusM}m). 본사 주소와
+        실근무지가 다르면 각각 입력해 주세요.
       </p>
 
-      <label className={`block text-[11px] font-bold ${labelCls}`}>사업장/직장 주소</label>
+      <label className={`block text-[11px] font-bold ${labelCls}`}>
+        사업자/법인/본사 주소
+        <span className={`ml-1 font-medium ${muted}`}>(서류 기반)</span>
+      </label>
       <input
         className={inputCls}
-        value={addr}
+        value={hqAddr}
         disabled={busy}
-        onChange={(e) => setAddr(e.target.value)}
-        placeholder="예: 서울특별시 …"
+        onChange={(e) => setHqAddr(e.target.value)}
+        placeholder="예: 대구시 수성구 …"
+      />
+
+      <label
+        className={`flex items-center gap-2 text-[12px] font-bold ${labelCls} ${busy ? "opacity-50" : ""}`}
+      >
+        <input
+          type="checkbox"
+          checked={sameAsHq}
+          disabled={busy}
+          onChange={(e) => setSameAsHq(e.target.checked)}
+          className="h-4 w-4 accent-sky-600"
+        />
+        본사 주소와 동일
+      </label>
+
+      <label className={`block text-[11px] font-bold ${labelCls}`}>
+        실제 근무지 / 매장 / 지점 주소
+        <span className={`ml-1 font-medium ${muted}`}>(GPS 대조용)</span>
+      </label>
+      <input
+        className={inputCls}
+        value={sameAsHq ? hqAddr : workAddr}
+        disabled={busy || sameAsHq}
+        onChange={(e) => setWorkAddr(e.target.value)}
+        placeholder="예: 대구시 북구 …"
       />
 
       {blockReason && phase !== "loading" ? (
@@ -172,7 +221,7 @@ export default function DccSecurityLocationGate({
             <p className={`text-[13px] font-black ${isDarkMode ? "text-sky-200" : "text-sky-800"}`}>
               위치를 확인 중입니다...
             </p>
-            <p className={`mt-0.5 text-[11px] ${muted}`}>GPS 수집 · 주소 변환 · 사업장 반경 대조</p>
+            <p className={`mt-0.5 text-[11px] ${muted}`}>GPS 수집 · 주소 변환 · 실제 근무지 반경 대조</p>
           </div>
         </div>
       ) : null}
@@ -190,9 +239,13 @@ export default function DccSecurityLocationGate({
           }`}
           role="status"
         >
-          <p className={`text-[11px] font-bold ${labelCls}`}>사업장/직장 주소</p>
+          <p className={`text-[11px] font-bold ${labelCls}`}>사업장/본사 주소</p>
           <p className={`mt-0.5 text-[13px] font-semibold leading-snug ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}>
-            {registeredAddress}
+            {hqShown}
+          </p>
+          <p className={`mt-3 text-[11px] font-bold ${labelCls}`}>실제 근무지 주소</p>
+          <p className={`mt-0.5 text-[13px] font-semibold leading-snug ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}>
+            {workShown}
           </p>
           <p className={`mt-3 text-[11px] font-bold ${labelCls}`}>위치확인 주소</p>
           <p className={`mt-0.5 text-[13px] font-semibold leading-snug ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}>
@@ -201,11 +254,6 @@ export default function DccSecurityLocationGate({
           {distanceM != null ? (
             <p className={`mt-2 text-[11px] ${muted}`}>
               직선거리 {distanceM}m · 허용 반경 {radiusM}m
-              {gate.checks.mobileDataOk === false
-                ? " · 모바일 데이터 필요"
-                : gate.checks.vpnRemoteOk === false
-                  ? " · VPN/원격 차단"
-                  : ""}
             </p>
           ) : null}
           <p
@@ -220,9 +268,9 @@ export default function DccSecurityLocationGate({
             }`}
           >
             {phase === "success"
-              ? "✅ 정상 승인되었습니다."
+              ? "✅ 실제 근무지 위치 인증이 승인되었습니다."
               : locationFailed
-                ? `⚠️ 등록된 사업장/직장 위치 근처(반경 ${radiusM}m 이내)에서 인증을 진행해 주세요.`
+                ? `⚠️ 등록된 실제 근무지 위치 근처(반경 ${radiusM}m 이내)에서 인증을 진행해 주세요.`
                 : `⚠️ ${error || gate.message || DCC_SECURITY_COPY.locationMismatch}`}
           </p>
         </div>
@@ -245,7 +293,7 @@ export default function DccSecurityLocationGate({
         </button>
         <button
           type="button"
-          disabled={buttonBlocked || !addr.trim() || phase === "success"}
+          disabled={buttonBlocked || !canSubmit || phase === "success"}
           onClick={() => void runAttest()}
           className="inline-flex min-w-[8.5rem] items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-[12px] font-black text-white disabled:cursor-not-allowed disabled:opacity-45"
         >

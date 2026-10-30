@@ -116,7 +116,9 @@ export default function EnterpriseDccApplyWizard({
   const [managePassword2, setManagePassword2] = useState("");
   const [ownerConfirmOpen, setOwnerConfirmOpen] = useState(false);
   const [docFiles, setDocFiles] = useState({});
+  const [hqAddress, setHqAddress] = useState("");
   const [workplaceAddress, setWorkplaceAddress] = useState("");
+  const [workplaceSameAsHq, setWorkplaceSameAsHq] = useState(true);
   const [docBusyKind, setDocBusyKind] = useState("");
 
   const panelCls = isDarkMode ? "bg-[#0f172a] text-slate-100" : "bg-white text-slate-900";
@@ -139,7 +141,15 @@ export default function EnterpriseDccApplyWizard({
       setContactEmail(app.dccContactEmail || "");
       setDccPhone(app.dccOutboundPhone || "");
       setBizNo(app.businessRegistrationNo || "");
-      setWorkplaceAddress(app.workplaceAddress || "");
+      setHqAddress(app.hqAddress || app.workplaceAddress || "");
+      setWorkplaceAddress(app.workplaceAddress || app.hqAddress || "");
+      setWorkplaceSameAsHq(
+        app.workplaceSameAsHq !== false &&
+          (!app.workplaceAddress ||
+            !app.hqAddress ||
+            app.hqAddress === app.workplaceAddress ||
+            Boolean(app.workplaceSameAsHq))
+      );
       let first = false;
       if (app.businessRegistrationNo) {
         try {
@@ -298,7 +308,9 @@ export default function EnterpriseDccApplyWizard({
           url: docFiles[s.kind].url,
           fileName: docFiles[s.kind].fileName
         })),
-        workplaceAddress: workplaceAddress.trim() || undefined
+        hqAddress: hqAddress.trim() || undefined,
+        workplaceAddress: (workplaceSameAsHq ? hqAddress : workplaceAddress).trim() || undefined,
+        workplaceSameAsHq
       });
       setApplication(res.application);
       setStep("details");
@@ -662,12 +674,40 @@ export default function EnterpriseDccApplyWizard({
               업로드해 주세요.
             </p>
             <label className="block text-[11px] font-bold">
-              사업장 주소 (위치 인증용)
+              사업자/법인/본사 주소
+              <span className={`ml-1 font-medium ${muted}`}>(서류 기반)</span>
               <input
                 className={`${inputCls} mt-1`}
-                value={workplaceAddress}
+                value={hqAddress}
+                onChange={(e) => {
+                  setHqAddress(e.target.value);
+                  if (workplaceSameAsHq) setWorkplaceAddress(e.target.value);
+                }}
+                placeholder="예: 대구시 수성구 …"
+              />
+            </label>
+            <label className={`flex items-center gap-2 text-[12px] font-bold ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}>
+              <input
+                type="checkbox"
+                checked={workplaceSameAsHq}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setWorkplaceSameAsHq(on);
+                  if (on) setWorkplaceAddress(hqAddress);
+                }}
+                className="h-4 w-4 accent-blue-600"
+              />
+              본사 주소와 동일
+            </label>
+            <label className="block text-[11px] font-bold">
+              실제 근무지 / 매장 / 지점 주소
+              <span className={`ml-1 font-medium ${muted}`}>(GPS 대조용)</span>
+              <input
+                className={`${inputCls} mt-1`}
+                value={workplaceSameAsHq ? hqAddress : workplaceAddress}
+                disabled={workplaceSameAsHq}
                 onChange={(e) => setWorkplaceAddress(e.target.value)}
-                placeholder="예: 서울특별시 …"
+                placeholder="예: 대구시 북구 …"
               />
             </label>
             {SME_DOC_SLOTS.map((slot) => {
@@ -907,7 +947,9 @@ export default function EnterpriseDccApplyWizard({
           <section className="space-y-3">
             <DccSecurityLocationGate
               applicationId={application?.id}
+              hqAddress={hqAddress || application?.hqAddress || ""}
               workplaceAddress={workplaceAddress || application?.workplaceAddress || ""}
+              workplaceSameAsHq={workplaceSameAsHq || Boolean(application?.workplaceSameAsHq)}
               isDarkMode={isDarkMode}
               onToast={toast}
               onPassed={(res) => void runAfterSecurityPassed(res)}

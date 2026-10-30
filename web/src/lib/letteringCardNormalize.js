@@ -67,8 +67,17 @@ export function normalizeLetteringCard(raw = {}) {
     customBackText: clampLetteringBizcardBackNote(String(raw.customBackText || "").trim()),
     promo: String(raw.promo || "").trim(),
     address: String(
-      raw.address || raw.businessAddress || raw.companyAddress || raw.officeAddress || ""
+      raw.hqAddress ||
+        raw.address ||
+        raw.businessAddress ||
+        raw.companyAddress ||
+        raw.officeAddress ||
+        ""
     ).trim(),
+    hqAddress: String(raw.hqAddress || raw.address || "").trim(),
+    workplaceAddress: String(raw.workplaceAddress || raw.verifiedWorkplaceAddress || "").trim(),
+    workplaceVerified: Boolean(raw.workplaceVerified),
+    workplaceVerifiedAt: String(raw.workplaceVerifiedAt || "").trim(),
     roadAddress: String(raw.roadAddress || raw.companyAddressRoad || "").trim(),
     addressDetail: String(raw.addressDetail || "").trim(),
     phoneDialEnabled: raw.phoneDialEnabled !== false && raw.phoneVisible !== false,

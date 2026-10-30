@@ -16,9 +16,9 @@ export const DCC_GEO_RADIUS_METERS = Math.max(
 );
 
 export const MSG_LOCATION_MISMATCH =
-  "등록된 사업장/직장 위치 근처(반경 150m 이내)에서 인증을 진행해 주세요.";
+  "등록된 실제 근무지 위치 근처(반경 150m 이내)에서 인증을 진행해 주세요.";
 
-export const MSG_LOCATION_APPROVED = "정상 승인되었습니다.";
+export const MSG_LOCATION_APPROVED = "실제 근무지 위치 인증이 승인되었습니다.";
 
 export const MSG_VPN_OR_REMOTE =
   "현재 기기 VPN 또는 원격프로그램이 작동중입니다. 잠시 작동을 중지하고 인증신청하세요.";
@@ -68,9 +68,12 @@ export type DccSecurityAttestationInput = {
   vpnActive?: boolean;
   /** 설치된/실행 중으로 보고된 패키지·앱 이름 */
   installedPackages?: string[];
+  /** GPS 대조용 — 실제 근무지/매장/지점 */
   workplaceAddress?: string;
   workplaceLat?: number | null;
   workplaceLng?: number | null;
+  /** 서류 기반 본사/법인 주소 (표시용) */
+  hqAddress?: string;
 };
 
 export type DccSecurityGateResult = {
@@ -84,7 +87,9 @@ export type DccSecurityGateResult = {
     vpnRemoteOk: boolean;
     distanceMeters: number | null;
     radiusMeters: number;
-    /** 2단계 등록 사업장/직장 주소 */
+    /** 사업자/법인/본사 주소 (서류) */
+    hqAddress: string;
+    /** 실제 근무지 주소 (GPS 대조 기준) */
     workplaceAddress: string;
     /** GPS 역지오코딩 현재 위치 주소 */
     currentAddress: string;
@@ -131,6 +136,7 @@ export async function evaluateDccSecurityGate(
 
   let distanceMeters: number | null = null;
   let locationOk = false;
+  const hqAddress = String(input.hqAddress || "").trim();
   const workplaceAddress = String(input.workplaceAddress || "").trim();
   let currentAddress = "";
 
@@ -141,7 +147,7 @@ export async function evaluateDccSecurityGate(
   if (!user) {
     reasons.push("위치 권한이 필요합니다. GPS를 켠 뒤 다시 시도해 주세요.");
   } else if (!workplace) {
-    reasons.push("사업장 주소 좌표를 확인하지 못했습니다. 주소를 다시 등록해 주세요.");
+    reasons.push("실제 근무지 주소 좌표를 확인하지 못했습니다. 주소를 다시 등록해 주세요.");
   } else {
     distanceMeters = Math.round(haversineKm(user, workplace) * 1000);
     locationOk = distanceMeters <= radiusM;
@@ -184,6 +190,7 @@ export async function evaluateDccSecurityGate(
       vpnRemoteOk,
       distanceMeters,
       radiusMeters: radiusM,
+      hqAddress: hqAddress || workplaceAddress,
       workplaceAddress,
       currentAddress:
         currentAddress ||

@@ -96,9 +96,24 @@ export function ensureEnterpriseDccTable() {
           ADD COLUMN IF NOT EXISTS "workplace_address" TEXT,
           ADD COLUMN IF NOT EXISTS "workplace_lat" DOUBLE PRECISION,
           ADD COLUMN IF NOT EXISTS "workplace_lng" DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS "hq_address" TEXT,
+          ADD COLUMN IF NOT EXISTS "hq_lat" DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS "hq_lng" DOUBLE PRECISION,
+          ADD COLUMN IF NOT EXISTS "workplace_same_as_hq" BOOLEAN NOT NULL DEFAULT FALSE,
           ADD COLUMN IF NOT EXISTS "docs_json" JSONB,
           ADD COLUMN IF NOT EXISTS "security_attested_at" TIMESTAMPTZ(6),
           ADD COLUMN IF NOT EXISTS "owner_reject_reason" TEXT;
+      `);
+      /* 레거시: 실근무지만 있던 경우 본사 주소로도 복제 */
+      await prisma.$executeRawUnsafe(`
+        UPDATE "enterprise_dcc_applications"
+        SET "hq_address" = "workplace_address",
+            "hq_lat" = "workplace_lat",
+            "hq_lng" = "workplace_lng",
+            "workplace_same_as_hq" = TRUE
+        WHERE "workplace_address" IS NOT NULL
+          AND TRIM("workplace_address") <> ''
+          AND ("hq_address" IS NULL OR TRIM("hq_address") = '');
       `);
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "dcc_create_bans" (
@@ -141,6 +156,10 @@ type AppRow = {
   workplace_address?: string | null;
   workplace_lat?: number | null;
   workplace_lng?: number | null;
+  hq_address?: string | null;
+  hq_lat?: number | null;
+  hq_lng?: number | null;
+  workplace_same_as_hq?: boolean | null;
   docs_json?: unknown;
   security_attested_at?: Date | null;
   owner_reject_reason?: string | null;
@@ -169,9 +188,13 @@ function mapApp(row: AppRow) {
     reviewedAt: row.reviewed_at,
     reviewedByUserId: row.reviewed_by_user_id,
     scenario: row.scenario || null,
+    hqAddress: row.hq_address || "",
+    hqLat: row.hq_lat ?? null,
+    hqLng: row.hq_lng ?? null,
     workplaceAddress: row.workplace_address || "",
     workplaceLat: row.workplace_lat ?? null,
     workplaceLng: row.workplace_lng ?? null,
+    workplaceSameAsHq: Boolean(row.workplace_same_as_hq),
     docs: row.docs_json && typeof row.docs_json === "object" ? row.docs_json : null,
     securityAttestedAt: row.security_attested_at || null,
     ownerRejectReason: row.owner_reject_reason || null,
@@ -714,7 +737,14 @@ export async function reviewEnterpriseDccApplication(input: {
           email: app.dcc_contact_email || "",
           companyLocked: true,
           enterpriseDccApplicationId: app.id,
-          manageLoginId
+          manageLoginId,
+          hqAddress: app.hq_address || "",
+          address: app.hq_address || app.workplace_address || "",
+          workplaceAddress: app.workplace_address || "",
+          workplaceVerified: Boolean(app.security_attested_at),
+          workplaceVerifiedAt: app.security_attested_at
+            ? new Date(app.security_attested_at).toISOString()
+            : null
         }
       }
     });
@@ -730,7 +760,14 @@ export async function reviewEnterpriseDccApplication(input: {
           email: app.dcc_contact_email || "",
           companyLocked: true,
           enterpriseDccApplicationId: app.id,
-          manageLoginId
+          manageLoginId,
+          hqAddress: app.hq_address || "",
+          address: app.hq_address || app.workplace_address || "",
+          workplaceAddress: app.workplace_address || "",
+          workplaceVerified: Boolean(app.security_attested_at),
+          workplaceVerifiedAt: app.security_attested_at
+            ? new Date(app.security_attested_at).toISOString()
+            : null
         }
       }
     });
@@ -1079,7 +1116,10 @@ export async function saveEnterpriseDccDocuments(input: {
   applicantUserId: string;
   businessRegistrationNo?: string;
   documents: Array<{ kind: string; url: string; fileName?: string }>;
+  /** @deprecated 실근무지 — hqAddress / workplaceAddress 사용 */
   workplaceAddress?: string;
+  hqAddress?: string;
+  workplaceSameAsHq?: boolean;
 }) {
   await ensureEnterpriseDccTable();
   if (await isDccCreateBanned(input.applicantUserId)) {
@@ -1109,73 +1149,123 @@ export async function saveEnterpriseDccDocuments(input: {
       );
     }
   }
-  const addr = String(input.workplaceAddress || app.workplace_address || "").trim();
-  let lat = app.workplace_lat;
-  let lng = app.workplace_lng;
-  if (addr && (lat == null || lng == null)) {
-    try {
-      const { geocodeDccAddress } = await import("../../integrations/kakao/kakaoAddressGeocode.js");
-      const point = await geocodeDccAddress(addr);
-      lat = point?.lat ?? null;
-      lng = point?.lng ?? null;
-    } catch {
-      /* geocode optional at upload; security gate retries */
+  const hqAddr = String(input.hqAddress || input.workplaceAddress || app.hq_address || "").trim();
+  const sameAsHq = input.workplaceSameAsHq !== false && !String(input.workplaceAddress || "").trim()
+    ? true
+    : Boolean(input.workplaceSameAsHq);
+  const workAddr = sameAsHq
+    ? hqAddr
+    : String(input.workplaceAddress || app.workplace_address || "").trim() || hqAddr;
+  let hqLat = app.hq_lat;
+  let hqLng = app.hq_lng;
+  let workLat = app.workplace_lat;
+  let workLng = app.workplace_lng;
+  try {
+    const { geocodeDccAddress } = await import("../../integrations/kakao/kakaoAddressGeocode.js");
+    if (hqAddr && (hqLat == null || hqLng == null)) {
+      const point = await geocodeDccAddress(hqAddr);
+      hqLat = point?.lat ?? null;
+      hqLng = point?.lng ?? null;
     }
+    if (sameAsHq) {
+      workLat = hqLat;
+      workLng = hqLng;
+    } else if (workAddr && (workLat == null || workLng == null)) {
+      const point = await geocodeDccAddress(workAddr);
+      workLat = point?.lat ?? null;
+      workLng = point?.lng ?? null;
+    }
+  } catch {
+    /* geocode optional at upload; security gate retries */
   }
   await prisma.$executeRawUnsafe(
     `UPDATE enterprise_dcc_applications SET
        docs_json = $2::jsonb,
-       workplace_address = COALESCE(NULLIF($3, ''), workplace_address),
-       workplace_lat = COALESCE($4, workplace_lat),
-       workplace_lng = COALESCE($5, workplace_lng),
+       hq_address = COALESCE(NULLIF($3, ''), hq_address),
+       hq_lat = COALESCE($4, hq_lat),
+       hq_lng = COALESCE($5, hq_lng),
+       workplace_address = COALESCE(NULLIF($6, ''), workplace_address),
+       workplace_lat = COALESCE($7, workplace_lat),
+       workplace_lng = COALESCE($8, workplace_lng),
+       workplace_same_as_hq = $9,
        scenario = 'sme_docs',
        status = 'docs_submitted',
        updated_at = NOW()
      WHERE id = $1::uuid`,
     app.id,
     JSON.stringify({ items: docs, uploadedAt: new Date().toISOString() }),
-    addr.slice(0, 500),
-    lat,
-    lng
+    hqAddr.slice(0, 500),
+    hqLat,
+    hqLng,
+    workAddr.slice(0, 500),
+    workLat,
+    workLng,
+    sameAsHq
   );
   const next = await getApp(app.id);
   return { ok: true, application: next ? mapApp(next) : null, nextStep: "details" };
 }
 
-/** 사업장 주소 저장 (위치 인증용) */
+/** 본사 + 실제 근무지 주소 저장 (GPS 대조용은 실근무지) */
 export async function saveEnterpriseWorkplace(input: {
   applicationId: string;
   applicantUserId: string;
-  workplaceAddress: string;
+  hqAddress?: string;
+  workplaceAddress?: string;
+  workplaceSameAsHq?: boolean;
   workplaceLat?: number | null;
   workplaceLng?: number | null;
+  hqLat?: number | null;
+  hqLng?: number | null;
 }) {
   await ensureEnterpriseDccTable();
   const app = await getApp(input.applicationId);
   if (!app || app.applicant_user_id !== input.applicantUserId) {
     throw new Error("신청 정보를 찾을 수 없습니다.");
   }
-  const addr = String(input.workplaceAddress || "").trim();
-  if (!addr) throw new Error("사업장 주소를 입력해 주세요.");
-  let lat = input.workplaceLat;
-  let lng = input.workplaceLng;
-  if (lat == null || lng == null) {
-    const { geocodeDccAddress } = await import("../../integrations/kakao/kakaoAddressGeocode.js");
-    const point = await geocodeDccAddress(addr);
-    lat = point?.lat ?? null;
-    lng = point?.lng ?? null;
+  const hqAddr = String(input.hqAddress ?? app.hq_address ?? "").trim();
+  if (!hqAddr) throw new Error("사업자/법인/본사 주소를 입력해 주세요.");
+  const sameAsHq = Boolean(input.workplaceSameAsHq);
+  const workAddr = sameAsHq
+    ? hqAddr
+    : String(input.workplaceAddress ?? app.workplace_address ?? "").trim();
+  if (!workAddr) throw new Error("실제 근무지/매장/지점 주소를 입력해 주세요.");
+
+  const { geocodeDccAddress } = await import("../../integrations/kakao/kakaoAddressGeocode.js");
+  let hqLat = input.hqLat ?? null;
+  let hqLng = input.hqLng ?? null;
+  if (hqLat == null || hqLng == null) {
+    const point = await geocodeDccAddress(hqAddr);
+    hqLat = point?.lat ?? null;
+    hqLng = point?.lng ?? null;
   }
+  let workLat = sameAsHq ? hqLat : input.workplaceLat ?? null;
+  let workLng = sameAsHq ? hqLng : input.workplaceLng ?? null;
+  if (!sameAsHq && (workLat == null || workLng == null)) {
+    const point = await geocodeDccAddress(workAddr);
+    workLat = point?.lat ?? null;
+    workLng = point?.lng ?? null;
+  }
+
   await prisma.$executeRawUnsafe(
     `UPDATE enterprise_dcc_applications SET
-       workplace_address = $2,
-       workplace_lat = $3,
-       workplace_lng = $4,
+       hq_address = $2,
+       hq_lat = $3,
+       hq_lng = $4,
+       workplace_address = $5,
+       workplace_lat = $6,
+       workplace_lng = $7,
+       workplace_same_as_hq = $8,
        updated_at = NOW()
      WHERE id = $1::uuid`,
     app.id,
-    addr.slice(0, 500),
-    lat,
-    lng
+    hqAddr.slice(0, 500),
+    hqLat,
+    hqLng,
+    workAddr.slice(0, 500),
+    workLat,
+    workLng,
+    sameAsHq
   );
   const next = await getApp(app.id);
   return { ok: true, application: next ? mapApp(next) : null };
@@ -1217,9 +1307,11 @@ export async function attestEnterpriseDccSecurity(input: {
     networkType: input.networkType,
     vpnActive: input.vpnActive,
     installedPackages: input.installedPackages,
+    /** GPS 대조 대상 = 실제 근무지 */
     workplaceAddress: app.workplace_address || undefined,
     workplaceLat: app.workplace_lat,
-    workplaceLng: app.workplace_lng
+    workplaceLng: app.workplace_lng,
+    hqAddress: app.hq_address || undefined
   });
 
   if (!gate.canActivateButton) {
