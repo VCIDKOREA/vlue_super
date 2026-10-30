@@ -921,9 +921,9 @@ function App() {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    void import("./lib/fiveWayProfile.js")
+    void (import("./lib/fiveWayProfile.js")
       .then((m) => m.fetchFiveWayProfile?.())
-      .catch(() => {});
+      .catch(() => {}));
   }, [isLoggedIn]);
 
   useEffect(() => {
