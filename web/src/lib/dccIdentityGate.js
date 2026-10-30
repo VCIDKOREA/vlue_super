@@ -3,7 +3,8 @@
  * - 소셜 즉시 가입 유저(미인증)는 DCC 진입 시 PASS 본인인증 필요
  * - 인증 직전 사전 안내 모달 → 이니시스 통합 본인인증
  */
-import { requestIamportCertification, getPortoneUserCode } from "./iamportClient.js";
+import { requestIamportCertification } from "./iamportClient.js";
+import { getPortoneUserCode } from "./portoneEnv.js";
 import { postPortoneIdentityComplete } from "./identityCompleteApi.js";
 import { setVlueSessionTokens } from "./vlueAuthHeaders.js";
 
