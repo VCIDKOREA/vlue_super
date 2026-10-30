@@ -2722,9 +2722,9 @@ function App() {
     localStorage.setItem(SESSION_KEY, "1");
     setIsLoggedIn(true);
     setCardFieldsTick((n) => n + 1);
-    queue import("./lib/fiveWayProfile.js")
+    void (import("./lib/fiveWayProfile.js")
       .then((m) => m.fetchFiveWayProfile?.())
-      .catch(() => {});
+      .catch(() => {}));
   }, []);
 
   const processTierChangeFromLoginData = useCallback(
