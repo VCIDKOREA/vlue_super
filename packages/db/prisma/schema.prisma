@@ -411,6 +411,7 @@ model User {
 
   familyProtectionAsGuardian FamilyProtectionLink[]    @relation("FamilyGuardian")
   familyProtectionAsWard     FamilyProtectionLink[]    @relation("FamilyWard")
+  vmapInviteTokens           VmapInviteToken[]         @relation("VmapInviteTokenInviter")
   ownedProtectionGroup       ProtectionGroup?          @relation("ProtectionGroupOwner")
   protectionMemberships      GroupMember[]             @relation("ProtectionGroupMemberUser")
   familyWardPresence         FamilyWardPresence?
@@ -3718,6 +3719,8 @@ model VmapRoom {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  inviteTokens VmapInviteToken[]
+
   @@index([hostUserId, active])
   @@map("vmap_rooms")
 }
@@ -3738,6 +3741,23 @@ model VmapMember {
   @@unique([roomId, userId])
   @@index([roomId])
   @@map("vmap_members")
+}
+
+/// V-Map 초대 토큰 — 카카오 공유 링크용 (24시간 유효)
+model VmapInviteToken {
+  id            String   @id @db.VarChar(64)
+  roomId        String   @map("room_id") @db.Uuid
+  inviterUserId String   @map("inviter_user_id") @db.Uuid
+  inviterName   String   @default("회원") @map("inviter_name") @db.VarChar(80)
+  expiresAt     DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  room    VmapRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  inviter User     @relation("VmapInviteTokenInviter", fields: [inviterUserId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([expiresAt])
+  @@map("vmap_invite_tokens")
 }
 
 model VmapMessage {

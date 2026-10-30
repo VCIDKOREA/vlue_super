@@ -44,6 +44,10 @@ import OfficeRemoteModal from "./components/office/OfficeRemoteModal.jsx";
 import PersonalFeed from "./components/PersonalFeed";
 import ProfilePanel from "./components/ProfilePanel";
 import LocationPlatform from "./components/location/LocationPlatform.jsx";
+import {
+  validateVmapInviteToken,
+  acceptVmapInviteToken
+} from "./lib/vmapInviteShare.js";
 import TodaySafetyPatch from "./components/TodaySafetyPatch.jsx";
 import VlueBrandWordmark from "./components/VlueBrandWordmark.jsx";
 import V1PaidPackageGateModal from "./components/V1PaidPackageGateModal.jsx";
@@ -410,7 +414,11 @@ function App() {
   useEffect(() => {
     try {
       if (isPasswordChangeCertPending() || isPhoneChangeCertPending()) return;
-      const hasDraft = Boolean(sessionStorage.getItem("vlue_pass_cert_draft_v1"));
+      /* Android WebView 는 sessionStorage 가 비는 경우가 있어 localStorage 도 확인 */
+      const hasDraft = Boolean(
+        localStorage.getItem("vlue_pass_cert_draft_v1") ||
+          sessionStorage.getItem("vlue_pass_cert_draft_v1")
+      );
       const q = new URLSearchParams(window.location.search || "");
       const hasCertReturn = Boolean(q.get("imp_uid") || q.get("impUid") || q.get("success"));
       if (!hasDraft && !hasCertReturn) return;
@@ -469,6 +477,71 @@ function App() {
     } catch {
       /* ignore */
     }
+  }, []);
+
+  /** V-Map 토큰 초대 딥링크 ?vmapInvite=token → 비회원 가드 + 자동 입장 */
+  useEffect(() => {
+    const handleVmapInvite = async () => {
+      try {
+        const q = new URLSearchParams(window.location.search || "");
+        const inviteToken = String(q.get("vmapInvite") || "").trim();
+        if (!inviteToken) return;
+
+        q.delete("vmapInvite");
+        const next = `${window.location.pathname}${q.toString() ? `?${q}` : ""}${window.location.hash || ""}`;
+        window.history.replaceState({}, "", next);
+
+        /* 토큰 유효성 검증 */
+        const validation = await validateVmapInviteToken(inviteToken);
+        if (!validation.ok) {
+          setBottomToast(validation.error || "초대 링크가 올바르지 않습니다.");
+          window.setTimeout(() => setBottomToast(""), 4000);
+          return;
+        }
+
+        /* 비회원인 경우 → 토큰 저장 후 가입 유도 */
+        if (!validation.isLoggedIn) {
+          sessionStorage.setItem("vlue_pending_vmap_invite", JSON.stringify({
+            token: inviteToken,
+            roomId: validation.roomId,
+            inviterName: validation.inviterName,
+            placeLabel: validation.placeLabel,
+            at: Date.now()
+          }));
+          setShowSplash(false);
+          setSignupOnboardingOpen(true);
+          setBottomToast(`${validation.inviterName}님의 V-Map 초대입니다. 가입 후 자동 입장됩니다!`);
+          window.setTimeout(() => setBottomToast(""), 5000);
+          return;
+        }
+
+        /* 회원인 경우 → 바로 수락 후 입장 */
+        setShowSplash(false);
+        try {
+          const accepted = await acceptVmapInviteToken(inviteToken);
+          if (accepted.ok && accepted.roomId) {
+            window.setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("vlue-open-location", {
+                  detail: {
+                    mode: "vmap",
+                    roomId: accepted.roomId,
+                    join: true,
+                    expandChat: true
+                  }
+                })
+              );
+            }, 400);
+          }
+        } catch (e) {
+          setBottomToast(e?.message || "방 입장에 실패했습니다.");
+          window.setTimeout(() => setBottomToast(""), 4000);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    void handleVmapInvite();
   }, []);
 
   /** 비밀번호 변경 PASS redirect 복귀 — 설정 화면으로 */
@@ -2502,6 +2575,44 @@ function App() {
     } catch {
       /* ignore */
     }
+
+    /* V-Map 초대 토큰이 있으면 자동 입장 */
+    try {
+      const raw = sessionStorage.getItem("vlue_pending_vmap_invite");
+      if (raw) {
+        sessionStorage.removeItem("vlue_pending_vmap_invite");
+        const pending = JSON.parse(raw);
+        /* 24시간 이내 초대만 유효 */
+        if (pending?.token && Date.now() - (pending.at || 0) < 24 * 60 * 60 * 1000) {
+          window.setTimeout(async () => {
+            try {
+              const accepted = await acceptVmapInviteToken(pending.token);
+              if (accepted?.ok && accepted.roomId) {
+                setBottomToast("V-Map 방에 자동 입장되었습니다!");
+                window.setTimeout(() => setBottomToast(""), 3000);
+                window.setTimeout(() => {
+                  window.dispatchEvent(
+                    new CustomEvent("vlue-open-location", {
+                      detail: {
+                        mode: "vmap",
+                        roomId: accepted.roomId,
+                        join: true,
+                        expandChat: true
+                      }
+                    })
+                  );
+                }, 500);
+              }
+            } catch (e) {
+              setBottomToast(e?.message || "V-Map 입장에 실패했습니다.");
+              window.setTimeout(() => setBottomToast(""), 4000);
+            }
+          }, 800);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -3480,17 +3591,12 @@ function App() {
           ensureCallDetectionForBroadcast(true);
         }
         if (readVcidBroadcastOn() || readDccBroadcastOn()) {
+          /* 조용히 복구 — 마이페이지 빨간 배너/토스트로 유저를 괴롭히지 않음 */
           ensureCallDetectionForBroadcast(true);
-          const health = healCallDetectionIfNeeded({
+          healCallDetectionIfNeeded({
             broadcastOn: true,
             nativeStatus: st
           });
-          if (!health.healthy) {
-            setBottomToast(
-              health.issues[0] || "통화 감지가 꺼져 있습니다. 프로필에서 「지금 켜기」를 눌러 주세요."
-            );
-            setTimeout(() => setBottomToast(""), 4500);
-          }
         }
         return;
       } catch {
@@ -3512,11 +3618,7 @@ function App() {
           const { readVcidBroadcastOn, readDccBroadcastOn } = await import("./lib/bizcardAccountSync.js");
           if (!(readVcidBroadcastOn() || readDccBroadcastOn())) return;
           const st = e?.detail?.letteringStatus || m.readLetteringPermissionStatus();
-          const health = m.healCallDetectionIfNeeded({ broadcastOn: true, nativeStatus: st });
-          if (!health.healthy && health.issues[0]) {
-            setBottomToast(health.issues[0]);
-            setTimeout(() => setBottomToast(""), 4000);
-          }
+          m.healCallDetectionIfNeeded({ broadcastOn: true, nativeStatus: st });
         } catch {
           /* ignore */
         }

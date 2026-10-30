@@ -1137,6 +1137,194 @@ locationMapRoutes.post("/family/messages", requireUserHeader, async (c) => {
   });
 });
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * V-Map 초대 토큰 시스템 — 카카오 공유 단일화 + 비회원 바이럴
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** 초대 토큰 생성 — 방에 참여한 회원이 외부 공유용 토큰 발급 */
+locationMapRoutes.post("/vmap/:id/invite-token", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const roomId = paramId(c);
+  const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
+  if (!room) return c.json({ error: "약속을 찾을 수 없습니다." }, 404);
+
+  const member = await prisma.vmapMember.findUnique({
+    where: { roomId_userId: { roomId, userId } }
+  });
+  if (!member && room.hostUserId !== userId) {
+    return c.json({ error: "방에 참여한 회원만 초대할 수 있습니다." }, 403);
+  }
+
+  const host = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { legalName: true, publicHandle: true }
+  });
+  const hostName =
+    String(host?.legalName || host?.publicHandle || "회원").replace(/^@+/, "").trim() || "회원";
+
+  /* 토큰 생성 — 24시간 유효 */
+  const token = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await prisma.$executeRaw`
+    INSERT INTO vmap_invite_tokens (id, room_id, inviter_user_id, inviter_name, expires_at, created_at)
+    VALUES (${token}::text, ${roomId}::uuid, ${userId}::uuid, ${hostName}, ${expiresAt}, now())
+    ON CONFLICT (id) DO UPDATE SET
+      inviter_user_id = ${userId}::uuid,
+      inviter_name = ${hostName},
+      expires_at = ${expiresAt},
+      created_at = now()
+  `;
+
+  return c.json({
+    ok: true,
+    token,
+    expiresAt: expiresAt.toISOString(),
+    roomId,
+    inviterName: hostName,
+    placeLabel: room.placeLabel || room.title || "약속"
+  });
+});
+
+/** 초대 토큰 검증 — 비회원도 호출 가능 (회원 여부 확인용) */
+locationMapRoutes.get("/vmap/invite/:token", async (c) => {
+  const token = String(c.req.param("token") || "").trim();
+  if (!token) return c.json({ error: "초대 링크가 올바르지 않습니다." }, 400);
+
+  type InviteRow = {
+    room_id: string;
+    inviter_user_id: string;
+    inviter_name: string;
+    expires_at: Date;
+    room_active: boolean;
+    place_label: string;
+    title: string;
+  };
+  const rows = await prisma.$queryRaw<InviteRow[]>`
+    SELECT
+      t.room_id,
+      t.inviter_user_id,
+      t.inviter_name,
+      t.expires_at,
+      r.active AS room_active,
+      COALESCE(r.place_label, '') AS place_label,
+      COALESCE(r.title, '약속') AS title
+    FROM vmap_invite_tokens t
+    JOIN vmap_rooms r ON r.id = t.room_id
+    WHERE t.id = ${token}
+    LIMIT 1
+  `;
+  const invite = rows[0];
+  if (!invite) return c.json({ error: "초대 링크가 올바르지 않습니다.", code: "INVALID_TOKEN" }, 400);
+  if (new Date(invite.expires_at) < new Date()) {
+    return c.json({ error: "초대 링크가 만료되었습니다.", code: "EXPIRED_TOKEN" }, 400);
+  }
+  if (!invite.room_active) {
+    return c.json({ error: "종료된 약속입니다.", code: "ROOM_CLOSED" }, 400);
+  }
+
+  /* 호출자 로그인 여부 확인 */
+  const authHeader = c.req.header("Authorization") || "";
+  const xUserId = c.req.header("X-VLUE-User-Id") || "";
+  const isLoggedIn = Boolean(authHeader && xUserId);
+
+  return c.json({
+    ok: true,
+    roomId: invite.room_id,
+    inviterName: invite.inviter_name,
+    placeLabel: invite.place_label || invite.title || "약속",
+    expiresAt: new Date(invite.expires_at).toISOString(),
+    isLoggedIn,
+    /* 비회원이면 가입 후 자동 입장을 위해 토큰 반환 */
+    pendingToken: isLoggedIn ? null : token
+  });
+});
+
+/** 초대 토큰으로 방 입장 — 로그인 필수 */
+locationMapRoutes.post("/vmap/invite/:token/accept", requireUserHeader, async (c) => {
+  const userId = await me(c);
+  const token = String(c.req.param("token") || "").trim();
+  if (!token) return c.json({ error: "초대 링크가 올바르지 않습니다." }, 400);
+
+  type InviteRow = {
+    room_id: string;
+    inviter_user_id: string;
+    inviter_name: string;
+    expires_at: Date;
+  };
+  const rows = await prisma.$queryRaw<InviteRow[]>`
+    SELECT room_id, inviter_user_id, inviter_name, expires_at
+    FROM vmap_invite_tokens
+    WHERE id = ${token}
+    LIMIT 1
+  `;
+  const invite = rows[0];
+  if (!invite) return c.json({ error: "초대 링크가 올바르지 않습니다." }, 400);
+  if (new Date(invite.expires_at) < new Date()) {
+    return c.json({ error: "초대 링크가 만료되었습니다." }, 400);
+  }
+
+  const roomId = invite.room_id;
+  const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
+  if (!room) return c.json({ error: "종료된 약속입니다." }, 404);
+
+  const body = await c.req.json().catch(() => ({}));
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { legalName: true, publicHandle: true }
+  });
+  const displayName =
+    clip(body.displayName, 80) ||
+    String(user?.legalName || user?.publicHandle || "참여자").replace(/^@+/, "").trim() ||
+    "참여자";
+
+  await prisma.vmapMember.upsert({
+    where: { roomId_userId: { roomId, userId } },
+    create: { roomId, userId, displayName, departed: false },
+    update: { displayName }
+  });
+
+  /* 초대자에게 수락 알림 */
+  if (invite.inviter_user_id && invite.inviter_user_id !== userId) {
+    const title = "V-Map 초대 수락";
+    const noticeBody = `${displayName}님이 V-Map 초대를 수락했습니다.`;
+    try {
+      await prisma.ownerNotification.create({
+        data: {
+          ownerUserId: invite.inviter_user_id,
+          actorUserId: userId,
+          title,
+          body: noticeBody,
+          payloadJson: {
+            type: "vlue-vmap-invite-accepted",
+            roomId,
+            actorUserId: userId,
+            actorName: displayName
+          }
+        }
+      });
+      ssePublish(invite.inviter_user_id, {
+        type: "vlue-vmap-invite-accepted",
+        title,
+        body: noticeBody,
+        roomId,
+        actorUserId: userId,
+        actorName: displayName,
+        at: new Date().toISOString()
+      });
+    } catch {
+      /* 알림 실패는 무시 */
+    }
+  }
+
+  return c.json({
+    ok: true,
+    roomId,
+    room,
+    joined: true
+  });
+});
+
 /** 가족 채팅 30일 TTL 크론 */
 locationMapRoutes.post("/cron/purge-family-chat", async (c) => {
   const secret = c.req.header("X-Family-Cron-Secret") || "";

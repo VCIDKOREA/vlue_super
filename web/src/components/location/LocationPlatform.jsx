@@ -85,8 +85,8 @@ import { isOverseasMember } from "../../lib/overseasLocation.js";
 import LocationPermissionSheet, { nativeLocationDenied } from "./LocationPermissionSheet.jsx";
 import VmapNaverSurface from "./VmapNaverSurface.jsx";
 import VmapGoogleSurface from "./VmapGoogleSurface.jsx";
-import VmapFriendInviteSheet from "./VmapFriendInviteSheet.jsx";
 import VMapChatOverlay from "./VMapChatOverlay.jsx";
+import { shareVmapInviteViaKakao } from "../../lib/vmapInviteShare.js";
 
 const TILE = 256;
 const ACCENT = "#00D2FF";
@@ -397,7 +397,7 @@ export default function LocationPlatform() {
   const [nativeMini, setNativeMini] = useState(false);
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
+  /* inviteOpen state 제거됨 — 카카오 공유로 단일화 */
   /** 가족방에서 상대 위치로 이동 중 — V-Map 모드로 전환하지 않음 */
   const [familyNavTarget, setFamilyNavTarget] = useState(null);
   const [familyNavBusy, setFamilyNavBusy] = useState(false);
@@ -2390,9 +2390,20 @@ export default function LocationPlatform() {
                 <button
                   type="button"
                   className={quietBtn}
-                  onClick={() => {
+                  onClick={async () => {
                     hideLocationAds();
-                    setInviteOpen(true);
+                    try {
+                      const result = await shareVmapInviteViaKakao({
+                        roomId: session.roomId,
+                        placeLabel: room?.placeLabel || room?.title || "",
+                        onToast: pushNotice
+                      });
+                      if (result?.ok && !result?.cancelled) {
+                        pushNotice("초대 링크가 공유되었습니다.");
+                      }
+                    } catch (e) {
+                      pushNotice(e?.message || "초대에 실패했습니다.");
+                    }
                   }}
                 >
                   친구 초대
@@ -2667,17 +2678,7 @@ export default function LocationPlatform() {
           {notice}
         </p>
       ) : null}
-      <VmapFriendInviteSheet
-        open={inviteOpen && Boolean(session.roomId)}
-        roomId={session.roomId}
-        placeLabel={room?.placeLabel || room?.title || ""}
-        dark={dark}
-        onClose={() => setInviteOpen(false)}
-        onInvited={() => {
-          pushNotice("초대를 보냈습니다.");
-        }}
-        onError={(message) => pushNotice(message)}
-      />
+      {/* VmapFriendInviteSheet 제거됨 — 카카오 공유로 단일화 */}
       <style>{`
         @keyframes vmap-voice-wave {
           0%, 100% { transform: scaleY(0.35); opacity: 0.7; }

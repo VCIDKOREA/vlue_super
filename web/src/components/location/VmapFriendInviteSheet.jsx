@@ -1,20 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { matchContactsWithVlue } from "../../lib/contactFriendsApi.js";
-import { collectDeviceContactsForSync } from "../../lib/collectDeviceContacts.js";
-import {
-  hasContactSyncConsent,
-  saveContactMatchCache,
-  readContactMatchCache,
-  setContactSyncConsent
-} from "../../lib/contactSyncStorage.js";
-import { mergeDeviceContactsCache } from "../../lib/contacts/deviceContactsCache.js";
-import { readLetteringPermissionStatus } from "../../lib/letteringSettings.js";
-import { fetchVmapEligibleFriends, inviteVmapFriends } from "../../lib/locationApi.js";
-import { shareVmapInviteViaKakao, shareVmapInviteViaSms } from "../../lib/vmapInviteShare.js";
-import ShareShowcaseChannelSheet from "../call/ShareShowcaseChannelSheet.jsx";
+/**
+ * @deprecated 이 컴포넌트는 더 이상 사용하지 않습니다.
+ * V-Map 초대는 카카오 공유로 단일화되었습니다.
+ * 전화번호부 탐색 관련 코드는 모두 제거되었습니다.
+ * 
+ * 새 초대 플로우:
+ * - LocationPlatform에서 "친구 초대" 버튼 → shareVmapInviteViaKakao() 직접 호출
+ * - 비회원은 vmapInvite 토큰으로 가입 유도 → 가입 후 자동 입장
+ * 
+ * @see vmapInviteShare.js
+ */
 
 /**
- * V-Map 친구 초대 — 전화부 동기화 + 동일 지역(eligible)만 초대 버튼
+ * V-Map 친구 초대 — [DEPRECATED] 전화부 기반 → 카카오 공유로 단일화됨
  */
 export default function VmapFriendInviteSheet({
   open,
