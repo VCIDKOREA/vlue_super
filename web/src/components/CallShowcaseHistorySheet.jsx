@@ -54,6 +54,11 @@ import {
 import { runCallPeerMatrixAction } from "../lib/call/runCallPeerMatrixAction.js";
 import ShareShowcaseChannelSheet from "./call/ShareShowcaseChannelSheet.jsx";
 import { CALL_PEER_CTA } from "../lib/call/callPeerMatrix.js";
+import {
+  ROW_GESTURE,
+  decideCallHistoryRowGesture,
+  rowGestureSuppressesClick
+} from "../lib/call/callHistoryRowGesture.js";
 import { resolveIsKnownContactSync } from "../lib/contacts/hybridKnownContact.js";
 import {
   DEVICE_CONTACTS_CHANGED,
@@ -367,6 +372,13 @@ function openSystemDialer(phone) {
 /** 좌: 카톡/SMS 전달 / 우: 기본 전화앱 — 배경 액션 노출 애니메이션 */
 function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, children }) {
   const startRef = useRef(null);
+  /*
+   * 탭(열기)은 브라우저 네이티브 `click` 으로 감지한다 — pointerup 수기 판정은
+   * 스크롤 컨테이너·OEM WebView 에서 pointercancel/오분류로 자주 삼켜져 전화부
+   * 행 탭이 먹통이 됐다. pointer 핸들러는 좌우 스와이프 제스처 전용으로만 둔다.
+   * 스와이프(또는 드래그)가 발생하면 뒤이어 오는 click 이 행을 열지 않도록 억제한다.
+   */
+  const suppressClickRef = useRef(false);
   const [offsetX, setOffsetX] = useState(0);
   const [settling, setSettling] = useState(false);
 
@@ -385,26 +397,42 @@ function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, ch
     }
     const dx = e.clientX - s.x;
     const dy = e.clientY - s.y;
-    if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.15) {
-      if (dx > 0) {
-        setOffsetX(88);
-        setSettling(true);
-        window.setTimeout(() => {
-          openSystemDialer(call.phoneDisplay || call.phone);
-          snapBack();
-        }, 160);
-      } else {
-        setOffsetX(-88);
-        setSettling(true);
-        window.setTimeout(() => {
-          onShare?.(call, matrix);
-          snapBack();
-        }, 160);
-      }
+    const gesture = decideCallHistoryRowGesture({ dx, dy, moved: s.moved });
+    /* 스와이프·드래그 직후의 click 은 행을 열지 않도록 억제 (탭은 click 으로 처리) */
+    if (rowGestureSuppressesClick(gesture)) suppressClickRef.current = true;
+    if (gesture === ROW_GESTURE.SWIPE_DIAL) {
+      setOffsetX(88);
+      setSettling(true);
+      window.setTimeout(() => {
+        openSystemDialer(call.phoneDisplay || call.phone);
+        snapBack();
+      }, 160);
+      return;
+    }
+    if (gesture === ROW_GESTURE.SWIPE_SHARE) {
+      setOffsetX(-88);
+      setSettling(true);
+      window.setTimeout(() => {
+        onShare?.(call, matrix);
+        snapBack();
+      }, 160);
       return;
     }
     snapBack();
-    if (!s.moved) onOpen?.(call);
+  };
+
+  const handleRowClick = (e) => {
+    /* CTA 버튼·링크·입력은 각자 핸들러가 처리 (행 열기 금지) */
+    if (e.target?.closest?.("button, a, input, select, textarea, label")) return;
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    console.debug("[call-history] 전화부 행 탭 감지 → openCall", {
+      id: call?.id,
+      phone: call?.phoneDisplay || call?.phone
+    });
+    onOpen?.(call);
   };
 
   const reveal = Math.max(-96, Math.min(96, offsetX));
@@ -433,6 +461,8 @@ function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, ch
         onPointerDown={(e) => {
           if (e.button != null && e.button !== 0) return;
           if (e.target?.closest?.("button")) return;
+          /* 새 제스처 시작 — 이전 스와이프의 click 억제 플래그 초기화 */
+          suppressClickRef.current = false;
           setSettling(false);
           startRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false };
           try {
@@ -451,9 +481,11 @@ function CallHistorySwipeRow({ call, matrix, busy, onOpen, onShare, onAction, ch
         }}
         onPointerUp={endSwipe}
         onPointerCancel={() => {
+          if (startRef.current?.moved) suppressClickRef.current = true;
           startRef.current = null;
           snapBack();
         }}
+        onClick={handleRowClick}
       >
         {children}
         <div className="call-history-row__trailing">
@@ -609,6 +641,7 @@ export default function CallShowcaseHistorySheet({ open, onClose, isDarkMode = f
   /** 미등록 번호 — 풀스크린 쇼케이스/신고 패널 호출 금지, 2줄 안심팝업만 즉시 표시 */
   const openUnregisteredPopupForCall = useCallback((call) => {
     const phone = call?.phoneDisplay || call?.phone || "";
+    console.debug("[call-history] 미등록 번호 → 모르는 번호 안심팝업(제보/신고) 열기", { phone });
     setAuthPopup({ open: false, name: "", phone: "", handle: "" });
     setContactSafePopup({ open: false, name: "", phone: "", abnormal: false, warning: "" });
     setSelected(null);

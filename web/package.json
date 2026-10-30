@@ -11,6 +11,7 @@
     "postbuild": "node scripts/sync-legal-static-to-dist.mjs && node ../scripts/verify-pc-installer-in-dist.mjs",
     "start": "node scripts/serve-production.mjs",
     "preview": "vite preview",
+    "test:row-gesture": "tsx src/lib/call/callHistoryRowGesture.test.js",
     "typecheck": "echo \"(JSX) typecheck optional\""
   },
   "dependencies": {
