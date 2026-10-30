@@ -59,7 +59,14 @@ export function resolveOutgoingLogoLabel(card, communityTipLabel = "") {
 }
 
 function personName(card, company) {
-  const candidates = [card?.name, card?.legalName, card?.displayName, card?.contactName];
+  /* softDisplayName = 상대방 표기 방식(닉/실명). DCC 앞면은 legalName/name 고정. */
+  const candidates = [
+    card?.softDisplayName,
+    card?.name,
+    card?.legalName,
+    card?.displayName,
+    card?.contactName
+  ];
   for (const raw of candidates) {
     const name = cleanName(raw);
     if (name && name !== company) return name;

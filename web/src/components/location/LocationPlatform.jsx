@@ -73,7 +73,7 @@ import {
   setMapThemePreference,
   subscribeLocationSession
 } from "../../lib/locationSession.js";
-import { getProfileHeaderName } from "../../lib/memberCardStorage.js";
+import { getPublicDisplayName } from "../../lib/fiveWayProfile.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters, resolveMapTheme } from "../../lib/sunTheme.js";
 import { formatGuideDistance, maneuverGlyph, nextGuideCue } from "../../lib/vmapGuide.js";
@@ -365,7 +365,7 @@ export default function LocationPlatform() {
       addressLabel: "",
       batteryPct: null,
       online: true,
-      displayName: getProfileHeaderName() || "나"
+      displayName: getPublicDisplayName() || "나"
     };
   });
   const [sponsor, setSponsor] = useState(null);
@@ -478,7 +478,7 @@ export default function LocationPlatform() {
       if (shouldJoin) {
         void (async () => {
           try {
-            await joinVmapRoom(roomId, { displayName: getProfileHeaderName() || "참여자" });
+            await joinVmapRoom(roomId, { displayName: getPublicDisplayName() || "참여자" });
             patchLocationSession({
               mode: "vmap",
               roomId,
@@ -607,7 +607,7 @@ export default function LocationPlatform() {
   useEffect(() => {
     if (!tracking) return undefined;
     let watchId = 0;
-    const name = getProfileHeaderName() || "나";
+    const name = getPublicDisplayName() || "나";
     /* 지도 열자마자 마지막 GPS로 본인 마커를 먼저 올린다 */
     const cached = readLastGeo();
     if (cached) {
@@ -1167,7 +1167,7 @@ export default function LocationPlatform() {
         ? `약 ${estimateEtaMinutes(haversineMeters(mine.lat, mine.lng, liveRoom.placeLat, liveRoom.placeLng))}분`
         : "";
     const ok = setNativeVmapMiniOverlay(true, {
-      label: getProfileHeaderName() || "V-Map",
+      label: getPublicDisplayName() || "V-Map",
       eta,
       place: liveRoom?.placeLabel || "",
       lat: mine?.lat,
@@ -1185,7 +1185,7 @@ export default function LocationPlatform() {
         ? `약 ${estimateEtaMinutes(haversineMeters(mine.lat, mine.lng, room.placeLat, room.placeLng))}분`
         : "";
     updateNativeVmapMiniOverlay({
-      label: getProfileHeaderName() || "V-Map",
+      label: getPublicDisplayName() || "V-Map",
       eta,
       place: room?.placeLabel || "",
       lat: mine?.lat,
@@ -1402,7 +1402,7 @@ export default function LocationPlatform() {
     setFamilyNavBusy(true);
     pushNotice("경로를 안내합니다…");
     try {
-      const actorName = getProfileHeaderName() || self.displayName || "나";
+      const actorName = getPublicDisplayName() || self.displayName || "나";
       const targetName = member.displayName || "가족";
       const notified = await startFamilyNavigate({
         targetUserId: member.userId,
@@ -1465,7 +1465,7 @@ export default function LocationPlatform() {
         placeLat: self.lat,
         placeLng: self.lng,
         placeLabel: self.addressLabel || "약속 장소",
-        displayName: getProfileHeaderName() || "나",
+        displayName: getPublicDisplayName() || "나",
         title: "V-Map 약속"
       });
       patchLocationSession({ mode: "vmap", roomId: data.room.id, departed: false, open: true, minimized: false });
@@ -1485,7 +1485,7 @@ export default function LocationPlatform() {
     setRoomBusy("join");
     pushNotice("입장 중...");
     try {
-      await joinVmapRoom(roomId, { displayName: getProfileHeaderName() || "참여자" });
+      await joinVmapRoom(roomId, { displayName: getPublicDisplayName() || "참여자" });
       patchLocationSession({ mode: "vmap", roomId, departed: false, open: true, minimized: false });
     } catch (error) {
       pushNotice(error.message || "입장하지 못했습니다.");
@@ -1604,7 +1604,7 @@ export default function LocationPlatform() {
       const url = URL.createObjectURL(blob);
       new Audio(url).play().catch(() => {});
       const dataUrl = await blobToDataUrl(blob);
-      const payload = { kind: "voice", body: dataUrl, displayName: getProfileHeaderName() || "나" };
+      const payload = { kind: "voice", body: dataUrl, displayName: getPublicDisplayName() || "나" };
       const sent =
         session.mode === "family"
           ? await postFamilyLocationMessage(payload).catch((error) => {
@@ -1642,7 +1642,7 @@ export default function LocationPlatform() {
       id: localId,
       kind: "text",
       body: text,
-      displayName: getProfileHeaderName() || "나",
+      displayName: getPublicDisplayName() || "나",
       createdAt: new Date().toISOString(),
       userId: getLocalVlueUserId(),
       cyanBadgeActive: localHasCyanBadge()
@@ -1654,7 +1654,7 @@ export default function LocationPlatform() {
           ? await postFamilyLocationMessage({
               kind: "text",
               body: text,
-              displayName: getProfileHeaderName() || "나"
+              displayName: getPublicDisplayName() || "나"
             })
           : await postVmapMessage(session.roomId, { kind: "text", body: text });
       if (sent?.message) {

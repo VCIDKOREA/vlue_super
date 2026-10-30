@@ -352,6 +352,16 @@ model User {
   nickChat String? @map("nick_chat") @db.VarChar(64)
   nickFeed String? @map("nick_feed") @db.VarChar(64)
 
+  /// 5-Way 프로필 — kakao|naver|google|instagram|vlue (null=가입 소셜 기본)
+  activeProfileSource String? @map("active_profile_source") @db.VarChar(32)
+  /// 상대방 표기 — legal(실명) | nickname(활성 프로필 닉)
+  displayNameMode String @default("nickname") @map("display_name_mode") @db.VarChar(16)
+  /// VLUE 커스텀 프로필 닉네임 — 최초 확정 후 변경 불가
+  vlueProfileNickname         String?   @map("vlue_profile_nickname") @db.VarChar(64)
+  vlueProfileNicknameLockedAt DateTime? @map("vlue_profile_nickname_locked_at") @db.Timestamptz(6)
+  /// VLUE 커스텀 프로필 사진 URL (https)
+  vlueProfilePhotoUrl String? @map("vlue_profile_photo_url") @db.Text
+
   /// 클라이언트 TERMS_VERSION 등과 일치하는 마지막 약관 동의 버전
   termsVersionAccepted String?   @map("terms_version_accepted") @db.VarChar(64)
   termsAcceptedAt      DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
@@ -2600,6 +2610,9 @@ model UserSocialLoginLink {
   provider       SocialLoginProvider @map("provider")
   providerUserId String              @map("provider_user_id") @db.VarChar(80)
   providerEmail  String?             @map("provider_email") @db.VarChar(254)
+  /// 소셜 프로필 캐시 — 5-Way 슬롯 표시용 (로그인·연동 시 갱신)
+  providerNickname        String? @map("provider_nickname") @db.VarChar(120)
+  providerProfileImageUrl String? @map("provider_profile_image_url") @db.Text
 
   linkedAt    DateTime  @default(now()) @map("linked_at") @db.Timestamptz(6)
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)

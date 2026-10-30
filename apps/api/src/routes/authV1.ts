@@ -13,6 +13,7 @@ import {
   verifyInstagramLinkState
 } from "../integrations/instagram/instagramOAuth.js";
 import { completeSocialLogin, linkSocialAccountToUser, unlinkSocialLogin } from "../services/socialAuthService.js";
+import { getProfileDisplayState, patchProfileDisplay } from "../services/profileDisplayService.js";
 import {
   completeKakaoLinkForUser,
   disconnectKakaoLink,
@@ -651,6 +652,8 @@ authV1Routes.get("/social/links", requireUserHeader, async (c) => {
       provider: true,
       providerUserId: true,
       providerEmail: true,
+      providerNickname: true,
+      providerProfileImageUrl: true,
       linkedAt: true,
       lastLoginAt: true
     },
@@ -659,7 +662,7 @@ authV1Routes.get("/social/links", requireUserHeader, async (c) => {
   if (!links.some((row) => row.provider === "kakao")) {
     const kakao = await prisma.userKakaoLink.findUnique({
       where: { userId },
-      select: { id: true, kakaoUserId: true, linkedAt: true }
+      select: { id: true, kakaoUserId: true, nickname: true, profileImageUrl: true, linkedAt: true }
     });
     if (kakao?.kakaoUserId) {
       links.push({
@@ -667,12 +670,46 @@ authV1Routes.get("/social/links", requireUserHeader, async (c) => {
         provider: "kakao",
         providerUserId: kakao.kakaoUserId,
         providerEmail: null,
+        providerNickname: kakao.nickname || null,
+        providerProfileImageUrl: kakao.profileImageUrl || null,
         linkedAt: kakao.linkedAt,
         lastLoginAt: null
       });
     }
   }
   return c.json({ links });
+});
+
+/** 5-Way 프로필 + 상대방 표기 방식 */
+authV1Routes.get("/profile/display", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const state = await getProfileDisplayState(userId);
+    return c.json(state);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "프로필 표시 정보를 불러오지 못했습니다.";
+    const status = (e as Error & { statusCode?: number }).statusCode === 404 ? 404 : 400;
+    return c.json({ error: msg }, status);
+  }
+});
+
+authV1Routes.patch("/profile/display", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = await c.req.json<{
+      activeProfileSource?: string;
+      displayNameMode?: string;
+      vlueNickname?: string;
+      vluePhotoUrl?: string;
+    }>();
+    const state = await patchProfileDisplay(userId, body || {});
+    return c.json(state);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "프로필 표시 설정에 실패했습니다.";
+    const code = (e as Error & { statusCode?: number }).statusCode;
+    const status = code === 404 ? 404 : code === 400 ? 400 : 400;
+    return c.json({ error: msg }, status);
+  }
 });
 
 /** 간편 로그인 연동 해제 — 다른 SNS 계정으로 다시 인증할 수 있게 */

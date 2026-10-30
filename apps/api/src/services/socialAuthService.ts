@@ -47,8 +47,35 @@ type ResolvedSocialIdentity = {
   providerUserId: string;
   providerEmail: string | null;
   displayName: string | null;
+  profileImageUrl: string | null;
   emailVerified: boolean;
 };
+
+async function upsertSocialLoginLink(userId: string, identity: ResolvedSocialIdentity) {
+  const nick = String(identity.displayName || "").trim().slice(0, 120) || null;
+  const photo = String(identity.profileImageUrl || "").trim() || null;
+  return prisma.userSocialLoginLink.upsert({
+    where: {
+      userId_provider: { userId, provider: identity.provider }
+    },
+    create: {
+      userId,
+      provider: identity.provider,
+      providerUserId: identity.providerUserId,
+      providerEmail: identity.providerEmail,
+      providerNickname: nick,
+      providerProfileImageUrl: photo,
+      lastLoginAt: new Date()
+    },
+    update: {
+      providerUserId: identity.providerUserId,
+      providerEmail: identity.providerEmail,
+      ...(nick ? { providerNickname: nick } : {}),
+      ...(photo ? { providerProfileImageUrl: photo } : {}),
+      lastLoginAt: new Date()
+    }
+  });
+}
 
 function normalizeProvider(raw: string): SocialLoginProvider | null {
   const p = raw.trim().toLowerCase();
@@ -74,6 +101,7 @@ async function resolveSocialIdentity(
         (typeof body.email === "string" && body.email.trim() ? body.email.trim() : null) ||
         null,
       displayName: k.nickname || (typeof body.nickname === "string" ? body.nickname.trim() : null) || null,
+      profileImageUrl: k.profileImageUrl || null,
       emailVerified: Boolean(k.emailVerified)
     };
   }
@@ -86,7 +114,13 @@ async function resolveSocialIdentity(
       throw new Error("네이버 토큰 검증에 실패했습니다.");
     }
     const json = (await res.json()) as {
-      response?: { id?: string; email?: string; nickname?: string; name?: string };
+      response?: {
+        id?: string;
+        email?: string;
+        nickname?: string;
+        name?: string;
+        profile_image?: string;
+      };
     };
     const providerUserId = String(json.response?.id || "").trim();
     if (!providerUserId) {
@@ -97,6 +131,7 @@ async function resolveSocialIdentity(
       providerUserId,
       providerEmail: json.response?.email || null,
       displayName: json.response?.nickname || json.response?.name || null,
+      profileImageUrl: String(json.response?.profile_image || "").trim() || null,
       emailVerified: Boolean(json.response?.email)
     };
   }
@@ -108,6 +143,7 @@ async function resolveSocialIdentity(
       providerUserId: g.id,
       providerEmail: g.email,
       displayName: g.name || (typeof body.nickname === "string" ? body.nickname.trim() : null) || null,
+      profileImageUrl: g.picture || null,
       emailVerified: g.emailVerified
     };
   }
@@ -119,6 +155,7 @@ async function resolveSocialIdentity(
       providerUserId: ig.igUserId || ig.appScopedUserId,
       providerEmail: null,
       displayName: ig.username || null,
+      profileImageUrl: ig.profilePictureUrl || null,
       emailVerified: false
     };
   }
@@ -180,44 +217,14 @@ async function findUserBySocialMapping(identity: ResolvedSocialIdentity) {
       }
     });
     if (kakaoProfile?.user) {
-      await prisma.userSocialLoginLink.upsert({
-        where: {
-          userId_provider: { userId: kakaoProfile.user.id, provider: "kakao" }
-        },
-        create: {
-          userId: kakaoProfile.user.id,
-          provider: "kakao",
-          providerUserId: identity.providerUserId,
-          providerEmail: identity.providerEmail
-        },
-        update: {
-          providerUserId: identity.providerUserId,
-          providerEmail: identity.providerEmail,
-          lastLoginAt: new Date()
-        }
-      });
+      await upsertSocialLoginLink(kakaoProfile.user.id, identity);
       return { user: kakaoProfile.user, via: "kakao_profile" as const };
     }
   }
 
   if (!legacy) return null;
 
-  await prisma.userSocialLoginLink.upsert({
-    where: {
-      userId_provider: { userId: legacy.id, provider: identity.provider }
-    },
-    create: {
-      userId: legacy.id,
-      provider: identity.provider,
-      providerUserId: identity.providerUserId,
-      providerEmail: identity.providerEmail
-    },
-    update: {
-      providerUserId: identity.providerUserId,
-      providerEmail: identity.providerEmail,
-      lastLoginAt: new Date()
-    }
-  });
+  await upsertSocialLoginLink(legacy.id, identity);
 
   return { user: legacy, via: "legacy_migrated" as const };
 }
@@ -235,10 +242,7 @@ async function loginMappedUser(
   req: HonoLikeReq,
   isNewUser = false
 ): Promise<SocialLoginResponse> {
-  await prisma.userSocialLoginLink.updateMany({
-    where: { userId: user.id, provider: identity.provider },
-    data: { lastLoginAt: new Date() }
-  });
+  await upsertSocialLoginLink(user.id, identity);
 
   let identityVerified = Boolean(user.identityVerified);
   if (user.identityVerified === undefined) {
@@ -307,6 +311,8 @@ async function createSocialUser(
       signupMethod: identity.provider,
       socialProvider: identity.provider,
       socialId: identity.providerUserId,
+      activeProfileSource: identity.provider,
+      displayNameMode: "nickname",
       identityVerified: false,
       accountStatus: "active",
       status: "ACTIVE",
@@ -323,15 +329,7 @@ async function createSocialUser(
     }
   });
 
-  await prisma.userSocialLoginLink.create({
-    data: {
-      userId: created.id,
-      provider: identity.provider,
-      providerUserId: identity.providerUserId,
-      providerEmail: identity.providerEmail,
-      lastLoginAt: new Date()
-    }
-  });
+  await upsertSocialLoginLink(created.id, identity);
 
   return created;
 }
@@ -406,22 +404,7 @@ export async function linkSocialAccountToUser(
     throw new Error("이 소셜 계정은 이미 다른 VLUE 계정에 연동되어 있습니다.");
   }
 
-  const link = await prisma.userSocialLoginLink.upsert({
-    where: {
-      userId_provider: { userId, provider: identity.provider }
-    },
-    create: {
-      userId,
-      provider: identity.provider,
-      providerUserId: identity.providerUserId,
-      providerEmail: identity.providerEmail
-    },
-    update: {
-      providerUserId: identity.providerUserId,
-      providerEmail: identity.providerEmail,
-      lastLoginAt: new Date()
-    }
-  });
+  const link = await upsertSocialLoginLink(userId, identity);
 
   await prisma.user.update({
     where: { id: userId },
@@ -437,6 +420,8 @@ export async function linkSocialAccountToUser(
       id: link.id,
       provider: link.provider,
       providerUserId: link.providerUserId,
+      providerNickname: link.providerNickname,
+      providerProfileImageUrl: link.providerProfileImageUrl,
       linkedAt: link.linkedAt
     }
   };
@@ -457,6 +442,10 @@ export async function unlinkSocialLogin(userId: string, providerRaw: string) {
   await prisma.user.updateMany({
     where: { id: userId, socialProvider: provider },
     data: { socialProvider: null, socialId: null }
+  });
+  await prisma.user.updateMany({
+    where: { id: userId, activeProfileSource: provider },
+    data: { activeProfileSource: "vlue" }
   });
   return { ok: true, provider };
 }

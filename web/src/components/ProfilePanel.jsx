@@ -16,6 +16,7 @@ import BroadcastLineSetupPanel from "./BroadcastLineSetupPanel.jsx";
 import EnterpriseDccApplyWizard from "./EnterpriseDccApplyWizard.jsx";
 import DccOwnerApprovalInbox from "./DccOwnerApprovalInbox.jsx";
 import SocialAccountLinkPanel from "./auth/SocialAccountLinkPanel.jsx";
+import FiveWayProfilePanel from "./profile/FiveWayProfilePanel.jsx";
 import BackButton from "./common/BackButton";
 import { isBillableMembershipKind, isB2bMembershipKind, isPaidMembershipKind, normalizeMembershipKind } from "../lib/membershipBm.js";
 import { pricingNumbers } from "../lib/pricingConfig.js";
@@ -24,6 +25,7 @@ import { fileToFittedAvatarDataUrl, readProfilePhotoAvatar, writeAvatar, scrubBr
 import { AVATAR_IMAGE_GUIDE } from "../lib/fitImageFile.js";
 import UserProfileAvatar from "./UserProfileAvatar.jsx";
 import { getMemberHandle, getProfileHeaderName } from "../lib/memberCardStorage.js";
+import { getPublicDisplayName, FIVE_WAY_PROFILE_CHANGED_EVENT } from "../lib/fiveWayProfile.js";
 import { formatPhoneE164ForKoreaDisplay } from "../lib/phoneDisplay.js";
 import { readLetteringFixedIdentity } from "../lib/letteringBizcardStorage.js";
 import { isPaidLetteringTier } from "../lib/letteringMembership.js";
@@ -303,7 +305,11 @@ function ProfilePanel({
   useEffect(() => {
     const h = () => setNickTick((n) => n + 1);
     window.addEventListener("vlue-nicknames-changed", h);
-    return () => window.removeEventListener("vlue-nicknames-changed", h);
+    window.addEventListener(FIVE_WAY_PROFILE_CHANGED_EVENT, h);
+    return () => {
+      window.removeEventListener("vlue-nicknames-changed", h);
+      window.removeEventListener(FIVE_WAY_PROFILE_CHANGED_EVENT, h);
+    };
   }, []);
   useEffect(() => {
     if (!open) return;
@@ -500,7 +506,8 @@ function ProfilePanel({
     [isEnterpriseMember, vluerLocked, membershipCtx]
   );
   const headerName = useMemo(
-    () => getProfileHeaderName(String(myCard?.name || "").trim()),
+    () =>
+      getPublicDisplayName(getProfileHeaderName(String(myCard?.name || "").trim())),
     [myCard?.name, nickTick, open]
   );
   const memberIdDisplay = getMemberHandle();
@@ -1041,6 +1048,9 @@ function ProfilePanel({
 
         <div ref={mainPanelScrollRef} className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-6 py-6 no-scrollbar">
           <DccOwnerApprovalInbox isDarkMode={isDarkMode} onToast={showSettingNotice} />
+          <div className="mb-4">
+            <FiveWayProfilePanel isDarkMode={isDarkMode} onToast={showSettingNotice} />
+          </div>
           <div className="mb-4">
             <SocialAccountLinkPanel
               onToast={showSettingNotice}

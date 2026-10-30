@@ -6,6 +6,7 @@ import { hasCurrentSelfPaidEntitlement } from "./membership/paidEntitlementDb.js
 import { getVluePublicOrigin } from "./bizcard/bizcardPublicUrls.js";
 import { buildViewerAccessContext } from "./follow/followService.js";
 import { maskProfileForViewer, privacySelect } from "./follow/profileAccessControl.js";
+import { mapPublicDisplayNames } from "./profileDisplayService.js";
 import {
   buildAgencyDcpLookupBody,
   resolveAgencyCallRoute
@@ -839,6 +840,9 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       }
     }
     showcaseStyle = applyLapsedCallShowcase(callTier, showcaseStyle);
+    const softNamesBiz = await mapPublicDisplayNames([card.user.id]);
+    const softDisplayNameBiz =
+      softNamesBiz.get(card.user.id) || firstStr(card.user.legalName, routedDisplayName);
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -851,6 +855,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           cardId: card.id,
           kind: card.kind,
           displayName: routedDisplayName,
+          legalName: firstStr(card.user.legalName),
+          softDisplayName: softDisplayNameBiz,
           jobTitle: routedTitle,
           companyName: routedAgent
             ? firstStr(agentDcc?.organization, agentDcc?.companyName, companyName)
@@ -957,6 +963,10 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       callTier,
       await overlayShowcaseStyleForUserId(user.id)
     );
+    /** DCC/명함 실명 — 항상 legalName 우선. softDisplayName 은 빅푸시·탭로고 등 소프트 표기 */
+    const legalDisplayName = firstStr(user.legalName, user.digitalCard?.displayName, exportSnap?.name);
+    const softNames = await mapPublicDisplayNames([user.id]);
+    const softDisplayName = softNames.get(user.id) || legalDisplayName;
     return {
       status: 200 as const,
       body: attachPeerPath(
@@ -966,7 +976,9 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
           vlue_verified_badge: await officialCyanBadgeForUserId(user.id),
           source: "user_mobile",
           userId: user.id,
-          displayName: firstStr(exportSnap?.name, user.digitalCard?.displayName, user.legalName),
+          displayName: legalDisplayName,
+          legalName: firstStr(user.legalName),
+          softDisplayName,
           publicHandle: user.publicHandle || "",
           jobTitle: firstStr(
             exportSnap?.title,

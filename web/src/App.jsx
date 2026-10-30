@@ -920,6 +920,13 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!isLoggedIn) return;
+    void import("./lib/fiveWayProfile.js")
+      .then((m) => m.fetchFiveWayProfile?.())
+      .catch(() => {});
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     if (!isLoggedIn) return undefined;
     const uid = localStorage.getItem("vlue_server_user_id");
     if (!uid) {
@@ -2715,6 +2722,9 @@ function App() {
     localStorage.setItem(SESSION_KEY, "1");
     setIsLoggedIn(true);
     setCardFieldsTick((n) => n + 1);
+    queue import("./lib/fiveWayProfile.js")
+      .then((m) => m.fetchFiveWayProfile?.())
+      .catch(() => {});
   }, []);
 
   const processTierChangeFromLoginData = useCallback(

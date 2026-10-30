@@ -15,6 +15,7 @@ import {
   sweepRemoteSecurityHeartbeats
 } from "../services/familyProtection/familyRemoteSecurityService.js";
 import { resolveUserPolicy } from "../services/membership/userPolicyManager.js";
+import { mapPublicDisplayNames } from "../services/profileDisplayService.js";
 
 const LAST_LOCATION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -459,6 +460,10 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
       if (String(person.email || "").endsWith("@vlue.demo")) pinnedDemoIds.add(person.id);
     }
   }
+  const publicNames = await mapPublicDisplayNames([...ids]);
+  for (const [id, label] of publicNames) {
+    if (label) names.set(id, label);
+  }
   const photos = await profilePhotos([...ids]);
   await ensureLocationPresenceOverseasSchema();
   await ensureFamilyRemoteSecuritySchema();
@@ -707,10 +712,14 @@ locationMapRoutes.get("/friends", requireUserHeader, async (c) => {
     select: { id: true, legalName: true, publicHandle: true }
   });
   const photos = await profilePhotos(peerIds);
+  const publicNames = await mapPublicDisplayNames(peerIds);
   const friends = users
     .map((user) => ({
       userId: user.id,
-      displayName: String(user.legalName || user.publicHandle || "친구").replace(/^@+/, "").trim() || "친구",
+      displayName:
+        publicNames.get(user.id) ||
+        String(user.legalName || user.publicHandle || "친구").replace(/^@+/, "").trim() ||
+        "친구",
       publicHandle: String(user.publicHandle || "").replace(/^@+/, "").trim(),
       photoUrl: photos.get(user.id) || "",
       inRoom: inRoom.has(user.id)
@@ -1055,7 +1064,9 @@ locationMapRoutes.post("/family/navigate", requireUserHeader, async (c) => {
     where: { id: { in: [userId, targetUserId] } },
     select: { id: true, legalName: true, publicHandle: true }
   });
+  const publicNames = await mapPublicDisplayNames([userId, targetUserId]);
   const nameOf = (id: string, fallback: string) => {
+    if (publicNames.get(id)) return publicNames.get(id)!;
     const row = users.find((u) => u.id === id);
     return String(row?.legalName || row?.publicHandle || fallback).replace(/^@+/, "").trim() || fallback;
   };
@@ -1107,8 +1118,10 @@ locationMapRoutes.post("/family/messages", requireUserHeader, async (c) => {
     where: { id: userId },
     select: { legalName: true, publicHandle: true }
   });
+  const publicNames = await mapPublicDisplayNames([userId]);
   const displayName =
     clip(body.displayName, 80) ||
+    publicNames.get(userId) ||
     String(user?.legalName || user?.publicHandle || "나").replace(/^@+/, "").trim() ||
     "나";
   const message = await prisma.locationFamilyMessage.create({
@@ -1273,8 +1286,10 @@ locationMapRoutes.post("/vmap/invite/:token/accept", requireUserHeader, async (c
     where: { id: userId },
     select: { legalName: true, publicHandle: true }
   });
+  const publicNames = await mapPublicDisplayNames([userId]);
   const displayName =
     clip(body.displayName, 80) ||
+    publicNames.get(userId) ||
     String(user?.legalName || user?.publicHandle || "참여자").replace(/^@+/, "").trim() ||
     "참여자";
 

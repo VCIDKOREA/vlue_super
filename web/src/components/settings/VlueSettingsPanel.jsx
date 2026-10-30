@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import LetteringSettingsSection from "../LetteringSettingsSection.jsx";
-import CallDetectionStatusBanner from "../CallDetectionStatusBanner.jsx";
 import {
   readAppSettings,
   writeAppSettings,
@@ -15,6 +14,7 @@ import {
   VLUE_NICKNAME_MAX
 } from "../../lib/memberCardStorage.js";
 import { readProfilePhotoAvatar, writeProfilePhoto } from "../../lib/vlueAvatar.js";
+import FiveWayProfilePanel from "../profile/FiveWayProfilePanel.jsx";
 import { ImagePlus, Upload } from "lucide-react";
 import {
   LETTERING_PHOTO_RULES,
@@ -376,10 +376,13 @@ export default function VlueSettingsPanel({
     return (
       <SettingsSubpageShell
         title="프로필 관리"
-        subtitle="아바타 · 닉네임 · 상태메시지"
+        subtitle="5-Way 프로필 · 표기 방식 · 아바타"
         onBack={() => onSubView(null)}
         isDarkMode={isDarkMode}
       >
+        <div className="mb-4">
+          <FiveWayProfilePanel isDarkMode={isDarkMode} onToast={showSettingNotice} />
+        </div>
         <div className={`rounded-2xl border p-4 ${boxClass}`}>
           <ProfilePhotoManageBlock isDarkMode={isDarkMode} showSettingNotice={showSettingNotice} />
           <label className={`mt-3 block text-[11px] font-bold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
@@ -737,7 +740,7 @@ export default function VlueSettingsPanel({
 
       <div className="vlue-scroll-pad-profile-panel flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
         <SettingsSection title="내 계정" isDarkMode={isDarkMode}>
-          <SettingsRowButton label="프로필 관리" sublabel="아바타 · 닉네임 · 상태메시지" onClick={() => onSubView("profileManage")} isDarkMode={isDarkMode} />
+          <SettingsRowButton label="프로필 관리" sublabel="5-Way 프로필 · 실명/닉네임 표기" onClick={() => onSubView("profileManage")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton label="VLUÉ ID 확인" value={getMemberHandle()} onClick={() => onSubView("vlueId")} isDarkMode={isDarkMode} />
           <SettingsDivider isDarkMode={isDarkMode} />
@@ -767,13 +770,6 @@ export default function VlueSettingsPanel({
             onChange={(next) => onToggleDccBroadcast?.(next)}
             isDarkMode={isDarkMode}
           />
-          <div className="px-1 pb-2 pt-2">
-            <CallDetectionStatusBanner
-              isDarkMode={isDarkMode}
-              broadcastOn={Boolean(isVCIDOn || dccBroadcastOn)}
-              onNotice={showSettingNotice}
-            />
-          </div>
           <SettingsDivider isDarkMode={isDarkMode} />
           <SettingsRowButton
             label="앱 권한 허용"

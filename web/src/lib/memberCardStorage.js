@@ -90,7 +90,8 @@ export function scrubBrandDisplayName(name) {
 }
 
 /**
- * 프로필 패널 헤더용 — 실명/명함 이름 우선 (채팅 닉의 VLUÉ 오염 제외)
+ * 프로필 패널 헤더용 — 5-Way 표기 모드(실명/닉) 우선, 없으면 레거시 후보
+ * DCC/명함 실명은 getLegalName() / readLetteringFixedIdentity 를 사용한다.
  */
 export function getProfileHeaderName(fallbackName = "") {
   try {
@@ -104,6 +105,20 @@ export function getProfileHeaderName(fallbackName = "") {
     }
   } catch {
     /* ignore */
+  }
+
+  try {
+    const mode = String(localStorage.getItem("vlue_display_name_mode") || "nickname").toLowerCase();
+    const activeNick = scrubBrandDisplayName(localStorage.getItem("vlue_active_profile_nickname") || "");
+    const legal = scrubBrandDisplayName(getLegalName());
+    if (mode === "legal" && legal) return legal;
+    if (activeNick) return activeNick;
+    if (mode !== "legal" && (scrubBrandDisplayName(readChatNickname()) || scrubBrandDisplayName(readFeedNickname()))) {
+      return scrubBrandDisplayName(readChatNickname()) || scrubBrandDisplayName(readFeedNickname());
+    }
+    if (legal) return legal;
+  } catch {
+    /* fall through */
   }
 
   const candidates = [

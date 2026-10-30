@@ -65,6 +65,7 @@ export type GoogleUserProfile = {
   email: string | null;
   emailVerified: boolean;
   name: string | null;
+  picture: string | null;
 };
 
 export async function fetchGoogleUserFromAccessToken(accessToken: string): Promise<GoogleUserProfile> {
@@ -88,11 +89,13 @@ export async function fetchGoogleUserFromAccessToken(accessToken: string): Promi
   const email = typeof json.email === "string" ? json.email.trim() : "";
   const emailVerified = json.email_verified === true || json.email_verified === "true";
   const name = typeof json.name === "string" ? json.name.trim() : null;
+  const picture = typeof json.picture === "string" ? json.picture.trim() : null;
 
   return {
     id,
     email: email || null,
     emailVerified,
-    name
+    name,
+    picture: picture || null
   };
 }

@@ -38,7 +38,7 @@ export function resolveShowcaseBarOwnerLabel(card = {}, opts = {}) {
   const org = isVlueBrandOrganization(rawOrg) || isBlankCallIdentityLabel(rawOrg) ? "" : rawOrg;
   if (org) return org;
   if (!hideName) {
-    const name = String(card.name || card.displayName || "").trim();
+    const name = String(card.softDisplayName || card.name || card.displayName || "").trim();
     if (!isBlankCallIdentityLabel(name)) return name;
   }
   const handle = String(card.publicHandle || card.loginId || card.vlueId || card.feedId || "")
@@ -61,7 +61,9 @@ export function resolveShowcaseProfileBarLabel(card = {}, opts = {}) {
       (card.hideBroadcastName || card.showcaseStyle?.showBroadcastName === false)
   );
   if (!hideName) {
-    const name = String(card.name || card.displayName || card.legalName || "").trim();
+    const name = String(
+      card.softDisplayName || card.name || card.displayName || card.legalName || ""
+    ).trim();
     if (name) return name;
   }
   const handle = String(card.publicHandle || card.loginId || card.vlueId || "")
@@ -96,7 +98,8 @@ export function resolveSavedShowcasePersonLine(card = {}, opts = {}) {
 export function resolveDccFrontIdentityLines(card = {}) {
   const rawOrg = String(card.organization || card.companyName || "").trim();
   const org = isVlueBrandOrganization(rawOrg) ? "" : rawOrg;
-  const name = String(card.name || card.displayName || "").trim();
+  /* DCC 명함 — 본인인증 실명 고정 (softDisplayName 사용 금지) */
+  const name = String(card.legalName || card.name || card.displayName || "").trim();
   const title = String(card.title || card.jobTitle || "").trim();
   const department = String(card.department || "").trim();
   const roleParts = [department, title].filter(Boolean);

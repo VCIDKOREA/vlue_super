@@ -209,20 +209,27 @@ export type InstagramProfile = {
   appScopedUserId: string;
   username: string;
   accountType: string | null;
+  profilePictureUrl: string | null;
 };
 
 export async function fetchInstagramProfile(accessToken: string): Promise<InstagramProfile> {
-  const params = new URLSearchParams({
-    fields: "user_id,username,account_type",
-    access_token: String(accessToken || "").trim()
-  });
-  const res = await fetch(`${IG_GRAPH}/${IG_GRAPH_VERSION}/me?${params.toString()}`);
-  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
+  const token = String(accessToken || "").trim();
+  const tryFields = ["user_id,username,account_type,profile_picture_url", "user_id,username,account_type"];
+  let json: Record<string, unknown> = {};
+  let ok = false;
+  for (const fields of tryFields) {
+    const params = new URLSearchParams({ fields, access_token: token });
+    const res = await fetch(`${IG_GRAPH}/${IG_GRAPH_VERSION}/me?${params.toString()}`);
+    json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok) {
+      ok = true;
+      break;
+    }
+  }
+  if (!ok) {
     const errObj = json.error && typeof json.error === "object" ? (json.error as Record<string, unknown>) : null;
     const err =
-      (errObj && typeof errObj.message === "string" && errObj.message) ||
-      `Instagram 프로필 조회 실패 (${res.status})`;
+      (errObj && typeof errObj.message === "string" && errObj.message) || "Instagram 프로필 조회 실패";
     throw new Error(err);
   }
 
@@ -236,11 +243,15 @@ export async function fetchInstagramProfile(accessToken: string): Promise<Instag
   const username = String(row.username || "").trim();
   if (!igUserId) throw new Error("Instagram 계정 ID를 확인할 수 없습니다.");
 
+  const profilePictureUrl =
+    typeof row.profile_picture_url === "string" ? String(row.profile_picture_url).trim() : "";
+
   return {
     igUserId,
     appScopedUserId: String(row.id || igUserId).trim(),
     username: username || igUserId,
-    accountType: typeof row.account_type === "string" ? row.account_type : null
+    accountType: typeof row.account_type === "string" ? row.account_type : null,
+    profilePictureUrl: profilePictureUrl || null
   };
 }
 
