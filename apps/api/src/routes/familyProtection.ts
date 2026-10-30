@@ -7,6 +7,7 @@ import {
   listFamilyProtection,
   lookupFamilyInviteCandidates,
   parseFamilyRelation,
+  recordWardDeviceSeen,
   recordWardHeartbeat,
   recordWardMissedCall,
   rejectProtectionLink,
@@ -242,6 +243,24 @@ familyProtectionRoutes.post("/links/:linkId/revoke", requireUserHeader, async (c
 familyProtectionRoutes.post("/presence/heartbeat", requireUserHeader, async (c) => {
   const me = c.get("vlueUserId") as string;
   return c.json(await recordWardHeartbeat(me));
+});
+
+/**
+ * 안드로이드 백그라운드 센싱 — Screen On / UsageStats / 타앱 사용
+ * VLUE 미접속이어도 기기 실사용이면 lastDeviceSeenAt 갱신 (골든타임 A모드)
+ */
+familyProtectionRoutes.post("/presence/device-seen", requireUserHeader, async (c) => {
+  const me = c.get("vlueUserId") as string;
+  const body = (await c.req.json().catch(() => ({}))) as {
+    source?: string;
+    packageName?: string;
+  };
+  return c.json(
+    await recordWardDeviceSeen(me, {
+      source: body.source,
+      packageName: body.packageName
+    })
+  );
 });
 
 /** 노부모 기기 — 부재중 전화 1건 (네이티브 통화앱 연동) */

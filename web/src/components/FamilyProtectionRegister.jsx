@@ -321,14 +321,45 @@ export default function FamilyProtectionRegister({ isDarkMode = false, prefillHa
                 원격 감지 시 본인 단말은 묵음·앱 진입 차단되고, 가족 전원에게 긴급 푸시가 갑니다. 앱 중단/삭제 시 마지막 위치는 24시간 V-MAP에 유지됩니다.
               </p>
               <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
-                <span>앱 미접속</span>
+                <span>골든타임(미접속·미작동) 알림</span>
                 <input type="checkbox" checked={fp.noAppEnabled} onChange={(e) => fp.setNoAppEnabled(e.target.checked)} />
               </label>
               {fp.noAppEnabled ? (
-                <label className={`mt-1 block text-[10px] ${sub}`}>
-                  미접속 (시간)
-                  <input type="number" min={1} max={168} value={fp.noAppHours} onChange={(e) => fp.setNoAppHours(e.target.value)} className={`mt-0.5 w-full rounded-lg border px-2 py-1.5 text-[12px] ${inputCls}`} />
-                </label>
+                <div className="mt-1.5 space-y-1.5">
+                  <p className={`text-[10px] font-bold ${strong}`}>감지 기준 (오탐 방지)</p>
+                  <label className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 text-[10px] leading-snug ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50"} ${sub}`}>
+                    <input
+                      type="radio"
+                      name="noAppDetectionMode"
+                      className="mt-0.5 shrink-0"
+                      checked={fp.noAppDetectionMode === "device_idle"}
+                      onChange={() => fp.setNoAppDetectionMode("device_idle")}
+                    />
+                    <span>
+                      <span className={`font-bold ${strong}`}>A. 휴대기기 실제 미작동</span>
+                      <span className="mt-0.5 block">
+                        안드로이드 백그라운드 센싱(화면 켜짐·UsageStats). 유튜브·전화 등 타 앱 사용 중이면 알림하지 않습니다.
+                      </span>
+                    </span>
+                  </label>
+                  <label className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 text-[10px] leading-snug ${isDarkMode ? "border-white/10 bg-white/5" : "border-slate-200 bg-slate-50"} ${sub}`}>
+                    <input
+                      type="radio"
+                      name="noAppDetectionMode"
+                      className="mt-0.5 shrink-0"
+                      checked={fp.noAppDetectionMode !== "device_idle"}
+                      onChange={() => fp.setNoAppDetectionMode("app_open")}
+                    />
+                    <span>
+                      <span className={`font-bold ${strong}`}>B. VLUE 앱 미접속</span>
+                      <span className="mt-0.5 block">VLUE 앱을 열지 않은 시간 기준으로 알림합니다.</span>
+                    </span>
+                  </label>
+                  <label className={`mt-1 block text-[10px] ${sub}`}>
+                    기준 시간
+                    <input type="number" min={1} max={168} value={fp.noAppHours} onChange={(e) => fp.setNoAppHours(e.target.value)} className={`mt-0.5 w-full rounded-lg border px-2 py-1.5 text-[12px] ${inputCls}`} />
+                  </label>
+                </div>
               ) : null}
               <label className={`mt-2 flex items-center justify-between text-[11px] ${sub}`}>
                 <span>부재중 전화</span>

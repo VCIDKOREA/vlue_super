@@ -125,6 +125,19 @@ export async function revokeFamilyProtectionLink(linkId) {
   return parseJson(res);
 }
 
+export async function postFamilyDeviceSeen(meta = {}) {
+  const res = await vlueAuthFetch(apiUrl("/api/family-protection/presence/device-seen"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source: meta.source || "web",
+      packageName: meta.packageName || undefined
+    })
+  });
+  if (!res.ok) throw new Error("device-seen failed");
+  return res.json().catch(() => ({ ok: true }));
+}
+
 export async function postFamilyHeartbeat() {
   const res = await vlueAuthFetch(apiUrl("/api/family-protection/presence/heartbeat"), {
     method: "POST",

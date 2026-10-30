@@ -6,10 +6,22 @@ export const DEFAULT_MISSED_CALL_THRESHOLD = 3;
 export const DEFAULT_LONG_CALL_MINUTES = 10;
 export const DEFAULT_BANK_THRESHOLD_KRW = 10000;
 
+/** device_idle = 실기기 미작동(Screen/UsageStats) · app_open = VLUE 앱 미접속 */
+export type NoAppDetectionMode = "device_idle" | "app_open";
+
+export function normalizeNoAppDetectionMode(raw: unknown): NoAppDetectionMode {
+  const s = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (s === "device_idle" || s === "device" || s === "idle" || s === "sensing") return "device_idle";
+  return "app_open";
+}
+
 export type FamilyProtectionSettingsRow = {
   userId: string;
   alertNoAppEnabled: boolean;
   alertNoAppHours: number;
+  alertNoAppDetectionMode: NoAppDetectionMode;
   alertMissedCallEnabled: boolean;
   alertMissedCallThreshold: number;
   alertChildSiteEnabled: boolean;
@@ -28,6 +40,7 @@ export function defaultFamilySettings(userId: string): FamilyProtectionSettingsR
     userId,
     alertNoAppEnabled: true,
     alertNoAppHours: DEFAULT_NO_APP_HOURS,
+    alertNoAppDetectionMode: "app_open",
     alertMissedCallEnabled: true,
     alertMissedCallThreshold: DEFAULT_MISSED_CALL_THRESHOLD,
     alertChildSiteEnabled: true,
@@ -82,6 +95,7 @@ export function mergeLinkAlertConfig(
   return {
     noAppEnabled: link.alertNoAppEnabled ?? settings.alertNoAppEnabled,
     noAppHours: link.alertNoAppHours ?? settings.alertNoAppHours,
+    noAppDetectionMode: normalizeNoAppDetectionMode(settings.alertNoAppDetectionMode),
     missedCallEnabled: link.alertMissedCallEnabled ?? settings.alertMissedCallEnabled,
     missedCallThreshold: link.alertMissedCallThreshold ?? settings.alertMissedCallThreshold,
     childSiteEnabled: settings.alertChildSiteEnabled,

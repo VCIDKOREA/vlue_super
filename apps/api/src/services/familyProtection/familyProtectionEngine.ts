@@ -20,7 +20,9 @@ import { matchRiskySite } from "./riskySiteMatcher.js";
 import { listBankConsentsForUser } from "./familyProtectionChildBank.js";
 import {
   defaultFamilySettings,
-  getOrCreateFamilySettings as getOrCreateSettingsFromHelper
+  getOrCreateFamilySettings as getOrCreateSettingsFromHelper,
+  mergeLinkAlertConfig,
+  normalizeNoAppDetectionMode
 } from "./familyProtectionSettingsHelper.js";
 import { getFamilyCircleOverview, relationDisplayLabel } from "./familyProtectionCircle.js";
 import { notifyFamilyGuardian } from "./familyProtectionNotify.js";
@@ -31,7 +33,11 @@ const ALERT_COOLDOWN_HOURS = 12;
 
 type WardRole = "elder" | "child" | "observer";
 type FamilyRelation = "parent" | "child" | "relative";
-type AlertKind = "elder_no_app_24h" | "elder_missed_calls" | "child_risky_site";
+type AlertKind =
+  | "elder_no_app_24h"
+  | "elder_device_absent"
+  | "elder_missed_calls"
+  | "child_risky_site";
 
 export const USAGE_GUIDE = {
   summary:
@@ -42,7 +48,7 @@ export const USAGE_GUIDE = {
     "③ 위치 확인(V-MAP): 동의·연결된 구성원 위치 공유. 앱 중단/삭제 시 마지막 확인 위치 24시간 유지",
     "④ 원격보안: TeamViewer·AnyDesk 등 작동 시 본인 단말 묵음·진입 차단 + 가족 전원 1차 긴급 푸시",
     "⑤ 원격 중 강제종료/삭제 시 2차 푸시. 푸시 탭 → V-MAP 마지막 확인 위치로 이동",
-    "⑥ 부모: 미접속·부재중·비회원·모르는 번호 장통화·정부기관 통화 알림",
+    "⑥ 부모: 골든타임(기기 미작동 A / VLUE 미접속 B)·부재중·비회원 장통화·정부기관 통화 알림",
     "⑦ 자녀: 유해·도박·VPN 사이트 (계좌·입출금 알림은 제공하지 않음)",
     "⑧ 네이티브 앱에서 통화·설치앱·10초 하트비트 연동 (docs/FAMILY_PROTECTION.md)"
   ]
@@ -89,6 +95,15 @@ function buildElderNoAppBody(
 ): string {
   const last = formatFamilyLastAccessAt(lastAt);
   return `${name} 님은 ${hours}시간 이상 VLUE 앱에 접속하지 않았습니다. (${last})`;
+}
+
+function buildElderDeviceIdleBody(
+  name: string,
+  hours: number,
+  lastAt: Date | null | undefined
+): string {
+  const last = formatFamilyLastAccessAt(lastAt).replace("마지막 접속", "마지막 기기 활동");
+  return `${name} 님의 휴대기기가 ${hours}시간 이상 실제 미작동(화면·앱 사용 없음)으로 감지되었습니다. (${last})`;
 }
 
 function relationToWardRole(relation: FamilyRelation): WardRole {
@@ -274,37 +289,15 @@ function mergeAlertConfig(
     alertMissedCallEnabled: boolean | null;
     alertMissedCallThreshold: number | null;
   },
-  settings: {
-    alertNoAppEnabled: boolean;
-    alertNoAppHours: number;
-    alertMissedCallEnabled: boolean;
-    alertMissedCallThreshold: number;
-    alertChildSiteEnabled: boolean;
-    alertElderLongCallEnabled: boolean;
-    alertElderLongCallMinutes: number;
-    alertElderRemoteAppEnabled: boolean;
-    alertElderGovCallEnabled: boolean;
-    alertChildBankEnabled: boolean;
-    alertChildBankAllTx: boolean;
-    alertChildBankThresholdKrw: number;
-    alertChildUnknownPayeeEnabled: boolean;
-  }
+  settings: Parameters<typeof mergeLinkAlertConfig>[1]
 ) {
-  return {
-    noAppEnabled: link.alertNoAppEnabled ?? settings.alertNoAppEnabled,
-    noAppHours: link.alertNoAppHours ?? settings.alertNoAppHours,
-    missedCallEnabled: link.alertMissedCallEnabled ?? settings.alertMissedCallEnabled,
-    missedCallThreshold: link.alertMissedCallThreshold ?? settings.alertMissedCallThreshold,
-    childSiteEnabled: settings.alertChildSiteEnabled,
-    longCallEnabled: settings.alertElderLongCallEnabled,
-    longCallMinutes: settings.alertElderLongCallMinutes,
-    remoteAppEnabled: settings.alertElderRemoteAppEnabled,
-    govCallEnabled: settings.alertElderGovCallEnabled,
-    childBankEnabled: false,
-    childBankAllTx: false,
-    childBankThresholdKrw: settings.alertChildBankThresholdKrw,
-    childUnknownPayeeEnabled: false
-  };
+  return mergeLinkAlertConfig(link, {
+    ...defaultFamilySettings(settings.userId || "unknown"),
+    ...settings,
+    alertNoAppDetectionMode: normalizeNoAppDetectionMode(
+      (settings as { alertNoAppDetectionMode?: string }).alertNoAppDetectionMode
+    )
+  });
 }
 
 async function recentAlertExists(wardUserId: string, kind: AlertKind) {
@@ -327,7 +320,7 @@ async function notifyGuardian(
   await notifyFamilyGuardian(guardianUserId, wardUserId, kind, title, body, payload);
 }
 
-/** 앱 포그라운드 진입 시만 기록 (5분 주기 없음) */
+/** 앱 포그라운드 진입 시만 기록 (5분 주기 없음) — VLUE 앱 접속 + 기기 활동 동시 갱신 */
 export async function recordWardHeartbeat(wardUserId: string) {
   const now = new Date();
   await expireChildProtectionIfAdult(wardUserId, now).catch((err) => {
@@ -338,12 +331,38 @@ export async function recordWardHeartbeat(wardUserId: string) {
     update: {
       lastAppAccessAt: now,
       lastDeviceSeenAt: now,
+      deviceAbsentSince: null,
       missedCallStreak: 0,
       missedCallStreakSince: null
     },
     create: { wardUserId, lastAppAccessAt: now, lastDeviceSeenAt: now }
   });
   return { ok: true, at: now.toISOString() };
+}
+
+/**
+ * 안드로이드 백그라운드 센싱(Screen On / UsageStats / 터치·타앱 사용) —
+ * VLUE 앱 미오픈이어도 기기 실사용이면 lastDeviceSeenAt만 갱신 (오탐 방지 A모드)
+ */
+export async function recordWardDeviceSeen(
+  wardUserId: string,
+  meta?: { source?: string; packageName?: string }
+) {
+  const now = new Date();
+  await familyProtectionDb.familyWardPresence.upsert({
+    where: { wardUserId },
+    update: {
+      lastDeviceSeenAt: now,
+      deviceAbsentSince: null
+    },
+    create: { wardUserId, lastDeviceSeenAt: now }
+  });
+  return {
+    ok: true,
+    at: now.toISOString(),
+    source: String(meta?.source || "device").slice(0, 40),
+    packageName: String(meta?.packageName || "").slice(0, 120) || undefined
+  };
 }
 
 /** 부재중 전화 1건 누적 — 기준 통과 시 보호자 푸시 */
@@ -454,17 +473,67 @@ export async function runElderProtectionChecks() {
     const name = await wardDisplayName(wardUserId);
 
     if (cfg.noAppEnabled) {
-      const noAppSince = hoursAgo(cfg.noAppHours);
-      if (!presence?.lastAppAccessAt || presence.lastAppAccessAt < noAppSince) {
-        if (!(await recentAlertExists(wardUserId, "elder_no_app_24h"))) {
-          const hours = cfg.noAppHours;
-          const body = buildElderNoAppBody(name, hours, presence?.lastAppAccessAt ?? null);
+      const hours = cfg.noAppHours;
+      const since = hoursAgo(hours);
+      const mode = cfg.noAppDetectionMode === "device_idle" ? "device_idle" : "app_open";
+
+      if (mode === "device_idle") {
+        /* A: 휴대기기 실제 미작동 — lastDeviceSeenAt */
+        const lastSeen = presence?.lastDeviceSeenAt ?? null;
+        const idle = !lastSeen || lastSeen < since;
+        if (idle && !(await recentAlertExists(wardUserId, "elder_device_absent"))) {
+          if (!presence?.deviceAbsentSince) {
+            await familyProtectionDb.familyWardPresence.upsert({
+              where: { wardUserId },
+              update: { deviceAbsentSince: lastSeen || since },
+              create: { wardUserId, deviceAbsentSince: lastSeen || since }
+            });
+          }
+          const body = buildElderDeviceIdleBody(name, hours, lastSeen);
+          await familyProtectionDb.familyProtectionAlert.create({
+            data: {
+              wardUserId,
+              kind: "elder_device_absent",
+              title: "[가족 보호] 기기 미작동(골든타임)",
+              body,
+              payloadJson: {
+                detectionMode: "device_idle",
+                lastDeviceSeenAt: lastSeen?.toISOString() || null,
+                noAppHours: hours
+              },
+              guardiansNotifiedAt: new Date()
+            }
+          });
+          await notifyGuardian(
+            link.guardianUserId,
+            wardUserId,
+            "elder_device_absent",
+            "[가족 보호] 기기 미작동(골든타임)",
+            body,
+            {
+              detectionMode: "device_idle",
+              lastDeviceSeenAt: lastSeen?.toISOString() || null,
+              noAppHours: hours
+            }
+          );
+          sent += 1;
+        }
+      } else {
+        /* B: VLUE 앱 미접속 — lastAppAccessAt */
+        const lastApp = presence?.lastAppAccessAt ?? null;
+        if ((!lastApp || lastApp < since) && !(await recentAlertExists(wardUserId, "elder_no_app_24h"))) {
+          const body = buildElderNoAppBody(name, hours, lastApp);
           await familyProtectionDb.familyProtectionAlert.create({
             data: {
               wardUserId,
               kind: "elder_no_app_24h",
-              title: "[가족 보호] 앱 미접속",
+              title: "[가족 보호] 앱 미접속(골든타임)",
               body,
+              payloadJson: {
+                detectionMode: "app_open",
+                lastAppAccessAt: lastApp?.toISOString() || null,
+                noAppHours: hours
+              },
               guardiansNotifiedAt: new Date()
             }
           });
@@ -472,10 +541,11 @@ export async function runElderProtectionChecks() {
             link.guardianUserId,
             wardUserId,
             "elder_no_app_24h",
-            "[가족 보호] 앱 미접속",
+            "[가족 보호] 앱 미접속(골든타임)",
             body,
             {
-              lastAppAccessAt: presence?.lastAppAccessAt?.toISOString() || null,
+              detectionMode: "app_open",
+              lastAppAccessAt: lastApp?.toISOString() || null,
               noAppHours: hours
             }
           );
@@ -1022,6 +1092,7 @@ export async function updateProtectionSettings(
   input: Partial<{
     alertNoAppEnabled: boolean;
     alertNoAppHours: number;
+    alertNoAppDetectionMode: string;
     alertMissedCallEnabled: boolean;
     alertMissedCallThreshold: number;
     alertChildSiteEnabled: boolean;
@@ -1039,6 +1110,10 @@ export async function updateProtectionSettings(
   const threshold = Math.min(20, Math.max(1, Math.floor(Number(input.alertMissedCallThreshold) || DEFAULT_MISSED_CALL_THRESHOLD)));
   const longMin = Math.min(180, Math.max(3, Math.floor(Number(input.alertElderLongCallMinutes) || 10)));
   const bankThreshold = Math.min(10_000_000, Math.max(1000, Math.floor(Number(input.alertChildBankThresholdKrw) || 10000)));
+  const detectionMode =
+    input.alertNoAppDetectionMode !== undefined
+      ? normalizeNoAppDetectionMode(input.alertNoAppDetectionMode)
+      : undefined;
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
   if (!user) {
@@ -1061,6 +1136,7 @@ export async function updateProtectionSettings(
     update: {
       ...(input.alertNoAppEnabled !== undefined ? { alertNoAppEnabled: Boolean(input.alertNoAppEnabled) } : {}),
       ...(input.alertNoAppHours !== undefined ? { alertNoAppHours: hours } : {}),
+      ...(detectionMode !== undefined ? { alertNoAppDetectionMode: detectionMode } : {}),
       ...(input.alertMissedCallEnabled !== undefined
         ? { alertMissedCallEnabled: Boolean(input.alertMissedCallEnabled) }
         : {}),
@@ -1091,6 +1167,7 @@ export async function updateProtectionSettings(
       userId,
       alertNoAppEnabled: input.alertNoAppEnabled ?? true,
       alertNoAppHours: hours,
+      alertNoAppDetectionMode: detectionMode ?? "app_open",
       alertMissedCallEnabled: input.alertMissedCallEnabled ?? true,
       alertMissedCallThreshold: threshold,
       alertChildSiteEnabled: input.alertChildSiteEnabled ?? true,

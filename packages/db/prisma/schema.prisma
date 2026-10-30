@@ -2195,6 +2195,12 @@ model FamilyProtectionSettings {
   user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   alertNoAppEnabled             Boolean  @default(true) @map("alert_no_app_enabled")
   alertNoAppHours               Int      @default(24) @map("alert_no_app_hours")
+  /**
+   * 골든타임(미접속) 감지 기준
+   * - device_idle: 안드로이드 백그라운드 센싱(Screen On·UsageStats) 기반 실기기 미작동
+   * - app_open: VLUE 앱 미접속
+   */
+  alertNoAppDetectionMode       String   @default("app_open") @map("alert_no_app_detection_mode") @db.VarChar(24)
   alertMissedCallEnabled        Boolean  @default(true) @map("alert_missed_call_enabled")
   alertMissedCallThreshold      Int      @default(3) @map("alert_missed_call_threshold")
   alertChildSiteEnabled         Boolean  @default(true) @map("alert_child_site_enabled")

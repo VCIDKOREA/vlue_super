@@ -26,6 +26,8 @@ export function displayFamilyUser(u) {
 function applySettingsFromRow(s, setters) {
   setters.setNoAppEnabled(s.alertNoAppEnabled !== false);
   setters.setNoAppHours(Number(s.alertNoAppHours) || 24);
+  const mode = String(s.alertNoAppDetectionMode || "app_open").toLowerCase();
+  setters.setNoAppDetectionMode(mode === "device_idle" ? "device_idle" : "app_open");
   setters.setMissedCallEnabled(s.alertMissedCallEnabled !== false);
   setters.setMissedCallThreshold(Number(s.alertMissedCallThreshold) || 3);
   setters.setChildSiteEnabled(s.alertChildSiteEnabled !== false);
@@ -49,6 +51,7 @@ export function useFamilyProtection() {
 
   const [noAppEnabled, setNoAppEnabled] = useState(true);
   const [noAppHours, setNoAppHours] = useState(24);
+  const [noAppDetectionMode, setNoAppDetectionMode] = useState("app_open");
   const [missedCallEnabled, setMissedCallEnabled] = useState(true);
   const [missedCallThreshold, setMissedCallThreshold] = useState(3);
   const [childSiteEnabled, setChildSiteEnabled] = useState(true);
@@ -64,6 +67,7 @@ export function useFamilyProtection() {
   const setters = {
     setNoAppEnabled,
     setNoAppHours,
+    setNoAppDetectionMode,
     setMissedCallEnabled,
     setMissedCallThreshold,
     setChildSiteEnabled,
@@ -182,6 +186,8 @@ export function useFamilyProtection() {
     setNoAppEnabled,
     noAppHours,
     setNoAppHours,
+    noAppDetectionMode,
+    setNoAppDetectionMode,
     missedCallEnabled,
     setMissedCallEnabled,
     missedCallThreshold,
@@ -210,6 +216,7 @@ export function useFamilyProtection() {
         await updateFamilyProtectionSettings({
           alertNoAppEnabled: noAppEnabled,
           alertNoAppHours: Number(noAppHours),
+          alertNoAppDetectionMode: noAppDetectionMode === "device_idle" ? "device_idle" : "app_open",
           alertMissedCallEnabled: missedCallEnabled,
           alertMissedCallThreshold: Number(missedCallThreshold),
           alertChildSiteEnabled: childSiteEnabled,

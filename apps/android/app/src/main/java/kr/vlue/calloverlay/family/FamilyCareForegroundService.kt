@@ -20,10 +20,12 @@ import kr.vlue.calloverlay.VlueForegroundHelper
  * 가족 보호 백그라운드 유지 —
  * - 배터리: 5분
  * - 원격제어 앱 스캔: 10초 (원격 활성/감시)
+ * - 골든타임 A모드: Screen On / UsageStats 기기 활동 보고
  */
 class FamilyCareForegroundService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var batteryAccumMs = 0L
+    private var deviceSeenAccumMs = 0L
 
     private val tick = object : Runnable {
         override fun run() {
@@ -39,6 +41,11 @@ class FamilyCareForegroundService : Service() {
                     batteryAccumMs = 0L
                     val snap = FamilyBatteryMonitor.read(this@FamilyCareForegroundService)
                     VlueFamilyBridge.dispatchBatteryState(snap.percent, snap.isCharging)
+                }
+                deviceSeenAccumMs += REMOTE_TICK_MS
+                if (deviceSeenAccumMs >= DEVICE_SEEN_TICK_MS) {
+                    deviceSeenAccumMs = 0L
+                    FamilyDeviceActivitySensor.tick(this@FamilyCareForegroundService)
                 }
             } catch (_: Exception) {
                 /* ignore */
@@ -57,6 +64,7 @@ class FamilyCareForegroundService : Service() {
             stopSelf()
             return
         }
+        FamilyDeviceActivitySensor.ensureStarted(this)
         handler.post(tick)
     }
 
@@ -98,7 +106,7 @@ class FamilyCareForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("VLUÉ 가족 보호")
-            .setContentText("배터리·보안 상태를 가족과 공유 중입니다.")
+            .setContentText("배터리·보안·기기활동(골든타임)을 가족과 공유 중입니다.")
             .setContentIntent(pi)
             .setOngoing(true)
             .build()
@@ -109,6 +117,7 @@ class FamilyCareForegroundService : Service() {
         private const val NOTIF_ID = 4105
         private const val REMOTE_TICK_MS = 10_000L
         private const val BATTERY_TICK_MS = 5 * 60 * 1000L
+        private const val DEVICE_SEEN_TICK_MS = 60_000L
 
         fun start(context: Context) {
             val i = Intent(context, FamilyCareForegroundService::class.java)
