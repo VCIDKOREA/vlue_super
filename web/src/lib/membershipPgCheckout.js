@@ -24,7 +24,9 @@ export function membershipOrderName(opts = {}) {
 
   switch (kind) {
     case "b2b":
-      return `VLUE 비즈니스 플랜 (${cycleLabel})`;
+      return `VLUE B2B 플랜 (${cycleLabel})`;
+    case "b2b_admin":
+      return `VLUE B2B 대표 관리자 (${cycleLabel})`;
     case "extension_line":
       return `VLUE 내선 대표번호 추가 회선 (${cycleLabel})`;
     case "multi_profile":
@@ -55,7 +57,8 @@ export async function openPaymentGateway({
     throw new Error("결제 설정(Store/Channel)이 없습니다. 웹 배포 환경변수를 확인해 주세요.");
   }
   const productKind = kind || tier || "paid";
-  const membershipTier = tier === "b2b" ? "b2b" : productKind === "b2b" ? "b2b" : "paid";
+  const membershipTier =
+    tier === "b2b" || productKind === "b2b" || productKind === "b2b_admin" ? "b2b" : "paid";
   // 심사 보완: 월간 결제 전용 고정
   const cycle = "monthly";
   const orderName = membershipOrderName({ kind: productKind, billingCycle: cycle });

@@ -257,6 +257,22 @@ export default function App() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
+      if (after === 'checkout' || (after && after.startsWith('checkout/'))) {
+        sessionStorage.removeItem(AFTER_LOGIN_KEY);
+        const plan = after.includes('/') ? after.split('/')[1] : '';
+        if (plan) {
+          try {
+            sessionStorage.setItem('vlue_checkout_plan', plan);
+          } catch {
+            /* ignore */
+          }
+        }
+        const hash = plan ? `checkout/${plan}` : 'checkout';
+        setRoute({ view: 'checkout', legalScrollId: plan || undefined });
+        window.location.hash = hash;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
     } catch {
       /* ignore */
     }
@@ -380,9 +396,12 @@ export default function App() {
         {view === 'checkout' && (
           <MembershipCheckoutPage
             user={user}
+            initialPlanId={legalScrollId || undefined}
             onLoginClick={() => {
               try {
-                sessionStorage.setItem(AFTER_LOGIN_KEY, 'checkout');
+                const plan = legalScrollId || sessionStorage.getItem('vlue_checkout_plan') || 'paid';
+                sessionStorage.setItem(AFTER_LOGIN_KEY, `checkout/${plan}`);
+                sessionStorage.setItem('vlue_checkout_plan', plan);
               } catch {
                 /* ignore */
               }

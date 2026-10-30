@@ -54,17 +54,31 @@ const CARD_PART_GUIDE: Record<ShowcaseDemoGrade, { title: string; intro: string;
   },
 };
 export default function PricingPage({ user, onLoginClick, onDownloadClick, onCheckoutClick }: PricingPageProps) {
-  const goWebCheckout = () => {
+  const goWebCheckout = (tierId = 'paid') => {
+    if (tierId === 'free') {
+      if (onDownloadClick) onDownloadClick();
+      else if (!user && onLoginClick) onLoginClick();
+      return;
+    }
+    const plan =
+      tierId === 'extension_line' || tierId === 'b2b' || tierId === 'b2b_admin' ? tierId : 'paid';
+    try {
+      sessionStorage.setItem('vlue_checkout_plan', plan);
+    } catch {
+      /* ignore */
+    }
+    try {
+      window.location.hash = `checkout/${plan}`;
+      return;
+    } catch {
+      /* fall through */
+    }
     if (onCheckoutClick) {
       onCheckoutClick();
       return;
     }
-    try {
-      window.location.hash = 'checkout';
-    } catch {
-      if (!user && onLoginClick) onLoginClick();
-      else if (onDownloadClick) onDownloadClick();
-    }
+    if (!user && onLoginClick) onLoginClick();
+    else if (onDownloadClick) onDownloadClick();
   };
   const [activeGrade, setActiveGrade] = useState<ShowcaseDemoGrade>('fss1332');
   const [tierView, setTierView] = useState<MarketingViewMode>('card');
@@ -100,7 +114,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick, onChe
           </p>
           <button
             type="button"
-            onClick={goWebCheckout}
+            onClick={() => goWebCheckout('paid')}
             className="mt-6 inline-flex items-center justify-center rounded-xl bg-primary-600 px-6 py-3 text-sm font-extrabold text-white shadow-md shadow-primary-500/20 hover:bg-primary-700"
           >
             플랜 선택 · 결제하기
@@ -141,7 +155,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick, onChe
             user={user}
             onLoginClick={onLoginClick}
             onDownloadClick={onDownloadClick}
-            onApplyTier={() => goWebCheckout()}
+            onApplyTier={(tierId) => goWebCheckout(tierId)}
           />
         </div>
 
@@ -337,7 +351,7 @@ export default function PricingPage({ user, onLoginClick, onDownloadClick, onChe
             <div className="flex-shrink-0">
               <button
                 type="button"
-                onClick={goWebCheckout}
+                onClick={() => goWebCheckout('b2b')}
                 className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-gray-900 font-bold text-sm rounded-2xl transition-all whitespace-nowrap flex items-center gap-2"
               >
                 <Building2 className="w-4 h-4" />
