@@ -52,4 +52,16 @@ object FamilyProtectionPrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_REMOTE_BLOCK_PKG, "")
             .orEmpty()
+
+    /**
+     * 로그아웃 시 가족 보호 로컬 상태 초기화.
+     * - 계정 전환 후 이전 사용자의 보고/차단 상태가 잔류하면
+     *   새 사용자의 가족에게 알림이 누락되거나 오발송될 수 있다.
+     */
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .apply()
+    }
 }

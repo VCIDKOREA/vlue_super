@@ -1200,6 +1200,24 @@ authRoutes.post("/devices/fcm-token", requireUserHeader, async (c) => {
   }
 });
 
+/** 로그아웃 시 FCM 토큰 정리 — 계정 전환 후 이전 사용자 알림 수신 방지 */
+authRoutes.delete("/devices/fcm-token", requireUserHeader, async (c) => {
+  try {
+    const uid = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as {
+      deviceToken?: string;
+    };
+    const { clearUserFcmTokens } = await import("../services/userDeviceFcm.js");
+    const result = await clearUserFcmTokens(uid, {
+      deviceToken: body.deviceToken || null
+    });
+    return c.json({ ok: result.ok, cleared: result.cleared });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return c.json({ error: msg }, 500);
+  }
+});
+
 /** 네이버 OAuth 콜백 뼈대 — NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 설정 후 토큰 교환 확장 */
 authRoutes.get("/callback/naver", async (c) => {
   const error = c.req.query("error");

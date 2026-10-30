@@ -108,4 +108,64 @@ object VlueFcmRegistrar {
             .remove(KEY_LAST_UPLOAD)
             .apply()
     }
+
+    /**
+     * 로그아웃 시 서버에서 FCM 토큰 해제 — 계정 전환 후 이전 사용자 알림 수신 방지.
+     * 비동기로 실행하여 로그아웃 플로우를 차단하지 않음.
+     */
+    fun clearTokenOnLogoutAsync(context: Context) {
+        Thread { clearTokenOnLogoutBlocking(context) }.start()
+    }
+
+    private fun clearTokenOnLogoutBlocking(context: Context): Boolean {
+        val app = context.applicationContext
+        return try {
+            val userId = LetteringPrefs.getUserId(app)?.trim().orEmpty()
+            val accessToken = LetteringPrefs.getAccessToken(app)?.trim().orEmpty()
+            val deviceToken = LetteringPrefs.getDeviceToken(app)?.trim().orEmpty()
+            if (userId.isEmpty() || accessToken.isEmpty()) {
+                Log.i(TAG, "logout clear skip: no session")
+                clearUploadCache(app)
+                return true
+            }
+
+            val api = BuildConfig.API_BASE_URL.trimEnd('/')
+            val url = URL("$api/api/auth/devices/fcm-token")
+            val body = JSONObject()
+            if (deviceToken.isNotEmpty()) {
+                body.put("deviceToken", deviceToken)
+            }
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "DELETE"
+                connectTimeout = 10_000
+                readTimeout = 10_000
+                doOutput = body.length() > 2
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer $accessToken")
+                setRequestProperty("X-VLUE-User-Id", userId)
+                setRequestProperty("X-VLUE-Platform", "app")
+                setRequestProperty("User-Agent", "VLUE-Android-App FcmRegistrar")
+            }
+            if (body.length() > 2) {
+                conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            }
+            val code = conn.responseCode
+            conn.disconnect()
+
+            clearUploadCache(app)
+
+            if (code in 200..299) {
+                Log.i(TAG, "logout clear ok")
+                true
+            } else {
+                Log.w(TAG, "logout clear failed http=$code")
+                false
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "logout clear error: ${e.message}")
+            clearUploadCache(app)
+            false
+        }
+    }
 }

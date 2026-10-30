@@ -1263,6 +1263,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                   try{return window.Android&&window.Android.getLetteringPermissionStatusJson?window.Android.getLetteringPermissionStatusJson():null;}
                   catch(e){return null;}
                 },
+                setLetteringEnabled:function(on){
+                  try{
+                    if(window.Android&&window.Android.setLetteringEnabled){
+                      window.Android.setLetteringEnabled(on===true||on===1||on==='1'||on==='true'?'1':'0');
+                    }
+                  }catch(e){}
+                },
                 requestLetteringPermissions:function(){
                   try{if(window.Android&&window.Android.requestLetteringPermissions)window.Android.requestLetteringPermissions();}catch(e){}
                 },
@@ -1557,9 +1564,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
 
         @android.webkit.JavascriptInterface
         fun clearUserSession() {
+            /* 서버에서 FCM 토큰 해제 — 계정 전환 후 이전 사용자 알림 수신 방지
+             * 세션 정리 전에 호출해야 auth 토큰 사용 가능 */
+            kr.vlue.calloverlay.push.VlueFcmRegistrar.clearTokenOnLogoutAsync(activity)
             LetteringIntegration.clearUserSession(activity)
             LetteringPrefs.setDeviceToken(activity, null)
-            kr.vlue.calloverlay.push.VlueFcmRegistrar.clearUploadCache(activity)
+            /* 가족 보호 로컬 상태 초기화 — 이전 사용자의 보고/차단 상태 제거 */
+            kr.vlue.calloverlay.family.FamilyProtectionPrefs.clear(activity)
         }
 
         /** 웹 SSE·알림함 → OS 상태바 푸시 (FCM 미등록 기기 보완) */
@@ -1631,23 +1642,40 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         @android.webkit.JavascriptInterface
         fun setLetteringEnabled(value: String) {
             activity.runOnUiThread {
-                val on = value == "1" || value == "true"
+                val on =
+                    value.equals("1", ignoreCase = true) ||
+                        value.equals("true", ignoreCase = true) ||
+                        value.equals("yes", ignoreCase = true)
                 if (on) {
-                    /* 웹 토글 ON → 네이티브도 먼저 켠다. 권한 부족 시 안내만 추가 */
+                    /* 쇼케이스 ON → 통화 감지 ON. 권한 부족일 때만 OS 창 */
                     LetteringPrefs.setLetteringEnabled(activity, true)
+                    LetteringIntegration.ensureLetteringArmedIfReady(activity)
+                    LetteringCallMonitorService.syncWithPrefs(activity)
                     if (!LetteringPermissionHelper.hasCallOverlayReady(activity)) {
-                        activity.promptLetteringPermissions()
+                        activity.requestLetteringOsPermissionsDirect()
                     }
+                    activity.notifyWebPermissionStatus()
                 } else {
                     LetteringPrefs.setLetteringEnabled(activity, false)
+                    activity.notifyWebPermissionStatus()
                 }
             }
         }
 
         @android.webkit.JavascriptInterface
         fun requestLetteringPermissions() {
-            // 웹 사전 고지 후 호출 — 추가 다이얼로그 없이 OS 권한 창을 바로 띄움
-            activity.runOnUiThread { activity.requestLetteringOsPermissionsDirect() }
+            activity.runOnUiThread {
+                /* 이미 준비됐으면 재요청·다이얼로그 없이 모니터만 동기화 */
+                if (LetteringPermissionHelper.hasCallOverlayReady(activity)) {
+                    if (!LetteringPrefs.isUserOptedOut(activity)) {
+                        LetteringPrefs.setLetteringEnabled(activity, true)
+                    }
+                    LetteringCallMonitorService.syncWithPrefs(activity)
+                    activity.notifyWebPermissionStatus()
+                    return@runOnUiThread
+                }
+                activity.requestLetteringOsPermissionsDirect()
+            }
         }
 
         @android.webkit.JavascriptInterface
