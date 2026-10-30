@@ -14,7 +14,7 @@ import { buildDistanceKmByUserId, type GeoPoint } from "../dcc/dccAddressDistanc
 import { geocodeDccAddress } from "../../integrations/kakao/kakaoAddressGeocode.js";
 import { normalizeShowcaseTag } from "./showcaseTagsService.js";
 
-export type ShowcaseSearchMode = "hashtag" | "phone" | "name" | "id";
+export type ShowcaseSearchMode = "hashtag" | "phone" | "name" | "id" | "all";
 
 export type MaskedShowcaseHit = {
   userId: string;
@@ -873,6 +873,36 @@ export async function saveDccExposure(userId: string, patch: DccExposureSavePatc
   };
 }
 
+/**
+ * 5대 조건 통합 검색 — @아이디·닉네임·실명·회사명·전화번호
+ * (프라이버시 옵트인 게이트는 각 하위 검색이 유지)
+ */
+export async function searchByAllConditions(
+  query: string,
+  limit = 24,
+  viewerId?: string | null,
+  origin?: GeoPoint | null
+): Promise<MaskedShowcaseHit[]> {
+  const q = String(query || "").trim();
+  if (!q) return [];
+  const per = Math.max(8, Math.ceil(limit * 0.75));
+  const [byId, byName, byPhone] = await Promise.all([
+    searchByPublicId(q, per, viewerId, origin).catch(() => [] as MaskedShowcaseHit[]),
+    searchByName(q, per, viewerId, origin).catch(() => [] as MaskedShowcaseHit[]),
+    searchByPhone(q, per, viewerId, origin).catch(() => [] as MaskedShowcaseHit[])
+  ]);
+  const seen = new Set<string>();
+  const merged: MaskedShowcaseHit[] = [];
+  for (const hit of [...byId, ...byName, ...byPhone]) {
+    const id = String(hit.userId || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(hit);
+    if (merged.length >= limit) break;
+  }
+  return merged;
+}
+
 /** 통합 진입 — mode에 따라 분기 */
 export async function runShowcaseSearch(opts: {
   mode: ShowcaseSearchMode;
@@ -890,14 +920,21 @@ export async function runShowcaseSearch(opts: {
   const viewerId = opts.viewerId || null;
   const origin = opts.origin || null;
   const mode: ShowcaseSearchMode =
-    opts.mode === "phone" || opts.mode === "name" || opts.mode === "id" ? opts.mode : "hashtag";
+    opts.mode === "phone" ||
+    opts.mode === "name" ||
+    opts.mode === "id" ||
+    opts.mode === "all"
+      ? opts.mode
+      : "hashtag";
   const items =
-    mode === "phone"
-      ? await searchByPhone(q, limit, viewerId, origin)
-      : mode === "name"
-        ? await searchByName(q, limit, viewerId, origin)
-        : mode === "id"
-          ? await searchByPublicId(q, limit, viewerId, origin)
-          : await searchByHashtag(q, limit, viewerId, origin);
+    mode === "all"
+      ? await searchByAllConditions(q, limit, viewerId, origin)
+      : mode === "phone"
+        ? await searchByPhone(q, limit, viewerId, origin)
+        : mode === "name"
+          ? await searchByName(q, limit, viewerId, origin)
+          : mode === "id"
+            ? await searchByPublicId(q, limit, viewerId, origin)
+            : await searchByHashtag(q, limit, viewerId, origin);
   return { mode, items, originReady: Boolean(origin) };
 }

@@ -108,8 +108,11 @@ authRoutes.get("/check-login-id", async (c) => {
         200
       );
     }
+    const selfId = String(c.req.header("x-vlue-user-id") || "").trim();
     const clash = await prisma.user.findFirst({
-      where: { publicHandle: normalized },
+      where: selfId
+        ? { publicHandle: normalized, NOT: { id: selfId } }
+        : { publicHandle: normalized },
       select: { id: true }
     });
     return c.json({

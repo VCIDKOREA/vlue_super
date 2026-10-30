@@ -70,11 +70,14 @@ function serializeAuthor(
   },
   lite?: { activityName: string; avatarUrl: string } | null
 ) {
-  const activity = lite?.activityName || "";
+  const handle = String(author.publicHandle || "")
+    .replace(/^@+/, "")
+    .trim();
+  /* 쇼케이스 소셜(댓글·좋아요) 식별자는 고유 @아이디 우선 — 닉네임/실명은 보조 */
   return {
     id: author.id,
-    handle: author.publicHandle || "",
-    name: activity || author.legalName || author.publicHandle || "회원",
+    handle,
+    name: handle ? `@${handle}` : author.legalName || lite?.activityName || "회원",
     avatarUrl: lite?.avatarUrl || ""
   };
 }

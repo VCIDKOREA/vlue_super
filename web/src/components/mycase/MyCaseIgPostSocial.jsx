@@ -33,7 +33,7 @@ function resolveMyCommentAuthor() {
   return {
     id: "me",
     handle,
-    name: getFeedDisplayName(handle || "나"),
+    name: handle ? `@${handle}` : getFeedDisplayName("나"),
     avatarUrl: readProfilePhotoAvatar() || ""
   };
 }
@@ -50,7 +50,11 @@ export function pickLatestShowcaseComment(comments) {
 
 export function showcaseCommentAuthorLabel(comment) {
   const author = comment?.author || {};
-  return String(author.name || author.handle || "회원").replace(/^@+/, "").trim() || "회원";
+  const handle = String(author.handle || "").replace(/^@+/, "").trim();
+  if (handle) return `@${handle}`;
+  const name = String(author.name || "").trim();
+  if (name.startsWith("@")) return name;
+  return name || "회원";
 }
 
 export function showcaseCommentPreviewLine(body) {
@@ -303,7 +307,11 @@ export default function MyCaseIgPostSocial({
         </div>
         <div className="my-case-ig-post__comment-body">
           <p className="my-case-ig-post__comment-meta">
-            <strong>{author.name || "회원"}</strong>
+            <strong>
+              {author.handle
+                ? `@${String(author.handle).replace(/^@+/, "")}`
+                : author.name || "회원"}
+            </strong>
             <ShowcaseCommentBody text={c.body} className="my-case-ig-post__comment-text" />
           </p>
         </div>

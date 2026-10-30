@@ -77,3 +77,77 @@ export async function ensurePublicHandleForExistingUser(
   }
   throw new Error("회원 ID를 설정할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 }
+
+/** 소셜/자동 발급 임시 ID — 케이스함·소셜 진입 전 사용자 선택 @아이디로 교체 필요 */
+export function isProvisionalAutoPublicHandle(handle: string | null | undefined): boolean {
+  const s = String(handle || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "");
+  return /^vlue[a-f0-9]{6}$/.test(s);
+}
+
+export function needsPublicHandleClaim(handle: string | null | undefined): boolean {
+  const s = String(handle || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "");
+  if (!s) return true;
+  return isProvisionalAutoPublicHandle(s);
+}
+
+/**
+ * 미설정·임시(vlue+hex) 핸들만 사용자 선택 @아이디로 확정.
+ * 이미 확정된 핸들은 변경 불가.
+ */
+export async function claimPublicHandleForUser(
+  prisma: PrismaClient,
+  userId: string,
+  desiredRaw: string
+): Promise<{ publicHandle: string; claimed: boolean }> {
+  const desired = normalizeDesiredPublicHandle(desiredRaw);
+  if (!desired) {
+    throw Object.assign(
+      new Error("영문 소문자로 시작, 3~20자(소문자·숫자·_), 숫자 1자 이상 포함이어야 합니다."),
+      { statusCode: 400 }
+    );
+  }
+  if (isReservedId(desired)) {
+    throw Object.assign(new Error(RESERVED_ID_MESSAGE), { statusCode: 400 });
+  }
+  if (isProvisionalAutoPublicHandle(desired)) {
+    throw Object.assign(new Error("자동 발급 형식의 아이디는 사용할 수 없습니다. 다른 ID를 입력해 주세요."), {
+      statusCode: 400
+    });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, publicHandle: true }
+  });
+  if (!user) {
+    throw Object.assign(new Error("회원을 찾을 수 없습니다."), { statusCode: 404 });
+  }
+
+  const current = String(user.publicHandle || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "");
+  if (current && !isProvisionalAutoPublicHandle(current)) {
+    if (current === desired) return { publicHandle: current, claimed: false };
+    throw Object.assign(new Error("이미 설정된 회원 ID는 변경할 수 없습니다."), { statusCode: 409 });
+  }
+
+  const clash = await prisma.user.findFirst({
+    where: { publicHandle: desired, NOT: { id: userId } },
+    select: { id: true }
+  });
+  if (clash) {
+    throw Object.assign(new Error("이미 사용 중인 회원 ID입니다. 다른 ID를 입력해 주세요."), {
+      statusCode: 409
+    });
+  }
+
+  await prisma.user.update({ where: { id: userId }, data: { publicHandle: desired } });
+  return { publicHandle: desired, claimed: true };
+}

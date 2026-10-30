@@ -25,6 +25,7 @@ import {
   writeShowcaseStyle
 } from "../../lib/showcase/showcaseStyleStorage.js";
 import { hasPlayableShowcaseBgm } from "../../lib/showcase/showcaseBgmPresets.js";
+import PublicHandleClaimGate from "../PublicHandleClaimGate.jsx";
 import "./my-case-detail.css";
 
 /**
@@ -166,6 +167,13 @@ export default function MyCaseScreen({
   );
 
   return (
+    <PublicHandleClaimGate
+      active={surfaceActive}
+      title="고유 @아이디 설정"
+      subtitle="케이스함을 열려면 고유 @아이디를 먼저 만들어 주세요. 이후 쇼케이스·소셜에서 @아이디로 표시됩니다."
+      onClaimed={() => onToast?.("고유 @아이디가 설정되었습니다.")}
+      onSkipUnavailable={onGoMain}
+    >
     <section className="mx-auto flex w-full max-w-none flex-1 flex-col overflow-hidden bg-white">
       <div
         className={`min-h-0 flex-1 overflow-y-auto ${
@@ -272,5 +280,6 @@ export default function MyCaseScreen({
         </div>
       </AppFullScreenView>
     </section>
+    </PublicHandleClaimGate>
   );
 }

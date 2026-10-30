@@ -353,21 +353,10 @@ export default function ShowcaseCommentSheet({
             className="showcase-comment-sheet__author"
             onClick={() => openAuthorCase(author)}
           >
-            {author?.name || "회원"}
+            {author?.handle
+              ? `@${String(author.handle).replace(/^@+/, "")}`
+              : author?.name || "회원"}
           </button>
-          {author?.handle ? (
-            <button
-              type="button"
-              className="showcase-comment-sheet__author-handle"
-              onClick={() => {
-                const handle = String(author.handle).replace(/^@+/, "");
-                onMention?.(handle);
-                dispatchCommentMention(handle);
-              }}
-            >
-              @{String(author.handle).replace(/^@+/, "")}
-            </button>
-          ) : null}
         </div>
         <ShowcaseCommentBody text={c.body} onHashtag={onHashtag} onMention={onMention} />
         <div className="showcase-comment-sheet__actions">

@@ -88,7 +88,7 @@ function readSelfProfile() {
   } catch {
     /* ignore */
   }
-  return { handle: handle || "mycase", name: name || handle || "나", avatarUrl, userId };
+  return { handle, name: name || handle || "나", avatarUrl, userId };
 }
 
 function formatCount(n) {
@@ -138,7 +138,18 @@ export default function MyCaseGrid({
   className = ""
 }) {
   const isMine = mode === "mine";
-  const self = useMemo(() => readSelfProfile(), []);
+  const [selfTick, setSelfTick] = useState(0);
+  const self = useMemo(() => readSelfProfile(), [selfTick]);
+
+  useEffect(() => {
+    const bump = () => setSelfTick((n) => n + 1);
+    window.addEventListener("vlue-member-handle-changed", bump);
+    window.addEventListener("storage", bump);
+    return () => {
+      window.removeEventListener("vlue-member-handle-changed", bump);
+      window.removeEventListener("storage", bump);
+    };
+  }, []);
 
   const [items, setItems] = useState([]);
   const [mainBroadcast, setMainBroadcast] = useState([]);
@@ -234,26 +245,14 @@ export default function MyCaseGrid({
   }, []);
 
   const displayHandle = isMine
-    ? self.handle
+    ? String(self.handle || "")
+        .replace(/^@+/, "")
+        .trim()
     : String(remoteProfile?.profile?.publicHandle || peerHintHandle || "")
         .replace(/^@+/, "")
         .trim();
-  const companyName = isMine
-    ? (() => {
-        try {
-          return String(buildUserLetteringCard()?.organization || "").trim();
-        } catch {
-          return "";
-        }
-      })()
-    : String(
-        remoteProfile?.profile?.companyName ||
-          remoteProfile?.cardExport?.organization ||
-          peerHintOrganization ||
-          ""
-      ).trim();
-  /** 케이스함 상단: 1순위 사업자명 · 2순위 VLUE ID (개인 이름·「케이스함」 금지) */
-  const topBarTitle = companyName || displayHandle || "";
+  /** 케이스함 최상단: [@아이디] + 인증배지 — 회사명·직장명·VLUE 접두어 금지 */
+  const topBarTitle = displayHandle ? `@${displayHandle}` : "";
   const displayName = isMine
     ? self.name
     : String(

@@ -14,6 +14,7 @@ import {
   detectShowcaseSearchMode,
   searchShowcaseByTag
 } from "../lib/showcase/showcaseTagsApi.js";
+import PublicHandleClaimGate from "./PublicHandleClaimGate.jsx";
 
 function shouldOpenFamilyTab() {
   try {
@@ -184,7 +185,7 @@ function FriendSearch({
     const timer = window.setTimeout(() => {
       setSearchBusy(true);
       setSearchError("");
-      const mode = detectShowcaseSearchMode(q) || "name";
+      const mode = detectShowcaseSearchMode(q) || "all";
       void searchShowcaseByTag(q, { mode }).then((res) => {
         if (cancelled) return;
         setSearchBusy(false);
@@ -368,6 +369,12 @@ function FriendSearch({
   );
 
   return (
+    <PublicHandleClaimGate
+      active
+      title="고유 @아이디 설정"
+      subtitle="친구·소셜 기능을 쓰려면 고유 @아이디가 필요합니다."
+      onSkipUnavailable={onGoMain}
+    >
     <section className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden pt-[max(12px,var(--vlue-safe-top,env(safe-area-inset-top,0px)))]">
       <ScreenBackHeader
         title="친구"
@@ -433,14 +440,14 @@ function FriendSearch({
           <>
             <div className="mt-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <p className="text-[12px] text-gray-500">
-                닉네임·아이디(@)·전화번호로 VLUE 회원을 검색합니다. 결과에서 바로 친구 신청·가족 등록이
-                가능합니다.
+                @아이디·닉네임·실명·회사명·전화번호 중 아무 조건으로도 VLUE 회원을 찾을 수 있습니다.
+                결과에서 바로 친구 신청·가족 등록이 가능합니다.
               </p>
               <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="닉네임 / @아이디 / 010번호"
+                  placeholder="@아이디 / 닉네임 / 실명 / 회사명 / 010번호"
                   autoFocus
                   className="w-full bg-transparent text-[13px] outline-none"
                 />
@@ -614,6 +621,7 @@ function FriendSearch({
         ) : null}
       </div>
     </section>
+    </PublicHandleClaimGate>
   );
 }
 

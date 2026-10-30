@@ -15,6 +15,10 @@ import {
 import { completeSocialLogin, linkSocialAccountToUser, unlinkSocialLogin } from "../services/socialAuthService.js";
 import { getProfileDisplayState, patchProfileDisplay } from "../services/profileDisplayService.js";
 import {
+  claimPublicHandleForUser,
+  needsPublicHandleClaim
+} from "../lib/publicHandle.js";
+import {
   completeKakaoLinkForUser,
   disconnectKakaoLink,
   getKakaoLinkStatus
@@ -709,6 +713,46 @@ authV1Routes.patch("/profile/display", requireUserHeader, async (c) => {
     const code = (e as Error & { statusCode?: number }).statusCode;
     const status = code === 404 ? 404 : code === 400 ? 400 : 400;
     return c.json({ error: msg }, status);
+  }
+});
+
+/** 고유 @아이디 상태 — 미설정·임시(vlue+hex)면 needsClaim */
+authV1Routes.get("/profile/public-handle", requireUserHeader, async (c) => {
+  const userId = c.get("vlueUserId") as string;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { publicHandle: true }
+  });
+  const publicHandle = String(user?.publicHandle || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, "");
+  return c.json({
+    ok: true,
+    publicHandle: publicHandle || null,
+    needsClaim: needsPublicHandleClaim(publicHandle)
+  });
+});
+
+/** 고유 @아이디 최초 확정 (미설정·임시 자동발급만 교체 가능) */
+authV1Routes.post("/profile/public-handle", requireUserHeader, async (c) => {
+  try {
+    const userId = c.get("vlueUserId") as string;
+    const body = (await c.req.json().catch(() => ({}))) as {
+      publicHandle?: string;
+      loginId?: string;
+    };
+    const result = await claimPublicHandleForUser(
+      prisma,
+      userId,
+      String(body.publicHandle || body.loginId || "")
+    );
+    return c.json({ ok: true, ...result, needsClaim: false });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "회원 ID를 설정하지 못했습니다.";
+    const code = (e as Error & { statusCode?: number }).statusCode;
+    const status = code === 404 ? 404 : code === 409 ? 409 : 400;
+    return c.json({ ok: false, error: msg }, status);
   }
 });
 

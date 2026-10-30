@@ -18,33 +18,27 @@ export async function syncShowcaseTagsToServer(tags = []) {
 
 /**
  * 검색어로 API mode 추론
- * `#태그` → hashtag, `@아이디` → id (명시 접두사 우선)
- * @returns {'hashtag'|'phone'|'name'|'id'|null} null = 로컬/업종만
+ * `#태그` → hashtag, 그 외 회원 검색은 5대 조건 통합(`all`)
+ * @returns {'hashtag'|'phone'|'name'|'id'|'all'|null} null = 로컬/업종만
  */
 export function detectShowcaseSearchMode(query) {
   const q = String(query || "").trim();
   if (!q) return null;
-  /* 명시 접두사 — 사용자가 # / @ 로 검색 의도를 지정한 경우 */
+  /* 해시태그만 전용 모드 — 나머지는 아이디·닉·실명·회사·전화 통합 */
   if (q.startsWith("#") || /(?:^|\s)#[\w가-힣_]+/i.test(q)) return "hashtag";
-  if (q.startsWith("@")) return "id";
-  const digits = q.replace(/\D/g, "");
-  const nonDigit = q.replace(/[\d\s\-()+.]/g, "");
-  if (digits.length >= 9 && nonDigit.length <= 2) return "phone";
-  /* @ 없이도 영문 핸들 형태면 아이디 검색 */
-  if (/^[a-zA-Z][a-zA-Z0-9._-]{1,31}$/.test(q)) return "id";
-  if (q.length >= 2) return "name";
+  if (q.length >= 2 || q.startsWith("@")) return "all";
   return null;
 }
 
 /**
  * V1 — 쇼케이스 검색 (인증 필수 · 상호주의 · 마스킹)
  * @param {string} query
- * @param {{ mode?: 'hashtag'|'phone'|'name'|'id', lat?: number, lng?: number }} [opts]
+ * @param {{ mode?: 'hashtag'|'phone'|'name'|'id'|'all', lat?: number, lng?: number }} [opts]
  */
 export async function searchShowcaseByTag(query, opts = {}) {
   const q = String(query || "").trim();
   if (!q) return { ok: true, items: [] };
-  const mode = opts.mode || detectShowcaseSearchMode(q) || "hashtag";
+  const mode = opts.mode || detectShowcaseSearchMode(q) || "all";
   try {
     const params = new URLSearchParams({ q, mode });
     if (Number.isFinite(Number(opts.lat)) && Number.isFinite(Number(opts.lng))) {

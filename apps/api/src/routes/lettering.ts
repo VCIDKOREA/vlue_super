@@ -607,7 +607,12 @@ letteringRoutes.get("/showcase/tags/search", SearchAuthInterceptor, async (c) =>
   const q = String(c.req.query("q") ?? c.req.query("tag") ?? "").trim();
   const modeRaw = String(c.req.query("mode") ?? "hashtag").trim().toLowerCase();
   const mode: ShowcaseSearchMode =
-    modeRaw === "phone" || modeRaw === "name" || modeRaw === "id" ? modeRaw : "hashtag";
+    modeRaw === "phone" ||
+    modeRaw === "name" ||
+    modeRaw === "id" ||
+    modeRaw === "all"
+      ? modeRaw
+      : "hashtag";
 
   if (!q) return c.json({ ok: true, mode, tag: null, items: [], originReady: false });
 
