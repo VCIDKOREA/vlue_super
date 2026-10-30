@@ -1,15 +1,9 @@
-# ⚠️ @vlue/pc-agent — Railway 배포 비권장 (사무실 Windows PC 전용)
-# 대시보드 Crashed → 서비스 Remove 권장. docs/RAILWAY_PC_AGENT.md
-#
-# 부득이하게 유지할 때 Variables:
-#   VLUE_AGENT_USER_ID=<User.uuid>
-#   VLUE_AGENT_WS_URL=wss://<@vlue-api-host>/api/office/ws/agent
-# Root Directory: 모노레포 루트 /
+# ⛔ Railway auto-deploy DISABLED — pc-agent는 사무실 Windows 전용, 클라우드 배포 금지.
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci"
+buildCommand = "echo \"Railway deploy disabled for pc-agent.\" && exit 1"
 
 [deploy]
-startCommand = "npm run start -w @vlue/pc-agent"
+startCommand = "echo \"Railway deploy disabled.\" && exit 1"
 restartPolicyType = "ON_FAILURE"

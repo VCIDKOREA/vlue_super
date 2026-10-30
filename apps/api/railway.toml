@@ -1,16 +1,11 @@
-# Railway — @vlue/api (모노레포 루트에서 배포할 때)
-# Root Directory: 저장소 루트 (/)
-#
-# 필수: Variables 탭에 DATABASE_URL, REDIS_URL, GEMINI_API_KEY,
-#   PORTONE_API_SECRET, PORTONE_V2_API_SECRET, JWT_ACCESS_SECRET, SESSION_SECRET, FILE_STORAGE_PROVIDER
-#   → docs/RAILWAY_API_ENV.md 참고
+# ⛔ Railway auto-deploy DISABLED — production is Fly.io (vlue-api).
+# Do not re-enable GitHub auto-deploy on Railway. Use: D:\dev\deploy-fly.ps1 api
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci && npm run build -w @vlue/db && npm run build -w @vlue/shared && npm run build -w @vlue/api"
-nixpacksConfigPath = "apps/api/nixpacks.toml"
+buildCommand = "echo \"Railway deploy disabled. Use Fly.io (vlue-api).\" && exit 1"
 
 [deploy]
-startCommand = "npm run db:deploy -w @vlue/db && npm run start -w @vlue/api"
+startCommand = "echo \"Railway deploy disabled.\" && exit 1"
 healthcheckPath = "/api/health"
 restartPolicyType = "ON_FAILURE"

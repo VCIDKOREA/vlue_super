@@ -1,20 +1,11 @@
-# Railway — @vlue/web (모노레포 루트에서 배포)
-# Settings → Deploy → Start Command 가 비어 있으면 이 파일 설정을 따릅니다.
+# ⛔ Railway auto-deploy DISABLED — production is Fly.io (vlue-web).
+# Do not re-enable GitHub auto-deploy on Railway. Use: D:\dev\deploy-fly.ps1 web
 
 [build]
 builder = "nixpacks"
-# npm ci / rm .vite 금지 — Railway 설치 단계와 충돌(EBUSY) 남
-# NODE_ENV=production 이면 vite·typescript(devDeps) 미설치 → 빌드 실패 방지
-buildCommand = "npm run build -w @vlue/shared && npm run build -w @vlue/web"
-
-[build.env]
-NIXPACKS_NODE_INSTALL_DEV_DEPS = "true"
-NPM_CONFIG_PRODUCTION = "false"
-REQUIRE_PC_INSTALLER = "1"
-VLUE_PC_INSTALLER_URL = "https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe"
-# VITE_VLUE_PC_WINDOWS_URL — 비움(런타임 same-origin /downloads 사용). GitHub URL 넣지 마세요.
+buildCommand = "echo \"Railway deploy disabled. Use Fly.io (vlue-web).\" && exit 1"
 
 [deploy]
-startCommand = "npm run start -w @vlue/web"
+startCommand = "echo \"Railway deploy disabled.\" && exit 1"
 healthcheckPath = "/"
 restartPolicyType = "ON_FAILURE"
