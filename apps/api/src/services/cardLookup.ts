@@ -15,7 +15,10 @@ import {
   PEER_REMOTE_SUMMARY,
   readOutgoingCallPathSignal
 } from "./callPathPeerSignal.js";
-import { loadOverlayShowcaseStyleLite } from "../lib/overlayLookupLite.js";
+import {
+  buildOverlayShowcaseStyleStubFromJson,
+  loadOverlayShowcaseStyleLite
+} from "../lib/overlayLookupLite.js";
 import {
   buildPublicDirectorySafeLookupBody,
   lookupPublicDirectoryByPhone
@@ -827,24 +830,12 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
     let showcaseStyle = await overlayShowcaseStyleForUserId(card.user.id);
     if (routedAgent) {
       const live = routedAgent.showcaseLiveStyleJson || routedAgent.showcaseStyleJson;
-      if (live && typeof live === "object") {
-        const s = live as Record<string, unknown>;
-        showcaseStyle = {
-          includeDigitalCard: Boolean(s.includeDigitalCard),
-          showBroadcastName: s.showBroadcastName !== false,
-          hasPages: Array.isArray(s.pages) && s.pages.length > 0,
-          hasGallery:
-            Boolean(s.gallery) &&
-            typeof s.gallery === "object" &&
-            Array.isArray((s.gallery as { photos?: unknown }).photos) &&
-            ((s.gallery as { photos: unknown[] }).photos?.length || 0) > 0,
-          hasBgm: Boolean(
-            s.bgm &&
-              typeof s.bgm === "object" &&
-              String((s.bgm as { mode?: unknown }).mode || "") !== "none"
-          ),
-          agentProfileId: routedAgent.id || undefined
-        };
+      /* 멀티프로필 라우팅도 lite 와 동일 계약: includeDigitalCard 삼상태 보존
+       * (키 누락을 false 로 주입하지 않음) + 콘텐츠 스텁. */
+      const agentStub = buildOverlayShowcaseStyleStubFromJson(live);
+      if (agentStub) {
+        agentStub.agentProfileId = routedAgent.id || undefined;
+        showcaseStyle = agentStub;
       }
     }
     showcaseStyle = applyLapsedCallShowcase(callTier, showcaseStyle);

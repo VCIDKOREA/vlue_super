@@ -146,6 +146,34 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
+    fun showcaseStubWithoutIncludeKey_opensShowcase() {
+        /* 라이트 조회 결과: 쇼케이스 설정 완료 회원. includeDigitalCard 키 없음(미설정),
+         * DCC 명함 필드도 없고 오직 showcase pages 스텁만. 안심팝업이 아닌 쇼케이스여야 한다. */
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"박서윤","showcaseStyle":{"v":2,"showBroadcastName":true,"pages":[{"type":"image"}]}}"""
+        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertTrue(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
+    fun showcaseStubWithIncludeFalse_isAuthMemberOnly() {
+        /* 명시 송출 OFF 는 콘텐츠 스텁이 있어도 안심팝업(인증-only) 유지 */
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"박서윤","showcaseStyle":{"v":2,"includeDigitalCard":false,"pages":[{"type":"image"}]}}"""
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
+    fun emptyPageShell_withoutContent_isAuthMemberOnly() {
+        /* type:"empty" 빈 껍데기는 콘텐츠가 아니다 — 인증-only */
+        val json =
+            """{"matched":true,"is_verified":true,"displayName":"박서윤","showcaseStyle":{"v":2,"showBroadcastName":true,"pages":[{"type":"empty"}]}}"""
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+    }
+
+    @Test
     fun broadcastOff_hasNoBroadcastContent() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이상춘","showcaseStyle":{"includeDigitalCard":false}}"""

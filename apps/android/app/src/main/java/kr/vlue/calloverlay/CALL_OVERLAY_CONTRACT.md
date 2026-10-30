@@ -171,6 +171,7 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 - [ ] BigPush not covered by status bar clock/battery
 - [ ] Auth member explicit broadcast OFF: center auth popup, not empty Showcase
 - [ ] Auth member DCC exists (even if `includeDigitalCard` key missing): full Showcase / call-history 케이스함
+- [ ] Member set up showcase but `includeDigitalCard` key absent in stored JSON: server lite loader (`loadOverlayShowcaseStyleLite`) must **omit** the key (never inject `false`) → full Showcase, not 안심/인증 팝업. Showcase content stub `pages:[{type:"image"}]` counts as media in `styleHasMedia` / web `styleHasShowcaseMedia`.
 - [ ] Auth member broadcast ON + content: full Showcase
 - [ ] Incoming answered + member showcase ON + number in device contacts: **FULL_SHOWCASE** (not 안심팝업 / contact promote)
 - [ ] In-call Showcase / MiniCase not covered by Android status bar

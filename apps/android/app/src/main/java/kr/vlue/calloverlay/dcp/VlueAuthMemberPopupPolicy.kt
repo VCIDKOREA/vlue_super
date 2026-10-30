@@ -247,6 +247,11 @@ object VlueAuthMemberPopupPolicy {
                 }
                 val blocks = p.optJSONArray("blocks")
                 if (blocks != null && blocks.length() > 0) return true
+                /* 라이트 조회 콘텐츠 스텁 `{type:"image"}` — 서버가 pages/gallery/bgm 실체가
+                 * 있을 때만 송출한다. 웹 styleHasShowcaseMedia 와 동일하게 미디어로 본다.
+                 * (빈 페이지 껍데기 type:"empty" 는 제외) */
+                val type = firstNonBlank(p.optString("type"))
+                if (type != null && type != "empty") return true
             }
         }
         val gallery = style.optJSONObject("gallery")
