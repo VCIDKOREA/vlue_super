@@ -6,8 +6,8 @@ import { pickDeviceContacts, isContactPickerSupported, stripLegacyDemoContacts }
  * @param {{ allowDemoConfirm?: boolean }} [opts] allowDemoConfirm는 무시(호환용)
  * @returns {Promise<{ name: string, phone: string }[]>}
  */
-export async function collectDeviceContactsForSync(_opts = {}) {
-  const fromNative = await syncDeviceContactsFromNative();
+export async function collectDeviceContactsForSync(opts = {}) {
+  const fromNative = await syncDeviceContactsFromNative({ force: Boolean(opts.force ?? true) });
   if (fromNative?.length) {
     const cleaned = stripLegacyDemoContacts(fromNative);
     if (cleaned.length !== fromNative.length) writeDeviceContactsCache(cleaned);

@@ -5,6 +5,19 @@
 export const DEVICE_CONTACTS_CACHE_KEY = "vlue_device_contacts_cache_v1";
 export const DEVICE_CONTACTS_CHANGED = "vlue-device-contacts-changed";
 
+function normalizePhoneKey(phone) {
+  let d = String(phone || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("82") && d.length >= 11) {
+    const rest = d.slice(2);
+    return rest.startsWith("0") ? rest : `0${rest}`;
+  }
+  if (d.startsWith("0")) return d;
+  if (d.length >= 9 && d.length <= 11) return `0${d}`;
+  return d;
+}
+
 /**
  * @returns {{ updatedAt: number, contacts: { name: string, phone: string }[] }}
  */
@@ -31,10 +44,14 @@ export function writeDeviceContactsCache(contacts) {
   for (const c of contacts || []) {
     const phone = String(c?.phone || "").trim();
     if (!phone) continue;
-    const key = phone.replace(/\D/g, "");
-    if (!key || seen.has(key)) continue;
+    const key = normalizePhoneKey(phone);
+    if (!key || key.length < 8 || seen.has(key)) continue;
     seen.add(key);
-    list.push({ name: String(c.name || "").trim(), phone });
+    list.push({
+      name: String(c.name || "").trim(),
+      phone,
+      normalized: key
+    });
   }
   const payload = { updatedAt: Date.now(), contacts: list };
   try {
@@ -61,6 +78,7 @@ function parseNativeContactsJson(raw) {
 /**
  * Android/iOS 네이티브에서 주소록 JSON 동기화
  * (짧은 간격 중복 호출은 캐시만 반환 — WebView 블로킹·트래픽 방지)
+ * 빈 결과는 cooldown 에 넣지 않아 권한 직후 재시도가 막히지 않게 한다.
  * @param {{ force?: boolean }} [opts]
  * @returns {Promise<{ name: string, phone: string }[]>}
  */
@@ -93,12 +111,12 @@ export async function syncDeviceContactsFromNative(opts = {}) {
     }
   }
 
-  _deviceContactsSyncAt = Date.now();
   const contacts = parseNativeContactsJson(raw);
   if (contacts.length) {
-    writeDeviceContactsCache(contacts);
-    return contacts;
+    _deviceContactsSyncAt = Date.now();
+    return writeDeviceContactsCache(contacts).contacts;
   }
+  /* 빈 목록은 throttle 하지 않음 — 권한 레이스 / 일시 실패 대비 */
   return readDeviceContactsCache().contacts;
 }
 

@@ -2,29 +2,38 @@ package kr.vlue.calloverlay
 
 /**
  * 기기 주소록 매칭용 KR 번호 키 (010 / 82 / +82).
+ * Google 동기화(+82 010-xxxx)도 동일 키로 묶는다.
  * Android API 없이 단위 테스트 가능.
  */
 object ContactPhoneKeys {
     fun digitsOnly(raw: String?): String = raw?.filter { it.isDigit() }.orEmpty()
 
     fun localDigits(raw: String?): String {
-        val d = digitsOnly(raw)
+        var d = digitsOnly(raw)
         if (d.isEmpty()) return ""
-        return if (d.startsWith("82") && d.length >= 10) "0${d.substring(2)}" else d
+        if (d.startsWith("00")) d = d.substring(2)
+        if (d.startsWith("82") && d.length >= 11) {
+            val rest = d.substring(2)
+            return if (rest.startsWith("0")) rest else "0$rest"
+        }
+        if (d.startsWith("0")) return d
+        if (d.length in 9..11) return "0$d"
+        return d
     }
 
     fun keys(raw: String?): Set<String> {
+        val local = localDigits(raw)
         val digits = digitsOnly(raw)
-        if (digits.length < 8) return emptySet()
-        val out = linkedSetOf(digits)
-        if (digits.startsWith("82") && digits.length >= 10) {
-            out.add("0${digits.substring(2)}")
-        }
-        if (digits.startsWith("0") && digits.length >= 10) {
-            out.add("82${digits.substring(1)}")
-        }
-        if (digits.length == 11 && digits.startsWith("010")) {
-            out.add(digits.substring(1))
+        if (local.length < 8 && digits.length < 8) return emptySet()
+        val out = linkedSetOf<String>()
+        if (digits.isNotEmpty()) out.add(digits)
+        if (local.isNotEmpty()) {
+            out.add(local)
+            if (local.startsWith("0") && local.length >= 10) {
+                out.add("82${local.substring(1)}")
+                /* 국내 0 제거 키 (8210… 과 동일 매칭) */
+                out.add(local.substring(1))
+            }
         }
         return out
     }

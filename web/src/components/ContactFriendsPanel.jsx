@@ -30,6 +30,7 @@ export default function ContactFriendsPanel({
   onOpenChat,
   onOpenShowcase,
   onResyncRequest,
+  onRegisterFamily,
   filterQuery = "",
   compact = false,
   /** 채팅방 친구 목록 userId — 매칭 캐시가 늦어도 친구로 표시 */
@@ -173,8 +174,9 @@ export default function ContactFriendsPanel({
       upsertKnownPhonesFromFriends({ contactMatchData: result });
       onMatchUpdate?.(result);
       if (!silent) {
+        const trunc = result.truncateded ? " (일부 생략)" : "";
         setNotice(
-          `전화부 ${contacts.length}건 동기화 · 가입 ${result.registered?.length || 0} · 추천 ${(result.unregistered || []).length}`
+          `전화부 ${contacts.length}건 동기화${trunc} · VLUE 회원 ${result.registered?.length || 0} · 미가입 ${(result.unregistered || []).length}`
         );
       }
       return true;
@@ -353,7 +355,8 @@ export default function ContactFriendsPanel({
       {!compact ? (
         <div className="flex items-center justify-between gap-2">
           <p className="text-[12px] font-black text-gray-700">
-            전화부 명단 · 가입 {registered.length} · 추천 {unregistered.length}
+            전화부 · VLUE 회원 {registered.length} · 미가입 {unregistered.length}
+            {matchData?.truncateded ? " · 일부 생략" : ""}
           </p>
           <button
             type="button"
@@ -375,56 +378,88 @@ export default function ContactFriendsPanel({
         <div className="contact-friends-list-wrap relative flex gap-1">
           <div className="min-w-0 flex-1 space-y-2">
             <ul className="space-y-2">
-              {pageRows.map((item) => (
-                <li
-                  key={item.key}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5"
-                >
+              {pageRows.map((item, index) => {
+                const prev = pageRows[index - 1];
+                const showMemberHeader = item.kind === "registered" && (!prev || prev.kind !== "registered");
+                const showGuestHeader = item.kind === "unregistered" && (!prev || prev.kind !== "unregistered");
+                return (
+                <li key={item.key} className="space-y-1">
+                  {showMemberHeader ? (
+                    <p className="px-1 pt-1 text-[10px] font-black uppercase tracking-wide text-blue-600">
+                      VLUE 가입 회원
+                    </p>
+                  ) : null}
+                  {showGuestHeader ? (
+                    <p className="px-1 pt-2 text-[10px] font-black uppercase tracking-wide text-violet-600">
+                      미가입 지인
+                    </p>
+                  ) : null}
+                  <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2.5">
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-black text-gray-900">{item.name}</p>
-                    <p className="truncate text-[11px] text-gray-500">{item.subtitle}</p>
+                    <p className="truncate text-[11px] text-gray-500">
+                      {item.kind === "registered"
+                        ? `VLUE 회원 · ${item.subtitle}`
+                        : `미가입 · ${item.subtitle}`}
+                    </p>
                   </div>
                   {item.kind === "registered" ? (
                     (() => {
                       const rel = resolveRelation(item.user);
                       const busy = busyId === item.user.userId;
-                      if (rel.isFriend) {
-                        return (
+                      return (
+                        <div className="flex shrink-0 flex-col items-stretch gap-1">
+                          {rel.isFriend ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onOpenShowcase) onOpenShowcase(item.user);
+                                else onOpenChat?.(item.user);
+                              }}
+                              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700"
+                            >
+                              수락됨 · 친구
+                            </button>
+                          ) : rel.pending === "sent" ? (
+                            <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-center text-[11px] font-black text-amber-700">
+                              {busy ? "처리 중…" : "신청 완료 (대기 중)"}
+                            </span>
+                          ) : rel.pending === "received" ? (
+                            <span className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-center text-[11px] font-black text-violet-700">
+                              받은 신청
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => handleFriendRequest(item.user)}
+                              className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
+                            >
+                              {busy ? "신청 중…" : "친구 신청"}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
-                              if (onOpenShowcase) onOpenShowcase(item.user);
-                              else onOpenChat?.(item.user);
+                              if (onRegisterFamily) {
+                                onRegisterFamily(item.user);
+                                return;
+                              }
+                              window.dispatchEvent(
+                                new CustomEvent("vlue-open-family-register", {
+                                  detail: {
+                                    handle: item.user.publicHandle || "",
+                                    userId: item.user.userId,
+                                    name: item.user.displayName || item.user.contactName
+                                  }
+                                })
+                              );
                             }}
-                            className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700"
+                            className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[10px] font-bold text-gray-700"
                           >
-                            쇼케이스
+                            가족 등록
                           </button>
-                        );
-                      }
-                      if (rel.pending === "sent") {
-                        return (
-                          <span className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-500">
-                            {busy ? "처리 중…" : "신청됨"}
-                          </span>
-                        );
-                      }
-                      if (rel.pending === "received") {
-                        return (
-                          <span className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700">
-                            받은 신청
-                          </span>
-                        );
-                      }
-                      return (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => handleFriendRequest(item.user)}
-                          className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
-                        >
-                          {busy ? "신청 중…" : "신청"}
-                        </button>
+                        </div>
                       );
                     })()
                   ) : (
@@ -434,11 +469,13 @@ export default function ContactFriendsPanel({
                       onClick={() => handleRecommend(item.row)}
                       className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-50"
                     >
-                      추천
+                      추천 초대
                     </button>
                   )}
+                  </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
 
             <nav

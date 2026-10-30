@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { privacySelectDccExposure } from "../follow/profileAccessControl.js";
 import { isDataUrl, isHttpMediaUrl } from "../../lib/mediaUrlGuard.js";
-import { normalizeToE164KR } from "../../lib/phoneE164.js";
+import { normalizeToE164KR, phoneMatchVariants } from "../../lib/phoneE164.js";
 import { isPlatformCeoHandle } from "../admin/platformAccountRoles.js";
 import { isDccExposureComplete, resolveDirectoryAddress, resolveDirectoryPhone } from "../dcc/dccExposure.js";
 import { buildDistanceKmByUserId, type GeoPoint } from "../dcc/dccAddressDistance.js";
@@ -58,6 +58,7 @@ type UserSearchRow = {
   phoneE164: string | null;
   legalName: string | null;
   publicHandle: string | null;
+  vlueProfileNickname?: string | null;
   showcaseTags: string[];
   hasActiveShowcase: boolean;
   identityVerified: boolean;
@@ -258,8 +259,15 @@ function digitsOnly(v: unknown): string {
 }
 
 function normalizeKrDigits(d: string): string {
-  if (d.startsWith("82") && d.length >= 10) return `0${d.slice(2)}`;
-  return d;
+  let digits = String(d || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("82") && digits.length >= 11) {
+    const rest = digits.slice(2);
+    return rest.startsWith("0") ? rest : `0${rest}`;
+  }
+  if (digits.startsWith("0")) return digits;
+  if (digits.length >= 9 && digits.length <= 11) return `0${digits}`;
+  return digits;
 }
 
 function phoneMatchesQuery(u: UserSearchRow, queryDigits: string): boolean {
@@ -279,7 +287,13 @@ function nameFieldMatches(u: UserSearchRow, needle: string): boolean {
   if (!u.isNameSearchAllowed) return false;
   const n = needle.toLowerCase();
   const snap = snapOf(u);
-  const fields = [u.legalName, snap.name, snap.displayName];
+  const fields = [
+    u.legalName,
+    (u as { vlueProfileNickname?: string | null }).vlueProfileNickname,
+    snap.name,
+    snap.displayName,
+    snap.nickname
+  ];
   return fields.some((f) => String(f || "").toLowerCase().includes(n));
 }
 
@@ -303,6 +317,10 @@ function idOrActivityMatches(u: UserSearchRow, needle: string): boolean {
     .replace(/^@/, "")
     .toLowerCase();
   if (handle && (handle === n || handle.includes(n) || n.includes(handle))) return true;
+  const nick = String((u as { vlueProfileNickname?: string | null }).vlueProfileNickname || "")
+    .replace(/^@/, "")
+    .toLowerCase();
+  if (nick && (nick === n || nick.includes(n) || n.includes(nick))) return true;
   const activity = [
     snap.activityName,
     snap.activityDisplayName,
@@ -331,7 +349,9 @@ export function maskShowcaseHit(u: UserSearchRow, opts?: { fullAccess?: boolean 
   const idAllowed = Boolean(u.isIdSearchAllowed);
   const addressAllowed = Boolean(u.isAddressSearchAllowed);
 
-  const rawName = String(u.legalName || snap.name || snap.displayName || "").trim();
+  const rawName = String(
+    u.vlueProfileNickname || u.legalName || snap.name || snap.displayName || snap.nickname || ""
+  ).trim();
   const rawPhone = String(u.phoneE164 || snap.phone || "").trim();
   const handle = String(u.publicHandle || snap.handle || "").trim();
   const org = String(u.businessProfile?.companyName || snap.organization || snap.companyName || "").trim();
@@ -388,6 +408,7 @@ const searchSelect = {
   phoneE164: true,
   legalName: true,
   publicHandle: true,
+  vlueProfileNickname: true,
   showcaseTags: true,
   hasActiveShowcase: true,
   identityVerified: true,
@@ -552,7 +573,18 @@ export async function searchByPhone(
   if (!e164 && queryDigits.length < 9) return [];
 
   let users: UserSearchRow[] = [];
-  if (e164) {
+  const variants = phoneMatchVariants(rawPhone);
+  if (variants.length) {
+    users = (await prisma.user.findMany({
+      where: {
+        ...baseTargetWhere(),
+        isPhoneSearchAllowed: true,
+        phoneE164: { in: variants }
+      },
+      select: searchSelect,
+      take: limit
+    })) as UserSearchRow[];
+  } else if (e164) {
     users = (await prisma.user.findMany({
       where: {
         ...baseTargetWhere(),
@@ -605,13 +637,17 @@ export async function searchByName(
           legalName: { contains: name, mode: "insensitive" }
         },
         {
+          isNameSearchAllowed: true,
+          vlueProfileNickname: { contains: name, mode: "insensitive" }
+        },
+        {
           isOrgSearchAllowed: true,
           businessProfile: { companyName: { contains: name, mode: "insensitive" } }
         }
       ]
     },
     select: searchSelect,
-    take: 80
+    take: 120
   })) as UserSearchRow[];
 
   /* 스냅샷 성명/상호만 있는 경우 — 경량 JSON path 스냅으로 추가 매칭 */
@@ -660,7 +696,10 @@ export async function searchByPublicId(
     where: {
       ...baseTargetWhere(),
       isIdSearchAllowed: true,
-      publicHandle: { equals: handle, mode: "insensitive" }
+      OR: [
+        { publicHandle: { equals: handle, mode: "insensitive" } },
+        { vlueProfileNickname: { equals: handle, mode: "insensitive" } }
+      ]
     },
     select: searchSelect,
     take: limit
@@ -669,10 +708,14 @@ export async function searchByPublicId(
   const candidates = (await prisma.user.findMany({
     where: {
       ...baseTargetWhere(),
-      isIdSearchAllowed: true
+      isIdSearchAllowed: true,
+      OR: [
+        { publicHandle: { contains: handle, mode: "insensitive" } },
+        { vlueProfileNickname: { contains: handle, mode: "insensitive" } }
+      ]
     },
     select: searchSelect,
-    take: 120
+    take: 200
   })) as UserSearchRow[];
 
   const candidatesWithSnap = await attachSearchSnapLites(candidates);

@@ -5,10 +5,15 @@ import ContactFriendsPanel from "./ContactFriendsPanel.jsx";
 import ScreenBackHeader from "./common/ScreenBackHeader";
 import {
   fetchContactFriendRequests,
-  respondContactFriendRequest
+  respondContactFriendRequest,
+  sendContactFriendRequest
 } from "../lib/contactFriendsApi.js";
 import { saveContactMatchCache } from "../lib/contactSyncStorage.js";
 import { EXPAND_FAMILY_KEY, OPEN_FAMILY_TAB_EVENT } from "../lib/posDashboardConstants.js";
+import {
+  detectShowcaseSearchMode,
+  searchShowcaseByTag
+} from "../lib/showcase/showcaseTagsApi.js";
 
 function shouldOpenFamilyTab() {
   try {
@@ -60,8 +65,13 @@ function FriendSearch({
   const [tab, setTab] = useState(() => (shouldOpenFamilyTab() ? "family" : "friends"));
   const [notice, setNotice] = useState("");
   const [busyRequestId, setBusyRequestId] = useState("");
+  const [familyPrefill, setFamilyPrefill] = useState("");
+  const [searchHits, setSearchHits] = useState([]);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [searchActionBusy, setSearchActionBusy] = useState("");
   const [sentRequests, setSentRequests] = useState(() =>
-    Array.isArray(requests) ? requests.filter((r) => r.status === "pending") : []
+    Array.isArray(requests) ? requests : []
   );
   const [receivedRequests, setReceivedRequests] = useState(() =>
     Array.isArray(inboxRequests) ? inboxRequests : []
@@ -78,7 +88,11 @@ function FriendSearch({
   onMatchUpdateRef.current = onContactMatchUpdate;
 
   const pendingSentIds = useMemo(
-    () => sentRequests.map((r) => String(r.toUserId || "").trim()).filter(Boolean),
+    () =>
+      sentRequests
+        .filter((r) => r.status === "pending")
+        .map((r) => String(r.toUserId || "").trim())
+        .filter(Boolean),
     [sentRequests]
   );
   const pendingReceivedIds = useMemo(
@@ -134,11 +148,59 @@ function FriendSearch({
 
   useEffect(() => {
     void reloadFriendRequests();
+    const timer = window.setInterval(() => {
+      void reloadFriendRequests();
+    }, 20000);
+    return () => window.clearInterval(timer);
   }, [reloadFriendRequests]);
 
   useEffect(() => {
     if (tab === "sent" || tab === "inbox") void reloadFriendRequests();
   }, [tab, reloadFriendRequests]);
+
+  useEffect(() => {
+    const openFamily = (event) => {
+      const handle = String(event?.detail?.handle || "").replace(/^@+/, "");
+      if (handle) setFamilyPrefill(handle);
+      setTab("family");
+    };
+    window.addEventListener("vlue-open-family-register", openFamily);
+    window.addEventListener(OPEN_FAMILY_TAB_EVENT, openFamily);
+    return () => {
+      window.removeEventListener("vlue-open-family-register", openFamily);
+      window.removeEventListener(OPEN_FAMILY_TAB_EVENT, openFamily);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "search") return undefined;
+    const q = String(query || "").trim();
+    if (q.length < 2) {
+      setSearchHits([]);
+      setSearchError("");
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setSearchBusy(true);
+      setSearchError("");
+      const mode = detectShowcaseSearchMode(q) || "name";
+      void searchShowcaseByTag(q, { mode }).then((res) => {
+        if (cancelled) return;
+        setSearchBusy(false);
+        if (!res.ok) {
+          setSearchHits([]);
+          setSearchError(res.error || "검색에 실패했습니다.");
+          return;
+        }
+        setSearchHits(Array.isArray(res.items) ? res.items : []);
+      });
+    }, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [tab, query]);
 
   useEffect(() => {
     if (!relationsReady || !contactMatchData?.registered?.length) return;
@@ -161,10 +223,7 @@ function FriendSearch({
   ]);
 
   useEffect(() => {
-    const openFamilyTab = () => setTab("family");
-    if (shouldOpenFamilyTab()) openFamilyTab();
-    window.addEventListener(OPEN_FAMILY_TAB_EVENT, openFamilyTab);
-    return () => window.removeEventListener(OPEN_FAMILY_TAB_EVENT, openFamilyTab);
+    if (shouldOpenFamilyTab()) setTab("family");
   }, []);
 
   const tabs = [
@@ -173,6 +232,58 @@ function FriendSearch({
     { id: "sent", label: "보낸 신청" },
     { id: "family", label: "가족 보호" }
   ];
+
+  const openFamilyForUser = (user) => {
+    const handle = String(user?.publicHandle || user?.handle || "").replace(/^@+/, "");
+    setFamilyPrefill(handle || String(user?.displayName || user?.name || "").trim());
+    setTab("family");
+    setNotice("가족 보호 등록 화면으로 이동했습니다. 대상을 확인한 뒤 초대해 주세요.");
+  };
+
+  const friendStatusForUser = (userId) => {
+    const uid = String(userId || "").trim();
+    if (!uid) return "none";
+    if (mergedFriendIds.includes(uid)) return "accepted";
+    if (pendingSentIds.includes(uid)) return "pending";
+    if (pendingReceivedIds.includes(uid)) return "received";
+    return "none";
+  };
+
+  const handleSearchFriendRequest = async (hit) => {
+    const uid = String(hit?.userId || hit?.id || "").trim();
+    if (!uid || searchActionBusy) return;
+    const status = friendStatusForUser(uid);
+    if (status === "accepted") {
+      setNotice("이미 친구입니다.");
+      return;
+    }
+    if (status === "pending") {
+      setNotice("이미 신청했습니다. 「보낸 신청」에서 대기 상태를 확인하세요.");
+      return;
+    }
+    if (status === "received") {
+      setNotice("상대가 보낸 신청이 있습니다. 「받은 신청」에서 수락해 주세요.");
+      return;
+    }
+    setSearchActionBusy(uid);
+    try {
+      const name = hit.displayName || hit.name || hit.handle || "상대";
+      const res = await sendContactFriendRequest(uid, `${name}님, VLUÉ에서 연결해요.`);
+      if (res.ok) {
+        handleFriendAdded({
+          userId: uid,
+          displayName: name,
+          requestId: res.id,
+          status: res.status || "pending",
+          autoAccepted: Boolean(res.autoAccepted) || res.status === "accepted"
+        });
+      }
+    } catch (e) {
+      setNotice(e?.message || "친구 신청에 실패했습니다.");
+    } finally {
+      setSearchActionBusy("");
+    }
+  };
 
   const handleFriendAdded = (user) => {
     const uid = String(user.userId || "").trim();
@@ -292,7 +403,12 @@ function FriendSearch({
 
         {tab === "family" ? (
           <div className="mt-3">
-            <FamilyProtectionRegister isDarkMode={isDarkMode} onToast={onFamilyToast} />
+            <FamilyProtectionRegister
+              key={familyPrefill || "family"}
+              isDarkMode={isDarkMode}
+              prefillHandle={familyPrefill}
+              onToast={onFamilyToast}
+            />
           </div>
         ) : null}
 
@@ -304,6 +420,7 @@ function FriendSearch({
               onResyncRequest={onContactResyncRequest}
               onOpenChat={onOpenContactChat}
               onOpenShowcase={onOpenContactShowcase || onOpenContactChat}
+              onRegisterFamily={openFamilyForUser}
               approvedFriendIds={mergedFriendIds}
               pendingSentIds={pendingSentIds}
               pendingReceivedIds={pendingReceivedIds}
@@ -316,21 +433,97 @@ function FriendSearch({
           <>
             <div className="mt-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <p className="text-[12px] text-gray-500">
-                전화부 동기화 명단에서 검색합니다. VLUÉ 사용 중이면 <b>신청</b>, 아니면 <b>추천</b>
-                (카톡·문자 공유)입니다.
+                닉네임·아이디(@)·전화번호로 VLUE 회원을 검색합니다. 결과에서 바로 친구 신청·가족 등록이
+                가능합니다.
               </p>
               <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="이름/아이디/번호로 검색"
+                  placeholder="닉네임 / @아이디 / 010번호"
                   autoFocus
                   className="w-full bg-transparent text-[13px] outline-none"
                 />
               </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 space-y-2">
+              {searchBusy ? (
+                <p className="rounded-xl bg-gray-50 px-3 py-4 text-center text-[12px] text-gray-500">
+                  회원 검색 중…
+                </p>
+              ) : null}
+              {searchError ? (
+                <p className="rounded-xl bg-rose-50 px-3 py-3 text-center text-[12px] font-bold text-rose-600">
+                  {searchError}
+                </p>
+              ) : null}
+              {!searchBusy && query.trim().length >= 2 && !searchHits.length && !searchError ? (
+                <p className="rounded-xl bg-gray-50 px-3 py-4 text-center text-[12px] text-gray-500">
+                  일치하는 VLUE 회원이 없습니다.
+                </p>
+              ) : null}
+              {searchHits.map((hit) => {
+                const uid = String(hit.userId || hit.id || "").trim();
+                const status = friendStatusForUser(uid);
+                const title =
+                  hit.displayName || hit.name || hit.handle || hit.publicHandle || "회원";
+                const sub = [hit.handle || hit.publicHandle, hit.maskedPhone || hit.phone]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <div
+                    key={uid || title}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-white p-3 shadow-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-black text-gray-900">{title}</p>
+                      <p className="truncate text-[11px] text-gray-500">{sub || "VLUE 회원"}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      {status === "accepted" ? (
+                        <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-center text-[11px] font-black text-emerald-700">
+                          수락됨
+                        </span>
+                      ) : status === "pending" ? (
+                        <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-center text-[11px] font-black text-amber-700">
+                          신청 완료 (대기 중)
+                        </span>
+                      ) : status === "received" ? (
+                        <span className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-center text-[11px] font-black text-violet-700">
+                          받은 신청
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={searchActionBusy === uid}
+                          onClick={() => void handleSearchFriendRequest(hit)}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
+                        >
+                          {searchActionBusy === uid ? "신청 중…" : "친구 신청"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openFamilyForUser({
+                            publicHandle: hit.handle || hit.publicHandle,
+                            displayName: title,
+                            userId: uid
+                          })
+                        }
+                        className="rounded-lg border border-gray-200 px-3 py-1 text-[10px] font-bold text-gray-700"
+                      >
+                        가족 등록
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-2 px-1 text-[11px] font-black text-gray-500">전화부 동기화 명단에서도 찾기</p>
               <ContactFriendsPanel
                 compact
                 filterQuery={query}
@@ -339,6 +532,7 @@ function FriendSearch({
                 onResyncRequest={onContactResyncRequest}
                 onOpenChat={onOpenContactChat}
                 onOpenShowcase={onOpenContactShowcase || onOpenContactChat}
+                onRegisterFamily={openFamilyForUser}
                 approvedFriendIds={mergedFriendIds}
                 pendingSentIds={pendingSentIds}
                 pendingReceivedIds={pendingReceivedIds}
@@ -361,7 +555,22 @@ function FriendSearch({
               </p>
             ) : null}
             {!requestsLoading
-              ? listForTab.map((req) => (
+              ? listForTab.map((req) => {
+                  const status = String(req.status || "pending");
+                  const statusLabel =
+                    req.statusLabel ||
+                    (status === "accepted"
+                      ? "수락됨"
+                      : status === "rejected"
+                        ? "거절됨"
+                        : "신청 완료 (대기 중)");
+                  const statusClass =
+                    status === "accepted"
+                      ? "text-emerald-700"
+                      : status === "rejected"
+                        ? "text-rose-600"
+                        : "text-amber-700";
+                  return (
                   <div key={req.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
                     <p className="text-[13px] font-bold text-gray-900">
                       {tab === "sent"
@@ -371,10 +580,10 @@ function FriendSearch({
                     {req.message ? (
                       <p className="mt-1 text-[11px] text-gray-500 line-clamp-2">{req.message}</p>
                     ) : null}
-                    <p className="mt-1 text-[10px] font-semibold text-gray-400">
-                      {tab === "sent" ? "대기 중" : "받은 신청"}
-                      {req.createdAt
-                        ? ` · ${new Date(req.createdAt).toLocaleDateString("ko-KR")}`
+                    <p className={`mt-1 text-[11px] font-black ${tab === "sent" ? statusClass : "text-violet-700"}`}>
+                      {tab === "sent" ? statusLabel : "받은 신청"}
+                      {req.updatedAt || req.createdAt
+                        ? ` · ${new Date(req.updatedAt || req.createdAt).toLocaleDateString("ko-KR")}`
                         : ""}
                     </p>
                     {tab === "inbox" ? (
@@ -398,7 +607,8 @@ function FriendSearch({
                       </div>
                     ) : null}
                   </div>
-                ))
+                );
+                })
               : null}
           </div>
         ) : null}

@@ -11,6 +11,8 @@ import org.json.JSONObject
 
 /** 디바이스 주소록 → 웹 하이브리드 판별용 JSON */
 object DeviceContactsReader {
+    private const val MAX_EXPORT = 5000
+
     fun findDisplayName(context: Context, rawPhone: String): String? {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS)
             != PackageManager.PERMISSION_GRANTED
@@ -27,7 +29,7 @@ object DeviceContactsReader {
             projection,
             null,
             null,
-            null
+            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE LOCALIZED ASC"
         )?.use { cursor ->
             val nameIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
             val phoneIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
@@ -114,40 +116,65 @@ object DeviceContactsReader {
         return false
     }
 
+    /**
+     * 단말기 로컬 / Google / SIM 등 Phone MIME 이 있는 모든 연락처를 수집.
+     * AccountType 으로 필터하지 않으며, 동일 번호(정규화)은 모바일 타입을 우선한다.
+     */
     fun readAsJson(context: Context): String {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS)
             != PackageManager.PERMISSION_GRANTED
         ) {
             return "[]"
         }
-        val out = JSONArray()
-        val seen = HashSet<String>()
+        data class Row(val name: String, val phone: String, val type: Int, val localKey: String)
+
+        val bestByKey = LinkedHashMap<String, Row>()
         val projection = arrayOf(
             ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-            ContactsContract.CommonDataKinds.Phone.NUMBER
+            ContactsContract.CommonDataKinds.Phone.NUMBER,
+            ContactsContract.CommonDataKinds.Phone.TYPE,
+            ContactsContract.CommonDataKinds.Phone.LABEL
         )
         context.contentResolver.query(
             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
             projection,
             null,
             null,
-            null
+            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE LOCALIZED ASC"
         )?.use { cursor ->
             val nameIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
             val phoneIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            val typeIdx = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
             while (cursor.moveToNext()) {
                 val phone = cursor.getString(phoneIdx)?.trim().orEmpty()
                 if (phone.isEmpty()) continue
-                val digits = phone.filter { it.isDigit() }
-                if (digits.length < 8 || !seen.add(digits)) continue
+                val localKey = ContactPhoneKeys.localDigits(phone)
+                if (localKey.length < 8) continue
                 val name = if (nameIdx >= 0) cursor.getString(nameIdx)?.trim().orEmpty() else ""
-                out.put(
-                    JSONObject()
-                        .put("name", name)
-                        .put("phone", phone)
-                )
-                if (out.length() >= 2000) break
+                val type = if (typeIdx >= 0) cursor.getInt(typeIdx) else ContactsContract.CommonDataKinds.Phone.TYPE_OTHER
+                val prev = bestByKey[localKey]
+                val preferMobile = type == ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE ||
+                    type == ContactsContract.CommonDataKinds.Phone.TYPE_WORK_MOBILE
+                val prevMobile = prev != null && (
+                    prev.type == ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE ||
+                        prev.type == ContactsContract.CommonDataKinds.Phone.TYPE_WORK_MOBILE
+                    )
+                if (prev == null || (preferMobile && !prevMobile) || (prev.name.isBlank() && name.isNotBlank())) {
+                    bestByKey[localKey] = Row(name, phone, type, localKey)
+                }
+                if (bestByKey.size >= MAX_EXPORT) break
             }
+        }
+
+        val out = JSONArray()
+        for (row in bestByKey.values) {
+            out.put(
+                JSONObject()
+                    .put("name", row.name)
+                    .put("phone", row.phone)
+                    .put("type", row.type)
+                    .put("normalized", row.localKey)
+            )
         }
         return out.toString()
     }

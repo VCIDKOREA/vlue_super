@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { resolveRequestUserId } from "../lib/authContext.js";
-import { normalizeToE164KR } from "../lib/phoneE164.js";
+import { normalizeToE164KR, phoneMatchVariants } from "../lib/phoneE164.js";
 import { ssePublish } from "../realtime/sseHub.js";
 import { sendShowcaseSocialPushToUser } from "../services/fcmNotificationService.js";
 
-const MAX_CONTACTS = 500;
+const MAX_CONTACTS = 2000;
 
 function displayKRPhone(e164: string): string {
   const d = e164.replace(/\D/g, "");
@@ -56,39 +56,55 @@ contactRoutes.post("/match", async (c) => {
     return c.json({ error: "invalid JSON" }, 400);
   }
 
+  const truncated = Array.isArray(body.contacts) && body.contacts.length > MAX_CONTACTS;
   const raw = Array.isArray(body.contacts) ? body.contacts.slice(0, MAX_CONTACTS) : [];
-  const entries: { name: string; phoneE164: string }[] = [];
+  const entries: { name: string; phoneE164: string; variants: string[] }[] = [];
   const seen = new Set<string>();
+  const allVariants = new Set<string>();
 
   for (const row of raw) {
-    const phoneE164 = normalizeToE164KR(String(row.phone || ""));
+    const phoneRaw = String(row.phone || "");
+    const phoneE164 = normalizeToE164KR(phoneRaw);
     if (!phoneE164 || seen.has(phoneE164)) continue;
     seen.add(phoneE164);
+    const variants = phoneMatchVariants(phoneRaw);
+    variants.forEach((v) => allVariants.add(v));
     entries.push({
       name: String(row.name || "").trim() || "연락처",
-      phoneE164
+      phoneE164,
+      variants
     });
   }
 
   if (!entries.length) {
-    return c.json({ registered: [], unregistered: [], matchedCount: 0 });
+    return c.json({
+      registered: [],
+      unregistered: [],
+      matchedCount: 0,
+      scannedCount: raw.length,
+      truncated: Boolean(truncated)
+    });
   }
 
-  const phones = entries.map((e) => e.phoneE164);
   const users = await prisma.user.findMany({
-    where: { phoneE164: { in: phones } },
+    where: { phoneE164: { in: [...allVariants] } },
     select: {
       id: true,
       phoneE164: true,
       legalName: true,
       publicHandle: true,
+      vlueProfileNickname: true,
       email: true
     }
   });
 
-  const userByPhone = new Map(
-    users.filter((u) => u.phoneE164).map((u) => [u.phoneE164 as string, u])
-  );
+  const userByVariant = new Map<string, (typeof users)[number]>();
+  for (const u of users) {
+    if (!u.phoneE164) continue;
+    for (const v of phoneMatchVariants(u.phoneE164)) {
+      if (!userByVariant.has(v)) userByVariant.set(v, u);
+    }
+  }
 
   const friendRows = await prisma.friendRequest.findMany({
     where: {
@@ -115,10 +131,13 @@ contactRoutes.post("/match", async (c) => {
   const registered: Array<{
     contactName: string;
     phoneE164: string;
+    phoneDisplay: string;
     userId: string;
     displayName: string;
     publicHandle: string | null;
+    nickname: string | null;
     isFriend: boolean;
+    friendStatus: "none" | "pending" | "accepted" | "received";
     friendRequestPending: "sent" | "received" | null;
   }> = [];
   const unregistered: Array<{
@@ -128,20 +147,37 @@ contactRoutes.post("/match", async (c) => {
   }> = [];
 
   for (const entry of entries) {
-    const user = userByPhone.get(entry.phoneE164);
+    let user: (typeof users)[number] | undefined;
+    for (const v of entry.variants) {
+      user = userByVariant.get(v);
+      if (user) break;
+    }
     if (user && user.id !== me) {
+      const isFriend = friendIds.has(user.id);
+      const pending = pendingSent.has(user.id)
+        ? ("sent" as const)
+        : pendingReceived.has(user.id)
+          ? ("received" as const)
+          : null;
       registered.push({
         contactName: entry.name,
         phoneE164: entry.phoneE164,
+        phoneDisplay: displayKRPhone(entry.phoneE164),
         userId: user.id,
-        displayName: userDisplayName(user),
+        displayName:
+          user.vlueProfileNickname?.trim() ||
+          userDisplayName(user),
         publicHandle: user.publicHandle,
-        isFriend: friendIds.has(user.id),
-        friendRequestPending: pendingSent.has(user.id)
-          ? "sent"
-          : pendingReceived.has(user.id)
-            ? "received"
-            : null
+        nickname: user.vlueProfileNickname || null,
+        isFriend,
+        friendStatus: isFriend
+          ? "accepted"
+          : pending === "sent"
+            ? "pending"
+            : pending === "received"
+              ? "received"
+              : "none",
+        friendRequestPending: pending
       });
     } else if (!user) {
       unregistered.push({
@@ -155,7 +191,9 @@ contactRoutes.post("/match", async (c) => {
   return c.json({
     registered,
     unregistered,
-    matchedCount: registered.length + unregistered.length
+    matchedCount: registered.length + unregistered.length,
+    scannedCount: raw.length,
+    truncated: Boolean(truncated)
   });
 });
 
@@ -179,7 +217,7 @@ async function deliverFriendNotice(opts: {
   actorUserId: string;
   title: string;
   body: string;
-  sseType: "vlue-friend-request" | "vlue-friend-accepted";
+  sseType: "vlue-friend-request" | "vlue-friend-accepted" | "vlue-friend-rejected";
   requestId: string;
   actorName: string;
 }) {
@@ -389,7 +427,7 @@ contactRoutes.get("/friend-requests", async (c) => {
   const me = await resolveRequestUserId(c);
   if (!me) return c.json({ error: "인증 필요" }, 401);
 
-  const [rows, acceptedRows] = await Promise.all([
+  const [pendingRows, sentHistory, acceptedRows] = await Promise.all([
     prisma.friendRequest.findMany({
       where: {
         status: "pending",
@@ -405,6 +443,32 @@ contactRoutes.get("/friend-requests", async (c) => {
         purposeText: true,
         applicantLegalNameSnapshot: true,
         createdAt: true,
+        updatedAt: true,
+        fromUser: {
+          select: { id: true, legalName: true, publicHandle: true, email: true, phoneE164: true }
+        },
+        toUser: {
+          select: { id: true, legalName: true, publicHandle: true, email: true, phoneE164: true }
+        }
+      }
+    }),
+    /* 보낸 쪽: pending + 최근 accepted/rejected 상태 피드백 */
+    prisma.friendRequest.findMany({
+      where: {
+        fromUserId: me,
+        status: { in: ["pending", "accepted", "rejected"] }
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        fromUserId: true,
+        toUserId: true,
+        status: true,
+        purposeText: true,
+        applicantLegalNameSnapshot: true,
+        createdAt: true,
+        updatedAt: true,
         fromUser: {
           select: { id: true, legalName: true, publicHandle: true, email: true, phoneE164: true }
         },
@@ -423,11 +487,23 @@ contactRoutes.get("/friend-requests", async (c) => {
     })
   ]);
 
-  const mapRow = (fr: (typeof rows)[number], direction: "sent" | "received") => {
+  const mapRow = (
+    fr: (typeof pendingRows)[number],
+    direction: "sent" | "received"
+  ) => {
     const peer = direction === "sent" ? fr.toUser : fr.fromUser;
+    const statusLabel =
+      fr.status === "accepted"
+        ? "수락됨"
+        : fr.status === "rejected"
+          ? "거절됨"
+          : fr.status === "pending"
+            ? "신청 완료 (대기 중)"
+            : fr.status;
     return {
       id: fr.id,
       status: fr.status,
+      statusLabel,
       direction,
       fromUserId: fr.fromUserId,
       toUserId: fr.toUserId,
@@ -440,12 +516,15 @@ contactRoutes.get("/friend-requests", async (c) => {
       peerName: userDisplayName(peer),
       peerHandle: peer.publicHandle,
       message: fr.purposeText || "",
-      createdAt: fr.createdAt.toISOString()
+      createdAt: fr.createdAt.toISOString(),
+      updatedAt: fr.updatedAt?.toISOString?.() || fr.createdAt.toISOString()
     };
   };
 
-  const sent = rows.filter((r) => r.fromUserId === me).map((r) => mapRow(r, "sent"));
-  const received = rows.filter((r) => r.toUserId === me).map((r) => mapRow(r, "received"));
+  const sent = sentHistory.map((r) => mapRow(r, "sent"));
+  const received = pendingRows
+    .filter((r) => r.toUserId === me)
+    .map((r) => mapRow(r, "received"));
   const acceptedFriendIds = [
     ...new Set(
       acceptedRows.map((r) => (r.fromUserId === me ? r.toUserId : r.fromUserId)).filter(Boolean)
@@ -565,9 +644,28 @@ contactRoutes.post("/friend-requests/:id/reject", async (c) => {
     return c.json({ error: "not_pending", status: fr.status }, 400);
   }
 
+  const meUser = await prisma.user.findUnique({
+    where: { id: me },
+    select: { legalName: true, publicHandle: true, email: true }
+  });
+  const rejecterName = userDisplayName(
+    meUser || { legalName: null, publicHandle: null, email: null }
+  );
+
   await prisma.friendRequest.update({
     where: { id },
     data: { status: "rejected" }
+  });
+
+  /* 신청자(from)에게 거절 상태 피드백 */
+  await deliverFriendNotice({
+    ownerUserId: fr.fromUserId,
+    actorUserId: me,
+    title: "친구 신청 거절",
+    body: `${rejecterName}님이 친구 신청을 거절했습니다.`,
+    sseType: "vlue-friend-rejected",
+    requestId: id,
+    actorName: rejecterName
   });
 
   return c.json({ ok: true, id, status: "rejected" });
