@@ -674,7 +674,9 @@ export async function reviewEnterpriseDccApplication(input: {
       passwordHash: managePasswordHash,
       ...(!phoneTaken && dccE164 ? { phoneE164: dccE164 } : {}),
       accountStatus: "active",
-      status: "ACTIVE"
+      status: "ACTIVE",
+      identityVerified: true,
+      identityVerifiedAt: new Date()
     }
   });
 
@@ -1232,12 +1234,24 @@ export async function attestEnterpriseDccSecurity(input: {
      WHERE id = $1::uuid`,
     app.id
   );
+
+  /* 1·2·3단계(본인·사업장·위치) 통과 — 본인인증 플래그 확정 (DCC 발급은 관리자 승인 시) */
+  await prisma.user.updateMany({
+    where: { id: input.applicantUserId, identityVerified: false },
+    data: {
+      identityVerified: true,
+      identityVerifiedAt: new Date(),
+      accountStatus: "active"
+    }
+  });
+
   const next = await getApp(app.id);
   return {
     ...gate,
     ok: true,
     application: next ? mapApp(next) : null,
-    nextStep: "submit"
+    nextStep: "submit",
+    identityVerified: true
   };
 }
 

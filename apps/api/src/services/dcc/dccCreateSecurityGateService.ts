@@ -5,20 +5,45 @@
 import { haversineKm, type GeoPoint } from "./dccAddressDistance.js";
 import { matchRemoteControlApp } from "../../lib/remoteControlApps.js";
 import { geocodeDccAddress } from "../../integrations/kakao/kakaoAddressGeocode.js";
+import { reverseGeocodeKakao } from "../../integrations/kakao/kakaoReverseGeocode.js";
+import { reverseGeocodeGoogle, addressLooksDetailed } from "../../integrations/google/googleMapsGeocode.js";
+import { reverseGeocodeNominatim } from "../../integrations/geo/nominatimReverse.js";
 
+/** DCC 3단계 위치 대조 반경 — 기본 150m (환경변수로 조정 가능) */
 export const DCC_GEO_RADIUS_METERS = Math.max(
   50,
-  Number(process.env.DCC_GEO_RADIUS_METERS || 300) || 300
+  Number(process.env.DCC_GEO_RADIUS_METERS || 150) || 150
 );
 
 export const MSG_LOCATION_MISMATCH =
-  "현재 신청하신 위치는 인증 위치가 아닙니다. 사내 장소에서 인증신청 하세요.";
+  "등록된 사업장/직장 위치 근처(반경 150m 이내)에서 인증을 진행해 주세요.";
+
+export const MSG_LOCATION_APPROVED = "정상 승인되었습니다.";
 
 export const MSG_VPN_OR_REMOTE =
   "현재 기기 VPN 또는 원격프로그램이 작동중입니다. 잠시 작동을 중지하고 인증신청하세요.";
 
 export const MSG_WIFI_REQUIRED_CELLULAR =
   "와이파이(Wi-Fi) 환경에서는 위치 인증을 할 수 없습니다. 모바일 데이터로 전환한 뒤 다시 시도해 주세요.";
+
+/** GPS → 도로명/지번 주소 (카카오 → 구글 → Nominatim) */
+export async function reverseGeocodeDccGps(lat: number, lng: number): Promise<string> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+  try {
+    const kakao = await reverseGeocodeKakao(lat, lng);
+    if (kakao && addressLooksDetailed(kakao)) return kakao.slice(0, 240);
+    const google = await reverseGeocodeGoogle(lat, lng);
+    if (google?.addressLabel && addressLooksDetailed(google.addressLabel)) {
+      return String(google.addressLabel).trim().slice(0, 240);
+    }
+    if (kakao) return kakao.slice(0, 240);
+    const named = await reverseGeocodeNominatim(lat, lng);
+    if (named) return String(named).trim().slice(0, 240);
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
 
 const VPN_PACKAGE_HINTS = [
   "vpn",
@@ -59,6 +84,12 @@ export type DccSecurityGateResult = {
     vpnRemoteOk: boolean;
     distanceMeters: number | null;
     radiusMeters: number;
+    /** 2단계 등록 사업장/직장 주소 */
+    workplaceAddress: string;
+    /** GPS 역지오코딩 현재 위치 주소 */
+    currentAddress: string;
+    userLat: number | null;
+    userLng: number | null;
   };
 };
 
@@ -100,6 +131,13 @@ export async function evaluateDccSecurityGate(
 
   let distanceMeters: number | null = null;
   let locationOk = false;
+  const workplaceAddress = String(input.workplaceAddress || "").trim();
+  let currentAddress = "";
+
+  if (user) {
+    currentAddress = await reverseGeocodeDccGps(user.lat, user.lng);
+  }
+
   if (!user) {
     reasons.push("위치 권한이 필요합니다. GPS를 켠 뒤 다시 시도해 주세요.");
   } else if (!workplace) {
@@ -131,7 +169,9 @@ export async function evaluateDccSecurityGate(
       ? MSG_LOCATION_MISMATCH
       : !mobileDataOk
         ? MSG_WIFI_REQUIRED_CELLULAR
-        : reasons[0];
+        : canActivateButton
+          ? MSG_LOCATION_APPROVED
+          : reasons[0];
 
   return {
     ok: canActivateButton,
@@ -143,7 +183,13 @@ export async function evaluateDccSecurityGate(
       mobileDataOk,
       vpnRemoteOk,
       distanceMeters,
-      radiusMeters: radiusM
+      radiusMeters: radiusM,
+      workplaceAddress,
+      currentAddress:
+        currentAddress ||
+        (user ? `좌표 ${user.lat.toFixed(5)}, ${user.lng.toFixed(5)}` : ""),
+      userLat: user?.lat ?? null,
+      userLng: user?.lng ?? null
     }
   };
 }
