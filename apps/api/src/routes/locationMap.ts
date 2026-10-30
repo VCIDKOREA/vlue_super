@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { prisma } from "../db/client.js";
 import { fetchKakaoCarDirections } from "../integrations/kakao/kakaoMobilityDirections.js";
+import { fetchGoogleDirections } from "../integrations/google/googleDirections.js";
+import { fetchNearbyTrafficSignals } from "../integrations/publicData/trafficSignal.js";
 import { searchKakaoLocalList } from "../integrations/kakao/kakaoLocalSearch.js";
 import { addressLooksDetailed, reverseGeocodeGoogle } from "../integrations/google/googleMapsGeocode.js";
 import { reverseGeocodeNominatim } from "../integrations/geo/nominatimReverse.js";
@@ -294,15 +296,51 @@ locationMapRoutes.get("/guide", requireUserHeader, async (c) => {
   const toLat = num(c.req.query("toLat"), NaN);
   const toLng = num(c.req.query("toLng"), NaN);
   const mode = String(c.req.query("mode") || "recommend").toLowerCase();
+  const transport = String(c.req.query("transport") || "car").toLowerCase();
+  const region = String(c.req.query("region") || "kr").toLowerCase();
   if (![fromLat, fromLng, toLat, toLng].every(Number.isFinite)) {
     return c.json({ ok: false, error: "좌표가 없습니다." }, 400);
   }
   try {
+    const overseas = region === "overseas" || region === "global" || region === "abroad";
+    const useGoogle =
+      overseas ||
+      transport === "walk" ||
+      transport === "bike" ||
+      transport === "transit" ||
+      transport === "walking" ||
+      transport === "bicycling";
+
+    if (useGoogle) {
+      const guided = await fetchGoogleDirections(fromLat, fromLng, toLat, toLng, {
+        transport: transport === "motorcycle" ? "car" : transport
+      });
+      if (!guided.ok) return c.json({ ok: false, error: guided.error }, 200);
+      return c.json(guided);
+    }
+
+    /* KR car / motorcycle → Kakao Mobility */
     const guided = await fetchKakaoCarDirections(fromLng, fromLat, toLng, toLat, { mode });
     if (!guided.ok) return c.json({ ok: false, error: guided.error }, 200);
-    return c.json(guided);
+    return c.json({ ...guided, transport, provider: "kakao" });
   } catch {
     return c.json({ ok: false, error: "길안내 서버에 연결하지 못했습니다." }, 200);
+  }
+});
+
+/** 전방 교차로 신호등 잔여시간 (공공데이터포털 C-ITS) */
+locationMapRoutes.get("/signals/nearby", requireUserHeader, async (c) => {
+  const lat = num(c.req.query("lat"), NaN);
+  const lng = num(c.req.query("lng"), NaN);
+  const radius = num(c.req.query("radius"), 400);
+  if (![lat, lng].every(Number.isFinite)) {
+    return c.json({ ok: false, error: "좌표가 없습니다.", signals: [] }, 400);
+  }
+  try {
+    const result = await fetchNearbyTrafficSignals(lat, lng, Math.min(2000, Math.max(80, radius)));
+    return c.json(result);
+  } catch {
+    return c.json({ ok: false, error: "신호 정보를 불러오지 못했습니다.", signals: [] }, 200);
   }
 });
 

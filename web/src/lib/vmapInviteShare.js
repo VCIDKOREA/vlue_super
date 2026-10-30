@@ -63,7 +63,17 @@ export async function acceptVmapInviteToken(token, displayName) {
 }
 
 /**
- * @param {{ token?: string, roomId?: string, placeLabel?: string, inviterName?: string }} opts
+ * @param {{
+ *   token?: string,
+ *   roomId?: string,
+ *   placeLabel?: string,
+ *   inviterName?: string,
+ *   etaMinutes?: number|null,
+ *   lat?: number|null,
+ *   lng?: number|null,
+ *   placeLat?: number|null,
+ *   placeLng?: number|null
+ * }} opts
  */
 export function buildVmapInviteMessage(opts = {}) {
   const sender = opts.inviterName || getInviteSenderName();
@@ -72,22 +82,48 @@ export function buildVmapInviteMessage(opts = {}) {
   const place = String(opts.placeLabel || "약속").trim() || "약속";
   /* 토큰 기반 URL 우선, 없으면 roomId 기반 */
   const joinUrl = opts.token ? buildVmapInviteUrl(opts.token) : buildVmapJoinUrl(opts.roomId);
+  const eta =
+    Number.isFinite(opts.etaMinutes) && opts.etaMinutes >= 0
+      ? `예상 도착(ETA): 약 ${Math.round(opts.etaMinutes)}분`
+      : null;
+  const live =
+    Number.isFinite(opts.lat) && Number.isFinite(opts.lng)
+      ? `실시간 좌표: ${Number(opts.lat).toFixed(5)}, ${Number(opts.lng).toFixed(5)}`
+      : null;
+  const dest =
+    Number.isFinite(opts.placeLat) && Number.isFinite(opts.placeLng)
+      ? `목적지 좌표: ${Number(opts.placeLat).toFixed(5)}, ${Number(opts.placeLng).toFixed(5)}`
+      : null;
 
   return [
-    `[V-Map 초대] ${who}님이 V-Map 약속에 초대했습니다.`,
+    `[V-Map 초대] ${who}님이 V-Map 목적지·경로를 공유했습니다.`,
     "",
     `목적지: ${place}`,
+    eta,
+    dest,
+    live,
     "",
-    "아래 링크로 VLUÉ 앱에서 바로 입장하세요.",
+    "아래 링크로 VLUÉ 앱에서 바로 입장·동기화하세요.",
     joinUrl,
     "",
     "비회원도 간편 가입 후 바로 입장 가능합니다!"
-  ].join("\n");
+  ]
+    .filter((line) => line != null && line !== "")
+    .join("\n");
 }
 
 /**
  * 카카오톡으로 V-Map 초대 공유 (토큰 자동 발급)
- * @param {{ roomId: string, placeLabel?: string, onToast?: (m: string) => void }} opts
+ * @param {{
+ *   roomId: string,
+ *   placeLabel?: string,
+ *   etaMinutes?: number|null,
+ *   lat?: number|null,
+ *   lng?: number|null,
+ *   placeLat?: number|null,
+ *   placeLng?: number|null,
+ *   onToast?: (m: string) => void
+ * }} opts
  */
 export async function shareVmapInviteViaKakao(opts = {}) {
   /* 1. 초대 토큰 발급 */
@@ -102,7 +138,12 @@ export async function shareVmapInviteViaKakao(opts = {}) {
   const text = buildVmapInviteMessage({
     token: tokenData.token,
     placeLabel: opts.placeLabel || tokenData.placeLabel,
-    inviterName: tokenData.inviterName
+    inviterName: tokenData.inviterName,
+    etaMinutes: opts.etaMinutes,
+    lat: opts.lat,
+    lng: opts.lng,
+    placeLat: opts.placeLat,
+    placeLng: opts.placeLng
   });
   const linkUrl = buildVmapInviteUrl(tokenData.token);
 

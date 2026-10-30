@@ -167,15 +167,26 @@ export function fetchFamilyLocationMessages(after) {
   return vlueAuthFetch(apiUrl(`/api/location/family/messages${q}`), { headers: vlueAuthHeaders() }).then(read);
 }
 
-export function fetchVmapGuide({ fromLat, fromLng, toLat, toLng, mode }) {
+export function fetchVmapGuide({ fromLat, fromLng, toLat, toLng, mode, transport, region }) {
   const q = new URLSearchParams({
     fromLat: String(fromLat),
     fromLng: String(fromLng),
     toLat: String(toLat),
     toLng: String(toLng),
-    mode: String(mode || "recommend")
+    mode: String(mode || "recommend"),
+    transport: String(transport || "car"),
+    region: String(region || "kr")
   });
   return vlueAuthFetch(apiUrl(`/api/location/guide?${q}`), { headers: vlueAuthHeaders() }).then(read);
+}
+
+export function fetchNearbySignals({ lat, lng, radius = 400 }) {
+  const q = new URLSearchParams({
+    lat: String(lat),
+    lng: String(lng),
+    radius: String(radius)
+  });
+  return vlueAuthFetch(apiUrl(`/api/location/signals/nearby?${q}`), { headers: vlueAuthHeaders() }).then(read);
 }
 
 export function exitVmapApi(roomId) {

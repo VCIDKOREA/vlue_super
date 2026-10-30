@@ -247,7 +247,7 @@ export function FamilyFolderPanels({
                 <div className={`mx-auto mb-3 h-1 w-10 rounded-full ${dark ? "bg-white/20" : "bg-slate-200"}`} />
                 <p className="text-[16px] font-black">가족 구성원</p>
                 <p className={`mt-1 text-[12px] ${dark ? "text-white/60" : "text-slate-500"}`}>
-                  이름을 누르면 지도가 그 위치로 이동하고 상세가 열립니다.
+                  이름을 누르면 지도가 그 위치로 이동합니다. 경로 안내는 별도 버튼으로 시작하세요.
                 </p>
                 <ul className="mt-3 space-y-2">
                   {profiles.map((member) => {

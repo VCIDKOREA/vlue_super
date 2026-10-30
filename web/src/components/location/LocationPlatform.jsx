@@ -41,6 +41,7 @@ import {
   fetchFamilyLocationMessages,
   fetchMapSponsor,
   fetchVmapGuide,
+  fetchNearbySignals,
   fetchVmapMessages,
   fetchVmapRoom,
   finishVmapApi,
@@ -87,8 +88,56 @@ import VmapNaverSurface from "./VmapNaverSurface.jsx";
 import VmapGoogleSurface from "./VmapGoogleSurface.jsx";
 import VMapChatOverlay from "./VMapChatOverlay.jsx";
 import { shareVmapInviteViaKakao } from "../../lib/vmapInviteShare.js";
+import {
+  formatTurnSpeech,
+  isVmapTtsMuted,
+  setVmapTtsMuted,
+  speakVmapGuide
+} from "../../lib/vmapNavSpeech.js";
 
 const TILE = 256;
+const TRANSPORT_OPTIONS = [
+  { id: "car", label: "자동차" },
+  { id: "transit", label: "대중교통" },
+  { id: "motorcycle", label: "이륜차" },
+  { id: "bike", label: "자전거" },
+  { id: "walk", label: "도보" }
+];
+
+function bearingDeg(fromLat, fromLng, toLat, toLng) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const toDeg = (r) => (r * 180) / Math.PI;
+  const φ1 = toRad(fromLat);
+  const φ2 = toRad(toLat);
+  const Δλ = toRad(toLng - fromLng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function remainingRouteMeters(route, lat, lng) {
+  const points = Array.isArray(route?.points) ? route.points : [];
+  if (!points.length || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return Number(route?.distanceM) || 0;
+  }
+  let nearest = 0;
+  let best = Infinity;
+  for (let i = 0; i < points.length; i += 1) {
+    const [lngP, latP] = points[i];
+    const d = haversineMeters(lat, lng, latP, lngP);
+    if (d < best) {
+      best = d;
+      nearest = i;
+    }
+  }
+  let rest = 0;
+  for (let i = nearest; i + 1 < points.length; i += 1) {
+    const [lngA, latA] = points[i];
+    const [lngB, latB] = points[i + 1];
+    rest += haversineMeters(latA, lngA, latB, lngB);
+  }
+  return Math.max(0, Math.round(rest || best));
+}
 const ACCENT = "#00D2FF";
 const AD_BANNER_PX = 56;
 /** 수동 도착 완료는 이 거리 안에 들어와야 한다. */
@@ -394,6 +443,13 @@ export default function LocationPlatform() {
   const [roomBusy, setRoomBusy] = useState("");
   const [routeMode, setRouteMode] = useState("recommend");
   const [routePickerOpen, setRoutePickerOpen] = useState(false);
+  const [transportMode, setTransportMode] = useState("car");
+  const [firstPersonNav, setFirstPersonNav] = useState(false);
+  const [ttsMuted, setTtsMuted] = useState(() => isVmapTtsMuted());
+  const [overseasPanelOpen, setOverseasPanelOpen] = useState(false);
+  const [navCamera, setNavCamera] = useState(null);
+  const [nearbySignal, setNearbySignal] = useState(null);
+  const [remainDistanceM, setRemainDistanceM] = useState(null);
   const [nativeMini, setNativeMini] = useState(false);
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
@@ -438,12 +494,17 @@ export default function LocationPlatform() {
   const leaveLock = useRef(false);
   const guideOnRef = useRef(false);
   const routeModeRef = useRef("recommend");
+  const transportModeRef = useRef("car");
+  const firstPersonNavRef = useRef(false);
+  const lastSpokenCueRef = useRef("");
   /** GPS → setSelf / 역지오코딩 / presence 과다 호출 방지 */
   const lastSelfUiRef = useRef({ lat: null, lng: null, at: 0 });
   const lastGeocodeRef = useRef({ lat: null, lng: null, at: 0, label: "", meta: null });
   const lastPresenceRef = useRef({ lat: null, lng: null, at: 0 });
   guideOnRef.current = guideOn;
   routeModeRef.current = routeMode;
+  transportModeRef.current = transportMode;
+  firstPersonNavRef.current = firstPersonNav;
 
   useEffect(() => subscribeLocationSession(setSession), []);
   roomRef.current = room;
@@ -902,7 +963,9 @@ export default function LocationPlatform() {
             fromLng: member.lng,
             toLat: room.placeLat,
             toLng: room.placeLng,
-            mode: routeModeRef.current
+            mode: routeModeRef.current,
+            transport: transportModeRef.current,
+            region: isOverseasMember(member) || isOverseasMember(self) ? "overseas" : "kr"
           });
           if (data?.ok && Array.isArray(data.points)) next[member.userId] = data;
         } catch {
@@ -914,7 +977,7 @@ export default function LocationPlatform() {
     return () => {
       cancelled = true;
     };
-  }, [session.mode, room?.placeReady, room?.placeLat, room?.placeLng, departedKey, routeMode]);
+  }, [session.mode, room?.placeReady, room?.placeLat, room?.placeLng, departedKey, routeMode, transportMode, self?.isOverseas]);
 
   /* 가족방 이동 안내 — 내 GPS → 상대 위치 경로 갱신 */
   const familyNavKey = familyNavTarget
@@ -935,7 +998,9 @@ export default function LocationPlatform() {
           fromLng: self.lng,
           toLat: familyNavTarget.lat,
           toLng: familyNavTarget.lng,
-          mode: routeModeRef.current
+          mode: routeModeRef.current,
+          transport: transportModeRef.current,
+          region: isOverseasMember(self) || isOverseasMember(familyNavTarget) ? "overseas" : "kr"
         });
         if (cancelled) return;
         if (data?.ok && Array.isArray(data.points)) {
@@ -948,7 +1013,90 @@ export default function LocationPlatform() {
     return () => {
       cancelled = true;
     };
-  }, [session.mode, familyNavKey, selfNavKey, guideOn, routeMode, familyNavTarget, self?.lat, self?.lng]);
+  }, [session.mode, familyNavKey, selfNavKey, guideOn, routeMode, transportMode, familyNavTarget, self?.lat, self?.lng]);
+
+  /* 1인칭 카메라 + 남은 거리 */
+  useEffect(() => {
+    if (!guideOn || !firstPersonNav || self?.lat == null || self?.lng == null) {
+      setRemainDistanceM(null);
+      return undefined;
+    }
+    const mineId = getLocalVlueUserId();
+    const route = routes[mineId];
+    const dest =
+      session.mode === "family" && familyNavTarget
+        ? familyNavTarget
+        : room?.placeReady
+          ? { lat: room.placeLat, lng: room.placeLng }
+          : null;
+    if (!dest) return undefined;
+    const remain = remainingRouteMeters(route, self.lat, self.lng);
+    setRemainDistanceM(remain);
+    const heading = bearingDeg(self.lat, self.lng, dest.lat, dest.lng);
+    const nextCam = {
+      lat: self.lat,
+      lng: self.lng,
+      heading,
+      tilt: 45,
+      zoom: 17,
+      at: Date.now()
+    };
+    setNavCamera(nextCam);
+    mapSurfaceRef.current?.setNavCamera?.(nextCam);
+    return undefined;
+  }, [
+    guideOn,
+    firstPersonNav,
+    self?.lat,
+    self?.lng,
+    routes,
+    familyNavTarget,
+    room?.placeLat,
+    room?.placeLng,
+    room?.placeReady,
+    session.mode
+  ]);
+
+  /* TTS 턴바이턴 */
+  useEffect(() => {
+    if (!guideOn || ttsMuted) return;
+    const cueNow = nextGuideCue(routes[getLocalVlueUserId()]?.steps);
+    if (!cueNow) return;
+    const key = `${cueNow.instruction}:${Math.round(Number(cueNow.distanceM) || 0)}`;
+    if (key === lastSpokenCueRef.current) return;
+    const speech = formatTurnSpeech(cueNow);
+    if (!speech) return;
+    if (speakVmapGuide(speech, { key })) lastSpokenCueRef.current = key;
+  }, [guideOn, ttsMuted, routes, self?.lat, self?.lng]);
+
+  /* 전방 신호등 폴링 */
+  useEffect(() => {
+    if (!guideOn || !firstPersonNav || self?.lat == null || self?.lng == null) {
+      setNearbySignal(null);
+      return undefined;
+    }
+    if (isOverseasMember(self)) {
+      setNearbySignal(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const data = await fetchNearbySignals({ lat: self.lat, lng: self.lng, radius: 350 });
+        if (cancelled) return;
+        const top = Array.isArray(data?.signals) ? data.signals[0] : null;
+        setNearbySignal(top || null);
+      } catch {
+        if (!cancelled) setNearbySignal(null);
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [guideOn, firstPersonNav, self?.lat, self?.lng, self?.isOverseas]);
 
   useEffect(() => {
     if (session.mode !== "family") {
@@ -1377,6 +1525,10 @@ export default function LocationPlatform() {
     setGuideOn(false);
     setRoutePickerOpen(false);
     setRoutes({});
+    setFirstPersonNav(false);
+    setNavCamera(null);
+    setNearbySignal(null);
+    mapSurfaceRef.current?.resetNavCamera?.();
     pushNotice("이동 안내를 종료했습니다.");
   };
 
@@ -1417,7 +1569,9 @@ export default function LocationPlatform() {
         fromLng: self.lng,
         toLat: member.lat,
         toLng: member.lng,
-        mode: routeModeRef.current
+        mode: routeModeRef.current,
+        transport: transportModeRef.current,
+        region: isOverseasMember(self) || isOverseasMember(member) ? "overseas" : "kr"
       });
       if (!data?.ok || !Array.isArray(data.points)) {
         throw new Error(data?.error || "경로를 찾지 못했습니다.");
@@ -1426,11 +1580,15 @@ export default function LocationPlatform() {
         userId: member.userId,
         name: targetName,
         lat: member.lat,
-        lng: member.lng
+        lng: member.lng,
+        isOverseas: isOverseasMember(member),
+        countryCode: member.countryCode || member.country_code
       };
       setFamilyNavTarget(dest);
       setRoutes({ [mineId]: data });
       setGuideOn(true);
+      const immersive = ["car", "motorcycle", "bike"].includes(transportModeRef.current);
+      setFirstPersonNav(immersive);
       userZoomedRef.current = false;
       mapSurfaceRef.current?.panTo?.(
         self.lat,
@@ -1859,18 +2017,55 @@ export default function LocationPlatform() {
   const domesticMembers =
     session.mode === "family" ? folderPeople.filter((member) => !isOverseasMember(member)) : members;
   const hideSharedSelf = session.mode === "family" && familyFolders.tab === "ward" && !familyFolders.sharing;
-  const useGoogleMap = session.mode === "family" && isOverseasMember(selected);
+  const navigatingNow =
+    guideOn &&
+    ((session.mode === "vmap" && session.departed && !selfArrived) || familyGuiding);
+  const useGoogleMap = navigatingNow
+    ? isOverseasMember(self)
+    : session.mode === "family" && isOverseasMember(selected);
+  const immersiveTransport = ["car", "motorcycle", "bike"].includes(transportMode);
+  const hideChromeForNav = navigatingNow && firstPersonNav && immersiveTransport;
   const chatReady =
     session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
+  const myRoute = routes[getLocalVlueUserId()] || null;
+  const transitLegs = Array.isArray(myRoute?.legs) ? myRoute.legs : [];
 
   const focusMember = (member, options = {}) => {
+    /* 이름 탭 = 선택 + 카메라만. 경로/안내는 시작하지 않음 */
     setSelected(member || null);
     setDetailOpen(Boolean(options?.detail));
+    setGuideOn(false);
+    setRoutes({});
+    setFamilyNavTarget(null);
+    setFirstPersonNav(false);
+    setNavCamera(null);
+    setNearbySignal(null);
+    mapSurfaceRef.current?.resetNavCamera?.();
     if (member?.lat != null && member?.lng != null) {
       userZoomedRef.current = true;
       markGesture();
-      patchLocationSession({ flyTo: { lat: member.lat, lng: member.lng, at: Date.now() } });
+      patchLocationSession({
+        flyTo: { lat: Number(member.lat), lng: Number(member.lng), zoom: 16, at: Date.now() }
+      });
+      window.setTimeout(() => {
+        mapSurfaceRef.current?.panTo?.(Number(member.lat), Number(member.lng), 16);
+      }, 80);
     }
+  };
+
+  const returnToVmapOverview = () => {
+    setFirstPersonNav(false);
+    setNavCamera(null);
+    mapSurfaceRef.current?.resetNavCamera?.();
+    const pts = [];
+    if (self?.lat != null && self?.lng != null) pts.push({ lat: self.lat, lng: self.lng });
+    (session.mode === "family" ? folderPeople : members).forEach((m) => {
+      if (m?.lat != null && m?.lng != null) pts.push({ lat: Number(m.lat), lng: Number(m.lng) });
+    });
+    if (room?.placeReady) pts.push({ lat: room.placeLat, lng: room.placeLng });
+    if (familyNavTarget?.lat != null) pts.push({ lat: familyNavTarget.lat, lng: familyNavTarget.lng });
+    if (pts.length) mapSurfaceRef.current?.fitBounds?.(pts);
+    else if (self?.lat != null) mapSurfaceRef.current?.panTo?.(self.lat, self.lng, 14);
   };
 
   const backToFamilyMap = () => {
@@ -1879,6 +2074,10 @@ export default function LocationPlatform() {
     setFamilyNavTarget(null);
     setRoutes({});
     setGuideOn(false);
+    setFirstPersonNav(false);
+    setNavCamera(null);
+    setNearbySignal(null);
+    mapSurfaceRef.current?.resetNavCamera?.();
   };
 
   const dark = theme === "dark";
@@ -1915,10 +2114,15 @@ export default function LocationPlatform() {
             members={overseasMembers}
             self={hideSharedSelf ? null : isOverseasMember(self) ? self : null}
             flyTo={session.flyTo}
+            guideFollow={navigatingNow && firstPersonNav}
+            navCamera={navCamera}
             onSelectMember={focusMember}
             onReady={() => {
               setMapReady(true);
               setMapError("");
+              if (session.flyTo?.lat != null) {
+                mapSurfaceRef.current?.panTo?.(session.flyTo.lat, session.flyTo.lng, session.flyTo.zoom || 16);
+              }
             }}
             onError={(error) => {
               setMapReady(false);
@@ -1943,7 +2147,8 @@ export default function LocationPlatform() {
             mode={session.mode}
             departed={session.departed}
             guideFollow={
-              (guideOn && session.mode === "vmap" && session.departed && !selfArrived) || familyGuiding
+              ((guideOn && session.mode === "vmap" && session.departed && !selfArrived) || familyGuiding) &&
+              firstPersonNav
             }
             flyTo={session.flyTo}
             pinEditable={Boolean(room?.hostUserId === getLocalVlueUserId())}
@@ -1985,38 +2190,54 @@ export default function LocationPlatform() {
         {session.mode === "family" && overseasMembers.length ? (
           <div className="pointer-events-none flex w-full justify-end">
             <div className={`pointer-events-auto w-full max-w-[280px] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${overseasDark ? "border border-violet-300/40 bg-[#24143f] text-[#f5f3ff]" : "border border-violet-200 bg-white text-slate-900"}`}>
-              <p className={`text-[12px] font-black tracking-tight ${overseasDark ? "text-[#f5f3ff]" : "text-slate-900"}`}>✈️ 해외 구성원 ({overseasMembers.length}명)</p>
-              <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
-                {overseasMembers.map((member) => (
-                  <li key={member.userId}>
-                    <button
-                      type="button"
-                      className={`block w-full rounded-xl px-2 py-1.5 text-left text-[11px] font-semibold ${
-                        selected?.userId === member.userId
-                          ? "bg-violet-500 text-white"
-                          : overseasDark
-                            ? "bg-white/10 text-[#f5f3ff]"
-                            : "bg-violet-50 text-violet-950"
-                      }`}
-                      onClick={() => focusMember(member, { detail: true })}
-                    >
-                      <span className="block truncate">{member.displayName}</span>
-                      <span className={`block truncate ${overseasDark ? "text-[#ddd6fe]" : "text-violet-800"}`}>
-                        {[member.cityName || member.city_name, member.countryName || member.country_name]
-                          .filter(Boolean)
-                          .join(", ") || "해외"}
-                      </span>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 text-left"
+                onClick={() => setOverseasPanelOpen((open) => !open)}
+                aria-expanded={overseasPanelOpen}
+              >
+                <p className={`text-[12px] font-black tracking-tight ${overseasDark ? "text-[#f5f3ff]" : "text-slate-900"}`}>
+                  해외 구성원 ({overseasMembers.length}명)
+                </p>
+                <span className={`text-[11px] font-bold ${overseasDark ? "text-[#ddd6fe]" : "text-violet-700"}`}>
+                  {overseasPanelOpen ? "접기" : "펼치기"}
+                </span>
+              </button>
+              {overseasPanelOpen ? (
+                <>
+                  <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
+                    {overseasMembers.map((member) => (
+                      <li key={member.userId}>
+                        <button
+                          type="button"
+                          className={`block w-full rounded-xl px-2 py-1.5 text-left text-[11px] font-semibold ${
+                            selected?.userId === member.userId
+                              ? "bg-violet-500 text-white"
+                              : overseasDark
+                                ? "bg-white/10 text-[#f5f3ff]"
+                                : "bg-violet-50 text-violet-950"
+                          }`}
+                          onClick={() => focusMember(member, { detail: true })}
+                        >
+                          <span className="block truncate">{member.displayName}</span>
+                          <span className={`block truncate ${overseasDark ? "text-[#ddd6fe]" : "text-violet-800"}`}>
+                            {[member.cityName || member.city_name, member.countryName || member.country_name]
+                              .filter(Boolean)
+                              .join(", ") || "해외"}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {useGoogleMap ? (
+                    <button type="button" className="mt-1.5 w-full rounded-full bg-[#03C75A] px-2 py-1 text-[11px] font-black text-white" onClick={backToFamilyMap}>
+                      네이버 가족 지도
                     </button>
-                  </li>
-                ))}
-              </ul>
-              {useGoogleMap ? (
-                <button type="button" className="mt-1.5 w-full rounded-full bg-[#03C75A] px-2 py-1 text-[11px] font-black text-white" onClick={backToFamilyMap}>
-                  네이버 가족 지도
-                </button>
-              ) : (
-                <p className={`mt-1.5 text-[10px] font-medium ${overseasDark ? "text-[#ddd6fe]" : "text-slate-600"}`}>프로필을 누르면 Google Maps로 전환</p>
-              )}
+                  ) : (
+                    <p className={`mt-1.5 text-[10px] font-medium ${overseasDark ? "text-[#ddd6fe]" : "text-slate-600"}`}>프로필을 누르면 Google Maps로 전환</p>
+                  )}
+                </>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -2026,29 +2247,84 @@ export default function LocationPlatform() {
               {maneuverGlyph(cue.instruction)}
             </div>
             <div className="px-3 py-3 text-center">
-              <p className="text-[22px] font-black tracking-tight text-[#00D2FF]">{formatGuideDistance(cue.distanceM)}</p>
+              <p className="text-[22px] font-black tracking-tight text-[#00D2FF]">
+                {formatGuideDistance(remainDistanceM != null ? remainDistanceM : cue.distanceM)}
+              </p>
               <p className="mt-1 text-[13px] font-bold leading-snug text-white">{cue.instruction}</p>
               <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#00D2FF]/80">
                 {familyGuiding
                   ? familyEtaMin != null
                     ? `약 ${familyEtaMin}분`
                     : "가족 이동"
-                  : routeMode === "free"
-                    ? "무료도로"
-                    : routeMode === "highway"
-                      ? "고속도로"
-                      : "추천경로"}
+                  : TRANSPORT_OPTIONS.find((row) => row.id === transportMode)?.label || "자동차"}
               </p>
-              {familyGuiding ? (
+              {nearbySignal ? (
+                <p className="mt-2 rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-[#00D2FF]">
+                  신호 {nearbySignal.phase || "—"}
+                  {nearbySignal.remainSec != null ? ` · ${nearbySignal.remainSec}초` : ""}
+                </p>
+              ) : null}
+              <div className="mt-2 flex gap-1">
                 <button
                   type="button"
-                  className="mt-3 w-full rounded-full bg-white py-2 text-[12px] font-black text-[#04121a]"
-                  onClick={stopFamilyNavigate}
+                  className="flex-1 rounded-full bg-white/15 py-1.5 text-[10px] font-black"
+                  onClick={() => {
+                    const next = !ttsMuted;
+                    setTtsMuted(next);
+                    setVmapTtsMuted(next);
+                  }}
                 >
-                  이동 종료
+                  {ttsMuted ? "음성 끔" : "음성 켬"}
                 </button>
-              ) : null}
+                {familyGuiding ? (
+                  <button
+                    type="button"
+                    className="flex-1 rounded-full bg-white py-1.5 text-[10px] font-black text-[#04121a]"
+                    onClick={stopFamilyNavigate}
+                  >
+                    종료
+                  </button>
+                ) : null}
+              </div>
             </div>
+          </div>
+        ) : null}
+        {navigatingNow && firstPersonNav ? (
+          <div className="pointer-events-auto flex flex-col items-start gap-2">
+            <button
+              type="button"
+              className="rounded-full border border-[#00D2FF]/60 bg-[#04121a]/90 px-3 py-2 text-[11px] font-black text-[#00D2FF] shadow-lg"
+              onClick={returnToVmapOverview}
+            >
+              전체 일행 보기 / V-MAP 복귀
+            </button>
+            {session.mode === "vmap" && session.roomId ? (
+              <button
+                type="button"
+                className="rounded-full border border-white/20 bg-[#04121a]/90 px-3 py-2 text-[11px] font-black text-white shadow-lg"
+                onClick={async () => {
+                  try {
+                    const etaMin = myRoute?.durationSec
+                      ? Math.max(1, Math.round(myRoute.durationSec / 60))
+                      : null;
+                    await shareVmapInviteViaKakao({
+                      roomId: session.roomId,
+                      placeLabel: room?.placeLabel || room?.title || "",
+                      etaMinutes: etaMin,
+                      lat: self?.lat,
+                      lng: self?.lng,
+                      placeLat: room?.placeLat,
+                      placeLng: room?.placeLng,
+                      onToast: pushNotice
+                    });
+                  } catch (e) {
+                    pushNotice(e?.message || "초대에 실패했습니다.");
+                  }
+                }}
+              >
+                일행 초대 & 목적지 공유
+              </button>
+            ) : null}
           </div>
         ) : null}
         </div>
@@ -2178,7 +2454,7 @@ export default function LocationPlatform() {
             </button>
           )
         ) : null}
-        {chatReady ? (
+        {chatReady && !hideChromeForNav ? (
           <VMapChatOverlay
             messages={messages}
             dark={dark}
@@ -2190,8 +2466,24 @@ export default function LocationPlatform() {
         ) : null}
       </div>
 
-      <div className="relative z-30 shrink-0 space-y-2 px-3 pb-1 pt-2">
+      <div className={`relative z-30 shrink-0 space-y-2 px-3 pb-1 pt-2 ${hideChromeForNav ? "hidden" : ""}`}>
         {selected && session.mode === "family" && !detailOpen ? (
+          <div className="space-y-2">
+          <div className={`flex flex-wrap gap-1 rounded-[18px] p-1.5 ${glass}`}>
+            {TRANSPORT_OPTIONS.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black ${transportMode === row.id ? accentBtn : quietBtn}`}
+                onClick={() => {
+                  setTransportMode(row.id);
+                  transportModeRef.current = row.id;
+                }}
+              >
+                {row.label}
+              </button>
+            ))}
+          </div>
           <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${glass}`}>
             <button type="button" className="min-w-0 flex-1 truncate text-left text-[13px] font-black" onClick={() => setDetailOpen(true)}>
               {selected.displayName}
@@ -2204,7 +2496,7 @@ export default function LocationPlatform() {
                 disabled={familyNavBusy}
                 onClick={() => void startFamilyMove(selected)}
               >
-                {familyNavTarget?.userId === selected.userId && guideOn ? "안내중" : "이동"}
+                {familyNavTarget?.userId === selected.userId && guideOn ? "안내중" : "경로 안내"}
               </button>
             ) : null}
             {useGoogleMap ? (
@@ -2214,6 +2506,7 @@ export default function LocationPlatform() {
             ) : (
               <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full text-lg" onClick={() => setSelected(null)} aria-label="닫기">×</button>
             )}
+          </div>
           </div>
         ) : selected ? (
           <article className={`${session.mode === "family" ? "max-h-[38vh] overflow-y-auto" : ""} rounded-[24px] px-4 py-3 ${glass}`}>
@@ -2245,7 +2538,7 @@ export default function LocationPlatform() {
                           ? "안내중…"
                           : familyNavTarget?.userId === selected.userId && guideOn
                             ? "안내중"
-                            : "이동"}
+                            : "경로 안내 / 이동 시작"}
                       </button>
                     ) : null}
                   </div>
@@ -2380,6 +2673,8 @@ export default function LocationPlatform() {
                           placed: true
                         };
                         setNativeVmapSession(true);
+                        setRoutePickerOpen(true);
+                        pushNotice("솔로 이동도 가능합니다. 이동 수단을 고른 뒤 길안내를 시작하세요.");
                         refreshRoom(session.roomId);
                       }).catch((error) => pushNotice(error.message));
                     }}
@@ -2393,50 +2688,112 @@ export default function LocationPlatform() {
                   onClick={async () => {
                     hideLocationAds();
                     try {
+                      const etaMin = myRoute?.durationSec
+                        ? Math.max(1, Math.round(myRoute.durationSec / 60))
+                        : room?.placeReady && self?.lat != null
+                          ? estimateEtaMinutes(
+                              haversineMeters(self.lat, self.lng, room.placeLat, room.placeLng)
+                            )
+                          : null;
                       const result = await shareVmapInviteViaKakao({
                         roomId: session.roomId,
                         placeLabel: room?.placeLabel || room?.title || "",
+                        etaMinutes: etaMin,
+                        lat: self?.lat,
+                        lng: self?.lng,
+                        placeLat: room?.placeLat,
+                        placeLng: room?.placeLng,
                         onToast: pushNotice
                       });
                       if (result?.ok && !result?.cancelled) {
-                        pushNotice("초대 링크가 공유되었습니다.");
+                        pushNotice("일행 초대 & 목적지 공유 링크가 준비되었습니다.");
                       }
                     } catch (e) {
                       pushNotice(e?.message || "초대에 실패했습니다.");
                     }
                   }}
                 >
-                  친구 초대
+                  일행 초대 & 목적지 공유
                 </button>
               </div>
             ) : null}
             {session.roomId && routePickerOpen ? (
               <div className={`rounded-2xl p-2 ${dark ? "bg-white/5" : "bg-slate-50"}`}>
-                <p className="mb-2 px-1 text-[11px] font-semibold opacity-70">경로 선택 · 카카오 길찾기</p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    ["recommend", "추천경로"],
-                    ["free", "무료도로"],
-                    ["highway", "고속도로"]
-                  ].map(([mode, label]) => (
+                <p className="mb-2 px-1 text-[11px] font-semibold opacity-70">이동 수단 선택</p>
+                <div className="grid grid-cols-5 gap-1">
+                  {TRANSPORT_OPTIONS.map((row) => (
                     <button
-                      key={mode}
+                      key={row.id}
                       type="button"
-                      className={routeMode === mode && guideOn ? accentBtn : quietBtn}
+                      className={`rounded-full px-1 py-2 text-[10px] font-black ${
+                        transportMode === row.id ? accentBtn : quietBtn
+                      }`}
                       onClick={() => {
-                        setRouteMode(mode);
-                        routeModeRef.current = mode;
+                        setTransportMode(row.id);
+                        transportModeRef.current = row.id;
+                        const immersive = ["car", "motorcycle", "bike"].includes(row.id);
                         userZoomedRef.current = false;
-                        setGuideOn(true);
-                        setRoutePickerOpen(false);
                         setRoutes({});
-                        pushNotice(`${label}로 길안내를 시작합니다.`);
+                        setGuideOn(true);
+                        setFirstPersonNav(immersive);
+                        setRoutePickerOpen(false);
+                        lastSpokenCueRef.current = "";
+                        pushNotice(`${row.label} 길안내를 시작합니다.`);
+                        if (immersive) speakVmapGuide("길안내를 시작합니다", { key: "nav-start" });
                       }}
                     >
-                      {label}
+                      {row.label}
                     </button>
                   ))}
                 </div>
+                {transportMode === "car" || transportMode === "motorcycle" ? (
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    {[
+                      ["recommend", "추천"],
+                      ["free", "무료"],
+                      ["highway", "고속"]
+                    ].map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={routeMode === mode ? accentBtn : quietBtn}
+                        onClick={() => {
+                          setRouteMode(mode);
+                          routeModeRef.current = mode;
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {guideOn && transportMode === "transit" && transitLegs.length ? (
+              <div className={`max-h-40 overflow-y-auto rounded-2xl p-2 ${dark ? "bg-white/5" : "bg-slate-50"}`}>
+                <p className="mb-1 px-1 text-[11px] font-semibold opacity-70">대중교통 타임라인</p>
+                <ul className="space-y-1.5">
+                  {transitLegs.map((leg, index) => (
+                    <li
+                      key={`${leg.kind}-${index}`}
+                      className={`rounded-xl px-2.5 py-2 text-[11px] ${dark ? "bg-white/10" : "bg-white"}`}
+                    >
+                      <p className="font-black">
+                        {leg.kind === "walk"
+                          ? "도보"
+                          : leg.kind === "transit"
+                            ? leg.lineName || leg.vehicleType || "대중교통"
+                            : leg.kind === "bike"
+                              ? "자전거"
+                              : "이동"}
+                        {leg.durationSec ? ` · ${Math.max(1, Math.round(leg.durationSec / 60))}분` : ""}
+                      </p>
+                      <p className={`mt-0.5 ${dark ? "text-white/70" : "text-slate-600"}`}>
+                        {[leg.from, leg.to].filter(Boolean).join(" → ") || leg.instruction}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : null}
             <form className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 ${dark ? "border-white/10 bg-white/10" : "border-black/10 bg-slate-100/80"}`} onSubmit={(event) => { event.preventDefault(); void sendText(); }}>
@@ -2486,7 +2843,7 @@ export default function LocationPlatform() {
             glass={glass}
             guidingUserId={familyGuiding ? familyNavTarget?.userId || "" : ""}
             onNavigateMember={(member) => {
-              focusMember(member, { detail: true });
+              focusMember(member, { detail: false });
             }}
             onStopGuide={stopFamilyNavigate}
           />

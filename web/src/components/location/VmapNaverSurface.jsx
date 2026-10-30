@@ -187,6 +187,72 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       map.panTo(coord);
       if (Number.isFinite(zoom)) map.setZoom(zoom, true);
     },
+    setNavCamera({ lat, lng, heading, tilt, zoom } = {}) {
+      const map = mapRef.current;
+      const naver = mapsApiRef.current;
+      if (!map || !naver) return;
+      gestureAtRef.current = performance.now();
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        const coord = new naver.LatLng(lat, lng);
+        try {
+          if (typeof map.morph === "function") {
+            map.morph(coord, Number.isFinite(zoom) ? zoom : map.getZoom(), {
+              duration: 220,
+              easing: "easeOutCubic"
+            });
+          } else {
+            map.panTo(coord);
+          }
+        } catch {
+          map.panTo(coord);
+        }
+      }
+      try {
+        if (Number.isFinite(heading) && typeof map.setHeading === "function") map.setHeading(heading);
+        if (Number.isFinite(tilt) && typeof map.setTilt === "function") map.setTilt(tilt);
+        else if (Number.isFinite(tilt) && typeof map.setOptions === "function") {
+          map.setOptions({ tilt });
+        }
+      } catch {
+        /* ignore */
+      }
+      if (Number.isFinite(zoom)) {
+        try {
+          map.setZoom(zoom, true);
+        } catch {
+          map.setZoom(zoom);
+        }
+      }
+    },
+    resetNavCamera() {
+      const map = mapRef.current;
+      if (!map) return;
+      try {
+        if (typeof map.setHeading === "function") map.setHeading(0);
+        if (typeof map.setTilt === "function") map.setTilt(0);
+        else if (typeof map.setOptions === "function") map.setOptions({ tilt: 0 });
+      } catch {
+        /* ignore */
+      }
+    },
+    fitBounds(points = []) {
+      const map = mapRef.current;
+      const naver = mapsApiRef.current;
+      if (!map || !naver || !points.length) return;
+      const bounds = new naver.LatLngBounds();
+      let any = false;
+      points.forEach((p) => {
+        if (!Number.isFinite(p?.lat) || !Number.isFinite(p?.lng)) return;
+        bounds.extend(new naver.LatLng(p.lat, p.lng));
+        any = true;
+      });
+      if (!any) return;
+      try {
+        map.fitBounds(bounds, { top: 72, right: 48, bottom: 160, left: 48 });
+      } catch {
+        map.fitBounds(bounds);
+      }
+    },
     getCenter() {
       const c = mapRef.current?.getCenter?.();
       if (!c) return null;
@@ -362,7 +428,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       /* fall through */
     }
     map.panTo(coord);
-  }, [flyTo]);
+  }, [flyTo?.lat, flyTo?.lng, flyTo?.at, flyTo?.zoom]);
 
   useEffect(() => {
     const map = mapRef.current;
