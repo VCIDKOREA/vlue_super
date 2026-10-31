@@ -12,8 +12,8 @@ const monorepoRoot = resolve(__dirname, "..");
  * `web/.env*` 를 병합. web 값이 있으면 우선.
  */
 function mergeViteEnv(mode) {
-  const fromRoot = loadEnv(mode, monorepoRoot, "VITE_");
-  const fromWeb = loadEnv(mode, __dirname, "VITE_");
+  const fromRoot = { ...loadEnv(mode, monorepoRoot, "VITE_"), ...loadEnv(mode, monorepoRoot, "NEXT_PUBLIC_") };
+  const fromWeb = { ...loadEnv(mode, __dirname, "VITE_"), ...loadEnv(mode, __dirname, "NEXT_PUBLIC_") };
   for (const [key, value] of Object.entries({ ...fromRoot, ...fromWeb })) {
     if (process.env[key] === undefined) process.env[key] = value;
   }
@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: __dirname,
     envDir: __dirname,
+    envPrefix: ["VITE_", "NEXT_PUBLIC_"],
     /** Electron 패키징 시 file:// 프로토콜 상대 경로 로딩 */
     base: process.env.VITE_ELECTRON_PACK === "1" ? "./" : "/",
     plugins: [react(), writeFirebaseWebConfigPlugin()],
