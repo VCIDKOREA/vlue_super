@@ -3,25 +3,36 @@ import { fetchNaverMapClientId, loadNaverMaps } from "../../lib/naverMapLoader.j
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters } from "../../lib/sunTheme.js";
+import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
 
-const MARKER_W = 148;
+const MARKER_W = 168;
 const MARKER_H = 78;
 
-function personHtml(name, status, photoUrl, live) {
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function personHtml(name, status, photoUrl, live, verified = false) {
   const initial = String(name || "?").trim().slice(0, 1) || "?";
-  const label = [name, status].filter(Boolean).join(" · ");
+  const namePart = escapeHtml(name || "멤버");
+  const statusPart = status ? ` · ${escapeHtml(status)}` : "";
+  const badge = verified ? verifiedSealSvgHtml(12) : "";
   const ring = live ? ACCENT : "#94a3b8";
   const face = photoUrl
     ? `<img src="${String(photoUrl).replace(/"/g, "")}" alt="" draggable="false" style="width:42px;height:42px;object-fit:cover;border-radius:999px;display:block" />`
-    : `<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:#083044;color:#fff;font-weight:700;font-size:16px;border-radius:999px">${initial}</div>`;
+    : `<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:#083044;color:#fff;font-weight:700;font-size:16px;border-radius:999px">${escapeHtml(initial)}</div>`;
   /* Naver HtmlIcon은 root에 position:absolute + size 고정이 있어야 안정적으로 보인다 */
   return `<div style="position:absolute;left:0;top:0;width:${MARKER_W}px;height:${MARKER_H}px;margin:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;pointer-events:auto;-webkit-user-select:none;user-select:none">
     <div style="width:48px;height:48px;border-radius:999px;padding:3px;background:${ring};box-shadow:0 0 0 2px #fff,0 8px 20px rgba(0,210,255,0.35);box-sizing:border-box">
       <div style="width:100%;height:100%;border-radius:999px;overflow:hidden;background:#fff">${face}</div>
     </div>
-    <div style="margin-top:3px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.92);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${label}</div>
+    <div style="margin-top:3px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.92);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:2px">${namePart}${badge}${statusPart}</div>
   </div>`;
 }
 
@@ -54,7 +65,12 @@ function buildVisiblePeople({ members, self, mode, departed, mineId, selfPhoto }
       lng: selfLng,
       online: self.online !== false,
       grayscale: false,
-      departed: mode === "vmap" ? Boolean(departed || prev.departed) : prev.departed
+      departed: mode === "vmap" ? Boolean(departed || prev.departed) : prev.departed,
+      cyanBadgeActive: Boolean(
+        self.cyanBadgeActive ?? self.isPaidUser ?? self.isVerified ?? prev.cyanBadgeActive
+      ),
+      isPaidUser: Boolean(self.isPaidUser ?? self.cyanBadgeActive ?? prev.isPaidUser),
+      isVerified: Boolean(self.isVerified ?? self.cyanBadgeActive ?? prev.isVerified)
     });
   }
 
@@ -457,7 +473,14 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           : mode === "family" && member.lastKnownLocation
             ? "📍 마지막 확인 위치"
             : "";
-      const html = personHtml(member.displayName || "멤버", status, mine && selfPhoto ? selfPhoto : member.photoUrl, !dead);
+      const verified = userHasVerifiedBadge(member);
+      const html = personHtml(
+        member.displayName || "멤버",
+        status,
+        mine && selfPhoto ? selfPhoto : member.photoUrl,
+        !dead,
+        verified
+      );
       let entry = overlaysRef.current.people.get(id);
       const nextPos = new naver.LatLng(member.lat, member.lng);
       if (!entry) {

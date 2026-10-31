@@ -356,6 +356,51 @@ locationMapRoutes.get("/map-config", async (c) => {
   });
 });
 
+/**
+ * V-MAP 카카오 Feed 썸네일용 Static Map 프록시 (공개).
+ * Google Static Maps 우선, 없으면 Yandex. 실패 시 브랜딩 로고로 리다이렉트.
+ */
+locationMapRoutes.get("/static-map", async (c) => {
+  const lat = num(c.req.query("lat"), Number.NaN);
+  const lng = num(c.req.query("lng"), Number.NaN);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
+  }
+  const w = Math.min(800, Math.max(200, Math.round(num(c.req.query("w"), 800))));
+  const h = Math.min(400, Math.max(120, Math.round(num(c.req.query("h"), 400))));
+  const googleKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  const upstream = googleKey
+    ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=${w}x${h}&scale=2&maptype=roadmap&markers=color:0x00D2FF%7C${lat},${lng}&key=${encodeURIComponent(googleKey)}`
+    : `https://static-maps.yandex.ru/1.x/?lang=ko_KR&ll=${lng},${lat}&z=15&size=${Math.min(650, w)},${Math.min(450, h)}&l=map&pt=${lng},${lat},pm2blm`;
+  try {
+    const res = await fetch(upstream, {
+      headers: { Accept: "image/*,*/*" },
+      signal: AbortSignal.timeout(8_000)
+    });
+    if (!res.ok) {
+      return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
+    }
+    const buf = await res.arrayBuffer();
+    if (!buf || buf.byteLength < 64) {
+      return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
+    }
+    const contentType = res.headers.get("content-type") || "image/png";
+    if (!/^image\//i.test(contentType)) {
+      return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
+    }
+    return new Response(buf, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  } catch {
+    return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
+  }
+});
+
 /** 지도 하단 스폰서. 없으면 앱이 AdMob으로 대체한다. */
 locationMapRoutes.get("/sponsor", async (c) => {
   try {
@@ -591,7 +636,14 @@ locationMapRoutes.get("/family", requireUserHeader, async (c) => {
     });
   }
   const enriched = await attachLastKnownLocationFields(members);
-  return c.json({ ok: true, members: enriched });
+  const badges = await cyanBadgeByUserIds(enriched.map((m) => m.userId));
+  const withBadges = enriched.map((m) => ({
+    ...m,
+    cyanBadgeActive: badges.get(m.userId) === true,
+    isPaidUser: badges.get(m.userId) === true,
+    isVerified: badges.get(m.userId) === true
+  }));
+  return c.json({ ok: true, members: withBadges });
 });
 
 locationMapRoutes.post("/vmap", requireUserHeader, async (c) => {
@@ -923,11 +975,14 @@ locationMapRoutes.post("/vmap/:id/arrive", requireUserHeader, async (c) => {
   return c.json({ ok: true, member, closingAt: room?.closingAt?.toISOString() || null });
 });
 
+/** 실시간 위치 — isDeparted(출발) 후에만 좌표 저장·공유. isJoined만으로는 차단 */
 locationMapRoutes.post("/vmap/:id/presence", requireUserHeader, async (c) => {
   const userId = await me(c);
   const roomId = paramId(c);
   const current = await prisma.vmapMember.findUnique({ where: { roomId_userId: { roomId, userId } } });
-  if (!current?.departed) return c.json({ ok: true, hidden: true });
+  if (!current?.departed) {
+    return c.json({ ok: true, hidden: true, isJoined: true, isDeparted: false });
+  }
   const body = await c.req.json().catch(() => ({}));
   const lat = num(body.lat, NaN);
   const lng = num(body.lng, NaN);
@@ -979,6 +1034,7 @@ locationMapRoutes.get("/vmap/:id", requireUserHeader, async (c) => {
   if (!mine) return c.json({ error: "방에 참여하지 않았습니다." }, 403);
   const members = await prisma.vmapMember.findMany({ where: { roomId } });
   const photos = await profilePhotos(members.map((member) => member.userId));
+  const badges = await cyanBadgeByUserIds(members.map((member) => member.userId));
   return c.json({
     ok: true,
     room,
@@ -990,7 +1046,10 @@ locationMapRoutes.get("/vmap/:id", requireUserHeader, async (c) => {
       dropout: isVmapDropout(member),
       photoUrl: photos.get(member.userId) || "",
       batteryPct: member.batteryPct,
-      addressLabel: ""
+      addressLabel: "",
+      cyanBadgeActive: badges.get(member.userId) === true,
+      isPaidUser: badges.get(member.userId) === true,
+      isVerified: badges.get(member.userId) === true
     }))
   });
 });
@@ -1303,20 +1362,52 @@ locationMapRoutes.get("/vmap/invite/:token", async (c) => {
     return c.json({ error: "종료된 약속입니다.", code: "ROOM_CLOSED" }, 400);
   }
 
-  /* 호출자 로그인 여부 확인 */
+  /* 호출자 로그인·기존 입장 여부 (헤더 userId — 클라이언트가 vlueAuthHeaders 로 전달) */
   const authHeader = c.req.header("Authorization") || "";
-  const xUserId = c.req.header("X-VLUE-User-Id") || "";
-  const isLoggedIn = Boolean(authHeader && xUserId);
+  const xUserId = String(c.req.header("X-VLUE-User-Id") || "").trim();
+  const isLoggedIn = Boolean(authHeader || xUserId);
+
+  let alreadyJoined = false;
+  let departed = false;
+  let placeLat: number | null = null;
+  let placeLng: number | null = null;
+  try {
+    const roomMeta = await prisma.vmapRoom.findFirst({
+      where: { id: invite.room_id },
+      select: { placeLat: true, placeLng: true }
+    });
+    const pla = Number(roomMeta?.placeLat);
+    const pln = Number(roomMeta?.placeLng);
+    placeLat = Number.isFinite(pla) ? pla : null;
+    placeLng = Number.isFinite(pln) ? pln : null;
+  } catch {
+    /* ignore */
+  }
+  if (xUserId) {
+    try {
+      const member = await prisma.vmapMember.findUnique({
+        where: { roomId_userId: { roomId: invite.room_id, userId: xUserId } }
+      });
+      alreadyJoined = Boolean(member);
+      departed = Boolean(member?.departed);
+    } catch {
+      /* ignore */
+    }
+  }
 
   return c.json({
     ok: true,
     roomId: invite.room_id,
     inviterName: invite.inviter_name,
     placeLabel: invite.place_label || invite.title || "약속",
+    placeLat,
+    placeLng,
     expiresAt: new Date(invite.expires_at).toISOString(),
     isLoggedIn,
-    /* 비회원이면 가입 후 자동 입장을 위해 토큰 반환 */
-    pendingToken: isLoggedIn ? null : token
+    alreadyJoined,
+    departed,
+    /* 비회원이면 가입 후 입장 확인을 위해 토큰 유지 */
+    pendingToken: alreadyJoined ? null : token
   });
 });
 
@@ -1360,9 +1451,17 @@ locationMapRoutes.post("/vmap/invite/:token/accept", requireUserHeader, async (c
     String(user?.legalName || user?.publicHandle || "참여자").replace(/^@+/, "").trim() ||
     "참여자";
 
-  await prisma.vmapMember.upsert({
+  /* 입장(isJoined)만 확정 — 위치 공유는 /depart(isDeparted) 전까지 비활성 */
+  const member = await prisma.vmapMember.upsert({
     where: { roomId_userId: { roomId, userId } },
-    create: { roomId, userId, displayName, departed: false },
+    create: {
+      roomId,
+      userId,
+      displayName,
+      departed: false,
+      lat: null,
+      lng: null
+    },
     update: { displayName }
   });
 
@@ -1403,7 +1502,10 @@ locationMapRoutes.post("/vmap/invite/:token/accept", requireUserHeader, async (c
     ok: true,
     roomId,
     room,
-    joined: true
+    joined: true,
+    departed: Boolean(member.departed),
+    isJoined: true,
+    isDeparted: Boolean(member.departed)
   });
 });
 

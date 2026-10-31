@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
 import { fetchGoogleMapsApiKey, loadGoogleMaps } from "../../lib/googleMapLoader.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
+import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
 
@@ -12,13 +13,6 @@ function toLatLngNum(value) {
 
 function isOverseasMember(member) {
   return Boolean(member?.isOverseas ?? member?.is_overseas);
-}
-
-function personLabel(member) {
-  const place = [member.cityName || member.city_name, member.countryName || member.country_name]
-    .filter(Boolean)
-    .join(", ");
-  return place ? `${member.displayName || "가족"} · ${place}` : member.displayName || "가족";
 }
 
 function escapeHtml(value) {
@@ -33,6 +27,12 @@ function buildAvatarElement(g, member) {
   const name = member.displayName || "가족";
   const initial = String(name).trim().slice(0, 1) || "?";
   const photo = String(member.photoUrl || "").trim();
+  const verified = userHasVerifiedBadge(member);
+  const place = [member.cityName || member.city_name, member.countryName || member.country_name]
+    .filter(Boolean)
+    .join(", ");
+  const badge = verified ? verifiedSealSvgHtml(12) : "";
+  const statusHtml = place ? ` · ${escapeHtml(place)}` : "";
   const face = photo
     ? `<img src="${escapeHtml(photo)}" alt="" draggable="false" style="width:42px;height:42px;object-fit:cover;border-radius:999px;display:block" />`
     : `<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:#083044;color:#fff;font-weight:700;font-size:16px;border-radius:999px">${escapeHtml(initial)}</div>`;
@@ -43,7 +43,7 @@ function buildAvatarElement(g, member) {
     <div style="width:48px;height:48px;border-radius:999px;padding:3px;background:${ACCENT};box-shadow:0 0 0 2px #fff,0 8px 20px rgba(0,210,255,0.35);box-sizing:border-box">
       <div style="width:100%;height:100%;border-radius:999px;overflow:hidden;background:#fff">${face}</div>
     </div>
-    <div style="margin-top:3px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.92);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(personLabel(member))}</div>
+    <div style="margin-top:3px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.92);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:2px">${escapeHtml(name)}${badge}${statusHtml}</div>
   `;
   return root;
 }

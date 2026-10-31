@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import VlueCyanVerifiedSeal from "../VlueCyanVerifiedSeal.jsx";
+import UserBadgeLabel, { userHasVerifiedBadge } from "../UserBadgeLabel.jsx";
 
 const PEEK_MS = 2800;
 const PEEK_H = 160;
@@ -10,10 +10,6 @@ function previewText(row) {
   if (row.kind === "voice") return "🎤 음성 메시지";
   if (row.kind === "system") return String(row.body || "");
   return String(row.body || "");
-}
-
-function authorPaid(row) {
-  return Boolean(row?.cyanBadgeActive ?? row?.paidMember ?? row?.isPaid);
 }
 
 /**
@@ -96,14 +92,17 @@ export default function VMapChatOverlay({
   if (!sorted.length && !expanded) return null;
 
   const renderAuthor = (row) => {
-    const paid = authorPaid(row);
     const name = row.displayName || "멤버";
     return (
       <span className="inline-flex min-w-0 shrink-0 items-center gap-0.5">
-        <span className="truncate font-semibold" style={{ color: "#00D2FF" }}>
-          {name}
-        </span>
-        {paid ? <VlueCyanVerifiedSeal size={14} className="shrink-0" title="VLUÉ 유료 인증" /> : null}
+        <UserBadgeLabel
+          name={name}
+          user={row}
+          verified={userHasVerifiedBadge(row)}
+          size={14}
+          nameClassName="truncate font-semibold text-[#00D2FF]"
+          className="shrink-0"
+        />
         <span className="mx-0.5 font-medium" style={{ color: metaColor }}>
           :
         </span>

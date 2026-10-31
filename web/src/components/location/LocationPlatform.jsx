@@ -87,7 +87,12 @@ import LocationPermissionSheet, { nativeLocationDenied } from "./LocationPermiss
 import VmapNaverSurface from "./VmapNaverSurface.jsx";
 import VmapGoogleSurface from "./VmapGoogleSurface.jsx";
 import VMapChatOverlay from "./VMapChatOverlay.jsx";
-import { shareVmapInviteViaKakao } from "../../lib/vmapInviteShare.js";
+import UserBadgeLabel, { userHasVerifiedBadge } from "../UserBadgeLabel.jsx";
+import {
+  isVmapKakaoInviteStale,
+  openPreparedVmapKakaoInviteShare,
+  prepareVmapKakaoInviteShare
+} from "../../lib/vmapInviteShare.js";
 import {
   formatTurnSpeech,
   isVmapTtsMuted,
@@ -442,7 +447,6 @@ export default function LocationPlatform() {
   const [miniPos, setMiniPos] = useState(() => readMiniPos() || { x: null, y: null });
   const [roomBusy, setRoomBusy] = useState("");
   const [routeMode, setRouteMode] = useState("recommend");
-  const [routePickerOpen, setRoutePickerOpen] = useState(false);
   const [transportMode, setTransportMode] = useState("car");
   const [firstPersonNav, setFirstPersonNav] = useState(false);
   const [ttsMuted, setTtsMuted] = useState(() => isVmapTtsMuted());
@@ -453,7 +457,9 @@ export default function LocationPlatform() {
   const [nativeMini, setNativeMini] = useState(false);
   const [mapError, setMapError] = useState("");
   const [mapReady, setMapReady] = useState(false);
-  /* inviteOpen state 제거됨 — 카카오 공유로 단일화 */
+  /* 카카오 Feed 미리 준비 — 클릭 시 sendDefault 동기 호출용 */
+  const [vmapKakaoPrepared, setVmapKakaoPrepared] = useState(null);
+  const vmapKakaoPrepGen = useRef(0);
   /** 가족방에서 상대 위치로 이동 중 — V-Map 모드로 전환하지 않음 */
   const [familyNavTarget, setFamilyNavTarget] = useState(null);
   const [familyNavBusy, setFamilyNavBusy] = useState(false);
@@ -527,10 +533,12 @@ export default function LocationPlatform() {
       const mode = event?.detail?.mode || "family";
       const roomId = String(event?.detail?.roomId || "").trim();
       const shouldJoin = Boolean(event?.detail?.join && roomId);
+      const inviteResume = Boolean(event?.detail?.inviteResume && roomId);
       const expandChat = Boolean(event?.detail?.expandChat);
       const familyPaywall = Boolean(event?.detail?.familyPaywall);
       const focusUserId = String(event?.detail?.focusUserId || event?.detail?.wardUserId || "").trim();
       const lastKnownLocation = Boolean(event?.detail?.lastKnownLocation);
+      const departedFlag = Boolean(event?.detail?.departed);
       const nextMode = mode === "vmap" || roomId ? "vmap" : "family";
       openLocation(nextMode);
       if (expandChat) {
@@ -551,13 +559,37 @@ export default function LocationPlatform() {
             const data = await fetchVmapRoom(roomId);
             setRoom(data.room || null);
             setMembers(Array.isArray(data.members) ? data.members : []);
-            setNotice("V-Map에 입장했습니다.");
+            setNotice("V-Map에 입장했습니다. 출발 전 위치는 공유되지 않습니다.");
             window.setTimeout(() => setNotice(""), 2400);
             if (expandChat) setChatExpandToken((n) => n + 1);
           } catch (error) {
             patchLocationSession({ mode: "vmap", open: true, minimized: false });
             setJoinCode(roomId);
             setNotice(error?.message || "초대 방에 입장하지 못했습니다.");
+            window.setTimeout(() => setNotice(""), 2400);
+          }
+        })();
+      } else if (inviteResume) {
+        /* 초대 확인 완료 또는 기존 입장 복귀 — accept 재호출 없음, 위치는 departed 후에만 */
+        patchLocationSession({
+          mode: "vmap",
+          roomId,
+          departed: departedFlag,
+          open: true,
+          minimized: false
+        });
+        void (async () => {
+          try {
+            const data = await fetchVmapRoom(roomId);
+            setRoom(data.room || null);
+            const list = Array.isArray(data.members) ? data.members : [];
+            setMembers(list);
+            const mine = list.find((m) => m.userId === getLocalVlueUserId());
+            if (mine) {
+              patchLocationSession({ departed: Boolean(mine.departed) });
+            }
+          } catch (error) {
+            setNotice(error?.message || "방 정보를 불러오지 못했습니다.");
             window.setTimeout(() => setNotice(""), 2400);
           }
         })();
@@ -650,7 +682,13 @@ export default function LocationPlatform() {
         return;
       }
       setRoom(data.room);
-      setMembers(Array.isArray(data.members) ? data.members : []);
+      const list = Array.isArray(data.members) ? data.members : [];
+      setMembers(list);
+      const mine = list.find((m) => m.userId === getLocalVlueUserId());
+      if (mine && sessionRef.current?.mode === "vmap" && sessionRef.current?.roomId === roomId) {
+        /* 서버 isDeparted 와 세션 동기화 — 출발 전 GPS 공유 차단 유지 */
+        patchLocationSession({ departed: Boolean(mine.departed) });
+      }
     } catch (error) {
       pushNotice(error.message);
     }
@@ -881,6 +919,38 @@ export default function LocationPlatform() {
     };
   }, [session.roomId, session.mode, refreshRoom]);
 
+  /* 초대 토큰·카카오 Feed를 미리 준비 → 버튼 클릭 시 친구 선택 창이 즉시 열림 */
+  useEffect(() => {
+    if (session.mode !== "vmap" || !session.roomId) {
+      setVmapKakaoPrepared(null);
+      return undefined;
+    }
+    const gen = ++vmapKakaoPrepGen.current;
+    let cancelled = false;
+    setVmapKakaoPrepared(null);
+    const run = async () => {
+      const prepared = await prepareVmapKakaoInviteShare({
+        roomId: session.roomId,
+        placeLabel: room?.placeLabel || room?.title || "",
+        placeLat: room?.placeLat,
+        placeLng: room?.placeLng
+      });
+      if (cancelled || gen !== vmapKakaoPrepGen.current) return;
+      setVmapKakaoPrepared(prepared);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    session.mode,
+    session.roomId,
+    room?.placeLabel,
+    room?.title,
+    room?.placeLat,
+    room?.placeLng
+  ]);
+
   useEffect(() => {
     const stamp = room?.closingAt;
     if (!stamp || arrivalLock.current) return undefined;
@@ -1037,7 +1107,7 @@ export default function LocationPlatform() {
       lat: self.lat,
       lng: self.lng,
       heading,
-      tilt: 45,
+      tilt: 55,
       zoom: 17,
       at: Date.now()
     };
@@ -1523,7 +1593,6 @@ export default function LocationPlatform() {
   const stopFamilyNavigate = () => {
     setFamilyNavTarget(null);
     setGuideOn(false);
-    setRoutePickerOpen(false);
     setRoutes({});
     setFirstPersonNav(false);
     setNavCamera(null);
@@ -1960,7 +2029,16 @@ export default function LocationPlatform() {
           <VmapNaverSurface
             active
             members={members}
-            self={self}
+            self={
+              self
+                ? {
+                    ...self,
+                    cyanBadgeActive: Boolean(self.cyanBadgeActive) || localHasCyanBadge(),
+                    isPaidUser: Boolean(self.isPaidUser) || localHasCyanBadge(),
+                    isVerified: Boolean(self.isVerified) || localHasCyanBadge()
+                  }
+                : null
+            }
             room={room}
             draftPin={draftPin}
             routes={routes}
@@ -2029,6 +2107,129 @@ export default function LocationPlatform() {
     session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
   const myRoute = routes[getLocalVlueUserId()] || null;
   const transitLegs = Array.isArray(myRoute?.legs) ? myRoute.legs : [];
+
+  const refreshVmapKakaoInvite = () => {
+    if (session.mode !== "vmap" || !session.roomId) return;
+    const gen = ++vmapKakaoPrepGen.current;
+    const etaMin = myRoute?.durationSec
+      ? Math.max(1, Math.round(myRoute.durationSec / 60))
+      : null;
+    void prepareVmapKakaoInviteShare({
+      roomId: session.roomId,
+      placeLabel: room?.placeLabel || room?.title || "",
+      etaMinutes: etaMin,
+      placeLat: room?.placeLat,
+      placeLng: room?.placeLng
+    }).then((prepared) => {
+      if (gen !== vmapKakaoPrepGen.current) return;
+      setVmapKakaoPrepared(prepared);
+    });
+  };
+
+  /**
+   * [출발] — 위치 공유 세션 시작 + 1인칭 체이싱 카메라 + TTS.
+   * 하단 버튼 onClick 에 반드시 바인딩한다.
+   */
+  const onDeparture = useCallback(() => {
+    if (session.mode !== "vmap" || !session.roomId || session.departed) return;
+    if (!room?.placeReady) {
+      pushNotice("방장이 도착 핀을 꽂은 뒤에 출발할 수 있습니다.");
+      return;
+    }
+    if (self?.lat == null || self?.lng == null) {
+      pushNotice("현재 위치를 받은 뒤에 출발할 수 있습니다.");
+      return;
+    }
+    const startLat = self.lat;
+    const startLng = self.lng;
+    const destLat = room.placeLat;
+    const destLng = room.placeLng;
+    departVmap(session.roomId, {
+      lat: startLat,
+      lng: startLng,
+      online: true,
+      displayName: self.displayName
+    })
+      .then(() => {
+        userZoomedRef.current = false;
+        patchLocationSession({ departed: true });
+        viewRef.current = {
+          ...viewRef.current,
+          lat: startLat,
+          lng: startLng,
+          zoom: zoomForMeters(haversineMeters(startLat, startLng, destLat, destLng)),
+          placed: true
+        };
+        setNativeVmapSession(true);
+
+        const mode = transportModeRef.current || transportMode || "car";
+        const immersive = ["car", "motorcycle", "bike"].includes(mode);
+        setRoutes({});
+        setGuideOn(true);
+        setFirstPersonNav(true);
+        lastSpokenCueRef.current = "";
+
+        const heading = bearingDeg(startLat, startLng, destLat, destLng);
+        const nextCam = {
+          lat: startLat,
+          lng: startLng,
+          heading,
+          tilt: 55,
+          zoom: 17,
+          at: Date.now()
+        };
+        setNavCamera(nextCam);
+        mapSurfaceRef.current?.setNavCamera?.(nextCam);
+
+        speakVmapGuide("길안내를 시작하겠습니다", { key: "nav-start" });
+        pushNotice(
+          immersive
+            ? "주행 중 · 위치 공유가 시작되었습니다."
+            : "위치 공유가 시작되었습니다. 길안내를 진행합니다."
+        );
+        refreshRoom(session.roomId);
+      })
+      .catch((error) => pushNotice(error.message || "출발에 실패했습니다."));
+  }, [
+    session.mode,
+    session.roomId,
+    session.departed,
+    room?.placeReady,
+    room?.placeLat,
+    room?.placeLng,
+    self?.lat,
+    self?.lng,
+    self?.displayName,
+    transportMode,
+    refreshRoom,
+    pushNotice
+  ]);
+
+  /** 클릭 제스처 안 — await 금지. 미리 준비한 Feed로 카톡 친구 선택 창을 즉시 연다. */
+  const openVmapKakaoInvite = () => {
+    hideLocationAds();
+    if (!session.roomId) {
+      pushNotice("V-Map 방이 없습니다. 목적지를 먼저 설정해 주세요.");
+      return;
+    }
+    if (!vmapKakaoPrepared?.ok || isVmapKakaoInviteStale(vmapKakaoPrepared)) {
+      pushNotice(
+        vmapKakaoPrepared?.error ||
+          "카카오톡 초대를 준비 중입니다. 잠시 후 다시 눌러 주세요."
+      );
+      refreshVmapKakaoInvite();
+      return;
+    }
+    const result = openPreparedVmapKakaoInviteShare(vmapKakaoPrepared);
+    if (!result.ok) {
+      pushNotice(result.error || "카카오톡 공유 창을 열지 못했습니다.");
+      refreshVmapKakaoInvite();
+      return;
+    }
+    pushNotice("카카오톡 친구 선택 창을 열었습니다.");
+    /* 다음 초대를 위해 새 토큰 미리 발급 */
+    refreshVmapKakaoInvite();
+  };
 
   const focusMember = (member, options = {}) => {
     /* 이름 탭 = 선택 + 카메라만. 경로/안내는 시작하지 않음 */
@@ -2100,6 +2301,15 @@ export default function LocationPlatform() {
       : null;
   const nearArrive = metersToPlace != null && metersToPlace <= MANUAL_ARRIVE_METERS;
   const sheetLift = `calc(${AD_BANNER_PX + 12}px + env(safe-area-inset-bottom, 0px))`;
+  const selfPaid = localHasCyanBadge();
+  const selfWithBadge = self
+    ? {
+        ...self,
+        cyanBadgeActive: Boolean(self.cyanBadgeActive) || selfPaid,
+        isPaidUser: Boolean(self.isPaidUser) || selfPaid,
+        isVerified: Boolean(self.isVerified) || selfPaid
+      }
+    : null;
   return (
     <section
       className={`fixed inset-x-0 top-0 z-[530] flex flex-col overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
@@ -2112,7 +2322,7 @@ export default function LocationPlatform() {
             ref={mapSurfaceRef}
             active={session.open}
             members={overseasMembers}
-            self={hideSharedSelf ? null : isOverseasMember(self) ? self : null}
+            self={hideSharedSelf ? null : isOverseasMember(selfWithBadge) ? selfWithBadge : null}
             flyTo={session.flyTo}
             guideFollow={navigatingNow && firstPersonNav}
             navCamera={navCamera}
@@ -2135,7 +2345,11 @@ export default function LocationPlatform() {
             ref={mapSurfaceRef}
             active={session.open}
             members={session.mode === "family" ? domesticMembers : members}
-            self={hideSharedSelf || (session.mode === "family" && isOverseasMember(self)) ? null : self}
+            self={
+              hideSharedSelf || (session.mode === "family" && isOverseasMember(selfWithBadge))
+                ? null
+                : selfWithBadge
+            }
             room={room}
             draftPin={draftPin}
             destPin={
@@ -2219,7 +2433,12 @@ export default function LocationPlatform() {
                           }`}
                           onClick={() => focusMember(member, { detail: true })}
                         >
-                          <span className="block truncate">{member.displayName}</span>
+                          <UserBadgeLabel
+                            name={member.displayName}
+                            user={member}
+                            size={12}
+                            nameClassName="block truncate font-semibold"
+                          />
                           <span className={`block truncate ${overseasDark ? "text-[#ddd6fe]" : "text-violet-800"}`}>
                             {[member.cityName || member.city_name, member.countryName || member.country_name]
                               .filter(Boolean)
@@ -2302,27 +2521,9 @@ export default function LocationPlatform() {
               <button
                 type="button"
                 className="rounded-full border border-white/20 bg-[#04121a]/90 px-3 py-2 text-[11px] font-black text-white shadow-lg"
-                onClick={async () => {
-                  try {
-                    const etaMin = myRoute?.durationSec
-                      ? Math.max(1, Math.round(myRoute.durationSec / 60))
-                      : null;
-                    await shareVmapInviteViaKakao({
-                      roomId: session.roomId,
-                      placeLabel: room?.placeLabel || room?.title || "",
-                      etaMinutes: etaMin,
-                      lat: self?.lat,
-                      lng: self?.lng,
-                      placeLat: room?.placeLat,
-                      placeLng: room?.placeLng,
-                      onToast: pushNotice
-                    });
-                  } catch (e) {
-                    pushNotice(e?.message || "초대에 실패했습니다.");
-                  }
-                }}
+                onClick={openVmapKakaoInvite}
               >
-                일행 초대 & 목적지 공유
+                카카오톡으로 초대하기
               </button>
             ) : null}
           </div>
@@ -2486,7 +2687,13 @@ export default function LocationPlatform() {
           </div>
           <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${glass}`}>
             <button type="button" className="min-w-0 flex-1 truncate text-left text-[13px] font-black" onClick={() => setDetailOpen(true)}>
-              {selected.displayName}
+              <UserBadgeLabel
+                name={selected.displayName}
+                user={selected}
+                verified={userHasVerifiedBadge(selected) || (selected.self && selfPaid)}
+                size={14}
+                nameClassName="font-black"
+              />
               <span className={`ml-2 text-[11px] font-semibold ${dark ? "text-white/60" : "text-slate-500"}`}>안심패치 올리기</span>
             </button>
             {!selected.self && selected.userId !== getLocalVlueUserId() && selected.lat != null && selected.lng != null ? (
@@ -2519,7 +2726,14 @@ export default function LocationPlatform() {
               {session.mode === "family" ? (
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight">{selected.displayName}</p>
+                    <UserBadgeLabel
+                      name={selected.displayName}
+                      user={selected}
+                      verified={userHasVerifiedBadge(selected) || (selected.self && selfPaid)}
+                      size={15}
+                      className="min-w-0 flex-1"
+                      nameClassName="text-[15px] font-semibold tracking-tight"
+                    />
                     {!selected.self &&
                     selected.userId !== getLocalVlueUserId() &&
                     selected.lat != null &&
@@ -2574,7 +2788,13 @@ export default function LocationPlatform() {
                 </div>
               ) : (
                 <div>
-                  <p className="text-[15px] font-semibold tracking-tight">{selected.displayName}</p>
+                  <UserBadgeLabel
+                    name={selected.displayName}
+                    user={selected}
+                    verified={userHasVerifiedBadge(selected) || (selected.self && selfPaid)}
+                    size={15}
+                    nameClassName="text-[15px] font-semibold tracking-tight"
+                  />
                   <p className={`mt-2 inline-flex rounded-full bg-[#00D2FF]/15 px-2.5 py-1 text-[12px] font-semibold ${dark ? "text-[#00D2FF]" : "text-[#0e7490]"}`}>
                     {selected.arrived
                       ? "도착 완료"
@@ -2616,18 +2836,12 @@ export default function LocationPlatform() {
                     <>
                       <button
                         type="button"
-                        aria-pressed={guideOn}
-                        onClick={() => {
-                          if (guideOn) {
-                            setGuideOn(false);
-                            setRoutePickerOpen(false);
-                            return;
-                          }
-                          setRoutePickerOpen(true);
-                        }}
-                        className={guideOn ? accentBtn : quietBtn}
+                        aria-pressed="true"
+                        aria-label="주행 중 위치 공유 중"
+                        className={accentBtn}
+                        disabled
                       >
-                        길안내
+                        주행 중 (위치 공유 중)
                       </button>
                       <button
                         type="button"
@@ -2653,71 +2867,18 @@ export default function LocationPlatform() {
                   <button
                     type="button"
                     className={accentBtn}
-                    onClick={() => {
-                      if (!room?.placeReady) {
-                        pushNotice("방장이 도착 핀을 꽂은 뒤에 출발할 수 있습니다.");
-                        return;
-                      }
-                      if (self?.lat == null) {
-                        pushNotice("현재 위치를 받은 뒤에 출발할 수 있습니다.");
-                        return;
-                      }
-                      departVmap(session.roomId, { lat: self.lat, lng: self.lng, online: true, displayName: self.displayName }).then(() => {
-                        userZoomedRef.current = false;
-                        patchLocationSession({ departed: true });
-                        viewRef.current = {
-                          ...viewRef.current,
-                          lat: self.lat,
-                          lng: self.lng,
-                          zoom: zoomForMeters(haversineMeters(self.lat, self.lng, room.placeLat, room.placeLng)),
-                          placed: true
-                        };
-                        setNativeVmapSession(true);
-                        setRoutePickerOpen(true);
-                        pushNotice("솔로 이동도 가능합니다. 이동 수단을 고른 뒤 길안내를 시작하세요.");
-                        refreshRoom(session.roomId);
-                      }).catch((error) => pushNotice(error.message));
-                    }}
+                    onClick={onDeparture}
+                    aria-label="출발"
                   >
                     출발
                   </button>
                 )}
-                <button
-                  type="button"
-                  className={quietBtn}
-                  onClick={async () => {
-                    hideLocationAds();
-                    try {
-                      const etaMin = myRoute?.durationSec
-                        ? Math.max(1, Math.round(myRoute.durationSec / 60))
-                        : room?.placeReady && self?.lat != null
-                          ? estimateEtaMinutes(
-                              haversineMeters(self.lat, self.lng, room.placeLat, room.placeLng)
-                            )
-                          : null;
-                      const result = await shareVmapInviteViaKakao({
-                        roomId: session.roomId,
-                        placeLabel: room?.placeLabel || room?.title || "",
-                        etaMinutes: etaMin,
-                        lat: self?.lat,
-                        lng: self?.lng,
-                        placeLat: room?.placeLat,
-                        placeLng: room?.placeLng,
-                        onToast: pushNotice
-                      });
-                      if (result?.ok && !result?.cancelled) {
-                        pushNotice("일행 초대 & 목적지 공유 링크가 준비되었습니다.");
-                      }
-                    } catch (e) {
-                      pushNotice(e?.message || "초대에 실패했습니다.");
-                    }
-                  }}
-                >
-                  일행 초대 & 목적지 공유
+                <button type="button" className={quietBtn} onClick={openVmapKakaoInvite}>
+                  카카오톡으로 초대하기
                 </button>
               </div>
             ) : null}
-            {session.roomId && routePickerOpen ? (
+            {session.roomId ? (
               <div className={`rounded-2xl p-2 ${dark ? "bg-white/5" : "bg-slate-50"}`}>
                 <p className="mb-2 px-1 text-[11px] font-semibold opacity-70">이동 수단 선택</p>
                 <div className="grid grid-cols-5 gap-1">
@@ -2731,15 +2892,17 @@ export default function LocationPlatform() {
                       onClick={() => {
                         setTransportMode(row.id);
                         transportModeRef.current = row.id;
+                        if (!session.departed) return;
                         const immersive = ["car", "motorcycle", "bike"].includes(row.id);
                         userZoomedRef.current = false;
                         setRoutes({});
                         setGuideOn(true);
-                        setFirstPersonNav(immersive);
-                        setRoutePickerOpen(false);
+                        setFirstPersonNav(true);
                         lastSpokenCueRef.current = "";
-                        pushNotice(`${row.label} 길안내를 시작합니다.`);
-                        if (immersive) speakVmapGuide("길안내를 시작합니다", { key: "nav-start" });
+                        pushNotice(`${row.label} 길안내로 전환합니다.`);
+                        if (immersive) {
+                          speakVmapGuide("길안내를 시작하겠습니다", { key: `nav-mode-${row.id}` });
+                        }
                       }}
                     >
                       {row.label}
@@ -2996,10 +3159,16 @@ export default function LocationPlatform() {
                       setMembersOpen(false);
                     }}
                   >
-                    <span className="font-bold">
-                      {member.displayName}
+                    <span className="inline-flex min-w-0 items-center gap-1 font-bold">
+                      <UserBadgeLabel
+                        name={member.displayName}
+                        user={member}
+                        verified={userHasVerifiedBadge(member) || (member.self && selfPaid)}
+                        size={13}
+                        nameClassName="font-bold"
+                      />
                       {session.mode === "family" && isOverseasMember(member) ? (
-                        <span className={`ml-1 text-[10px] font-black ${dark ? "text-[#ddd6fe]" : "text-violet-700"}`}>✈️ 해외</span>
+                        <span className={`text-[10px] font-black ${dark ? "text-[#ddd6fe]" : "text-violet-700"}`}>✈️ 해외</span>
                       ) : null}
                     </span>
                     <span className="text-[11px] opacity-70">

@@ -7,6 +7,7 @@ import {
   sendProtectionSos,
   setProtectionLocationSharing
 } from "../../lib/familyProtectionApi.js";
+import UserBadgeLabel from "../UserBadgeLabel.jsx";
 
 export const SLOT_PRICE_KRW = 2500;
 
@@ -172,7 +173,12 @@ export function FamilyFolderPanels({
                 className={`w-full truncate rounded-2xl px-2 py-2 text-[11px] font-bold ${active ? chipOn : quiet}`}
                 onClick={() => goToMember(member)}
               >
-                {member.displayName || member.name || "가족"}
+                <UserBadgeLabel
+                  name={member.displayName || member.name || "가족"}
+                  user={member}
+                  size={11}
+                  nameClassName="font-bold"
+                />
               </button>
             </li>
           );
@@ -219,7 +225,12 @@ export function FamilyFolderPanels({
                           className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left ${active ? chipOn : quiet}`}
                           onClick={() => goToMember(member)}
                         >
-                          <span className="font-black">{member.displayName || member.name || "가족"}</span>
+                          <UserBadgeLabel
+                            name={member.displayName || member.name || "가족"}
+                            user={member}
+                            size={13}
+                            nameClassName="font-black"
+                          />
                           <span className="text-[11px] font-bold opacity-80">
                             {active ? "이동 중" : member.self ? "내 위치" : "보기"}
                           </span>
