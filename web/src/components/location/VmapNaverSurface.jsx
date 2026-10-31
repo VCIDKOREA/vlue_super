@@ -3,10 +3,11 @@ import { fetchNaverMapClientId, loadNaverMaps } from "../../lib/naverMapLoader.j
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters } from "../../lib/sunTheme.js";
+import { chaseLookAheadMeters, lookAheadLatLng } from "../../lib/vmapGuide.js";
 import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
-const CHASE_TILT = 55;
+const CHASE_TILT = 60;
 const CHASE_ZOOM = 17;
 
 function bearingDegrees(fromLat, fromLng, toLat, toLng) {
@@ -19,17 +20,27 @@ function bearingDegrees(fromLat, fromLng, toLat, toLng) {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
+function mapViewportHeight(map) {
+  try {
+    const size = map?.getSize?.();
+    const height = Number(size?.height ?? size?.y);
+    if (Number.isFinite(height) && height > 200) return height;
+  } catch {
+    /* ignore */
+  }
+  return 640;
+}
+
+/** GL 지도는 heading 이 아니라 rotation 이다. 틸트는 55도 이상으로 고정한다. */
 function applyNaverChase(map, heading, tilt) {
   if (!map) return;
-  const tiltDeg = Number.isFinite(tilt) ? tilt : CHASE_TILT;
-  const headingDeg = Number.isFinite(heading) ? heading : null;
+  const tiltDeg = Math.max(55, Math.min(63, Number.isFinite(tilt) ? tilt : CHASE_TILT));
+  const rotation = Number.isFinite(heading) ? ((heading % 360) + 360) % 360 : null;
   try {
-    if (typeof map.setOptions === "function") {
-      map.setOptions({
-        tilt: tiltDeg,
-        ...(headingDeg != null ? { heading: headingDeg } : {})
-      });
-    }
+    map.setOptions?.({
+      tilt: tiltDeg,
+      ...(rotation != null ? { rotation } : {})
+    });
   } catch {
     /* ignore */
   }
@@ -38,9 +49,10 @@ function applyNaverChase(map, heading, tilt) {
   } catch {
     /* ignore */
   }
-  if (headingDeg == null) return;
+  if (rotation == null) return;
   try {
-    if (typeof map.setHeading === "function") map.setHeading(headingDeg);
+    if (typeof map.setRotation === "function") map.setRotation(rotation);
+    else if (typeof map.setHeading === "function") map.setHeading(rotation);
   } catch {
     /* ignore */
   }
@@ -76,12 +88,19 @@ function forceNaverNavCamera(map, naver, cam = {}) {
       } catch {
         /* ignore */
       }
-      const tiltOff = Number.isFinite(tiltNow) && Math.abs(tiltNow - locked.tilt) > 1;
+      if (map.__vmapChasePausedUntil && Date.now() < map.__vmapChasePausedUntil) return;
+      const tiltOff = !Number.isFinite(tiltNow) || tiltNow < 55 || Math.abs(tiltNow - locked.tilt) > 1;
       const zoomOff = Number.isFinite(zoomNow) && Number.isFinite(locked.zoom) && Math.abs(zoomNow - locked.zoom) > 0.8;
+      let rotationNow = headingNow;
+      try {
+        if (typeof map.getRotation === "function") rotationNow = map.getRotation();
+      } catch {
+        /* ignore */
+      }
       const headingOff =
         locked.heading != null &&
-        Number.isFinite(headingNow) &&
-        Math.abs((((headingNow - locked.heading) % 360) + 540) % 360 - 180) > 2;
+        Number.isFinite(rotationNow) &&
+        Math.abs((((rotationNow - locked.heading) % 360) + 540) % 360 - 180) > 2;
       if (!tiltOff && !zoomOff && !headingOff) return;
       map.__vmapChaseIdleAt = now;
       applyNaverChase(map, locked.heading, locked.tilt);
@@ -95,13 +114,17 @@ function forceNaverNavCamera(map, naver, cam = {}) {
     });
   }
   if (lat != null && lng != null) {
-    const coord = new naver.LatLng(lat, lng);
+    const zoomNow = Number.isFinite(map.getZoom?.()) ? map.getZoom() : nextZoom;
+    const aheadM =
+      heading != null ? chaseLookAheadMeters(lat, nextZoom || zoomNow, mapViewportHeight(map)) : 0;
+    const look = lookAheadLatLng(lat, lng, heading ?? 0, aheadM);
+    const coord = new naver.LatLng(look.lat, look.lng);
     try {
       map.setOptions?.({
         center: coord,
         zoom: nextZoom,
         tilt: tiltDeg,
-        ...(heading != null ? { heading } : {})
+        ...(heading != null ? { rotation: ((heading % 360) + 360) % 360 } : {})
       });
     } catch {
       /* ignore */
@@ -138,6 +161,14 @@ function escapeHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function navArrowHtml() {
+  return `<div style="width:40px;height:40px;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">
+    <svg width="28" height="34" viewBox="0 0 28 34" aria-hidden="true">
+      <path d="M14 2 L25 30 L14 24 L3 30 Z" fill="#1d4ed8" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+    </svg>
+  </div>`;
 }
 
 function personHtml(name, status, photoUrl, live, verified = false) {
@@ -339,11 +370,13 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       };
       pendingNavRef.current = cam;
       followTargetRef.current = cam;
+      if (force && mapRef.current) mapRef.current.__vmapChasePausedUntil = 0;
       programmaticRef.current += 1;
       const burst = () => {
         const live = mapRef.current;
         const naver = mapsApiRef.current;
         if (!live || !naver) return;
+        if (!force && live.__vmapChasePausedUntil && Date.now() < live.__vmapChasePausedUntil) return;
         forceNaverNavCamera(live, naver, cam);
       };
       burst();
@@ -362,9 +395,11 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       clearNaverChase(map);
       if (!map) return;
       try {
-        if (typeof map.setHeading === "function") map.setHeading(0);
+        map.__vmapChasePausedUntil = 0;
+        if (typeof map.setRotation === "function") map.setRotation(0);
+        else if (typeof map.setHeading === "function") map.setHeading(0);
         if (typeof map.setTilt === "function") map.setTilt(0);
-        else if (typeof map.setOptions === "function") map.setOptions({ tilt: 0, heading: 0 });
+        else if (typeof map.setOptions === "function") map.setOptions({ tilt: 0, rotation: 0 });
       } catch {
         /* ignore */
       }
@@ -423,7 +458,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           center,
           zoom: seedLat != null ? 16 : 15,
           minZoom: 5,
-          maxZoom: 21,
+          maxZoom: 20,
           zoomControl: false,
           mapTypeControl: false,
           scaleControl: false,
@@ -444,6 +479,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         const markGesture = () => {
           if (programmaticRef.current > 0 || mapRef.current?.__vmapApplyingChase) return;
           gestureAtRef.current = performance.now();
+          if (mapRef.current?.__vmapChase) mapRef.current.__vmapChasePausedUntil = Date.now() + 8000;
           onGestureRef.current?.();
         };
         dragListener = naverMaps.Event.addListener(map, "dragstart", markGesture);
@@ -501,36 +537,9 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           const liveMap = mapRef.current;
           const naver = mapsApiRef.current;
           if (!guideFollowRef.current || !target || !liveMap || !naver) return;
-          if (performance.now() - gestureAtRef.current < 900) {
-            applyNaverChase(liveMap, target.heading, target.tilt);
-            return;
-          }
-          const cur = liveMap.getCenter();
-          const distM = haversineMeters(cur.lat(), cur.lng(), target.lat, target.lng);
-          if (distM >= 8 && Number.isFinite(target.lat) && Number.isFinite(target.lng)) {
-            programmaticRef.current += 1;
-            const coord = new naver.LatLng(target.lat, target.lng);
-            const nextZoom = Number.isFinite(target.zoom) ? target.zoom : CHASE_ZOOM;
-            try {
-              liveMap.setCenter(coord);
-            } catch {
-              try {
-                liveMap.panTo(coord);
-              } catch {
-                /* ignore */
-              }
-            }
-            try {
-              if (Math.abs(liveMap.getZoom() - nextZoom) > 0.35) liveMap.setZoom(nextZoom, false);
-            } catch {
-              /* ignore */
-            }
-            window.setTimeout(() => {
-              programmaticRef.current = Math.max(0, programmaticRef.current - 1);
-            }, 80);
-          }
+          if (liveMap.__vmapChasePausedUntil && Date.now() < liveMap.__vmapChasePausedUntil) return;
           forceNaverNavCamera(liveMap, naver, target);
-        }, 1000);
+        }, 450);
 
         setMapEpoch((n) => n + 1);
         onReadyRef.current?.();
@@ -614,13 +623,18 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
             ? "📍 마지막 확인 위치"
             : "";
       const verified = userHasVerifiedBadge(member);
-      const html = personHtml(
-        member.displayName || "멤버",
-        status,
-        mine && selfPhoto ? selfPhoto : member.photoUrl,
-        !dead,
-        verified
-      );
+      const chasing = Boolean(guideFollow && mine && !member.arrived);
+      const html = chasing
+        ? navArrowHtml()
+        : personHtml(
+            member.displayName || "멤버",
+            status,
+            mine && selfPhoto ? selfPhoto : member.photoUrl,
+            !dead,
+            verified
+          );
+      const markerSize = chasing ? new naver.Size(40, 40) : iconSize;
+      const markerAnchor = chasing ? new naver.Point(20, 34) : iconAnchor;
       let entry = overlaysRef.current.people.get(id);
       const nextPos = new naver.LatLng(member.lat, member.lng);
       if (!entry) {
@@ -630,8 +644,8 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           title: member.displayName || "멤버",
           icon: {
             content: html,
-            size: iconSize,
-            anchor: iconAnchor
+            size: markerSize,
+            anchor: markerAnchor
           },
           zIndex: mine ? 120 : 100
         });
@@ -640,7 +654,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         overlaysRef.current.people.set(id, entry);
       } else {
         if (entry.html !== html) {
-          entry.marker.setIcon({ content: html, size: iconSize, anchor: iconAnchor });
+          entry.marker.setIcon({ content: html, size: markerSize, anchor: markerAnchor });
           entry.html = html;
         }
         /* 미세 GPS 떨림으로 setPosition 남발하면 지도가 버벅임 */
@@ -657,13 +671,15 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       if (mine && guideFollow && !member.arrived) {
         const destLat = mode === "family" ? toLatLngNum(destPin?.lat) : room?.placeReady ? room.placeLat : null;
         const destLng = mode === "family" ? toLatLngNum(destPin?.lng) : room?.placeReady ? room.placeLng : null;
+        const lockedHeading = pendingNavRef.current?.heading;
         followTargetRef.current = {
           lat: member.lat,
           lng: member.lng,
           zoom: CHASE_ZOOM,
           tilt: CHASE_TILT,
-          heading:
-            destLat != null && destLng != null
+          heading: Number.isFinite(lockedHeading)
+            ? lockedHeading
+            : destLat != null && destLng != null
               ? bearingDegrees(member.lat, member.lng, destLat, destLng)
               : null
         };
@@ -749,7 +765,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
             map,
             path,
             strokeColor: own ? ACCENT : "#38bdf8",
-            strokeWeight: own ? 6 : 5,
+            strokeWeight: own ? (guideFollow ? 9 : 6) : 5,
             strokeOpacity: 0.95,
             strokeLineCap: "round",
             strokeLineJoin: "round",
@@ -758,7 +774,10 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           overlaysRef.current.lines.set(userId, line);
         } else {
           line.setPath(path);
-          line.setOptions({ strokeColor: own ? ACCENT : "#38bdf8", strokeWeight: own ? 6 : 5 });
+          line.setOptions({
+            strokeColor: own ? ACCENT : "#38bdf8",
+            strokeWeight: own ? (guideFollow ? 9 : 6) : 5
+          });
         }
       });
     }

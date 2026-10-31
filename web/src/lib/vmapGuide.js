@@ -72,6 +72,7 @@ export function alongRouteMeters(points, lat, lng) {
   if (total <= 0) return { traveled: 0, remain: 0, total: 0 };
   let bestDist = Infinity;
   let bestTraveled = 0;
+  let bestBearing = null;
   let walked = 0;
   for (let i = 0; i + 1 < points.length; i += 1) {
     const latA = points[i][1];
@@ -95,6 +96,7 @@ export function alongRouteMeters(points, lat, lng) {
     if (dist < bestDist - 0.3 || (Math.abs(dist - bestDist) <= 0.3 && traveled > bestTraveled)) {
       bestDist = dist;
       bestTraveled = traveled;
+      bestBearing = bearingDegrees(latA, lngA, latB, lngB);
     }
     walked += len;
   }
@@ -102,8 +104,45 @@ export function alongRouteMeters(points, lat, lng) {
   return {
     traveled,
     remain: Math.max(0, total - traveled),
-    total
+    total,
+    bearing: bestBearing
   };
+}
+
+function bearingDegrees(fromLat, fromLng, toLat, toLng) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const φ1 = toRad(fromLat);
+  const φ2 = toRad(toLat);
+  const Δλ = toRad(toLng - fromLng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+/** 진행 방향 앞으로 meters 만큼 이동한 좌표. 차량을 화면 하단에 두기 위한 카메라 중심. */
+export function lookAheadLatLng(lat, lng, headingDeg, meters) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(headingDeg) || !(meters > 0)) {
+    return { lat, lng };
+  }
+  const R = 6378137;
+  const δ = meters / R;
+  const θ = (headingDeg * Math.PI) / 180;
+  const φ1 = (lat * Math.PI) / 180;
+  const λ1 = (lng * Math.PI) / 180;
+  const φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ));
+  const λ2 = λ1 + Math.atan2(Math.sin(θ) * Math.sin(δ) * Math.cos(φ1), Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2));
+  return {
+    lat: (φ2 * 180) / Math.PI,
+    lng: (((λ2 * 180) / Math.PI + 540) % 360) - 180
+  };
+}
+
+/** 화면 높이의 약 20%만큼 전방을 카메라 중심으로 밀어 차량이 하단 1/3에 오게 한다. */
+export function chaseLookAheadMeters(lat, zoom, viewportHeightPx) {
+  const height = Number.isFinite(viewportHeightPx) && viewportHeightPx > 200 ? viewportHeightPx : 640;
+  const z = Number.isFinite(zoom) ? zoom : 17;
+  const mpp = (156543.03392 * Math.cos(((Number(lat) || 0) * Math.PI) / 180)) / 2 ** z;
+  return Math.max(36, Math.min(280, height * 0.2 * mpp));
 }
 
 function stepCumulative(steps) {

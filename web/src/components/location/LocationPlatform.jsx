@@ -110,6 +110,16 @@ const TRANSPORT_OPTIONS = [
   { id: "walk", label: "도보" }
 ];
 
+function driveCourse(lat, lng, headingDeg, speedKmh, routePoints, destLat, destLng) {
+  if (Number.isFinite(headingDeg) && Number(speedKmh) >= 4) return headingDeg;
+  const along = alongRouteMeters(routePoints, lat, lng);
+  if (Number.isFinite(along?.bearing)) return along.bearing;
+  if (Number.isFinite(destLat) && Number.isFinite(destLng) && Number.isFinite(lat) && Number.isFinite(lng)) {
+    return bearingDeg(lat, lng, destLat, destLng);
+  }
+  return 0;
+}
+
 function bearingDeg(fromLat, fromLng, toLat, toLng) {
   const toRad = (d) => (d * Math.PI) / 180;
   const toDeg = (r) => (r * 180) / Math.PI;
@@ -1293,12 +1303,12 @@ export default function LocationPlatform() {
     if (!dest) return undefined;
     const remain = remainingRouteMeters(route, self.lat, self.lng);
     setRemainDistanceM(remain);
-    const heading = bearingDeg(self.lat, self.lng, dest.lat, dest.lng);
+    const heading = driveCourse(self.lat, self.lng, self.headingDeg, self.speedKmh, route?.points, dest.lat, dest.lng);
     const nextCam = {
       lat: self.lat,
       lng: self.lng,
       heading,
-      tilt: 55,
+      tilt: 60,
       zoom: 17,
       at: Date.now()
     };
@@ -1310,6 +1320,8 @@ export default function LocationPlatform() {
     firstPersonNav,
     self?.lat,
     self?.lng,
+    self?.headingDeg,
+    self?.speedKmh,
     routes,
     familyNavTarget,
     room?.placeLat,
@@ -2175,12 +2187,12 @@ export default function LocationPlatform() {
     const startLng = self.lng;
     const destLat = room.placeLat;
     const destLng = room.placeLng;
-    const heading = bearingDeg(startLat, startLng, destLat, destLng);
+    const heading = driveCourse(startLat, startLng, self.headingDeg, self.speedKmh, null, destLat, destLng);
     const nextCam = {
       lat: startLat,
       lng: startLng,
       heading,
-      tilt: 55,
+      tilt: 60,
       zoom: 17,
       at: Date.now()
     };
@@ -2533,12 +2545,21 @@ export default function LocationPlatform() {
     setGuideOn(true);
     setFirstPersonNav(true);
     if (session.mode === "vmap") setDriveChase(true);
-    const heading = dest ? bearingDeg(self.lat, self.lng, dest.lat, dest.lng) : 0;
+    const route = routes[getLocalVlueUserId()];
+    const heading = driveCourse(
+      self.lat,
+      self.lng,
+      self.headingDeg,
+      self.speedKmh,
+      route?.points,
+      dest?.lat,
+      dest?.lng
+    );
     const nextCam = {
       lat: self.lat,
       lng: self.lng,
       heading,
-      tilt: 55,
+      tilt: 60,
       zoom: 17,
       at: Date.now()
     };
@@ -2682,7 +2703,41 @@ export default function LocationPlatform() {
             onExpandedChange={setFamilyBarOpen}
           />
         ) : null}
-        <div className={`pointer-events-none absolute right-3 z-30 flex w-[min(280px,calc(100%-5.5rem))] flex-col items-end gap-2 ${familyBarOpen ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
+        {navigatingNow && (cue || showSpeedometer) ? (
+          <div className="pointer-events-none absolute inset-x-3 z-30 top-[calc(58px+env(safe-area-inset-top))]">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-[#00D2FF]/80 bg-[#04121a]/92 px-2.5 py-1.5 text-white shadow-lg">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#00D2FF] text-[20px] font-black leading-none text-[#04121a]">
+                {maneuverGlyph(cue?.instruction || "")}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[16px] font-black leading-none text-[#00D2FF]">
+                  {cue ? formatGuideDistance(cue.remainM) : ""}
+                </p>
+                <p className="mt-0.5 truncate text-[12px] font-bold">{cue?.instruction || "경로 안내"}</p>
+              </div>
+              {showSpeedometer ? (
+                <div className={`shrink-0 text-right ${speedOverLimit ? "text-red-400" : "text-white"}`}>
+                  <p className="text-[18px] font-black leading-none">{hudSpeedKmh == null ? 0 : hudSpeedKmh}</p>
+                  <p className="text-[9px] font-black tracking-wide text-[#00D2FF]">
+                    km/h{speedLimitKmh != null ? ` · 제한 ${speedLimitKmh}` : ""}
+                  </p>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="shrink-0 rounded-full bg-white/15 px-2 py-1 text-[10px] font-black"
+                onClick={() => {
+                  const next = !ttsMuted;
+                  setTtsMuted(next);
+                  setVmapTtsMuted(next);
+                }}
+              >
+                {ttsMuted ? "음성 끔" : "음성"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+        <div className={`pointer-events-none absolute right-3 z-30 flex w-[min(168px,calc(100%-5.5rem))] flex-col items-end gap-1.5 ${navigatingNow ? "top-[calc(112px+env(safe-area-inset-top))]" : familyBarOpen ? "top-[calc(168px+env(safe-area-inset-top))]" : "top-[calc(64px+env(safe-area-inset-top))]"}`}>
         {session.mode === "family" && overseasMembers.length ? (
           <div className="pointer-events-none flex w-full justify-end">
             <div className={`pointer-events-auto w-full max-w-[280px] rounded-[22px] px-3 py-2.5 shadow-lg backdrop-blur-xl ${overseasDark ? "border border-violet-300/40 bg-[#24143f] text-[#f5f3ff]" : "border border-violet-200 bg-white text-slate-900"}`}>
@@ -2742,80 +2797,27 @@ export default function LocationPlatform() {
             </div>
           </div>
         ) : null}
-        {showSpeedometer ? (
-          <div className="pointer-events-none w-[10.5rem] rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 px-3 py-3 text-center text-white shadow-[0_18px_50px_rgba(0,210,255,0.28)]">
-            <p className={`text-[40px] font-black leading-none tracking-tight ${speedOverLimit ? "text-red-400" : "text-white"}`}>
-              {hudSpeedKmh == null ? 0 : hudSpeedKmh}
-            </p>
-            <p className="mt-1 text-[11px] font-black tracking-wide text-[#00D2FF]">km/h</p>
-            {speedLimitKmh != null ? (
-              <p className={`mt-1 text-[11px] font-bold ${speedOverLimit ? "text-red-300" : "text-white/80"}`}>
-                제한 {speedLimitKmh}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        {guideOn && cue && (session.mode === "vmap" || familyGuiding) ? (
-          <div className="pointer-events-auto relative w-[10.5rem] overflow-hidden rounded-[26px] border-2 border-[#00D2FF] bg-[#04121a]/95 text-white shadow-[0_18px_50px_rgba(0,210,255,0.35)]">
-            <div className="flex items-center justify-center bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] px-2 py-4 text-[42px] font-black leading-none text-[#04121a]">
-              {maneuverGlyph(cue.instruction)}
-            </div>
-            <div className="px-3 py-3 text-center">
-              <p className="text-[22px] font-black tracking-tight text-[#00D2FF]">
-                {formatGuideDistance(cue.remainM)}
-              </p>
-              <p className="mt-1 text-[13px] font-bold leading-snug text-white">{cue.instruction}</p>
-              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#00D2FF]/80">
-                {familyGuiding
-                  ? familyEtaMin != null
-                    ? `약 ${familyEtaMin}분`
-                    : "가족 이동"
-                  : TRANSPORT_OPTIONS.find((row) => row.id === transportMode)?.label || "자동차"}
-              </p>
-              {nearbySignal ? (
-                <p className="mt-2 rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-[#00D2FF]">
-                  {`신호 ${nearbySignal.phase || "—"}${
-                    nearbySignal.remainSec != null ? ` ${nearbySignal.remainSec}초` : ""
-                  }${nearbySignal.flow ? ` · ${nearbySignal.flow}` : ""}`}
-                </p>
-              ) : null}
-              <div className="mt-2 flex gap-1">
-                <button
-                  type="button"
-                  className="flex-1 rounded-full bg-white/15 py-1.5 text-[10px] font-black"
-                  onClick={() => {
-                    const next = !ttsMuted;
-                    setTtsMuted(next);
-                    setVmapTtsMuted(next);
-                  }}
-                >
-                  {ttsMuted ? "음성 끔" : "음성 켬"}
-                </button>
-                {familyGuiding ? (
-                  <button
-                    type="button"
-                    className="flex-1 rounded-full bg-white py-1.5 text-[10px] font-black text-[#04121a]"
-                    onClick={stopFamilyNavigate}
-                  >
-                    종료
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
+        {familyGuiding ? (
+          <button
+            type="button"
+            className="pointer-events-auto rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[#04121a] shadow"
+            onClick={stopFamilyNavigate}
+          >
+            안내 종료
+          </button>
         ) : null}
         {navigatingNow ? (
           <div className="pointer-events-auto flex flex-col items-start gap-2">
             <button
               type="button"
-              className="rounded-full border border-[#00D2FF]/60 bg-[#04121a]/90 px-3 py-2 text-[11px] font-black text-[#00D2FF] shadow-lg"
+              className="rounded-full border border-[#00D2FF]/60 bg-[#04121a]/90 px-2.5 py-1 text-[10px] font-black text-[#00D2FF] shadow"
               onClick={showAllParty}
             >
               전체 일행 보기
             </button>
             <button
               type="button"
-              className="rounded-full bg-[#00D2FF] px-3 py-2 text-[11px] font-black text-[#04121a] shadow-lg"
+              className="rounded-full bg-[#00D2FF] px-2.5 py-1 text-[10px] font-black text-[#04121a] shadow"
               onClick={returnToVmapDrive}
             >
               V-MAP 복귀
@@ -2823,7 +2825,7 @@ export default function LocationPlatform() {
             {session.mode === "vmap" && session.roomId ? (
               <button
                 type="button"
-                className="rounded-full border border-white/20 bg-[#04121a]/90 px-3 py-2 text-[11px] font-black text-white shadow-lg"
+                className="rounded-full border border-white/20 bg-[#04121a]/90 px-2.5 py-1 text-[10px] font-black text-white shadow"
                 onClick={openVmapKakaoInvite}
               >
                 카카오톡으로 초대하기

@@ -3,20 +3,26 @@ import { fetchGoogleMapsApiKey, loadGoogleMaps } from "../../lib/googleMapLoader
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
+import { chaseLookAheadMeters, lookAheadLatLng } from "../../lib/vmapGuide.js";
 
 const ACCENT = "#00D2FF";
-const CHASE_TILT = 55;
+const CHASE_TILT = 60;
 const CHASE_ZOOM = 17;
 
 function forceGoogleNavCamera(map, cam = {}) {
   if (!map) return false;
-  const tiltDeg = Number.isFinite(cam.tilt) ? cam.tilt : CHASE_TILT;
+  const tiltDeg = Math.max(55, Number.isFinite(cam.tilt) ? cam.tilt : CHASE_TILT);
   const nextZoom = Number.isFinite(cam.zoom) ? cam.zoom : CHASE_ZOOM;
   const heading = Number.isFinite(cam.heading) ? cam.heading : null;
   const lat = Number.isFinite(cam.lat) ? cam.lat : null;
   const lng = Number.isFinite(cam.lng) ? cam.lng : null;
   map.__vmapChase = { lat, lng, heading, tilt: tiltDeg, zoom: nextZoom };
-  const center = lat != null && lng != null ? { lat, lng } : null;
+  let center = lat != null && lng != null ? { lat, lng } : null;
+  if (center && heading != null) {
+    const height = map.getDiv?.()?.clientHeight || 640;
+    const ahead = chaseLookAheadMeters(lat, nextZoom, height);
+    center = lookAheadLatLng(lat, lng, heading, ahead);
+  }
   try {
     if (typeof map.moveCamera === "function") {
       map.moveCamera({

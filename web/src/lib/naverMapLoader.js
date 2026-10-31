@@ -40,7 +40,8 @@ export function loadNaverMaps(clientId) {
     const script = document.createElement("script");
     script.dataset.vlueNaverMaps = "1";
     script.async = true;
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(key)}`;
+    /* submodules=gl 이 있어야 setTilt / setRotation 이 동작한다. 없으면 지도가 평면으로 남는다. */
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(key)}&submodules=gl`;
     script.onload = () => {
       if (window.naver?.maps) resolve(window.naver.maps);
       else reject(new Error("네이버 지도 SDK 로드에 실패했습니다."));
