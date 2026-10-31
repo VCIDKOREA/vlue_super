@@ -109,10 +109,30 @@ const VmapGoogleSurface = forwardRef(function VmapGoogleSurface(
     setNavCamera({ lat, lng, heading, tilt, zoom } = {}) {
       const map = mapRef.current;
       if (!map) return;
-      if (Number.isFinite(lat) && Number.isFinite(lng)) map.panTo({ lat, lng });
-      if (Number.isFinite(heading) && typeof map.setHeading === "function") map.setHeading(heading);
-      if (Number.isFinite(tilt) && typeof map.setTilt === "function") map.setTilt(tilt);
-      if (Number.isFinite(zoom)) map.setZoom(zoom);
+      const tiltDeg = Number.isFinite(tilt) ? tilt : 55;
+      const nextZoom = Number.isFinite(zoom) ? zoom : 17;
+      const center = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+      try {
+        if (typeof map.moveCamera === "function") {
+          map.moveCamera({
+            ...(center ? { center } : {}),
+            zoom: nextZoom,
+            tilt: tiltDeg,
+            ...(Number.isFinite(heading) ? { heading } : {})
+          });
+        } else if (center) {
+          map.panTo(center);
+        }
+      } catch {
+        if (center) map.panTo(center);
+      }
+      try {
+        if (typeof map.setTilt === "function") map.setTilt(tiltDeg);
+        if (Number.isFinite(heading) && typeof map.setHeading === "function") map.setHeading(heading);
+        if (typeof map.setZoom === "function") map.setZoom(nextZoom);
+      } catch {
+        /* ignore */
+      }
     },
     resetNavCamera() {
       const map = mapRef.current;

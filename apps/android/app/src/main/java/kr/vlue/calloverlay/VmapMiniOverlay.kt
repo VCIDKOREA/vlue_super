@@ -23,6 +23,7 @@ import org.json.JSONObject
  */
 object VmapMiniOverlay {
     private var windowManager: WindowManager? = null
+    @Volatile
     private var container: FrameLayout? = null
     private var params: WindowManager.LayoutParams? = null
     private var titleView: TextView? = null
@@ -37,7 +38,27 @@ object VmapMiniOverlay {
     private var startY = 0
     private var moved = false
 
+    @Volatile
+    var backgroundHold: Boolean = false
+    @Volatile
+    var lastPayloadJson: String = "{}"
+    @Volatile
+    var lastRemainM: Double? = null
+    @Volatile
+    var lastLat: Double? = null
+    @Volatile
+    var lastLng: Double? = null
+    @Volatile
+    var destLat: Double? = null
+    @Volatile
+    var destLng: Double? = null
+    @Volatile
+    var statusLine: String = "길안내 중"
+
+    fun isAttached(): Boolean = container != null
+
     fun show(context: Context, payloadJson: String?): String {
+        if (!payloadJson.isNullOrBlank()) lastPayloadJson = payloadJson
         val app = context.applicationContext
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(app)) {
             return """{"ok":false,"error":"overlay_permission"}"""
@@ -55,18 +76,32 @@ object VmapMiniOverlay {
     }
 
     fun update(context: Context, payloadJson: String?) {
+        if (!payloadJson.isNullOrBlank()) lastPayloadJson = payloadJson
         val payload = try {
-            JSONObject(payloadJson ?: "{}")
+            JSONObject(lastPayloadJson.ifBlank { "{}" })
         } catch (_: Exception) {
             JSONObject()
         }
-        context.applicationContext.mainExecutorOrHandler().execute {
-            if (container == null) return@execute
+        val app = context.applicationContext
+        app.mainExecutorOrHandler().execute {
+            if (container == null) {
+                if (!backgroundHold) return@execute
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(app)) return@execute
+                ensureAttached(app)
+            }
             applyPayload(payload)
         }
     }
 
     fun hide(context: Context) {
+        if (backgroundHold) return
+        context.applicationContext.mainExecutorOrHandler().execute {
+            detach(context.applicationContext)
+        }
+    }
+
+    fun forceHide(context: Context) {
+        backgroundHold = false
         context.applicationContext.mainExecutorOrHandler().execute {
             detach(context.applicationContext)
         }
@@ -89,14 +124,42 @@ object VmapMiniOverlay {
         val glyph = payload.optString("glyph").trim()
         val remain = payload.optString("remain").trim()
         val instruction = payload.optString("instruction").trim()
+        val heading = payload.optDouble("heading", Double.NaN)
+        if (payload.has("remainM") && !payload.isNull("remainM")) {
+            val meters = payload.optDouble("remainM", Double.NaN)
+            if (!meters.isNaN()) lastRemainM = meters
+        }
+        val lat = payload.optDouble("lat", Double.NaN)
+        val lng = payload.optDouble("lng", Double.NaN)
+        if (!lat.isNaN() && !lng.isNaN()) {
+            lastLat = lat
+            lastLng = lng
+        }
+        val dLat = payload.optDouble("destLat", Double.NaN)
+        val dLng = payload.optDouble("destLng", Double.NaN)
+        if (!dLat.isNaN() && !dLng.isNaN()) {
+            destLat = dLat
+            destLng = dLng
+        }
         titleView?.text = label
-        glyphView?.text = if (glyph.isNotEmpty()) glyph else "↑"
-        remainView?.text = remain.ifBlank { "—" }
-        instructionView?.text = instruction.ifBlank { "경로 안내" }
-        val visible = glyph.isNotEmpty() || remain.isNotEmpty() || instruction.isNotEmpty()
-        glyphView?.visibility = if (visible) View.VISIBLE else View.GONE
-        remainView?.visibility = if (visible) View.VISIBLE else View.GONE
-        instructionView?.visibility = if (visible) View.VISIBLE else View.GONE
+        if (!heading.isNaN()) {
+            glyphView?.text = "↑"
+            glyphView?.rotation = heading.toFloat()
+        } else {
+            glyphView?.rotation = 0f
+            glyphView?.text = if (glyph.isNotEmpty()) glyph else "↑"
+        }
+        val remainText = remain.ifBlank { "—" }
+        remainView?.text = remainText
+        val instructionText = instruction.ifBlank { "경로 안내" }
+        instructionView?.text = instructionText
+        statusLine = listOf(remainText, instructionText)
+            .filter { it.isNotBlank() && it != "—" }
+            .joinToString(" · ")
+            .ifBlank { "길안내 중" }
+        glyphView?.visibility = View.VISIBLE
+        remainView?.visibility = View.VISIBLE
+        instructionView?.visibility = View.VISIBLE
         subView?.text = when {
             eta.isNotEmpty() && place.isNotEmpty() -> "$eta · $place"
             eta.isNotEmpty() -> eta
@@ -241,7 +304,11 @@ object VmapMiniOverlay {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = app.resources.displayMetrics.widthPixels - width - 24
-            y = 160
+            y = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP,
+                48f,
+                app.resources.displayMetrics
+            ).toInt()
         }
 
         root.setOnTouchListener { _, event ->

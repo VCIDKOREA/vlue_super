@@ -12,6 +12,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.provider.Settings
+import android.speech.tts.TextToSpeech
+import java.util.ArrayDeque
+import java.util.Locale
 import org.json.JSONObject
 import android.util.Log
 import android.view.View
@@ -63,6 +66,10 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     /** PASS/포트원 본인인증 window.open 팝업 */
     private var certPopupDialog: AlertDialog? = null
     private var certPopupWebView: WebView? = null
+    private var vmapOverlayPrompted = false
+    private var vmapTts: TextToSpeech? = null
+    private var vmapTtsReady = false
+    private val vmapTtsPending = ArrayDeque<String>()
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -1062,13 +1069,49 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         }
     }
 
+    fun warmVmapTts() {
+        if (vmapTts != null) return
+        vmapTts = TextToSpeech(applicationContext) { status ->
+            vmapTtsReady = status == TextToSpeech.SUCCESS
+            if (!vmapTtsReady) return@TextToSpeech
+            vmapTts?.language = Locale.KOREAN
+            val pending = ArrayList(vmapTtsPending)
+            vmapTtsPending.clear()
+            pending.forEach { phrase ->
+                vmapTts?.speak(phrase, TextToSpeech.QUEUE_ADD, null, "vmap-${System.nanoTime()}")
+            }
+        }
+    }
+
+    fun speakVmapTts(text: String, flush: Boolean) {
+        val phrase = text.trim()
+        runOnUiThread {
+            val engine = vmapTts
+            if (engine == null || !vmapTtsReady) {
+                if (phrase.isNotEmpty()) vmapTtsPending.addLast(phrase)
+                if (engine == null) warmVmapTts()
+                return@runOnUiThread
+            }
+            if (phrase.isEmpty()) {
+                if (flush) engine.stop()
+                return@runOnUiThread
+            }
+            val mode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            engine.speak(phrase, mode, null, "vmap-${System.nanoTime()}")
+        }
+    }
+
     override fun onPause() {
         super.onPause()
+        if (VmapNavOverlayService.sessionLive) {
+            VmapNavOverlayService.hold(this)
+        }
         dispatchWebCustomEvent("vlue-app-background", """{"reason":"pause"}""")
     }
 
     override fun onResume() {
         super.onResume()
+        VmapNavOverlayService.release(this)
         /* 앱 복귀 시 통화 감지 자동 무장 + FGS 재동기화 */
         LetteringIntegration.ensureLetteringArmedIfReady(this)
         LetteringCallMonitorService.syncWithPrefs(this)
@@ -1096,6 +1139,13 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         VlueFamilyBridge.detachWebView()
         if (::nativeAdManager.isInitialized) nativeAdManager.destroy()
         if (::bannerAdManager.isInitialized) bannerAdManager.destroy()
+        try {
+            vmapTts?.stop()
+            vmapTts?.shutdown()
+        } catch (_: Exception) {
+        }
+        vmapTts = null
+        vmapTtsReady = false
         super.onDestroy()
     }
 
@@ -1306,6 +1356,15 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 },
                 hideVmapMiniOverlay:function(){
                   try{if(window.Android&&window.Android.hideVmapMiniOverlay)window.Android.hideVmapMiniOverlay();}catch(e){}
+                },
+                warmVmapSpeech:function(){
+                  try{if(window.Android&&window.Android.warmVmapSpeech)window.Android.warmVmapSpeech();}catch(e){}
+                },
+                speakVmap:function(text){
+                  try{if(window.Android&&window.Android.speakVmap)window.Android.speakVmap(String(text||''));}catch(e){}
+                },
+                speakVmapNow:function(text){
+                  try{if(window.Android&&window.Android.speakVmapNow)window.Android.speakVmapNow(String(text||''));}catch(e){}
                 },
                 analyzeSms:function(requestId,sender,messageText){
                   try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
@@ -1950,6 +2009,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             VmapMiniOverlay.hide(activity)
         }
 
+        @android.webkit.JavascriptInterface
+        fun warmVmapSpeech() {
+            activity.warmVmapTts()
+        }
+
+        @android.webkit.JavascriptInterface
+        fun speakVmap(text: String?) {
+            activity.speakVmapTts(text.orEmpty(), false)
+        }
+
+        @android.webkit.JavascriptInterface
+        fun speakVmapNow(text: String?) {
+            activity.speakVmapTts(text.orEmpty(), true)
+        }
+
         /** V-Map이 미니맵으로 내려가도 프로세스를 유지. Exit Room에서 중지. */
         @android.webkit.JavascriptInterface
         fun startVmapSession() {
@@ -1963,6 +2037,21 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 } catch (_: Exception) {
                     /* OEM이 백그라운드 시작을 막는 경우 지도 화면은 유지 */
                 }
+                try {
+                    VmapNavOverlayService.start(activity)
+                } catch (_: Exception) {
+                }
+                activity.warmVmapTts()
+                if (!activity.vmapOverlayPrompted &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                    !Settings.canDrawOverlays(activity)
+                ) {
+                    activity.vmapOverlayPrompted = true
+                    try {
+                        LetteringPermissionHelper.openOverlaySettings(activity)
+                    } catch (_: Exception) {
+                    }
+                }
             }
         }
 
@@ -1974,6 +2063,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 } catch (_: Exception) {
                 }
                 FamilyCareForegroundService.stop(activity)
+                VmapNavOverlayService.stop(activity)
+                try {
+                    activity.vmapTts?.stop()
+                } catch (_: Exception) {
+                }
             }
         }
 

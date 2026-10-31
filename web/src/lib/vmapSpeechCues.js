@@ -17,9 +17,9 @@ export function turnBandKey(distanceM) {
 export function turnBand(distanceM) {
   const d = Number(distanceM);
   if (!Number.isFinite(d) || d < 0) return "";
-  if (d <= 50) return "soon";
-  if (d <= 320) return "300";
-  if (d <= 540) return "500";
+  if (d <= 70) return "50";
+  if (d <= 360) return "300";
+  if (d <= 620) return "500";
   return "";
 }
 
@@ -27,9 +27,9 @@ export function phraseForTurn(instruction, distanceM) {
   const turn = classifyTurn(instruction) || String(instruction || "직진").replace(/입니다\.?$/, "");
   const band = turnBand(distanceM);
   if (!turn || /직진|도착|안내를 시작/.test(turn)) return "";
-  if (band === "500") return `약 500미터 앞, ${turn}입니다.`;
+  if (band === "500") return `500미터 앞, ${turn}입니다.`;
   if (band === "300") return `300미터 앞, ${turn}입니다.`;
-  if (band === "soon") return `잠시 후, ${turn}입니다.`;
+  if (band === "50" || band === "soon") return `50미터 앞, ${turn}입니다.`;
   return "";
 }
 

@@ -6,6 +6,36 @@ import { estimateEtaMinutes, haversineMeters } from "../../lib/sunTheme.js";
 import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
+const CHASE_TILT = 55;
+const CHASE_ZOOM = 17;
+
+function bearingDegrees(fromLat, fromLng, toLat, toLng) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const φ1 = toRad(fromLat);
+  const φ2 = toRad(toLat);
+  const Δλ = toRad(toLng - fromLng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+function applyNaverChase(map, heading, tilt) {
+  if (!map) return;
+  const tiltDeg = Number.isFinite(tilt) ? tilt : CHASE_TILT;
+  try {
+    if (typeof map.setTilt === "function") map.setTilt(tiltDeg);
+    else if (typeof map.setOptions === "function") map.setOptions({ tilt: tiltDeg });
+  } catch {
+    /* ignore */
+  }
+  if (!Number.isFinite(heading)) return;
+  try {
+    if (typeof map.setHeading === "function") map.setHeading(heading);
+    else if (typeof map.setOptions === "function") map.setOptions({ heading });
+  } catch {
+    /* ignore */
+  }
+}
 
 const MARKER_W = 168;
 const MARKER_H = 78;
@@ -208,37 +238,24 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       const naver = mapsApiRef.current;
       if (!map || !naver) return;
       gestureAtRef.current = performance.now();
+      const tiltDeg = Number.isFinite(tilt) ? tilt : CHASE_TILT;
+      const nextZoom = Number.isFinite(zoom) ? zoom : CHASE_ZOOM;
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         const coord = new naver.LatLng(lat, lng);
         try {
           if (typeof map.morph === "function") {
-            map.morph(coord, Number.isFinite(zoom) ? zoom : map.getZoom(), {
-              duration: 220,
-              easing: "easeOutCubic"
-            });
+            map.morph(coord, nextZoom, { duration: 420, easing: "easeOutCubic" });
           } else {
             map.panTo(coord);
+            map.setZoom(nextZoom, true);
           }
         } catch {
           map.panTo(coord);
         }
       }
-      try {
-        if (Number.isFinite(heading) && typeof map.setHeading === "function") map.setHeading(heading);
-        if (Number.isFinite(tilt) && typeof map.setTilt === "function") map.setTilt(tilt);
-        else if (Number.isFinite(tilt) && typeof map.setOptions === "function") {
-          map.setOptions({ tilt });
-        }
-      } catch {
-        /* ignore */
-      }
-      if (Number.isFinite(zoom)) {
-        try {
-          map.setZoom(zoom, true);
-        } catch {
-          map.setZoom(zoom);
-        }
-      }
+      applyNaverChase(map, heading, tiltDeg);
+      window.setTimeout(() => applyNaverChase(mapRef.current, heading, tiltDeg), 280);
+      window.setTimeout(() => applyNaverChase(mapRef.current, heading, tiltDeg), 520);
     },
     resetNavCamera() {
       const map = mapRef.current;
@@ -246,7 +263,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       try {
         if (typeof map.setHeading === "function") map.setHeading(0);
         if (typeof map.setTilt === "function") map.setTilt(0);
-        else if (typeof map.setOptions === "function") map.setOptions({ tilt: 0 });
+        else if (typeof map.setOptions === "function") map.setOptions({ tilt: 0, heading: 0 });
       } catch {
         /* ignore */
       }
@@ -301,7 +318,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
             ? new naverMaps.LatLng(seedLat, seedLng)
             : new naverMaps.LatLng(36.119, 128.344);
         if (seedLat != null && seedLng != null) centeredSelfRef.current = true;
-        const map = new naverMaps.Map(hostRef.current, {
+        const mapOptions = {
           center,
           zoom: seedLat != null ? 16 : 15,
           minZoom: 5,
@@ -311,8 +328,16 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           scaleControl: false,
           logoControl: true,
           mapDataControl: false,
-          disableKineticPan: false
-        });
+          disableKineticPan: false,
+          gl: true,
+          tilt: 0
+        };
+        let map;
+        try {
+          map = new naverMaps.Map(hostRef.current, mapOptions);
+        } catch {
+          map = new naverMaps.Map(hostRef.current, { ...mapOptions, gl: false });
+        }
         mapRef.current = map;
 
         const markGesture = () => {
@@ -371,25 +396,25 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           const liveMap = mapRef.current;
           const naver = mapsApiRef.current;
           if (!guideFollowRef.current || !target || !liveMap || !naver) return;
-          if (performance.now() - gestureAtRef.current < 1100) return;
+          applyNaverChase(liveMap, target.heading, target.tilt);
+          if (performance.now() - gestureAtRef.current < 900) return;
           const cur = liveMap.getCenter();
           const distM = haversineMeters(cur.lat(), cur.lng(), target.lat, target.lng);
           if (distM < 8) return;
           const coord = new naver.LatLng(target.lat, target.lng);
-          const nextZoom = Number.isFinite(target.zoom) ? target.zoom : liveMap.getZoom();
+          const nextZoom = Number.isFinite(target.zoom) ? target.zoom : CHASE_ZOOM;
           try {
             if (typeof liveMap.morph === "function") {
               liveMap.morph(coord, nextZoom, { duration: 280, easing: "easeOutCubic" });
-              gestureAtRef.current = performance.now();
-              return;
+            } else {
+              liveMap.panTo(coord);
+              if (Math.abs(liveMap.getZoom() - nextZoom) > 0.35) liveMap.setZoom(nextZoom, true);
             }
           } catch {
-            /* fall through */
+            liveMap.panTo(coord);
           }
-          liveMap.panTo(coord);
-          if (Number.isFinite(target.zoom) && Math.abs(liveMap.getZoom() - target.zoom) > 0.35) {
-            liveMap.setZoom(target.zoom, true);
-          }
+          applyNaverChase(liveMap, target.heading, target.tilt);
+          window.setTimeout(() => applyNaverChase(mapRef.current, target.heading, target.tilt), 300);
           gestureAtRef.current = performance.now();
         }, 1000);
 
@@ -520,12 +545,11 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         followTargetRef.current = {
           lat: member.lat,
           lng: member.lng,
-          zoom:
+          zoom: CHASE_ZOOM,
+          tilt: CHASE_TILT,
+          heading:
             destLat != null && destLng != null
-              ? Math.max(
-                  12,
-                  Math.min(18, 16 - Math.log2(Math.max(150, haversineMeters(member.lat, member.lng, destLat, destLng)) / 400))
-                )
+              ? bearingDegrees(member.lat, member.lng, destLat, destLng)
               : null
         };
       }
