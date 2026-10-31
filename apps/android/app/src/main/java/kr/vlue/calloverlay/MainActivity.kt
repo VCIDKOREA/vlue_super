@@ -1133,7 +1133,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         if (vmapTtsSpeaking) return
         val engine = vmapTts
         if (engine == null || !vmapTtsReady) return
-        val next = vmapTtsQueue.removeFirstOrNull() ?: return
+        val next = vmapTtsQueue.pollFirst() ?: return
         vmapTtsSpeaking = true
         val engineId = "vmap-${vmapTtsEpoch}:${next.id}"
         vmapActiveEngineId = engineId
