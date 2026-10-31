@@ -25,6 +25,7 @@ fun gradleProp(key: String, fallback: String): String {
             "ADMOB_REWARDED_30_ID" -> props.getProperty("admob.rewarded.30.id")
             "ADMOB_NATIVE_ID" -> props.getProperty("admob.native.id")
             "ADMOB_BANNER_ID" -> props.getProperty("admob.banner.id")
+            "KAKAO_NATIVE_APP_KEY" -> props.getProperty("kakao.native.app.key")
             else -> null
         }
         val value = mapped?.trim().orEmpty()
@@ -43,6 +44,19 @@ val admobRewarded15Id = gradleProp("ADMOB_REWARDED_15_ID", "ca-app-pub-394025609
 val admobRewarded30Id = gradleProp("ADMOB_REWARDED_30_ID", "ca-app-pub-3940256099942544/5224354917")
 val admobNativeId = gradleProp("ADMOB_NATIVE_ID", "ca-app-pub-3940256099942544/2247696110")
 val admobBannerId = gradleProp("ADMOB_BANNER_ID", "ca-app-pub-3940256099942544/6300978111")
+/* 카카오 네이티브 앱 키 → scheme kakao{key}://kakaolink (local.properties: kakao.native.app.key) */
+val kakaoNativeAppKey =
+    gradleProp("KAKAO_NATIVE_APP_KEY", "").ifEmpty {
+        val localFile = rootProject.file("local.properties")
+        if (localFile.exists()) {
+            val props = Properties().apply {
+                localFile.inputStream().use { stream -> load(stream) }
+            }
+            props.getProperty("kakao.native.app.key")?.trim().orEmpty()
+        } else {
+            ""
+        }
+    }.ifEmpty { "da99c2f9e5586e84a3f4fb728a2095ee" }
 
 /** 릴리즈 서명 — keystore.properties 있으면 실키, 없으면 debug 키로 서명(스토어 제출 전 교체) */
 val keystorePropsFile = rootProject.file("keystore.properties")
@@ -64,8 +78,8 @@ android {
     defaultConfig {
         minSdk = 26
         targetSdk = 36
-        versionCode = 87
-        versionName = "1.0.36"
+        versionCode = 91
+        versionName = "1.0.39"
         buildConfigField("String", "API_BASE_URL", "\"$vlueApiBase\"")
         buildConfigField("String", "WEB_BASE_URL", "\"$vlueWebBase\"")
         buildConfigField("String", "SUPABASE_URL", "\"$vlueSupabaseUrl\"")
@@ -74,7 +88,9 @@ android {
         buildConfigField("String", "ADMOB_REWARDED_30_ID", "\"$admobRewarded30Id\"")
         buildConfigField("String", "ADMOB_NATIVE_ID", "\"$admobNativeId\"")
         buildConfigField("String", "ADMOB_BANNER_ID", "\"$admobBannerId\"")
+        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoNativeAppKey\"")
         manifestPlaceholders["admobAppId"] = admobAppId
+        manifestPlaceholders["kakaoScheme"] = "kakao$kakaoNativeAppKey"
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")

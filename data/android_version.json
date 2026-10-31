@@ -1,6 +1,9 @@
 {
-  "latestVersionCode": 50,
-  "latestVersionName": "1.0.8",
-  "message": "새로운 버전이 있습니다. 업데이트 하시겠습니까?",
-  "updatedAt": "2026-09-11T10:11:00.000Z"
+  "latestVersionCode": 90,
+  "latestVersionName": "1.0.38",
+  "minRequiredVersionCode": 1,
+  "isForced": false,
+  "message": "새로운 버전이 있습니다. 업데이트하시겠습니까?",
+  "forceMessage": "필수 업데이트가 있습니다. 스토어에서 최신 버전으로 업데이트해 주세요.",
+  "updatedAt": "2026-10-26T06:00:00.000Z"
 }

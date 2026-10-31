@@ -144,6 +144,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        logIncomingIntent("onCreate", intent)
         rewardedAdViewModel = ViewModelProvider(this)[VlueRewardedAdViewModel::class.java]
         /* Application 에서도 초기화 — 누락 대비 MainActivity에서 재확인 */
         VlueCallOverlayApp.initMobileAds("MainActivity.onCreate")
@@ -430,6 +431,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         handleLocationChatIntent(intent)
         handleRemoteSecurityDeepLink(intent)
         handleVmapRestoreIntent(intent)
+        handleVmapInviteDeepLink(intent)
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -442,9 +444,113 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             handleLocationChatIntent(intent)
             handleRemoteSecurityDeepLink(intent)
             handleVmapRestoreIntent(intent)
+            handleVmapInviteDeepLink(intent)
             VlueAppUpdatePrompt.applyIntentExtras(intent, this)
             VlueAppUpdatePrompt.maybeShow(this)
         }
+    }
+
+    /** 동일 Intent 로 초대 URL을 반복 load 하지 않기 위한 가드 */
+    private var lastHandledVmapInviteToken: String = ""
+
+    private fun logIncomingIntent(tag: String, intent: Intent?) {
+        if (intent == null) {
+            Log.i(TAG, "$tag intent=null")
+            return
+        }
+        val data = intent.data
+        Log.i(
+            TAG,
+            "$tag action=${intent.action} data=$data " +
+                "scheme=${data?.scheme} host=${data?.host} path=${data?.path} " +
+                "query=${data?.query} extrasKeys=${intent.extras?.keySet()?.joinToString()}"
+        )
+    }
+
+    /**
+     * 카카오/커스텀 스킴 V-Map 초대 → WebView /app?vmapInvite=…
+     * 지원: vlue://vmap|invite , https://…/app|/invite/vmap , kakao*://kakaolink
+     */
+    private fun handleVmapInviteDeepLink(intent: Intent?) {
+        logIncomingIntent("vmapInvite", intent)
+        if (intent == null || !::webView.isInitialized) {
+            Log.w(TAG, "vmapInvite skip: intentNull=${intent == null} webViewReady=${::webView.isInitialized}")
+            return
+        }
+        var token = ""
+        var roomId = ""
+        val data = intent.data
+        if (data != null) {
+            val scheme = data.scheme?.lowercase().orEmpty()
+            val host = data.host?.lowercase().orEmpty()
+            val path = data.path.orEmpty()
+            token = data.getQueryParameter("inviteToken")
+                ?.trim()
+                .orEmpty()
+                .ifBlank { data.getQueryParameter("vmapInvite")?.trim().orEmpty() }
+            roomId = data.getQueryParameter("roomId")?.trim().orEmpty()
+            /* 카카오 실행 파라미터가 fragment 또는 중첩 쿼리로 올 때 */
+            if (token.isEmpty()) {
+                val raw = data.toString()
+                val m =
+                    Regex("[?&](?:inviteToken|vmapInvite)=([^&#]+)", RegexOption.IGNORE_CASE)
+                        .find(raw)
+                if (m != null) {
+                    token = Uri.decode(m.groupValues[1]).trim()
+                }
+            }
+            if (token.isEmpty() && scheme == "vlue" && (host == "vmap" || host == "invite")) {
+                val pathToken = data.lastPathSegment?.trim().orEmpty()
+                if (pathToken.isNotEmpty() && pathToken != "vmap" && pathToken != "invite") {
+                    token = pathToken
+                }
+            }
+            if (token.isEmpty() && path.contains("invite")) {
+                token = data.getQueryParameter("vmapInvite")?.trim().orEmpty()
+            }
+            Log.i(TAG, "vmapInvite parsed scheme=$scheme host=$host tokenLen=${token.length} roomId=$roomId")
+        }
+        if (token.isEmpty()) {
+            token = intent.getStringExtra("inviteToken")?.trim().orEmpty()
+                .ifBlank { intent.getStringExtra("vmapInvite")?.trim().orEmpty() }
+        }
+        if (token.isEmpty()) {
+            Log.w(TAG, "vmapInvite: no token in intent — ignore")
+            return
+        }
+        if (token == lastHandledVmapInviteToken) {
+            Log.i(TAG, "vmapInvite: duplicate token ignored")
+            return
+        }
+        lastHandledVmapInviteToken = token
+        val enc = java.net.URLEncoder.encode(token, "UTF-8")
+        val target = "${VlueLetteringConfig.appShellUrl}?vmapInvite=$enc"
+        Log.i(TAG, "vmap invite deep link → $target roomId=$roomId")
+        webView.post {
+            try {
+                webView.loadUrl(target)
+            } catch (e: Exception) {
+                Log.e(TAG, "vmap invite load failed", e)
+            }
+        }
+        webView.postDelayed({
+            try {
+                val safeToken = org.json.JSONObject.quote(token)
+                webView.evaluateJavascript(
+                    """
+                    (function(){
+                      try{
+                        window.dispatchEvent(new CustomEvent('vlue-vmap-invite-deep-link',{
+                          detail:{ inviteToken:$safeToken }
+                        }));
+                      }catch(e){}
+                    })();
+                    """.trimIndent(),
+                    null
+                )
+            } catch (_: Exception) {
+            }
+        }, 500)
     }
 
     private fun handleVmapRestoreIntent(intent: Intent?) {

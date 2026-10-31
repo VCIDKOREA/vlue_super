@@ -1,13 +1,16 @@
 package kr.vlue.calloverlay
 
 import android.app.Activity
-import android.app.AlertDialog
-import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import kr.vlue.calloverlay.update.AppUpdateDecision
+import kr.vlue.calloverlay.update.AppUpdateDialog
+import kr.vlue.calloverlay.update.AppUpdateKind
+import kr.vlue.calloverlay.update.AppUpdateStoreLinks
+import kr.vlue.calloverlay.update.AppVersionInfo
+import kr.vlue.calloverlay.update.AppVersionPolicy
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -15,23 +18,30 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 앱 실행 시 서버 최신 versionCode 와 비교 → 구버전이면 업데이트 팝업 → 스토어.
- * (푸시 알림과 무관)
+ * 앱 실행 시 서버 최신 버전과 비교 → 강제/선택 업데이트 팝업 → 스토어.
+ *
+ * 로직: [AppVersionPolicy] · UI: [AppUpdateDialog] · 스토어: [AppUpdateStoreLinks]
  */
 object VlueAppUpdatePrompt {
     private const val TAG = "VlueAppUpdate"
     private val io = Executors.newSingleThreadExecutor()
     private val dialogShowing = AtomicBoolean(false)
     private val checkInFlight = AtomicBoolean(false)
+    /** 자동 체크는 프로세스당 1회 (페이지 이동마다 반복 방지) */
+    private val autoCheckDone = AtomicBoolean(false)
+    /** 선택 업데이트 "다음에 하기" 후 같은 세션에서 재표시 안 함 */
+    private val optionalSkippedThisSession = AtomicBoolean(false)
+    /** 강제 업데이트 진행 중 — 스토어 복귀 시 onStart에서 재검사 */
+    private val forceUpdateActive = AtomicBoolean(false)
 
     const val EXTRA_FORCE_UPDATE = "vlue_force_update"
     const val EXTRA_UPDATE_TITLE = "vlue_update_title"
     const val EXTRA_UPDATE_BODY = "vlue_update_body"
     const val EXTRA_MIN_VERSION_CODE = "vlue_min_version_code"
 
-    /** 푸시 extras 호환 — 무시해도 됨. 실제 안내는 [checkServerAndMaybeShow] */
+    /** 푸시 extras 호환 — 실제 안내는 서버 조회 */
     fun applyIntentExtras(intent: Intent?, activity: Activity) {
-        /* no-op: 버전 안내는 서버 조회로만 */
+        /* no-op */
     }
 
     fun markPending(context: android.content.Context, title: String, body: String, minVersionCode: Int = 0) {
@@ -50,44 +60,42 @@ object VlueAppUpdatePrompt {
     fun isForceUpdatePayload(data: Map<String, String>): Boolean = false
 
     fun clear(context: android.content.Context) {
-        /* no-op */
+        optionalSkippedThisSession.set(false)
+        autoCheckDone.set(false)
+        forceUpdateActive.set(false)
     }
 
+    /** 앱 시작·페이지 로드 — 프로세스당 1회. 강제 업데이트 중이면 매번 재검사 */
     fun maybeShow(activity: Activity) {
+        if (forceUpdateActive.get()) {
+            checkServerAndMaybeShow(activity)
+            return
+        }
+        if (!autoCheckDone.compareAndSet(false, true)) return
         checkServerAndMaybeShow(activity)
     }
 
+    /** JS 브릿지·수동 재검사 — 항상 서버 조회 */
     fun checkServerAndMaybeShow(activity: Activity) {
         if (dialogShowing.get() || !checkInFlight.compareAndSet(false, true)) return
         io.execute {
             try {
-                val base = BuildConfig.API_BASE_URL.trimEnd('/')
-                val url = URL("$base/api/app/android-version")
-                val conn =
-                    (url.openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 8_000
-                        readTimeout = 8_000
-                        requestMethod = "GET"
-                        setRequestProperty("Accept", "application/json")
-                    }
-                val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                conn.disconnect()
-                if (code !in 200..299 || text.isBlank()) return@execute
-
-                val json = JSONObject(text)
-                val latest = json.optInt("latestVersionCode", 0)
-                if (latest <= 0 || BuildConfig.VERSION_CODE >= latest) return@execute
-
-                val message =
-                    json.optString("message").trim().ifBlank {
-                        "새로운 버전이 있습니다. 업데이트 하시겠습니까?"
-                    }
-                val versionName = json.optString("latestVersionName").trim()
-
+                val remote = fetchRemoteVersion() ?: return@execute
+                val decision =
+                    AppVersionPolicy.decide(
+                        currentVersionCode = BuildConfig.VERSION_CODE,
+                        currentVersionName = BuildConfig.VERSION_NAME,
+                        remote = remote
+                    )
+                if (decision.kind == AppUpdateKind.NONE) {
+                    forceUpdateActive.set(false)
+                    return@execute
+                }
+                if (decision.kind == AppUpdateKind.OPTIONAL && optionalSkippedThisSession.get()) {
+                    return@execute
+                }
                 Handler(Looper.getMainLooper()).post {
-                    showUpdateDialog(activity, message, versionName)
+                    showDecision(activity, decision, remote)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "android-version check failed", e)
@@ -97,64 +105,49 @@ object VlueAppUpdatePrompt {
         }
     }
 
-    private fun showUpdateDialog(activity: Activity, message: String, latestVersionName: String) {
+    private fun fetchRemoteVersion(): AppVersionInfo? {
+        val base = BuildConfig.API_BASE_URL.trimEnd('/')
+        val url = URL("$base/api/app/android-version")
+        val conn =
+            (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 8_000
+                readTimeout = 8_000
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+            }
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        conn.disconnect()
+        if (code !in 200..299 || text.isBlank()) return null
+        return AppVersionInfo.fromJson(JSONObject(text))
+    }
+
+    private fun showDecision(
+        activity: Activity,
+        decision: AppUpdateDecision,
+        remote: AppVersionInfo
+    ) {
         if (activity.isFinishing) return
         if (!dialogShowing.compareAndSet(false, true)) return
-        try {
-            val title =
-                if (latestVersionName.isNotBlank()) {
-                    "VLUÉ 업데이트 ($latestVersionName)"
-                } else {
-                    "VLUÉ 업데이트"
-                }
-            AlertDialog.Builder(activity)
-                .setTitle(title)
-                .setMessage(message)
-                .setCancelable(true)
-                .setNegativeButton("닫기") { d, _ ->
-                    d.dismiss()
-                    dialogShowing.set(false)
-                }
-                .setPositiveButton("확인") { _, _ ->
-                    openVlueStore(activity)
-                    dialogShowing.set(false)
-                }
-                .setOnCancelListener {
-                    dialogShowing.set(false)
-                }
-                .show()
-        } catch (e: Exception) {
-            dialogShowing.set(false)
-            Log.w(TAG, "show update dialog failed", e)
+        if (decision.kind == AppUpdateKind.FORCED) {
+            forceUpdateActive.set(true)
         }
+        AppUpdateDialog.show(
+            activity = activity,
+            decision = decision,
+            remote = remote,
+            onClosed = { _ ->
+                dialogShowing.set(false)
+                if (decision.kind == AppUpdateKind.OPTIONAL) {
+                    optionalSkippedThisSession.set(true)
+                }
+                /* 강제는 forceUpdateActive 유지 → onStart/maybeShow 에서 재표시 */
+            }
+        )
     }
 
     fun openVlueStore(activity: Activity) {
-        val pkg = activity.packageName
-        val candidates =
-            listOf(
-                Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")),
-                Intent(Intent.ACTION_VIEW, Uri.parse("samsungapps://ProductDetail/$pkg")),
-                Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse("https://apps.samsung.com/appquery/appDetail.as?appId=$pkg")
-                ),
-                Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse("https://play.google.com/store/apps/details?id=$pkg")
-                )
-            )
-        for (intent in candidates) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            try {
-                activity.startActivity(intent)
-                return
-            } catch (_: ActivityNotFoundException) {
-                /* try next */
-            } catch (e: Exception) {
-                Log.w(TAG, "open store candidate failed", e)
-            }
-        }
-        Log.w(TAG, "no store activity for $pkg")
+        AppUpdateStoreLinks.openStore(activity, null)
     }
 }

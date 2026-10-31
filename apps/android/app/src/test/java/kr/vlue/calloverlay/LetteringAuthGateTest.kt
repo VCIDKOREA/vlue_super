@@ -68,4 +68,32 @@ class LetteringAuthGateTest {
         LetteringPrefs.clearAuthSession(context)
         assertFalse(LetteringAuthGate.canRunCallOverlay(context))
     }
+
+    @Test
+    fun userOptOut_doesNotBlockAuthGate_butDisablesLettering() {
+        LetteringPrefs.setSession(context, "user-1", "token-abc")
+        LetteringPrefs.setAuthGate(
+            context,
+            identityVerified = true,
+            onboardingComplete = true,
+            accountStatus = "active"
+        )
+        LetteringPrefs.setLetteringEnabled(context, false)
+        assertTrue(LetteringAuthGate.canRunCallOverlay(context))
+        assertFalse(LetteringPrefs.isLetteringEnabled(context))
+        LetteringPrefs.setLetteringEnabled(context, true)
+        assertTrue(LetteringPrefs.isLetteringEnabled(context))
+    }
+
+    @Test
+    fun activeAccount_withoutOnboardingFlags_allowsOverlay() {
+        LetteringPrefs.setSession(context, "user-legacy", "token-xyz")
+        LetteringPrefs.setAuthGate(
+            context,
+            identityVerified = false,
+            onboardingComplete = false,
+            accountStatus = "active"
+        )
+        assertTrue(LetteringAuthGate.canRunCallOverlay(context))
+    }
 }

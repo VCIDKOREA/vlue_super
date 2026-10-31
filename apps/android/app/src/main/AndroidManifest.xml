@@ -136,6 +136,53 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="vlue" android:host="lettering" />
             </intent-filter>
+            <!-- V-Map 커스텀 스킴: vlue://vmap?inviteToken=... / vlue://invite?... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vlue" android:host="vmap" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vlue" android:host="invite" />
+            </intent-filter>
+            <!-- 카카오톡 Share → kakao{NATIVE_APP_KEY}://kakaolink?... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${kakaoScheme}" android:host="kakaolink" />
+            </intent-filter>
+            <!-- HTTPS App Link: /app · /invite/vmap -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="www.vlue.kr"
+                    android:pathPrefix="/app" />
+                <data
+                    android:scheme="https"
+                    android:host="www.vlue.kr"
+                    android:pathPrefix="/invite/vmap" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="m.vlue.kr"
+                    android:pathPrefix="/app" />
+                <data
+                    android:scheme="https"
+                    android:host="m.vlue.kr"
+                    android:pathPrefix="/invite/vmap" />
+            </intent-filter>
         </activity>
 
         <activity

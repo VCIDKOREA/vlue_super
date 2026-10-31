@@ -18,10 +18,7 @@ object LetteringAuthGate {
      */
     fun canRunCallOverlay(context: Context): Boolean {
         val app = context.applicationContext
-        if (LetteringPrefs.isUserOptedOut(app)) {
-            Log.i(TAG, "block: user opted out")
-            return false
-        }
+        /* 사용자 opt-out 은 isLetteringEnabled 에서만 처리 — 인증 게이트와 섞지 않음 */
         if (!LetteringPrefs.hasAuthenticatedSession(app)) {
             Log.i(TAG, "block: no authenticated session (userId/token)")
             return false
@@ -35,7 +32,6 @@ object LetteringAuthGate {
 
     fun denyReason(context: Context): String {
         val app = context.applicationContext
-        if (LetteringPrefs.isUserOptedOut(app)) return "user_opted_out"
         if (!LetteringPrefs.hasAuthenticatedSession(app)) return "not_authenticated"
         if (!LetteringPrefs.isIdentityReadyForOverlay(app)) return "identity_or_onboarding_incomplete"
         return "ok"

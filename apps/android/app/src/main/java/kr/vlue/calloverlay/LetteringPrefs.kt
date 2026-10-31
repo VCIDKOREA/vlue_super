@@ -26,16 +26,17 @@ object LetteringPrefs {
 
     /**
      * 통화 감지 ON 여부.
-     * - 사용자가 명시적으로 끈 경우만 OFF
-     * - **로그인+PASS/온보딩 완료** 후에만 권한 준비 시 자동 ON
+     * - 사용자가 명시적으로 끈 경우(쇼케이스 OFF)만 OFF
+     * - **로그인+PASS/온보딩 완료** 후에만 동작
      * - 미가입·미인증 상태에서는 권한만 있어도 OFF
      */
     fun isLetteringEnabled(context: Context): Boolean {
         val p = prefs(context)
         if (p.getBoolean(KEY_USER_OPTED_OUT, false)) return false
         if (!LetteringAuthGate.canRunCallOverlay(context)) return false
-        if (LetteringPermissionHelper.hasCallOverlayReady(context)) return true
-        return p.getBoolean(KEY_ENABLED, false)
+        /* 명시적 ON 플래그 또는 권한 준비 완료 시 ON */
+        if (p.getBoolean(KEY_ENABLED, false)) return true
+        return LetteringPermissionHelper.hasCallOverlayReady(context)
     }
 
     fun setLetteringEnabled(context: Context, enabled: Boolean) {
@@ -117,6 +118,7 @@ object LetteringPrefs {
      * 가입(온보딩) 완료 + PASS 본인인증 완료.
      * 온보딩 미완료·pending_identity 는 거부.
      * 게이트 키가 한 번도 동기화되지 않은 레거시 설치(이미 로그인)만 임시 허용.
+     * accountStatus=active 이면 플래그 누락 레거시도 허용.
      */
     fun isIdentityReadyForOverlay(context: Context): Boolean {
         val p = prefs(context)
@@ -124,12 +126,16 @@ object LetteringPrefs {
         if (status == "pending_identity" || status == "pending" || status == "rejected") {
             return false
         }
-        /* 가입 플로우 완료가 최우선 — PASS 후 가입 API만 끝난 중간 상태는 차단 */
         if (isOnboardingComplete(context)) return true
         if (isIdentityVerified(context) && status.isNotEmpty()) return true
         val gateNeverSynced =
             !p.contains(KEY_ONBOARDING_COMPLETE) && !p.contains(KEY_IDENTITY_VERIFIED)
-        return gateNeverSynced && hasAuthenticatedSession(context)
+        if (gateNeverSynced && hasAuthenticatedSession(context)) return true
+        /* 활성 계정인데 웹이 false/false 를 밀어 넣은 경우 */
+        if (hasAuthenticatedSession(context) && (status == "active" || status == "approved")) {
+            return true
+        }
+        return false
     }
 
     fun getMemberPhone(context: Context): String =
