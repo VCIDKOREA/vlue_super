@@ -1194,47 +1194,76 @@ locationMapRoutes.post("/family/messages", requireUserHeader, async (c) => {
 
 /** 초대 토큰 생성 — 방에 참여한 회원이 외부 공유용 토큰 발급 */
 locationMapRoutes.post("/vmap/:id/invite-token", requireUserHeader, async (c) => {
-  const userId = await me(c);
-  const roomId = paramId(c);
-  const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
-  if (!room) return c.json({ error: "약속을 찾을 수 없습니다." }, 404);
+  try {
+    const userId = await me(c);
+    const roomId = paramId(c);
+    if (!roomId) return c.json({ error: "방 정보가 없습니다." }, 400);
 
-  const member = await prisma.vmapMember.findUnique({
-    where: { roomId_userId: { roomId, userId } }
-  });
-  if (!member && room.hostUserId !== userId) {
-    return c.json({ error: "방에 참여한 회원만 초대할 수 있습니다." }, 403);
+    const room = await prisma.vmapRoom.findFirst({ where: { id: roomId, active: true } });
+    if (!room) return c.json({ error: "약속을 찾을 수 없습니다." }, 404);
+
+    const member = await prisma.vmapMember.findUnique({
+      where: { roomId_userId: { roomId, userId } }
+    });
+    if (!member && room.hostUserId !== userId) {
+      return c.json({ error: "방에 참여한 회원만 초대할 수 있습니다." }, 403);
+    }
+
+    const host = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { legalName: true, publicHandle: true }
+    });
+    const hostName =
+      String(host?.legalName || host?.publicHandle || "회원").replace(/^@+/, "").trim() || "회원";
+
+    /* 토큰 생성 — 24시간 유효 */
+    const token =
+      globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await prisma.vmapInviteToken.upsert({
+      where: { id: token },
+      create: {
+        id: token,
+        roomId,
+        inviterUserId: userId,
+        inviterName: hostName.slice(0, 80),
+        expiresAt
+      },
+      update: {
+        inviterUserId: userId,
+        inviterName: hostName.slice(0, 80),
+        expiresAt
+      }
+    });
+
+    const placeLat = Number((room as { placeLat?: number | null }).placeLat);
+    const placeLng = Number((room as { placeLng?: number | null }).placeLng);
+
+    return c.json({
+      ok: true,
+      token,
+      expiresAt: expiresAt.toISOString(),
+      roomId,
+      inviterName: hostName,
+      placeLabel: room.placeLabel || room.title || "약속",
+      placeLat: Number.isFinite(placeLat) ? placeLat : null,
+      placeLng: Number.isFinite(placeLng) ? placeLng : null
+    });
+  } catch (e) {
+    console.error("[vmap invite-token]", e);
+    const msg = e instanceof Error ? e.message : String(e || "");
+    if (/vmap_invite_tokens|does not exist|P2021/i.test(msg)) {
+      return c.json(
+        {
+          error:
+            "초대 토큰 저장소가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요."
+        },
+        503
+      );
+    }
+    return c.json({ error: "초대 토큰 생성에 실패했습니다." }, 500);
   }
-
-  const host = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { legalName: true, publicHandle: true }
-  });
-  const hostName =
-    String(host?.legalName || host?.publicHandle || "회원").replace(/^@+/, "").trim() || "회원";
-
-  /* 토큰 생성 — 24시간 유효 */
-  const token = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-  await prisma.$executeRaw`
-    INSERT INTO vmap_invite_tokens (id, room_id, inviter_user_id, inviter_name, expires_at, created_at)
-    VALUES (${token}::text, ${roomId}::uuid, ${userId}::uuid, ${hostName}, ${expiresAt}, now())
-    ON CONFLICT (id) DO UPDATE SET
-      inviter_user_id = ${userId}::uuid,
-      inviter_name = ${hostName},
-      expires_at = ${expiresAt},
-      created_at = now()
-  `;
-
-  return c.json({
-    ok: true,
-    token,
-    expiresAt: expiresAt.toISOString(),
-    roomId,
-    inviterName: hostName,
-    placeLabel: room.placeLabel || room.title || "약속"
-  });
 });
 
 /** 초대 토큰 검증 — 비회원도 호출 가능 (회원 여부 확인용) */
