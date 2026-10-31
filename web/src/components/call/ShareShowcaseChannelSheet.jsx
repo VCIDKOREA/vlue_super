@@ -11,7 +11,9 @@ export default function ShareShowcaseChannelSheet({
   busy = false,
   title = "쇼케이스 전달하기",
   subtitle = "전달 방법을 선택하세요",
-  smsHint = "통화 번호로 초대 문자를 보냅니다"
+  smsHint = "통화 번호로 초대 문자를 보냅니다",
+  kakaoTitle = "카카오톡으로 초대하기",
+  kakaoHint = "친구를 직접 선택해 초대합니다"
 }) {
   if (!open || typeof document === "undefined") return null;
 
@@ -52,8 +54,8 @@ export default function ShareShowcaseChannelSheet({
             톡
           </span>
           <span className="share-showcase-channel-sheet__btn-text">
-            <strong>카카오톡으로 보내기</strong>
-            <em>친구를 직접 선택해 초대합니다</em>
+            <strong>{kakaoTitle}</strong>
+            <em>{kakaoHint}</em>
           </span>
         </button>
 

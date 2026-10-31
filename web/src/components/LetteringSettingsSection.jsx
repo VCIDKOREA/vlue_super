@@ -1,61 +1,31 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  openNativeAppSettings,
-  readLetteringEnabled,
-  requestLetteringPermissions,
-  writeLetteringEnabled
-} from "../lib/letteringSettings.js";
-import CallDetectionStatusBanner from "./CallDetectionStatusBanner.jsx";
+import { useCallback } from "react";
+import { openNativeAppSettings, requestLetteringPermissions, readLetteringPermissionStatus } from "../lib/letteringSettings.js";
 
-/** 메인 앱 설정 — VLUÉ 레터링 켜기/끄기 + 권한 유도 */
+/**
+ * 설정 > 프로필 하위 — 권한 보조만.
+ * 통화 감지 ON/OFF 는 마이페이지 「쇼케이스 켜짐/꺼짐」 토글이 담당.
+ */
 export default function LetteringSettingsSection({
   isDarkMode = false,
-  onNotice,
-  onOpenBizcardHub,
-  variant = "app"
+  onNotice
 }) {
-  const [enabled, setEnabled] = useState(() => readLetteringEnabled());
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    const onChange = () => setEnabled(readLetteringEnabled());
-    window.addEventListener("vlue-lettering-settings-changed", onChange);
-    return () => window.removeEventListener("vlue-lettering-settings-changed", onChange);
-  }, []);
-
-  const handleToggle = useCallback(
-    async (next) => {
-      if (!next) {
-        writeLetteringEnabled(false);
-        setEnabled(false);
-        onNotice?.("VLUÉ 레터링이 꺼졌습니다.");
-        return;
-      }
-      setBusy(true);
-      const perm = requestLetteringPermissions();
-      writeLetteringEnabled(true);
-      setEnabled(true);
-      setBusy(false);
-      if (perm.ok) {
-        onNotice?.(
-          "레터링이 켜졌습니다. 전화·통화기록·「다른 앱 위에 표시」권한을 허용해 주세요. 백그라운드 실행 중이면 정상 송출됩니다."
-        );
-      } else {
-        onNotice?.(
-          "레터링이 켜졌습니다. VLUÉ 앱에서 전화·통화기록·다른 앱 위에 표시 권한을 허용해 주세요."
-        );
-      }
-    },
-    [onNotice]
-  );
-
   const openAppPermissionSettings = useCallback(() => {
     const r = openNativeAppSettings();
     if (r?.ok) {
-      onNotice?.("「권한」에서 카메라·사진·위치 등을 허용으로 바꿔 주세요.");
+      onNotice?.("「권한」에서 전화·통화기록·다른 앱 위에 표시를 허용으로 바꿔 주세요.");
     } else {
       onNotice?.("앱 설정을 열 수 없습니다. 기기 설정 → 앱 → VLUÉ → 권한으로 이동해 주세요.");
     }
+  }, [onNotice]);
+
+  const checkCallPermissions = useCallback(() => {
+    const st = readLetteringPermissionStatus();
+    if (st?.callOverlayReady) {
+      onNotice?.("통화·오버레이 권한이 이미 허용되어 있습니다.");
+      return;
+    }
+    requestLetteringPermissions();
+    onNotice?.("필요한 권한 허용 창을 열었습니다.");
   }, [onNotice]);
 
   const canOpenAppSettings =
@@ -63,133 +33,33 @@ export default function LetteringSettingsSection({
     Boolean(window.Android?.openAppSettings || window.VlueLettering?.openAppSettings);
 
   const border = isDarkMode ? "border-white/10 bg-white/5" : "border-gray-100 bg-white";
-  const label = isDarkMode ? "text-gray-200" : "text-gray-700";
   const hint = isDarkMode ? "text-gray-400" : "text-gray-500";
 
   return (
     <div className={`rounded-2xl border p-3 ${border}`}>
       <p className={`mb-1 text-[12px] font-black ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
-        VLUÉ 레터링 · 통화 감지
+        통화·오버레이 권한
       </p>
       <p className={`mb-3 text-[11px] leading-snug ${hint}`}>
-        통화 수·발신 시 VLUÉ 인증 명함·쇼케이스를 표시합니다. 꺼두면 백그라운드 감시가 중지됩니다.
-        <br />
-        ※ 정상 동작 시 「백그라운드 실행」목록에 VLUÉ가 있으면 됩니다. 알림창에 없어도 송출됩니다.
+        통화 감지 ON/OFF는 마이페이지 우측 상단 <strong>쇼케이스 켜짐/꺼짐</strong> 토글로 제어합니다.
+        권한이 부족할 때만 아래에서 허용해 주세요.
       </p>
-      <div className="mb-3">
-        <CallDetectionStatusBanner isDarkMode={isDarkMode} onNotice={onNotice} />
-      </div>
+      <button
+        type="button"
+        className="mb-2 w-full rounded-xl bg-blue-600 py-2.5 text-[12px] font-black text-white"
+        onClick={checkCallPermissions}
+      >
+        통화·오버레이 권한 확인
+      </button>
       {canOpenAppSettings ? (
-        <>
-          <button
-            type="button"
-            className="mb-3 w-full rounded-xl bg-blue-600 py-2.5 text-[12px] font-black text-white"
-            onClick={openAppPermissionSettings}
-          >
-            남은 권한 허용하기
-          </button>
-          <p className={`mb-3 text-[10px] leading-snug ${hint}`}>
-            한 번 누르면 VLUÉ 앱 설정으로 이동합니다. 「권한」에서 카메라·사진·위치 등을 허용으로 바꾸면
-            됩니다.
-          </p>
-        </>
-      ) : null}
-      <label className={`flex items-center justify-between text-[12px] font-semibold ${label}`}>
-        레터링 기능 켜기
-        <input
-          type="checkbox"
-          checked={enabled}
-          disabled={busy}
-          onChange={(e) => handleToggle(e.target.checked)}
-        />
-      </label>
-      {enabled ? (
-        <div className="mt-3 space-y-2">
-          <button
-            type="button"
-            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
-              isDarkMode ? "border-blue-400/40 text-blue-300" : "border-blue-200 text-blue-700"
-            }`}
-            onClick={() => requestLetteringPermissions()}
-          >
-            통화·오버레이 권한 다시 확인
-          </button>
-          <button
-            type="button"
-            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
-              isDarkMode ? "border-amber-400/40 text-amber-200" : "border-amber-200 text-amber-800"
-            }`}
-            onClick={() => {
-              try {
-                if (typeof window.Android?.testLetteringBigPush === "function") {
-                  window.Android.testLetteringBigPush("01012345678");
-                  onNotice?.("빅푸시 테스트 기동 — 배너·알림·화면이 뜨는지 확인하세요.");
-                  return;
-                }
-              } catch {
-                /* ignore */
-              }
-              onNotice?.("빅푸시 테스트는 VLUÉ Android 앱에서만 가능합니다.");
-            }}
-          >
-            빅푸시 테스트 (통화 없이)
-          </button>
-          <button
-            type="button"
-            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
-              isDarkMode ? "border-emerald-400/40 text-emerald-200" : "border-emerald-200 text-emerald-800"
-            }`}
-            onClick={() => {
-              try {
-                if (typeof window.Android?.testDcpPathNormal === "function") {
-                  window.Android.testDcpPathNormal();
-                  onNotice?.("DCP 정상 경로 테스트 — 상단 디지털인증프로필을 확인하세요.");
-                  return;
-                }
-              } catch {
-                /* ignore */
-              }
-              onNotice?.("DCP 테스트는 VLUÉ Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
-            }}
-          >
-            DCP 정상 테스트
-          </button>
-          <button
-            type="button"
-            className={`w-full rounded-lg border py-2 text-[11px] font-bold ${
-              isDarkMode ? "border-rose-400/40 text-rose-200" : "border-rose-200 text-rose-800"
-            }`}
-            onClick={() => {
-              try {
-                if (typeof window.Android?.testDcpPathAbnormal === "function") {
-                  window.Android.testDcpPathAbnormal();
-                  onNotice?.("DCP 비정상 경로 테스트 — 경고 오버레이를 확인하세요.");
-                  return;
-                }
-              } catch {
-                /* ignore */
-              }
-              onNotice?.("DCP 테스트는 VLUÉ Android 앱에서만 가능합니다. 홈 화면 버튼으로도 미리볼 수 있습니다.");
-            }}
-          >
-            DCP 비정상 테스트
-          </button>
-        </div>
-      ) : null}
-      <p className={`mt-3 text-[10px] leading-snug ${hint}`}>
-        {variant === "web"
-          ? "명함 신청·수정은 이 페이지 「디지털인증명함」 탭에서 할 수 있습니다. 실제 통화 오버레이는 모바일 앱에서 동작합니다."
-          : "명함 신청·미리보기·수정은 프로필 메뉴 첫 화면 상단 「디지털인증명함」 카드에서만 할 수 있습니다."}
-      </p>
-      {onOpenBizcardHub ? (
         <button
           type="button"
-          className={`mt-2 w-full rounded-lg border py-2 text-[11px] font-bold ${
-            isDarkMode ? "border-cyan-500/35 text-cyan-200" : "border-cyan-200 text-cyan-800"
+          className={`w-full rounded-xl border py-2.5 text-[12px] font-bold ${
+            isDarkMode ? "border-white/20 text-white/90" : "border-gray-200 text-gray-800"
           }`}
-          onClick={onOpenBizcardHub}
+          onClick={openAppPermissionSettings}
         >
-          명함 설정 화면으로 이동
+          앱 설정 열기
         </button>
       ) : null}
     </div>

@@ -46,8 +46,10 @@ import ProfilePanel from "./components/ProfilePanel";
 import LocationPlatform from "./components/location/LocationPlatform.jsx";
 import {
   validateVmapInviteToken,
-  acceptVmapInviteToken
+  acceptVmapInviteToken,
+  VMAP_PENDING_INVITE_KEY
 } from "./lib/vmapInviteShare.js";
+import VmapInviteConfirmModal from "./components/location/VmapInviteConfirmModal.jsx";
 import TodaySafetyPatch from "./components/TodaySafetyPatch.jsx";
 import VlueBrandWordmark from "./components/VlueBrandWordmark.jsx";
 import V1PaidPackageGateModal from "./components/V1PaidPackageGateModal.jsx";
@@ -381,6 +383,8 @@ function App() {
     return false;
   });
   const [signupIntent, setSignupIntent] = useState(/** @type {'general' | 'trust'} */ ("general"));
+  const [vmapInvitePrompt, setVmapInvitePrompt] = useState(null);
+  const [vmapInviteBusy, setVmapInviteBusy] = useState(false);
 
   const [pendingAuthAction, setPendingAuthAction] = useState(null);
   const [guestAuthOverlay, setGuestAuthOverlay] = useState(false);
@@ -480,69 +484,120 @@ function App() {
     }
   }, []);
 
-  /** V-Map 토큰 초대 딥링크 ?vmapInvite=token → 비회원 가드 + 자동 입장 */
+  /** V-Map 토큰 초대 — 확인 팝업 / 비회원 가입 유지 / 기존 입장 시 즉시 복귀 */
   useEffect(() => {
-    const handleVmapInvite = async () => {
+    const stripInviteFromUrl = () => {
       try {
         const q = new URLSearchParams(window.location.search || "");
-        const inviteToken = String(q.get("vmapInvite") || "").trim();
-        if (!inviteToken) return;
-
+        if (!q.has("vmapInvite") && !q.has("inviteToken")) return;
         q.delete("vmapInvite");
+        q.delete("inviteToken");
         const next = `${window.location.pathname}${q.toString() ? `?${q}` : ""}${window.location.hash || ""}`;
         window.history.replaceState({}, "", next);
-
-        /* 토큰 유효성 검증 */
-        const validation = await validateVmapInviteToken(inviteToken);
-        if (!validation.ok) {
-          setBottomToast(validation.error || "초대 링크가 올바르지 않습니다.");
-          window.setTimeout(() => setBottomToast(""), 4000);
-          return;
-        }
-
-        /* 비회원인 경우 → 토큰 저장 후 가입 유도 */
-        if (!validation.isLoggedIn) {
-          sessionStorage.setItem("vlue_pending_vmap_invite", JSON.stringify({
-            token: inviteToken,
-            roomId: validation.roomId,
-            inviterName: validation.inviterName,
-            placeLabel: validation.placeLabel,
-            at: Date.now()
-          }));
-          setShowSplash(false);
-          setSignupOnboardingOpen(true);
-          setBottomToast(`${validation.inviterName}님의 V-Map 초대입니다. 가입 후 자동 입장됩니다!`);
-          window.setTimeout(() => setBottomToast(""), 5000);
-          return;
-        }
-
-        /* 회원인 경우 → 바로 수락 후 입장 */
-        setShowSplash(false);
-        try {
-          const accepted = await acceptVmapInviteToken(inviteToken);
-          if (accepted.ok && accepted.roomId) {
-            window.setTimeout(() => {
-              window.dispatchEvent(
-                new CustomEvent("vlue-open-location", {
-                  detail: {
-                    mode: "vmap",
-                    roomId: accepted.roomId,
-                    join: true,
-                    expandChat: true
-                  }
-                })
-              );
-            }, 400);
-          }
-        } catch (e) {
-          setBottomToast(e?.message || "방 입장에 실패했습니다.");
-          window.setTimeout(() => setBottomToast(""), 4000);
-        }
       } catch {
         /* ignore */
       }
     };
-    void handleVmapInvite();
+
+    const persistPendingInvite = (payload) => {
+      try {
+        sessionStorage.setItem(VMAP_PENDING_INVITE_KEY, JSON.stringify({ ...payload, at: Date.now() }));
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const openJoinedRoom = (roomId, departed = false) => {
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent("vlue-open-location", {
+            detail: {
+              mode: "vmap",
+              roomId,
+              join: false,
+              inviteResume: true,
+              departed: Boolean(departed),
+              expandChat: true
+            }
+          })
+        );
+      }, 350);
+    };
+
+    const promptInviteConfirm = (invite) => {
+      setVmapInvitePrompt({
+        token: invite.token,
+        roomId: invite.roomId,
+        inviterName: invite.inviterName || "",
+        placeLabel: invite.placeLabel || "약속"
+      });
+    };
+
+    const handleVmapInvite = async (rawToken) => {
+      const inviteToken = String(rawToken || "").trim();
+      if (!inviteToken) return;
+      stripInviteFromUrl();
+
+      const validation = await validateVmapInviteToken(inviteToken);
+      if (!validation.ok) {
+        setBottomToast(validation.error || "초대 링크가 올바르지 않습니다.");
+        window.setTimeout(() => setBottomToast(""), 4000);
+        return;
+      }
+
+      const pendingPayload = {
+        token: inviteToken,
+        roomId: validation.roomId,
+        inviterName: validation.inviterName,
+        placeLabel: validation.placeLabel
+      };
+
+      /* 비회원 → 토큰 세션 유지 + 간편 가입 */
+      if (!validation.isLoggedIn || localStorage.getItem(SESSION_KEY) !== "1") {
+        persistPendingInvite(pendingPayload);
+        setShowSplash(false);
+        setSignupOnboardingOpen(true);
+        setBottomToast(`${validation.inviterName || "친구"}님의 V-Map 초대입니다. 가입 후 입장 확인이 이어집니다.`);
+        window.setTimeout(() => setBottomToast(""), 5000);
+        return;
+      }
+
+      setShowSplash(false);
+
+      /* 이미 확인(입장)한 회원 → 팝업 없이 복귀 (출발 여부는 서버 플래그) */
+      if (validation.alreadyJoined) {
+        try {
+          sessionStorage.removeItem(VMAP_PENDING_INVITE_KEY);
+        } catch {
+          /* ignore */
+        }
+        openJoinedRoom(validation.roomId, validation.departed);
+        return;
+      }
+
+      /* 미입장 → 매번 확인 팝업 (취소해도 토큰은 유지해 재진입 시 다시 표시) */
+      persistPendingInvite(pendingPayload);
+      promptInviteConfirm(pendingPayload);
+    };
+
+    const bootFromUrl = () => {
+      try {
+        const q = new URLSearchParams(window.location.search || "");
+        const token = String(q.get("vmapInvite") || q.get("inviteToken") || "").trim();
+        if (token) void handleVmapInvite(token);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const onDeepLinkEvent = (event) => {
+      const token = String(event?.detail?.inviteToken || event?.detail?.token || "").trim();
+      if (token) void handleVmapInvite(token);
+    };
+
+    bootFromUrl();
+    window.addEventListener("vlue-vmap-invite-deep-link", onDeepLinkEvent);
+    return () => window.removeEventListener("vlue-vmap-invite-deep-link", onDeepLinkEvent);
   }, []);
 
   /** 비밀번호 변경 PASS redirect 복귀 — 설정 화면으로 */
@@ -2596,41 +2651,71 @@ function App() {
     });
   }, []);
 
-  /** 가입/소셜 로그인 직후 대기 중인 V-Map 초대 토큰 자동 수락 */
+  /** 가입/소셜 로그인 직후 — 자동 accept 하지 않고 입장 확인 팝업 표시 */
   const consumePendingVmapInviteAfterAuth = useCallback(() => {
     try {
-      const raw = sessionStorage.getItem("vlue_pending_vmap_invite");
+      const raw = sessionStorage.getItem(VMAP_PENDING_INVITE_KEY);
       if (!raw) return;
-      sessionStorage.removeItem("vlue_pending_vmap_invite");
       const pending = JSON.parse(raw);
-      if (!pending?.token || Date.now() - (pending.at || 0) >= 24 * 60 * 60 * 1000) return;
-      window.setTimeout(async () => {
-        try {
-          const accepted = await acceptVmapInviteToken(pending.token);
-          if (accepted?.ok && accepted.roomId) {
-            setBottomToast("V-Map 방에 자동 입장되었습니다!");
-            window.setTimeout(() => setBottomToast(""), 3000);
-            window.setTimeout(() => {
-              window.dispatchEvent(
-                new CustomEvent("vlue-open-location", {
-                  detail: {
-                    mode: "vmap",
-                    roomId: accepted.roomId,
-                    join: true,
-                    expandChat: true
-                  }
-                })
-              );
-            }, 500);
-          }
-        } catch (e) {
-          setBottomToast(e?.message || "V-Map 입장에 실패했습니다.");
-          window.setTimeout(() => setBottomToast(""), 4000);
-        }
-      }, 800);
+      if (!pending?.token || Date.now() - (pending.at || 0) >= 24 * 60 * 60 * 1000) {
+        sessionStorage.removeItem(VMAP_PENDING_INVITE_KEY);
+        return;
+      }
+      window.setTimeout(() => {
+        setVmapInvitePrompt({
+          token: pending.token,
+          roomId: pending.roomId || "",
+          inviterName: pending.inviterName || "",
+          placeLabel: pending.placeLabel || "약속"
+        });
+      }, 600);
     } catch {
       /* ignore */
     }
+  }, []);
+
+  const confirmVmapInvitePrompt = useCallback(async () => {
+    if (!vmapInvitePrompt?.token || vmapInviteBusy) return;
+    setVmapInviteBusy(true);
+    try {
+      const accepted = await acceptVmapInviteToken(vmapInvitePrompt.token);
+      try {
+        sessionStorage.removeItem(VMAP_PENDING_INVITE_KEY);
+      } catch {
+        /* ignore */
+      }
+      setVmapInvitePrompt(null);
+      if (accepted?.ok && accepted.roomId) {
+        setBottomToast("V-Map에 입장했습니다. 출발 전까지 위치는 공유되지 않습니다.");
+        window.setTimeout(() => setBottomToast(""), 3600);
+        window.setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("vlue-open-location", {
+              detail: {
+                mode: "vmap",
+                roomId: accepted.roomId,
+                join: false,
+                inviteResume: true,
+                departed: Boolean(accepted.departed || accepted.isDeparted),
+                expandChat: true
+              }
+            })
+          );
+        }, 300);
+      }
+    } catch (e) {
+      setBottomToast(e?.message || "방 입장에 실패했습니다.");
+      window.setTimeout(() => setBottomToast(""), 4000);
+    } finally {
+      setVmapInviteBusy(false);
+    }
+  }, [vmapInvitePrompt, vmapInviteBusy]);
+
+  const cancelVmapInvitePrompt = useCallback(() => {
+    /* 취소 = 미입장. 토큰은 세션에 남겨 카톡 링크로 재진입 시 다시 팝업 */
+    setVmapInvitePrompt(null);
+    setBottomToast("입장을 취소했습니다. 초대 링크로 다시 들어오면 확인할 수 있습니다.");
+    window.setTimeout(() => setBottomToast(""), 3200);
   }, []);
 
   const finishOnboarding = useCallback((payload) => {
@@ -6515,6 +6600,14 @@ function App() {
           window.setTimeout(() => setBottomToast(""), 2800);
         }}
         isDarkMode={isDarkMode}
+      />
+      <VmapInviteConfirmModal
+        open={Boolean(vmapInvitePrompt?.token)}
+        busy={vmapInviteBusy}
+        inviterName={vmapInvitePrompt?.inviterName || ""}
+        placeLabel={vmapInvitePrompt?.placeLabel || ""}
+        onConfirm={() => void confirmVmapInvitePrompt()}
+        onCancel={cancelVmapInvitePrompt}
       />
       <VluePillToast
         message={bottomToast}

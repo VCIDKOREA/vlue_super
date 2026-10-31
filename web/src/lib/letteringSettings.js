@@ -1,3 +1,5 @@
+import { syncNativeAuthSession } from "./vlueAuthHeaders.js";
+
 export const LETTERING_ENABLED_KEY = "vlue_lettering_enabled";
 export const CALL_DETECTION_HEALTH_EVENT = "vlue-call-detection-health";
 
@@ -22,44 +24,63 @@ export function writeLetteringEnabled(enabled) {
 /** Android/iOS 네이티브 SharedPreferences·UserDefaults 동기화 */
 export function syncLetteringEnabledToNative(enabled) {
   if (typeof window === "undefined") return;
-  const payload = { enabled: Boolean(enabled) };
+  const on = Boolean(enabled);
   try {
-    window.VlueLettering?.setLetteringEnabled?.(payload.enabled);
+    window.VlueLettering?.setLetteringEnabled?.(on);
   } catch {
     /* ignore */
   }
   try {
-    window.Android?.setLetteringEnabled?.(payload.enabled ? "1" : "0");
+    window.Android?.setLetteringEnabled?.(on ? "1" : "0");
   } catch {
     /* ignore */
   }
   try {
-    window.webkit?.messageHandlers?.vlueLetteringSettings?.postMessage(payload);
+    window.webkit?.messageHandlers?.vlueLetteringSettings?.postMessage({ enabled: on });
   } catch {
     /* ignore */
   }
 }
 
 /**
- * 쇼케이스/명함 송출 ON → 통화 감지(레터링) + 백그라운드 모니터도 함께 켠다.
- * UI 토글만 켜고 lettering_enabled=false 이면 빅푸가 아예 안 뜸.
+ * 쇼케이스 켜짐/꺼짐과 통화 감지를 하나로 맞춤.
+ * @returns {{ ok: boolean, needsPermissions: boolean }}
  */
-export function ensureCallDetectionForBroadcast(on) {
-  if (!on) return;
-  writeLetteringEnabled(true);
-  try {
+export function syncCallDetectionWithShowcase(on) {
+  if (on) {
+    try {
+      syncNativeAuthSession();
+    } catch {
+      /* ignore */
+    }
+    writeLetteringEnabled(true);
     const st = readLetteringPermissionStatus();
-    if (st && st.callOverlayReady === false) {
+    const needsPermissions = Boolean(st && st.callOverlayReady === false);
+    if (needsPermissions) {
       requestLetteringPermissions();
     }
-  } catch {
-    /* ignore */
+    try {
+      window.dispatchEvent(new CustomEvent(CALL_DETECTION_HEALTH_EVENT));
+    } catch {
+      /* ignore */
+    }
+    return { ok: true, needsPermissions };
   }
+  writeLetteringEnabled(false);
   try {
     window.dispatchEvent(new CustomEvent(CALL_DETECTION_HEALTH_EVENT));
   } catch {
     /* ignore */
   }
+  return { ok: true, needsPermissions: false };
+}
+
+/**
+ * 쇼케이스/명함 송출 ON → 통화 감지(레터링) + 백그라운드 모니터도 함께 켠다.
+ */
+export function ensureCallDetectionForBroadcast(on) {
+  if (!on) return;
+  syncCallDetectionWithShowcase(true);
 }
 
 export function requestLetteringPermissions() {
@@ -175,7 +196,7 @@ export function readLetteringPermissionStatus() {
 }
 
 /**
- * 송출 ON인데 통화 감지가 꺼졌는지 — 사용자에게 보여줄 상태.
+ * 송출 ON인데 통화 감지가 꺼졌는지 — 내부 복구용 (마이페이지 배너에는 쓰지 않음).
  * @param {{ broadcastOn?: boolean, nativeStatus?: object|null }} [opts]
  */
 export function getCallDetectionHealth(opts = {}) {
@@ -192,24 +213,20 @@ export function getCallDetectionHealth(opts = {}) {
   }
   const st = opts.nativeStatus ?? readLetteringPermissionStatus();
   const webLettering = readLetteringEnabled();
-  const letteringEnabled = st?.letteringEnabled === true || (st == null && webLettering);
+  const letteringEnabled =
+    st?.letteringEnabled === true ||
+    (st == null && webLettering) ||
+    (webLettering && st?.letteringUserOptedOut !== true);
   const callOverlayReady = st == null ? true : st.callOverlayReady === true;
   const callMonitorRunning = st?.callMonitorRunning === true;
   const issues = [];
   if (broadcastOn && !letteringEnabled) {
-    issues.push("통화 감지가 꺼져 있습니다. 빅푸시가 표시되지 않습니다.");
+    issues.push("통화 감지가 꺼져 있습니다.");
   }
   if (broadcastOn && letteringEnabled && st && !callOverlayReady) {
     issues.push("전화·오버레이 권한이 필요합니다.");
   }
-  if (broadcastOn && letteringEnabled && st && callOverlayReady && st.callMonitorRunning === false) {
-    issues.push("백그라운드 통화 감지가 중지되어 있습니다.");
-  }
-  const healthy =
-    !broadcastOn ||
-    (letteringEnabled &&
-      callOverlayReady &&
-      (st == null || callMonitorRunning || st.callMonitorRunning == null));
+  const healthy = !broadcastOn || (letteringEnabled && callOverlayReady);
   return {
     broadcastOn: Boolean(broadcastOn),
     letteringEnabled: Boolean(letteringEnabled),
@@ -221,12 +238,12 @@ export function getCallDetectionHealth(opts = {}) {
   };
 }
 
-/** 문제 있으면 자동 복구 시도 후 health 반환 */
+/** 문제 있으면 조용히 자동 복구 (토스트/배너 없음) */
 export function healCallDetectionIfNeeded(opts = {}) {
   const before = getCallDetectionHealth(opts);
   if (!before.broadcastOn) return before;
   if (!before.letteringEnabled || !before.callOverlayReady) {
-    ensureCallDetectionForBroadcast(true);
+    syncCallDetectionWithShowcase(true);
   }
   return getCallDetectionHealth(opts);
 }

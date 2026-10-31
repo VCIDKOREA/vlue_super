@@ -11,20 +11,40 @@ export type ShowcaseOgShareMeta = {
   shareCover: string;
 };
 
+function tryHttpMediaUrl(u: unknown): string {
+  const s = String(u || "").trim();
+  if (!s) return "";
+  if (s.startsWith("blob:") || s.startsWith("data:")) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  return "";
+}
+
+/**
+ * 카카오 Feed·주소 복사 OG 공통 — 「공유용 커버」만 (갤러리 첫장 금지).
+ * 카톡 SDK 도 shareCoverUrl / kakaoFeedBg 를 최우선으로 씀.
+ */
+export function extractExplicitShareCoverFromStyle(style: unknown): string {
+  if (!style || typeof style !== "object" || Array.isArray(style)) return "";
+  const st = style as Record<string, unknown>;
+  return (
+    tryHttpMediaUrl(st.shareCoverUrl) ||
+    tryHttpMediaUrl(st.kakaoFeedBgUrl) ||
+    tryHttpMediaUrl(st.kakaoFeedBgDataUrl)
+  );
+}
+
 /** 쇼케이스 스타일(live / draft)에서 대표 커버 이미지 URL 추출 */
 export function extractCoverFromShowcaseStyle(style: unknown): string {
   if (!style || typeof style !== "object" || Array.isArray(style)) return "";
   const st = style as Record<string, unknown>;
 
-  const tryUrl = (u: unknown) => {
-    const s = String(u || "").trim();
-    if (!s) return "";
-    if (s.startsWith("blob:") || s.startsWith("data:")) return "";
-    if (/^https?:\/\//i.test(s)) return s;
-    return "";
-  };
+  const tryUrl = tryHttpMediaUrl;
 
-  const direct = tryUrl(st.shareCoverUrl) || tryUrl(st.titlePhotoUrl) || tryUrl(st.photoUrl);
+  const direct =
+    tryUrl(st.shareCoverUrl) ||
+    tryUrl(st.kakaoFeedBgUrl) ||
+    tryUrl(st.titlePhotoUrl) ||
+    tryUrl(st.photoUrl);
   if (direct) return direct;
 
   const pages = Array.isArray(st.pages) ? st.pages : [];
@@ -258,11 +278,23 @@ async function fetchShowcaseOgShareMetaFromDb(
     const row = rows[0];
     if (!row) return empty;
 
+    /*
+     * 우선순위 = 카카오 SDK 공유와 동일:
+     * 1) DB/스냅샷 전용 공유 커버(shareCoverUrl·kakaoFeedBg)
+     * 2) 스타일에 명시된 shareCoverUrl
+     * 3) 타이틀 사진
+     * 4) 라이브/드래프트 갤러리 등 (이전엔 이게 1순위라 산토리니 등 잘못된 OG가 나감)
+     * 5) 프로필 photo
+     */
+    const explicitShare = pickHttpUrl(row.share_cover, row.kakao_bg);
+    const liveShare = extractExplicitShareCoverFromStyle(row.showcase_live);
+    const draftShare = extractExplicitShareCoverFromStyle(row.showcase_style);
+    const titlePhoto = pickHttpUrl(row.title_photo);
     const liveCover = extractCoverFromShowcaseStyle(row.showcase_live);
     const styleCover = extractCoverFromShowcaseStyle(row.showcase_style);
-    const snapCover = pickHttpUrl(row.title_photo, row.share_cover, row.kakao_bg);
     const photo = pickHttpUrl(row.photo_url, row.snap_photo);
-    const resolvedCover = liveCover || styleCover || snapCover || photo;
+    const resolvedCover =
+      explicitShare || liveShare || draftShare || titlePhoto || liveCover || styleCover || photo;
 
     const meta: ShowcaseOgShareMeta = {
       name: String(row.name || "").trim(),

@@ -3,7 +3,11 @@ import {
   isOgScraperUserAgent,
   isUserDocumentNavigation
 } from "../services/showcase/showcaseOgLandingPage.js";
-import { toAsciiOgImageUrl } from "../services/showcase/showcaseOgShareMeta.js";
+import {
+  extractExplicitShareCoverFromStyle,
+  extractCoverFromShowcaseStyle,
+  toAsciiOgImageUrl
+} from "../services/showcase/showcaseOgShareMeta.js";
 
 function assert(cond: boolean, message: string) {
   if (!cond) throw new Error(message);
@@ -71,6 +75,26 @@ function run() {
   );
   assert(encoded.includes("%"), "non-ascii image path is percent-encoded");
   assert(!encoded.includes("다운로드"), "raw hangul is not left in og:image URL");
+
+  const style = {
+    shareCoverUrl: "https://cdn.example/office-share.jpg",
+    titlePhotoUrl: "https://cdn.example/title.jpg",
+    pages: [{ gallery: { photos: [{ url: "https://cdn.example/santorini.jpg" }] } }]
+  };
+  assert(
+    extractExplicitShareCoverFromStyle(style) === "https://cdn.example/office-share.jpg",
+    "explicit share cover ignores gallery"
+  );
+  assert(
+    extractCoverFromShowcaseStyle(style) === "https://cdn.example/office-share.jpg",
+    "full extract still prefers shareCoverUrl over gallery"
+  );
+  assert(
+    extractCoverFromShowcaseStyle({
+      pages: [{ gallery: { photos: [{ url: "https://cdn.example/santorini.jpg" }] } }]
+    }) === "https://cdn.example/santorini.jpg",
+    "gallery used only when no share cover"
+  );
 
   console.log("[test] showcase OG landing page ok");
 }

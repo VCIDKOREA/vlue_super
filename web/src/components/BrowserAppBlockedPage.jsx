@@ -19,6 +19,19 @@ export default function BrowserAppBlockedPage() {
     relayAppOAuthToMarketing();
   }, []);
 
+  /* 구버전 카톡 링크(/app?vmapInvite=) → 앱 핸드오프 브리지로 이동 */
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search || "");
+      const token = String(q.get("vmapInvite") || q.get("inviteToken") || "").trim();
+      if (!token) return;
+      const next = `/invite/vmap?vmapInvite=${encodeURIComponent(token)}`;
+      window.location.replace(next);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     document.documentElement.classList.remove("dark");
     document.body.dataset.vlueShell = "app-blocked";

@@ -13,6 +13,7 @@ import { isSuperAdminHqEntry } from "./lib/hqRoute.js";
 import { isAdminConsoleEntry } from "./lib/adminRoute.js";
 import { resolveSiteShell } from "./lib/siteMode.js";
 import BrowserAppBlockedPage from "./components/BrowserAppBlockedPage.jsx";
+import VmapInviteBridgePage from "./components/VmapInviteBridgePage.jsx";
 import WwwStagingLockGate from "./components/WwwStagingLockGate.jsx";
 import "./index.css";
 import "./styles.css";
@@ -21,6 +22,11 @@ import { applyAppSettingsToDocument } from "./lib/vlueAppSettings.js";
 import { logProductionEnvBinding } from "./config.js";
 import { ensurePricingConfigLoaded } from "./lib/pricingConfig.js";
 import { VLUE_ANDROID_APP_UA_TOKEN } from "./lib/vlueClientAccess.js";
+
+function isVmapInviteBridgePath(pathname = "") {
+  const p = String(pathname || "").replace(/\/+$/, "") || "/";
+  return p === "/invite/vmap";
+}
 
 try {
   if (typeof navigator !== "undefined" && String(navigator.userAgent || "").includes(VLUE_ANDROID_APP_UA_TOKEN)) {
@@ -86,8 +92,12 @@ if (!rootEl) {
   document.body.innerHTML =
     '<p style="padding:24px;font-family:sans-serif">앱 루트(#root)를 찾을 수 없습니다.</p>';
 } else {
+  const vmapInviteBridge =
+    typeof window !== "undefined" && isVmapInviteBridgePath(window.location.pathname);
+
   let Shell = App;
   if (showPortoneV2Callback) Shell = PortoneV2PaymentCallback;
+  else if (vmapInviteBridge) Shell = VmapInviteBridgePage;
   else if (showAdminConsole) Shell = AdminConsoleApp;
   else if (showHq) Shell = SuperAdminHqApp;
   else if (showAdminGate) Shell = AdminSecretApp;
@@ -96,8 +106,8 @@ if (!rootEl) {
   else if (siteShell === "marketing") Shell = VlueMarketingApp;
 
   const appBlocked = siteShell === "blocked";
-  /* 공개 쇼케이스는 Coming Soon 잠금 없이 바로 연다 (카톡 인앱 브라우저) */
-  const shellTree = appBlocked || showcasePublic ? (
+  /* 공개 쇼케이스·V-Map 초대 브리지는 Coming Soon 잠금 없이 바로 연다 */
+  const shellTree = appBlocked || showcasePublic || vmapInviteBridge ? (
     <Shell />
   ) : (
     <WwwStagingLockGate>
