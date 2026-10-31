@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.provider.ContactsContract
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import java.util.ArrayDeque
 import java.util.Locale
 import org.json.JSONObject
@@ -51,6 +52,8 @@ import android.view.ViewGroup
  * VLUÉ 메인 WebView + 레터링 + 가족보호 + 앱 PIN 잠금
  */
 class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
+    private data class VmapUtterance(val text: String, val id: String)
+
     private lateinit var webView: WebView
     private lateinit var mainRoot: FrameLayout
     private lateinit var pinLock: PinLockController
@@ -69,7 +72,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
     private var vmapOverlayPrompted = false
     private var vmapTts: TextToSpeech? = null
     private var vmapTtsReady = false
-    private val vmapTtsPending = ArrayDeque<String>()
+    private val vmapTtsQueue = ArrayDeque<VmapUtterance>()
+    private var vmapTtsSpeaking = false
+    private var vmapTtsEpoch = 0
+    private var vmapActiveEngineId: String? = null
+    private val vmapTtsHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -1074,31 +1081,89 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         vmapTts = TextToSpeech(applicationContext) { status ->
             vmapTtsReady = status == TextToSpeech.SUCCESS
             if (!vmapTtsReady) return@TextToSpeech
-            vmapTts?.language = Locale.KOREAN
-            val pending = ArrayList(vmapTtsPending)
-            vmapTtsPending.clear()
-            pending.forEach { phrase ->
-                vmapTts?.speak(phrase, TextToSpeech.QUEUE_ADD, null, "vmap-${System.nanoTime()}")
-            }
+            val engine = vmapTts ?: return@TextToSpeech
+            engine.language = Locale.KOREAN
+            engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+
+                override fun onDone(utteranceId: String?) {
+                    finishVmapUtterance(utteranceId)
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) {
+                    finishVmapUtterance(utteranceId)
+                }
+
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    finishVmapUtterance(utteranceId)
+                }
+            })
+            runOnUiThread { pumpVmapTts() }
         }
     }
 
-    fun speakVmapTts(text: String, flush: Boolean) {
+    /**
+     * 한 문장만 엔진에 넣고, onDone/onError 이후에 다음 문장으로 넘긴다.
+     * QUEUE_ADD 로 여러 문장을 한꺼번에 넣으면 멘트가 겹친다.
+     */
+    fun speakVmapTts(text: String, flush: Boolean, utteranceId: String = "") {
         val phrase = text.trim()
         runOnUiThread {
-            val engine = vmapTts
-            if (engine == null || !vmapTtsReady) {
-                if (phrase.isNotEmpty()) vmapTtsPending.addLast(phrase)
-                if (engine == null) warmVmapTts()
-                return@runOnUiThread
+            if (flush) {
+                vmapTtsEpoch += 1
+                vmapTtsQueue.clear()
+                vmapTtsSpeaking = false
+                vmapActiveEngineId = null
+                vmapTtsHandler.removeCallbacksAndMessages(null)
+                try {
+                    vmapTts?.stop()
+                } catch (_: Exception) {
+                }
             }
-            if (phrase.isEmpty()) {
-                if (flush) engine.stop()
-                return@runOnUiThread
-            }
-            val mode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
-            engine.speak(phrase, mode, null, "vmap-${System.nanoTime()}")
+            if (phrase.isEmpty()) return@runOnUiThread
+            val id = utteranceId.ifBlank { "auto-${System.nanoTime()}" }
+            vmapTtsQueue.addLast(VmapUtterance(phrase, id))
+            if (vmapTts == null) warmVmapTts()
+            pumpVmapTts()
         }
+    }
+
+    private fun pumpVmapTts() {
+        if (vmapTtsSpeaking) return
+        val engine = vmapTts
+        if (engine == null || !vmapTtsReady) return
+        val next = vmapTtsQueue.removeFirstOrNull() ?: return
+        vmapTtsSpeaking = true
+        val engineId = "vmap-${vmapTtsEpoch}:${next.id}"
+        vmapActiveEngineId = engineId
+        val result = try {
+            engine.speak(next.text, TextToSpeech.QUEUE_FLUSH, null, engineId)
+        } catch (_: Exception) {
+            TextToSpeech.ERROR
+        }
+        val holdMs = (2400L + next.text.length * 340L).coerceAtMost(20000L)
+        vmapTtsHandler.postDelayed({ finishVmapUtterance(engineId) }, holdMs)
+        if (result == TextToSpeech.ERROR) finishVmapUtterance(engineId)
+    }
+
+    private fun finishVmapUtterance(engineId: String?) {
+        runOnUiThread {
+            val raw = engineId.orEmpty()
+            if (raw.isEmpty() || raw != vmapActiveEngineId) return@runOnUiThread
+            val epoch = raw.removePrefix("vmap-").substringBefore(":").toIntOrNull()
+            if (epoch == null || epoch != vmapTtsEpoch) return@runOnUiThread
+            vmapTtsHandler.removeCallbacksAndMessages(null)
+            vmapActiveEngineId = null
+            vmapTtsSpeaking = false
+            notifyVmapTtsDone(raw.substringAfter(":", ""))
+            pumpVmapTts()
+        }
+    }
+
+    private fun notifyVmapTtsDone(clientId: String) {
+        if (clientId.isBlank()) return
+        dispatchWebCustomEvent("vlue-vmap-tts-done", """{"id":${JSONObject.quote(clientId)}}""")
     }
 
     override fun onPause() {
@@ -1139,6 +1204,11 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         VlueFamilyBridge.detachWebView()
         if (::nativeAdManager.isInitialized) nativeAdManager.destroy()
         if (::bannerAdManager.isInitialized) bannerAdManager.destroy()
+        vmapTtsEpoch += 1
+        vmapTtsQueue.clear()
+        vmapTtsSpeaking = false
+        vmapActiveEngineId = null
+        vmapTtsHandler.removeCallbacksAndMessages(null)
         try {
             vmapTts?.stop()
             vmapTts?.shutdown()
@@ -1365,6 +1435,9 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
                 },
                 speakVmapNow:function(text){
                   try{if(window.Android&&window.Android.speakVmapNow)window.Android.speakVmapNow(String(text||''));}catch(e){}
+                },
+                speakVmapQueued:function(text,id){
+                  try{if(window.Android&&window.Android.speakVmapQueued)window.Android.speakVmapQueued(String(text||''),String(id||''));}catch(e){}
                 },
                 analyzeSms:function(requestId,sender,messageText){
                   try{return window.Android&&window.Android.analyzeSms?window.Android.analyzeSms(String(requestId||''),String(sender||''),String(messageText||'')):JSON.stringify({ok:false});}
@@ -2023,6 +2096,15 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         fun speakVmapNow(text: String?) {
             activity.speakVmapTts(text.orEmpty(), true)
         }
+
+        @android.webkit.JavascriptInterface
+        fun speakVmapQueued(text: String?, utteranceId: String?) {
+            activity.speakVmapTts(text.orEmpty(), false, utteranceId.orEmpty())
+        }
+
+        /** 네이티브 Location.speed(m/s)를 km/h로 환산한 값. 아직 없으면 -1. */
+        @android.webkit.JavascriptInterface
+        fun getVmapSpeedKmh(): Int = VmapNavOverlayService.lastSpeedKmh
 
         /** V-Map이 미니맵으로 내려가도 프로세스를 유지. Exit Room에서 중지. */
         @android.webkit.JavascriptInterface

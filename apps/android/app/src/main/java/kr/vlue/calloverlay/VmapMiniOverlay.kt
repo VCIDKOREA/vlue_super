@@ -124,7 +124,6 @@ object VmapMiniOverlay {
         val glyph = payload.optString("glyph").trim()
         val remain = payload.optString("remain").trim()
         val instruction = payload.optString("instruction").trim()
-        val heading = payload.optDouble("heading", Double.NaN)
         if (payload.has("remainM") && !payload.isNull("remainM")) {
             val meters = payload.optDouble("remainM", Double.NaN)
             if (!meters.isNaN()) lastRemainM = meters
@@ -142,13 +141,9 @@ object VmapMiniOverlay {
             destLng = dLng
         }
         titleView?.text = label
-        if (!heading.isNaN()) {
-            glyphView?.text = "↑"
-            glyphView?.rotation = heading.toFloat()
-        } else {
-            glyphView?.rotation = 0f
-            glyphView?.text = if (glyph.isNotEmpty()) glyph else "↑"
-        }
+        /* heading 으로 View.rotation 을 주면 카드 레이어까지 대각선으로 돌아간다. 화살표 글리프만 정자세로 둔다. */
+        resetOverlayTransform()
+        glyphView?.text = if (glyph.isNotEmpty()) glyph else "↑"
         val remainText = remain.ifBlank { "—" }
         remainView?.text = remainText
         val instructionText = instruction.ifBlank { "경로 안내" }
@@ -166,6 +161,26 @@ object VmapMiniOverlay {
             place.isNotEmpty() -> place
             else -> "탭하면 지도 열기"
         }
+    }
+
+    /** 회전 변환이 카드 통째로 붙지 않도록 오버레이 트리의 transform 을 항상 정자세로 되돌린다. */
+    private fun resetOverlayTransform() {
+        val root = container
+        root?.animate()?.cancel()
+        root?.rotation = 0f
+        root?.rotationX = 0f
+        root?.rotationY = 0f
+        root?.scaleX = 1f
+        root?.scaleY = 1f
+        glyphView?.animate()?.cancel()
+        glyphView?.rotation = 0f
+        glyphView?.rotationX = 0f
+        glyphView?.rotationY = 0f
+        val column = root?.getChildAt(0)
+        column?.animate()?.cancel()
+        column?.rotation = 0f
+        column?.rotationX = 0f
+        column?.rotationY = 0f
     }
 
     private fun ensureAttached(app: Context) {
@@ -189,61 +204,82 @@ object VmapMiniOverlay {
             app.resources.displayMetrics
         ).toInt()
 
+        fun dp(value: Float): Int = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            value,
+            app.resources.displayMetrics
+        ).toInt()
+
         val root = FrameLayout(app).apply {
             background = GradientDrawable().apply {
-                cornerRadius = TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP,
-                    22f,
-                    app.resources.displayMetrics
-                )
+                cornerRadius = dp(22f).toFloat()
                 setColor(Color.parseColor("#F20C1220"))
-                setStroke(
-                    TypedValue.applyDimension(
-                        TypedValue.COMPLEX_UNIT_DIP,
-                        2f,
-                        app.resources.displayMetrics
-                    ).toInt(),
-                    Color.parseColor("#00D2FF")
-                )
+                setStroke(dp(2f), Color.parseColor("#00D2FF"))
             }
-            elevation = 24f
+            elevation = 12f
+            clipChildren = true
+            clipToPadding = true
+            clipToOutline = true
+            rotation = 0f
         }
 
         val column = LinearLayout(app).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(24, 28, 24, 28)
+            clipChildren = true
+            clipToPadding = true
+            rotation = 0f
+            setPadding(dp(14f), dp(16f), dp(14f), dp(16f))
         }
         val badge = TextView(app).apply {
             text = "V-Map"
             setTextColor(Color.parseColor("#04121A"))
             textSize = 11f
-            setPadding(18, 8, 18, 8)
+            gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            setPadding(dp(10f), dp(4f), dp(10f), dp(4f))
             background = GradientDrawable().apply {
-                cornerRadius = 40f
+                cornerRadius = dp(20f).toFloat()
                 setColor(Color.parseColor("#00D2FF"))
             }
             typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val arrowSize = dp(52f)
+        val arrowBox = FrameLayout(app).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(16f).toFloat()
+                setColor(Color.parseColor("#00D2FF"))
+            }
+            clipChildren = true
+            clipToPadding = true
+            rotation = 0f
         }
         glyphView = TextView(app).apply {
             text = "↑"
             setTextColor(Color.parseColor("#04121A"))
-            textSize = 28f
+            textSize = 26f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(8, 10, 8, 10)
-            background = GradientDrawable().apply {
-                cornerRadius = 18f
-                setColor(Color.parseColor("#00D2FF"))
-            }
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            includeFontPadding = false
+            rotation = 0f
         }
+        arrowBox.addView(
+            glyphView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER
+            )
+        )
         remainView = TextView(app).apply {
             text = "—"
             setTextColor(Color.parseColor("#00D2FF"))
             textSize = 18f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 8, 0, 0)
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            setPadding(0, dp(8f), 0, 0)
         }
         instructionView = TextView(app).apply {
             text = "경로 안내"
@@ -251,8 +287,10 @@ object VmapMiniOverlay {
             textSize = 12f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
             maxLines = 2
-            setPadding(0, 4, 0, 4)
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(0, dp(2f), 0, dp(2f))
         }
         titleView = TextView(app).apply {
             text = "V-Map"
@@ -260,26 +298,37 @@ object VmapMiniOverlay {
             textSize = 13f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 6, 0, 2)
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(0, dp(4f), 0, dp(1f))
         }
         subView = TextView(app).apply {
             text = "탭하면 지도 열기"
             setTextColor(Color.parseColor("#B3FFFFFF"))
             textSize = 10f
             gravity = Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
-        column.addView(badge, LinearLayout.LayoutParams(
+        fun centeredWrap() = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = Gravity.CENTER_HORIZONTAL })
-        column.addView(glyphView, LinearLayout.LayoutParams(
+        ).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        fun centeredText() = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = 10 })
-        column.addView(remainView)
-        column.addView(instructionView)
-        column.addView(titleView)
-        column.addView(subView)
+        ).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        column.addView(badge, centeredWrap())
+        column.addView(arrowBox, LinearLayout.LayoutParams(arrowSize, arrowSize).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = dp(8f)
+        })
+        column.addView(remainView, centeredText())
+        column.addView(instructionView, centeredText())
+        column.addView(titleView, centeredText())
+        column.addView(subView, centeredText())
         root.addView(
             column,
             FrameLayout.LayoutParams(

@@ -22,7 +22,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
 import kotlin.math.asin
-import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -116,33 +115,30 @@ class VmapNavOverlayService : Service() {
         if (!lat.isFinite() || !lng.isFinite()) return
         val prevLat = VmapMiniOverlay.lastLat
         val prevLng = VmapMiniOverlay.lastLng
-        var remain = VmapMiniOverlay.lastRemainM
-        var heading = Double.NaN
-        if (prevLat != null && prevLng != null) {
-            val moved = haversine(prevLat, prevLng, lat, lng)
-            if (moved in 2.0..600.0) {
-                heading = bearing(prevLat, prevLng, lat, lng)
-                if (remain != null) remain = (remain - moved).coerceAtLeast(0.0)
-            }
-        }
-        if (remain == null) {
-            val dLat = VmapMiniOverlay.destLat
-            val dLng = VmapMiniOverlay.destLng
-            if (dLat != null && dLng != null) remain = haversine(lat, lng, dLat, dLng)
+        if (location.hasSpeed() && location.speed >= 0f) {
+            lastSpeedKmh = (location.speed * 3.6).roundToInt().coerceIn(0, 240)
         }
         val obj = try {
             JSONObject(VmapMiniOverlay.lastPayloadJson.ifBlank { "{}" })
         } catch (_: Exception) {
             JSONObject()
         }
+        val cueRemain = obj.has("remainM") && !obj.isNull("remainM")
+        var remain = if (cueRemain) VmapMiniOverlay.lastRemainM else null
+        if (cueRemain && prevLat != null && prevLng != null && remain != null) {
+            val moved = haversine(prevLat, prevLng, lat, lng)
+            if (moved in 0.5..600.0) {
+                remain = (remain - moved).coerceAtLeast(0.0)
+            }
+        }
         obj.put("lat", lat)
         obj.put("lng", lng)
-        obj.put("glyph", "↑")
-        if (remain != null) {
+        obj.remove("heading")
+        if (obj.optString("glyph").isBlank()) obj.put("glyph", "↑")
+        if (cueRemain && remain != null) {
             obj.put("remainM", remain)
             obj.put("remain", formatMeters(remain))
         }
-        if (!heading.isNaN()) obj.put("heading", heading)
         if (!obj.has("instruction") || obj.optString("instruction").isBlank()) {
             obj.put("instruction", "경로 안내")
         }
@@ -160,7 +156,7 @@ class VmapNavOverlayService : Service() {
         locationManager = lm
         try {
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 4f, locationListener, Looper.getMainLooper())
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1f, locationListener, Looper.getMainLooper())
             }
             if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 3000L, 8f, locationListener, Looper.getMainLooper())
@@ -263,6 +259,10 @@ class VmapNavOverlayService : Service() {
         @Volatile
         var running: Boolean = false
 
+        /** 네이티브 GPS 속도(km/h). 없으면 -1. 웹 속도계가 m/s 공백일 때 읽는다. */
+        @Volatile
+        var lastSpeedKmh: Int = -1
+
         fun start(context: Context) {
             sessionLive = true
             val intent = Intent(context, VmapNavOverlayService::class.java)
@@ -315,14 +315,6 @@ private fun haversine(lat1: Double, lng1: Double, lat2: Double, lng2: Double): D
     val a = sin(dLat / 2) * sin(dLat / 2) +
         cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2) * sin(dLng / 2)
     return 2 * r * asin(sqrt(a))
-}
-
-private fun bearing(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-    val dLng = Math.toRadians(lng2 - lng1)
-    val y = sin(dLng) * cos(Math.toRadians(lat2))
-    val x = cos(Math.toRadians(lat1)) * sin(Math.toRadians(lat2)) -
-        sin(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * cos(dLng)
-    return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
 }
 
 private fun formatMeters(meters: Double): String {

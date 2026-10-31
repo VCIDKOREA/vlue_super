@@ -9,6 +9,7 @@ export type KakaoLocalItem = {
   longitude: number | null;
   distance_m: number | null;
   rank: number;
+  image_url: string;
 };
 
 export type KakaoSearchCenter = {
@@ -72,6 +73,18 @@ function scoreKakaoDoc(doc: Record<string, string>, keyword: string): number {
   return score;
 }
 
+const PLACE_IMAGE_KEY =
+  /^(thumurl|thum_url|thumbnail|thumbnail_url|imageurl|image_url|photourl|photo_url|imgurl|img_url|placeimage|place_image|repimage|rep_image|mainimage|main_image)$/i;
+
+function pickDocImage(doc: Record<string, string>): string {
+  for (const [key, value] of Object.entries(doc || {})) {
+    if (!PLACE_IMAGE_KEY.test(key)) continue;
+    const url = String(value || "").trim();
+    if (/^https?:\/\//i.test(url)) return url;
+  }
+  return "";
+}
+
 function parseKakaoDoc(doc: Record<string, string>, keyword: string, rank: number): KakaoLocalItem {
   const road = String(doc.road_address_name || "").trim();
   const jibun = String(doc.address_name || "").trim();
@@ -89,7 +102,8 @@ function parseKakaoDoc(doc: Record<string, string>, keyword: string, rank: numbe
     latitude: y > 0 ? y : null,
     longitude: x > 0 ? x : null,
     distance_m: Number.isFinite(distanceRaw) && distanceRaw > 0 ? distanceRaw : null,
-    rank
+    rank,
+    image_url: pickDocImage(doc)
   };
 }
 

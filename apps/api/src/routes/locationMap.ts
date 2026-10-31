@@ -711,7 +711,8 @@ locationMapRoutes.get("/place-search", requireUserHeader, async (c) => {
         label: item.place_name,
         address: item.road_address || item.address,
         lat: item.latitude,
-        lng: item.longitude
+        lng: item.longitude,
+        imageUrl: item.image_url || ""
       }))
   });
 });

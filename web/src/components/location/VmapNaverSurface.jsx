@@ -22,19 +22,111 @@ function bearingDegrees(fromLat, fromLng, toLat, toLng) {
 function applyNaverChase(map, heading, tilt) {
   if (!map) return;
   const tiltDeg = Number.isFinite(tilt) ? tilt : CHASE_TILT;
+  const headingDeg = Number.isFinite(heading) ? heading : null;
+  try {
+    if (typeof map.setOptions === "function") {
+      map.setOptions({
+        tilt: tiltDeg,
+        ...(headingDeg != null ? { heading: headingDeg } : {})
+      });
+    }
+  } catch {
+    /* ignore */
+  }
   try {
     if (typeof map.setTilt === "function") map.setTilt(tiltDeg);
-    else if (typeof map.setOptions === "function") map.setOptions({ tilt: tiltDeg });
   } catch {
     /* ignore */
   }
-  if (!Number.isFinite(heading)) return;
+  if (headingDeg == null) return;
   try {
-    if (typeof map.setHeading === "function") map.setHeading(heading);
-    else if (typeof map.setOptions === "function") map.setOptions({ heading });
+    if (typeof map.setHeading === "function") map.setHeading(headingDeg);
   } catch {
     /* ignore */
   }
+}
+
+/** morph 는 틸트를 0으로 되돌리므로, 중심·줌·틸트·베어링을 한 번에 다시 박는다. */
+function forceNaverNavCamera(map, naver, cam = {}) {
+  if (!map || !naver) return false;
+  const tiltDeg = Number.isFinite(cam.tilt) ? cam.tilt : CHASE_TILT;
+  const nextZoom = Number.isFinite(cam.zoom) ? cam.zoom : CHASE_ZOOM;
+  const heading = Number.isFinite(cam.heading) ? cam.heading : null;
+  const lat = Number.isFinite(cam.lat) ? cam.lat : null;
+  const lng = Number.isFinite(cam.lng) ? cam.lng : null;
+  map.__vmapChase = { lat, lng, heading, tilt: tiltDeg, zoom: nextZoom };
+  map.__vmapApplyingChase = true;
+  window.setTimeout(() => {
+    map.__vmapApplyingChase = false;
+  }, 80);
+  if (!map.__vmapChaseBound && naver.Event?.addListener) {
+    map.__vmapChaseBound = true;
+    naver.Event.addListener(map, "idle", () => {
+      const locked = map.__vmapChase;
+      if (!locked) return;
+      const now = Date.now();
+      if (map.__vmapChaseIdleAt && now - map.__vmapChaseIdleAt < 350) return;
+      let tiltNow = locked.tilt;
+      let headingNow = locked.heading;
+      let zoomNow = locked.zoom;
+      try {
+        if (typeof map.getTilt === "function") tiltNow = map.getTilt();
+        if (typeof map.getHeading === "function") headingNow = map.getHeading();
+        if (typeof map.getZoom === "function") zoomNow = map.getZoom();
+      } catch {
+        /* ignore */
+      }
+      const tiltOff = Number.isFinite(tiltNow) && Math.abs(tiltNow - locked.tilt) > 1;
+      const zoomOff = Number.isFinite(zoomNow) && Number.isFinite(locked.zoom) && Math.abs(zoomNow - locked.zoom) > 0.8;
+      const headingOff =
+        locked.heading != null &&
+        Number.isFinite(headingNow) &&
+        Math.abs((((headingNow - locked.heading) % 360) + 540) % 360 - 180) > 2;
+      if (!tiltOff && !zoomOff && !headingOff) return;
+      map.__vmapChaseIdleAt = now;
+      applyNaverChase(map, locked.heading, locked.tilt);
+      if (zoomOff) {
+        try {
+          map.setZoom(locked.zoom, false);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }
+  if (lat != null && lng != null) {
+    const coord = new naver.LatLng(lat, lng);
+    try {
+      map.setOptions?.({
+        center: coord,
+        zoom: nextZoom,
+        tilt: tiltDeg,
+        ...(heading != null ? { heading } : {})
+      });
+    } catch {
+      /* ignore */
+    }
+    try {
+      map.setCenter?.(coord);
+    } catch {
+      try {
+        map.panTo?.(coord);
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      map.setZoom?.(nextZoom, false);
+    } catch {
+      /* ignore */
+    }
+  }
+  applyNaverChase(map, heading, tiltDeg);
+  return true;
+}
+
+function clearNaverChase(map) {
+  if (map) map.__vmapChase = null;
 }
 
 const MARKER_W = 168;
@@ -195,6 +287,8 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
   const onErrorRef = useRef(onError);
   const selfRef = useRef(self);
   const centeredSelfRef = useRef(false);
+  const pendingNavRef = useRef(null);
+  const programmaticRef = useRef(0);
   const [mapEpoch, setMapEpoch] = useState(0);
 
   guideFollowRef.current = guideFollow;
@@ -233,32 +327,39 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
       map.panTo(coord);
       if (Number.isFinite(zoom)) map.setZoom(zoom, true);
     },
-    setNavCamera({ lat, lng, heading, tilt, zoom } = {}) {
-      const map = mapRef.current;
-      const naver = mapsApiRef.current;
-      if (!map || !naver) return;
-      gestureAtRef.current = performance.now();
+    setNavCamera({ lat, lng, heading, tilt, zoom, force = false } = {}) {
       const tiltDeg = Number.isFinite(tilt) ? tilt : CHASE_TILT;
       const nextZoom = Number.isFinite(zoom) ? zoom : CHASE_ZOOM;
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        const coord = new naver.LatLng(lat, lng);
-        try {
-          if (typeof map.morph === "function") {
-            map.morph(coord, nextZoom, { duration: 420, easing: "easeOutCubic" });
-          } else {
-            map.panTo(coord);
-            map.setZoom(nextZoom, true);
-          }
-        } catch {
-          map.panTo(coord);
-        }
+      const cam = {
+        lat,
+        lng,
+        heading: Number.isFinite(heading) ? heading : null,
+        tilt: tiltDeg,
+        zoom: nextZoom
+      };
+      pendingNavRef.current = cam;
+      followTargetRef.current = cam;
+      programmaticRef.current += 1;
+      const burst = () => {
+        const live = mapRef.current;
+        const naver = mapsApiRef.current;
+        if (!live || !naver) return;
+        forceNaverNavCamera(live, naver, cam);
+      };
+      burst();
+      if (force) {
+        window.requestAnimationFrame(burst);
+        [60, 180, 420, 900].forEach((ms) => window.setTimeout(burst, ms));
       }
-      applyNaverChase(map, heading, tiltDeg);
-      window.setTimeout(() => applyNaverChase(mapRef.current, heading, tiltDeg), 280);
-      window.setTimeout(() => applyNaverChase(mapRef.current, heading, tiltDeg), 520);
+      window.setTimeout(() => {
+        programmaticRef.current = Math.max(0, programmaticRef.current - 1);
+      }, force ? 1100 : 120);
     },
     resetNavCamera() {
       const map = mapRef.current;
+      pendingNavRef.current = null;
+      followTargetRef.current = null;
+      clearNaverChase(map);
       if (!map) return;
       try {
         if (typeof map.setHeading === "function") map.setHeading(0);
@@ -341,6 +442,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
         mapRef.current = map;
 
         const markGesture = () => {
+          if (programmaticRef.current > 0 || mapRef.current?.__vmapApplyingChase) return;
           gestureAtRef.current = performance.now();
           onGestureRef.current?.();
         };
@@ -390,32 +492,44 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
           resizeObserver.observe(hostRef.current);
         }
 
-        /* 길안내 추적: 잦은 setCenter 대신 임계값 + morph (주기 완화) */
+        const pendingCam = pendingNavRef.current;
+        if (pendingCam) forceNaverNavCamera(map, naverMaps, pendingCam);
+
+        /* 길안내 추적. morph 는 틸트를 지우므로 setCenter 뒤에 체이스를 다시 박는다. */
         idleTimer = window.setInterval(() => {
           const target = followTargetRef.current;
           const liveMap = mapRef.current;
           const naver = mapsApiRef.current;
           if (!guideFollowRef.current || !target || !liveMap || !naver) return;
-          applyNaverChase(liveMap, target.heading, target.tilt);
-          if (performance.now() - gestureAtRef.current < 900) return;
+          if (performance.now() - gestureAtRef.current < 900) {
+            applyNaverChase(liveMap, target.heading, target.tilt);
+            return;
+          }
           const cur = liveMap.getCenter();
           const distM = haversineMeters(cur.lat(), cur.lng(), target.lat, target.lng);
-          if (distM < 8) return;
-          const coord = new naver.LatLng(target.lat, target.lng);
-          const nextZoom = Number.isFinite(target.zoom) ? target.zoom : CHASE_ZOOM;
-          try {
-            if (typeof liveMap.morph === "function") {
-              liveMap.morph(coord, nextZoom, { duration: 280, easing: "easeOutCubic" });
-            } else {
-              liveMap.panTo(coord);
-              if (Math.abs(liveMap.getZoom() - nextZoom) > 0.35) liveMap.setZoom(nextZoom, true);
+          if (distM >= 8 && Number.isFinite(target.lat) && Number.isFinite(target.lng)) {
+            programmaticRef.current += 1;
+            const coord = new naver.LatLng(target.lat, target.lng);
+            const nextZoom = Number.isFinite(target.zoom) ? target.zoom : CHASE_ZOOM;
+            try {
+              liveMap.setCenter(coord);
+            } catch {
+              try {
+                liveMap.panTo(coord);
+              } catch {
+                /* ignore */
+              }
             }
-          } catch {
-            liveMap.panTo(coord);
+            try {
+              if (Math.abs(liveMap.getZoom() - nextZoom) > 0.35) liveMap.setZoom(nextZoom, false);
+            } catch {
+              /* ignore */
+            }
+            window.setTimeout(() => {
+              programmaticRef.current = Math.max(0, programmaticRef.current - 1);
+            }, 80);
           }
-          applyNaverChase(liveMap, target.heading, target.tilt);
-          window.setTimeout(() => applyNaverChase(mapRef.current, target.heading, target.tilt), 300);
-          gestureAtRef.current = performance.now();
+          forceNaverNavCamera(liveMap, naver, target);
         }, 1000);
 
         setMapEpoch((n) => n + 1);
@@ -455,6 +569,7 @@ const VmapNaverSurface = forwardRef(function VmapNaverSurface(
 
   useEffect(() => {
     if (!flyTo?.lat || !mapRef.current || !mapsApiRef.current) return;
+    if (mapRef.current.__vmapChase) return;
     const map = mapRef.current;
     const naver = mapsApiRef.current;
     gestureAtRef.current = performance.now();

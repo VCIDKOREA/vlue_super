@@ -5,6 +5,47 @@ import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
+const CHASE_TILT = 55;
+const CHASE_ZOOM = 17;
+
+function forceGoogleNavCamera(map, cam = {}) {
+  if (!map) return false;
+  const tiltDeg = Number.isFinite(cam.tilt) ? cam.tilt : CHASE_TILT;
+  const nextZoom = Number.isFinite(cam.zoom) ? cam.zoom : CHASE_ZOOM;
+  const heading = Number.isFinite(cam.heading) ? cam.heading : null;
+  const lat = Number.isFinite(cam.lat) ? cam.lat : null;
+  const lng = Number.isFinite(cam.lng) ? cam.lng : null;
+  map.__vmapChase = { lat, lng, heading, tilt: tiltDeg, zoom: nextZoom };
+  const center = lat != null && lng != null ? { lat, lng } : null;
+  try {
+    if (typeof map.moveCamera === "function") {
+      map.moveCamera({
+        ...(center ? { center } : {}),
+        zoom: nextZoom,
+        tilt: tiltDeg,
+        ...(heading != null ? { heading } : {})
+      });
+    } else if (center && typeof map.panTo === "function") {
+      map.panTo(center);
+    }
+  } catch {
+    if (center) {
+      try {
+        map.panTo(center);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  try {
+    if (typeof map.setTilt === "function") map.setTilt(tiltDeg);
+    if (heading != null && typeof map.setHeading === "function") map.setHeading(heading);
+    if (typeof map.setZoom === "function") map.setZoom(nextZoom);
+  } catch {
+    /* ignore */
+  }
+  return true;
+}
 
 function toLatLngNum(value) {
   const n = typeof value === "number" ? value : Number(value);
@@ -78,6 +119,7 @@ const VmapGoogleSurface = forwardRef(function VmapGoogleSurface(
   const flyToRef = useRef(flyTo);
   const mapReadyRef = useRef(false);
   const guideFollowRef = useRef(guideFollow);
+  const pendingNavRef = useRef(null);
 
   onSelectRef.current = onSelectMember;
   onReadyRef.current = onReady;
@@ -106,36 +148,30 @@ const VmapGoogleSurface = forwardRef(function VmapGoogleSurface(
       map.panTo({ lat, lng });
       if (Number.isFinite(zoom)) map.setZoom(zoom);
     },
-    setNavCamera({ lat, lng, heading, tilt, zoom } = {}) {
-      const map = mapRef.current;
-      if (!map) return;
-      const tiltDeg = Number.isFinite(tilt) ? tilt : 55;
-      const nextZoom = Number.isFinite(zoom) ? zoom : 17;
-      const center = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
-      try {
-        if (typeof map.moveCamera === "function") {
-          map.moveCamera({
-            ...(center ? { center } : {}),
-            zoom: nextZoom,
-            tilt: tiltDeg,
-            ...(Number.isFinite(heading) ? { heading } : {})
-          });
-        } else if (center) {
-          map.panTo(center);
-        }
-      } catch {
-        if (center) map.panTo(center);
-      }
-      try {
-        if (typeof map.setTilt === "function") map.setTilt(tiltDeg);
-        if (Number.isFinite(heading) && typeof map.setHeading === "function") map.setHeading(heading);
-        if (typeof map.setZoom === "function") map.setZoom(nextZoom);
-      } catch {
-        /* ignore */
+    setNavCamera({ lat, lng, heading, tilt, zoom, force = false } = {}) {
+      const cam = {
+        lat,
+        lng,
+        heading: Number.isFinite(heading) ? heading : null,
+        tilt: Number.isFinite(tilt) ? tilt : CHASE_TILT,
+        zoom: Number.isFinite(zoom) ? zoom : CHASE_ZOOM
+      };
+      pendingNavRef.current = cam;
+      const burst = () => {
+        const live = mapRef.current;
+        if (!live) return;
+        forceGoogleNavCamera(live, cam);
+      };
+      burst();
+      if (force) {
+        window.requestAnimationFrame(burst);
+        [60, 180, 420, 900].forEach((ms) => window.setTimeout(burst, ms));
       }
     },
     resetNavCamera() {
       const map = mapRef.current;
+      pendingNavRef.current = null;
+      if (map) map.__vmapChase = null;
       if (!map) return;
       try {
         if (typeof map.setHeading === "function") map.setHeading(0);
@@ -238,8 +274,44 @@ const VmapGoogleSurface = forwardRef(function VmapGoogleSurface(
         });
         mapRef.current = map;
         mapReadyRef.current = true;
+        if (maps.event?.addListener && !map.__vmapChaseBound) {
+          map.__vmapChaseBound = true;
+          maps.event.addListener(map, "idle", () => {
+            const locked = map.__vmapChase;
+            if (!locked) return;
+            const now = Date.now();
+            if (map.__vmapChaseIdleAt && now - map.__vmapChaseIdleAt < 350) return;
+            let tiltNow = locked.tilt;
+            let headingNow = locked.heading;
+            let zoomNow = locked.zoom;
+            try {
+              if (typeof map.getTilt === "function") tiltNow = map.getTilt();
+              if (typeof map.getHeading === "function") headingNow = map.getHeading();
+              if (typeof map.getZoom === "function") zoomNow = map.getZoom();
+            } catch {
+              /* ignore */
+            }
+            const tiltOff = Number.isFinite(tiltNow) && Math.abs(tiltNow - locked.tilt) > 1;
+            const zoomOff = Number.isFinite(zoomNow) && Math.abs(zoomNow - locked.zoom) > 0.4;
+            const headingOff =
+              locked.heading != null &&
+              Number.isFinite(headingNow) &&
+              Math.abs((((headingNow - locked.heading) % 360) + 540) % 360 - 180) > 2;
+            if (!tiltOff && !zoomOff && !headingOff) return;
+            map.__vmapChaseIdleAt = now;
+            try {
+              if (typeof map.setTilt === "function") map.setTilt(locked.tilt);
+              if (locked.heading != null && typeof map.setHeading === "function") map.setHeading(locked.heading);
+              if (typeof map.setZoom === "function") map.setZoom(locked.zoom);
+            } catch {
+              /* ignore */
+            }
+          });
+        }
+        const pendingNav = pendingNavRef.current;
+        if (pendingNav) forceGoogleNavCamera(map, pendingNav);
         const pending = flyToRef.current;
-        if (pending?.lat != null && pending?.lng != null) applyFlyTo(pending);
+        if (pending?.lat != null && pending?.lng != null && !map.__vmapChase) applyFlyTo(pending);
         onReadyRef.current?.();
       } catch (error) {
         if (!cancelled) onErrorRef.current?.(error);
@@ -325,23 +397,14 @@ const VmapGoogleSurface = forwardRef(function VmapGoogleSurface(
       flyToRef.current = flyTo;
       return;
     }
+    if (mapRef.current.__vmapChase) return;
     applyFlyTo(flyTo);
   }, [active, flyTo?.lat, flyTo?.lng, flyTo?.at, flyTo?.zoom]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!active || !map || !navCamera) return;
-    if (!guideFollow) return;
-    if (Number.isFinite(navCamera.lat) && Number.isFinite(navCamera.lng)) {
-      map.panTo({ lat: navCamera.lat, lng: navCamera.lng });
-    }
-    if (Number.isFinite(navCamera.heading) && typeof map.setHeading === "function") {
-      map.setHeading(navCamera.heading);
-    }
-    if (Number.isFinite(navCamera.tilt) && typeof map.setTilt === "function") {
-      map.setTilt(navCamera.tilt);
-    }
-    if (Number.isFinite(navCamera.zoom)) map.setZoom(navCamera.zoom);
+    if (!active || !map || !navCamera || !guideFollow) return;
+    forceGoogleNavCamera(map, navCamera);
   }, [active, guideFollow, navCamera?.lat, navCamera?.lng, navCamera?.heading, navCamera?.tilt, navCamera?.zoom, navCamera?.at]);
 
   return <div ref={hostRef} className="absolute inset-0 h-full w-full" />;

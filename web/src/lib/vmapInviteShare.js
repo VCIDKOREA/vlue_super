@@ -107,44 +107,59 @@ function pickKakaoHostedImageUrl(res) {
   ).trim();
 }
 
+function asHttpsImage(url) {
+  const raw = String(url || "").trim();
+  if (/^https:\/\//i.test(raw)) return raw;
+  if (/^http:\/\//i.test(raw)) return `https://${raw.slice("http://".length)}`;
+  return "";
+}
+
 /**
- * Static Map URL → 카카오 CDN 업로드/스크랩. 실패 시 FALLBACK_THUMB.
+ * 원격 이미지를 카카오 CDN에 올린다. 실패하면 원본 HTTPS URL을 그대로 돌려준다.
  */
-async function resolveVmapShareImageUrl(Kakao, lat, lng) {
-  const candidate = buildVmapShareImageUrl(lat, lng);
-  if (!candidate || candidate === FALLBACK_THUMB) return FALLBACK_THUMB;
+async function hostKakaoImage(Kakao, candidate) {
+  const url = asHttpsImage(candidate);
+  if (!url) return "";
 
   if (typeof Kakao?.Share?.uploadImage === "function") {
     try {
-      const fetched = await fetch(candidate, { mode: "cors", credentials: "omit" });
+      const fetched = await fetch(url, { mode: "cors", credentials: "omit" });
       if (fetched.ok) {
         const blob = await fetched.blob();
         if (blob && blob.size > 32) {
-          const type = blob.type || "image/png";
+          const type = blob.type || "image/jpeg";
           const ext = /png/i.test(type) ? "png" : /webp/i.test(type) ? "webp" : "jpg";
-          const file = new File([blob], `vmap-map.${ext}`, { type });
+          const file = new File([blob], `vmap-share.${ext}`, { type });
           const uploaded = await Kakao.Share.uploadImage({ file: [file] });
           const hosted = pickKakaoHostedImageUrl(uploaded);
           if (hosted && /^https:\/\//i.test(hosted)) return hosted;
         }
       }
     } catch {
-      /* scrapImage 폴백 */
+      /* scrapImage */
     }
   }
 
   if (typeof Kakao?.Share?.scrapImage === "function") {
     try {
-      const scraped = await Kakao.Share.scrapImage({ imageUrl: candidate });
+      const scraped = await Kakao.Share.scrapImage({ imageUrl: url });
       const hosted = pickKakaoHostedImageUrl(scraped);
       if (hosted && /^https:\/\//i.test(hosted)) return hosted;
     } catch {
-      /* fallback */
+      /* 원본 URL */
     }
   }
 
-  /* 카카오 CDN 실패여도 좌표 지도 URL을 그대로 씀 — 로고는 좌표 없을 때만 */
-  return candidate;
+  return url;
+}
+
+/**
+ * Static Map URL → 카카오 CDN 업로드/스크랩. 실패 시 지도 URL, 좌표 없으면 로고.
+ */
+async function resolveVmapShareImageUrl(Kakao, lat, lng) {
+  const candidate = buildVmapShareImageUrl(lat, lng);
+  if (!candidate || candidate === FALLBACK_THUMB) return FALLBACK_THUMB;
+  return hostKakaoImage(Kakao, candidate);
 }
 
 /** 초대 토큰 발급 API 호출 */
@@ -316,7 +331,10 @@ export function isVmapKakaoInviteStale(prepared) {
  *   lat?: number|null,
  *   lng?: number|null,
  *   placeLat?: number|null,
- *   placeLng?: number|null
+ *   placeLng?: number|null,
+ *   imageUrl?: string,
+ *   thumUrl?: string,
+ *   placeImageUrl?: string
  * }} opts
  */
 export async function prepareVmapKakaoInviteShare(opts = {}) {
@@ -369,18 +387,21 @@ export async function prepareVmapKakaoInviteShare(opts = {}) {
       ? tokenData.placeLng
       : null;
   const linkUrl = buildVmapInviteUrl(tokenData.token);
-  let imageUrl = buildVmapShareImageUrl(placeLat, placeLng);
+  const placePhoto = asHttpsImage(opts.imageUrl || opts.thumUrl || opts.placeImageUrl);
+  let imageUrl = placePhoto || buildVmapShareImageUrl(placeLat, placeLng);
   try {
     const resolved = await withTimeout(
-      resolveVmapShareImageUrl(Kakao, placeLat, placeLng),
+      placePhoto ? hostKakaoImage(Kakao, placePhoto) : resolveVmapShareImageUrl(Kakao, placeLat, placeLng),
       10_000,
-      "지도 썸네일 생성"
+      placePhoto ? "장소 사진 썸네일" : "지도 썸네일 생성"
     );
     if (resolved && /^https:\/\//i.test(resolved)) imageUrl = resolved;
   } catch {
-    /* 좌표 지도 URL 유지 */
+    /* 장소 사진이 있으면 그 URL을 유지하고, 없을 때만 지도 URL */
   }
-  if (!imageUrl || !/^https:\/\//i.test(imageUrl)) {
+  if (placePhoto) {
+    imageUrl = /^https:\/\//i.test(imageUrl) ? imageUrl : placePhoto;
+  } else if (!imageUrl || !/^https:\/\//i.test(imageUrl)) {
     imageUrl = FALLBACK_THUMB;
   }
   const inviter = tokenData.inviterName || getInviteSenderName();

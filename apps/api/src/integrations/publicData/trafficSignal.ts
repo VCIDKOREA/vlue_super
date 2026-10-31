@@ -22,6 +22,8 @@ export type NearbySignal = {
   label: string;
   distanceM: number;
   speedKmh: number | null;
+  /** 게시 제한속도. 통행 속도(speedKmh)와 별도 필드가 있을 때만. */
+  speedLimitKmh: number | null;
   flow: string;
 };
 
@@ -105,6 +107,25 @@ function pickSpeedKmh(row: Record<string, unknown>) {
   return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
 }
 
+function pickSpeedLimitKmh(row: Record<string, unknown>) {
+  const n = num(
+    row.speedLimitKmh ??
+      row.speedLimit ??
+      row.limitSpeed ??
+      row.limtSpd ??
+      row.limitSpd ??
+      row.maxSpd ??
+      row.maxSpeed ??
+      row.spdLmt ??
+      row.spdLmtVal ??
+      row.rstrctSpd ??
+      row.roadLimitSpd ??
+      row.limtVehSpd
+  );
+  if (!Number.isFinite(n) || n <= 0 || n > 200) return null;
+  return Math.round(n);
+}
+
 function pickFlow(row: Record<string, unknown>, remainSec: number | null, phase: string) {
   const raw = String(row.flow ?? row.trficFlow ?? row.congestion ?? "").trim();
   if (raw) return raw.slice(0, 24);
@@ -181,6 +202,7 @@ export async function fetchNearbyTrafficSignals(
             label: pickLabel(row),
             distanceM,
             speedKmh: pickSpeedKmh(row),
+            speedLimitKmh: pickSpeedLimitKmh(row),
             flow: pickFlow(row, remainSec, phase)
           } satisfies NearbySignal;
         })
