@@ -1237,8 +1237,8 @@ locationMapRoutes.post("/vmap/:id/invite-token", requireUserHeader, async (c) =>
       }
     });
 
-    const placeLat = Number((room as { placeLat?: number | null }).placeLat);
-    const placeLng = Number((room as { placeLng?: number | null }).placeLng);
+    const placeLat = Number(room.placeLat);
+    const placeLng = Number(room.placeLng);
 
     return c.json({
       ok: true,
