@@ -94,11 +94,18 @@ import {
   prepareVmapKakaoInviteShare
 } from "../../lib/vmapInviteShare.js";
 import {
-  formatTurnSpeech,
   isVmapTtsMuted,
   setVmapTtsMuted,
-  speakVmapGuide
+  speakVmapGuide,
+  unlockVmapSpeech
 } from "../../lib/vmapNavSpeech.js";
+import {
+  joinMemberPhrase,
+  phraseForSafety,
+  phraseForSpecialRoad,
+  phraseForTurn,
+  turnBandKey
+} from "../../lib/vmapSpeechCues.js";
 
 const TILE = 256;
 const TRANSPORT_OPTIONS = [
@@ -503,6 +510,11 @@ export default function LocationPlatform() {
   const transportModeRef = useRef("car");
   const firstPersonNavRef = useRef(false);
   const lastSpokenCueRef = useRef("");
+  const inviteWaitDepartRef = useRef(false);
+  const spokenNavKeysRef = useRef(new Set());
+  const lastRemainRef = useRef(null);
+  const knownMemberIdsRef = useRef(new Set());
+  const lastSpeedKmhRef = useRef(null);
   /** GPS → setSelf / 역지오코딩 / presence 과다 호출 방지 */
   const lastSelfUiRef = useRef({ lat: null, lng: null, at: 0 });
   const lastGeocodeRef = useRef({ lat: null, lng: null, at: 0, label: "", meta: null });
@@ -538,7 +550,7 @@ export default function LocationPlatform() {
       const familyPaywall = Boolean(event?.detail?.familyPaywall);
       const focusUserId = String(event?.detail?.focusUserId || event?.detail?.wardUserId || "").trim();
       const lastKnownLocation = Boolean(event?.detail?.lastKnownLocation);
-      const departedFlag = Boolean(event?.detail?.departed);
+      const waitDepart = Boolean(event?.detail?.waitDepart) || Boolean(event?.detail?.inviteResume);
       const nextMode = mode === "vmap" || roomId ? "vmap" : "family";
       openLocation(nextMode);
       if (expandChat) {
@@ -548,6 +560,9 @@ export default function LocationPlatform() {
         void (async () => {
           try {
             await joinVmapRoom(roomId, { displayName: getPublicDisplayName() || "참여자" });
+            inviteWaitDepartRef.current = true;
+            setGuideOn(false);
+            setFirstPersonNav(false);
             patchLocationSession({
               mode: "vmap",
               roomId,
@@ -569,12 +584,17 @@ export default function LocationPlatform() {
             window.setTimeout(() => setNotice(""), 2400);
           }
         })();
-      } else if (inviteResume) {
-        /* 초대 확인 완료 또는 기존 입장 복귀 — accept 재호출 없음, 위치는 departed 후에만 */
+      } else if (inviteResume || waitDepart) {
+        /* 딥링크 입장 — 출발 대기. 서버 departed 여부와 무관하게 isDeparted=false */
+        inviteWaitDepartRef.current = true;
+        setGuideOn(false);
+        setFirstPersonNav(false);
+        setNavCamera(null);
+        mapSurfaceRef.current?.resetNavCamera?.();
         patchLocationSession({
           mode: "vmap",
           roomId,
-          departed: departedFlag,
+          departed: false,
           open: true,
           minimized: false
         });
@@ -584,10 +604,7 @@ export default function LocationPlatform() {
             setRoom(data.room || null);
             const list = Array.isArray(data.members) ? data.members : [];
             setMembers(list);
-            const mine = list.find((m) => m.userId === getLocalVlueUserId());
-            if (mine) {
-              patchLocationSession({ departed: Boolean(mine.departed) });
-            }
+            patchLocationSession({ departed: false });
           } catch (error) {
             setNotice(error?.message || "방 정보를 불러오지 못했습니다.");
             window.setTimeout(() => setNotice(""), 2400);
@@ -686,8 +703,12 @@ export default function LocationPlatform() {
       setMembers(list);
       const mine = list.find((m) => m.userId === getLocalVlueUserId());
       if (mine && sessionRef.current?.mode === "vmap" && sessionRef.current?.roomId === roomId) {
-        /* 서버 isDeparted 와 세션 동기화 — 출발 전 GPS 공유 차단 유지 */
-        patchLocationSession({ departed: Boolean(mine.departed) });
+        /* 딥링크 출발 대기 중에는 서버 플래그로 자동 주행 전환하지 않음 */
+        if (!inviteWaitDepartRef.current) {
+          patchLocationSession({ departed: Boolean(mine.departed) });
+        } else {
+          patchLocationSession({ departed: false });
+        }
       }
     } catch (error) {
       pushNotice(error.message);
@@ -739,6 +760,10 @@ export default function LocationPlatform() {
         haversineMeters(geoCache.lat, geoCache.lng, lat, lng) >= 80 ||
         nowTs - geoCache.at >= 45000;
 
+      const speedKmh =
+        Number.isFinite(coords?.speed) && coords.speed >= 0 ? Math.round(coords.speed * 3.6) : lastSpeedKmhRef.current;
+      if (Number.isFinite(speedKmh)) lastSpeedKmhRef.current = speedKmh;
+      const headingDeg = Number.isFinite(coords?.heading) ? coords.heading : null;
       const next = {
         lat,
         lng,
@@ -749,7 +774,9 @@ export default function LocationPlatform() {
         isOverseas: Boolean(geoCache.meta?.isOverseas),
         countryCode: geoCache.meta?.countryCode || "",
         countryName: geoCache.meta?.countryName || "",
-        cityName: geoCache.meta?.cityName || ""
+        cityName: geoCache.meta?.cityName || "",
+        speedKmh: Number.isFinite(speedKmh) ? speedKmh : null,
+        headingDeg
       };
 
       /* 미세 GPS 떨림마다 React 리렌더·네이버 마커 재생성 막기 */
@@ -1003,6 +1030,24 @@ export default function LocationPlatform() {
     return () => window.clearInterval(timer);
   }, [session.roomId, session.open, session.mode]);
 
+  useEffect(() => {
+    if (session.mode !== "vmap" || !session.roomId) {
+      knownMemberIdsRef.current = new Set();
+      return;
+    }
+    const mine = getLocalVlueUserId();
+    const ids = new Set(members.map((m) => String(m.userId || "")).filter(Boolean));
+    const prev = knownMemberIdsRef.current;
+    if (prev.size) {
+      members.forEach((m) => {
+        const id = String(m.userId || "");
+        if (!id || id === mine || prev.has(id)) return;
+        speakVmapGuide(joinMemberPhrase(m.displayName), { key: `join-${id}` });
+      });
+    }
+    knownMemberIdsRef.current = ids;
+  }, [members, session.mode, session.roomId]);
+
   const departedKey = members
     .filter((member) => member.departed && member.lat != null)
     .map((member) => `${member.userId}:${Number(member.lat).toFixed(3)}:${Number(member.lng).toFixed(3)}`)
@@ -1127,17 +1172,37 @@ export default function LocationPlatform() {
     session.mode
   ]);
 
-  /* TTS 턴바이턴 */
+  /* TTS 턴바이턴 · 특수구간 · 안전 · 목적지 */
   useEffect(() => {
-    if (!guideOn || ttsMuted) return;
+    if (!guideOn || ttsMuted || !session.departed) return;
     const cueNow = nextGuideCue(routes[getLocalVlueUserId()]?.steps);
-    if (!cueNow) return;
-    const key = `${cueNow.instruction}:${Math.round(Number(cueNow.distanceM) || 0)}`;
-    if (key === lastSpokenCueRef.current) return;
-    const speech = formatTurnSpeech(cueNow);
-    if (!speech) return;
-    if (speakVmapGuide(speech, { key })) lastSpokenCueRef.current = key;
-  }, [guideOn, ttsMuted, routes, self?.lat, self?.lng]);
+    const remain = remainDistanceM;
+    const spoken = spokenNavKeysRef.current;
+    const speakOnce = (key, text, extra = {}) => {
+      if (!text || spoken.has(key)) return;
+      if (speakVmapGuide(text, { key, ...extra })) spoken.add(key);
+    };
+
+    if (Number.isFinite(remain)) {
+      if (remain <= 35) speakOnce("arrive-final", "목적지에 도착했습니다. 오늘도 좋은 하루 보내십시오!", { interrupt: true });
+      else if (remain <= 100) speakOnce("arrive-100", "약 100미터 앞, 목적지 주변입니다.");
+      const prevRemain = lastRemainRef.current;
+      if (prevRemain != null && remain - prevRemain > 180 && prevRemain > 80) {
+        speakOnce(`reroute-${Math.round(remain / 50)}`, "경로를 재탐색합니다.", { interrupt: true });
+      }
+      lastRemainRef.current = remain;
+    }
+
+    if (cueNow) {
+      const dist = Math.round(Number(cueNow.distanceM) || 0);
+      const turn = phraseForTurn(cueNow.instruction, dist);
+      if (turn) speakOnce(`tbt-${cueNow.instruction}-${turnBandKey(dist)}`, turn);
+      const special = phraseForSpecialRoad(cueNow.instruction);
+      if (special && dist <= 80) speakOnce(`special-${cueNow.instruction}`, special);
+      const safety = phraseForSafety(cueNow.instruction, { placeLabel: room?.placeLabel });
+      if (safety && dist <= 120) speakOnce(`safety-${safety}`, safety);
+    }
+  }, [guideOn, ttsMuted, session.departed, routes, remainDistanceM, room?.placeLabel]);
 
   /* 전방 신호등 폴링 */
   useEffect(() => {
@@ -1384,16 +1449,21 @@ export default function LocationPlatform() {
       mine?.lat != null && liveRoom?.placeReady
         ? `약 ${estimateEtaMinutes(haversineMeters(mine.lat, mine.lng, liveRoom.placeLat, liveRoom.placeLng))}분`
         : "";
+    const cueNow = nextGuideCue(routes[getLocalVlueUserId()]?.steps);
     const ok = setNativeVmapMiniOverlay(true, {
       label: getPublicDisplayName() || "V-Map",
       eta,
       place: liveRoom?.placeLabel || "",
       lat: mine?.lat,
-      lng: mine?.lng
+      lng: mine?.lng,
+      glyph: maneuverGlyph(cueNow?.instruction),
+      instruction: cueNow?.instruction || "",
+      remain: formatGuideDistance(remainDistanceM != null ? remainDistanceM : cueNow?.distanceM),
+      departed: Boolean(session.departed)
     });
     setNativeMini(Boolean(ok));
     return undefined;
-  }, [session.minimized, session.open, session.mode, session.roomId, self]);
+  }, [session.minimized, session.open, session.mode, session.roomId, self, routes, remainDistanceM, session.departed]);
 
   useEffect(() => {
     if (!(session.minimized && !session.open && nativeMini)) return undefined;
@@ -1402,15 +1472,20 @@ export default function LocationPlatform() {
       mine?.lat != null && room?.placeReady
         ? `약 ${estimateEtaMinutes(haversineMeters(mine.lat, mine.lng, room.placeLat, room.placeLng))}분`
         : "";
+    const cueNow = nextGuideCue(routes[getLocalVlueUserId()]?.steps);
     updateNativeVmapMiniOverlay({
       label: getPublicDisplayName() || "V-Map",
       eta,
       place: room?.placeLabel || "",
       lat: mine?.lat,
-      lng: mine?.lng
+      lng: mine?.lng,
+      glyph: maneuverGlyph(cueNow?.instruction),
+      instruction: cueNow?.instruction || "",
+      remain: formatGuideDistance(remainDistanceM != null ? remainDistanceM : cueNow?.distanceM),
+      departed: Boolean(session.departed)
     });
     return undefined;
-  }, [session.minimized, session.open, nativeMini, members, self, room]);
+  }, [session.minimized, session.open, nativeMini, members, self, room, routes, remainDistanceM, session.departed]);
 
   useEffect(() => {
     if (session.open) {
@@ -1598,6 +1673,7 @@ export default function LocationPlatform() {
     setNavCamera(null);
     setNearbySignal(null);
     mapSurfaceRef.current?.resetNavCamera?.();
+    speakVmapGuide("목적지 안내를 종료합니다.", { key: "guide-stop", interrupt: true });
     pushNotice("이동 안내를 종료했습니다.");
   };
 
@@ -1728,6 +1804,7 @@ export default function LocationPlatform() {
     hideLocationAds();
     setSettingsOpen(false);
     setMembersOpen(false);
+    if (session.departed) speakVmapGuide("목적지 안내를 종료합니다.", { key: "guide-leave", interrupt: true });
     const roomId = session.roomId;
     const host = Boolean(roomRef.current?.hostUserId) && roomRef.current.hostUserId === getLocalVlueUserId();
     pushNotice(host ? "방삭제중..." : "방 나가는 중...");
@@ -1921,6 +1998,7 @@ export default function LocationPlatform() {
       setArriveState("done");
       setMembers((prev) => prev.map((member) => (member.userId === getLocalVlueUserId() ? { ...member, arrived: true } : member)));
       if (data?.closingAt) setRoom((prev) => (prev ? { ...prev, closingAt: data.closingAt, closingReason: "arrived" } : prev));
+      speakVmapGuide("목적지에 도착했습니다. 오늘도 좋은 하루 보내십시오!", { key: "arrive-done", interrupt: true });
       pushNotice("도착으로 표시했습니다.");
       refreshRoom(session.roomId);
     } catch (error) {
@@ -1944,6 +2022,10 @@ export default function LocationPlatform() {
       pushNotice("현재 위치를 받은 뒤에 출발할 수 있습니다.");
       return;
     }
+    unlockVmapSpeech();
+    inviteWaitDepartRef.current = false;
+    spokenNavKeysRef.current = new Set();
+    lastRemainRef.current = null;
     const startLat = self.lat;
     const startLng = self.lng;
     const destLat = room.placeLat;
@@ -1985,7 +2067,7 @@ export default function LocationPlatform() {
         setNavCamera(nextCam);
         mapSurfaceRef.current?.setNavCamera?.(nextCam);
 
-        speakVmapGuide("길안내를 시작하겠습니다", { key: "nav-start" });
+        speakVmapGuide("길안내를 시작하겠습니다.", { key: "nav-start", interrupt: true });
         pushNotice(
           immersive
             ? "주행 중 · 위치 공유가 시작되었습니다."
@@ -2015,8 +2097,12 @@ export default function LocationPlatform() {
 
   if (session.minimized && !session.open) {
     if (nativeMini) return null;
-    const miniW = 148;
-    const miniH = 168;
+    const miniW = 168;
+    const miniH = 210;
+    const miniCue = nextGuideCue(routes[getLocalVlueUserId()]?.steps);
+    const miniRemain = formatGuideDistance(
+      remainDistanceM != null ? remainDistanceM : miniCue?.distanceM
+    );
     const left = Number.isFinite(miniPos.x) ? miniPos.x : Math.max(12, (typeof window !== "undefined" ? window.innerWidth : 360) - miniW - 12);
     const top = Number.isFinite(miniPos.y) ? miniPos.y : 72;
     const onMiniDown = (event) => {
@@ -2091,6 +2177,15 @@ export default function LocationPlatform() {
           <span className="rounded-full bg-[#00D2FF] px-2 py-0.5 text-[10px] font-black tracking-tight text-[#04121a]">V-Map</span>
           <span className="text-[10px] font-semibold text-white/75">탭=확대</span>
         </div>
+        {miniCue ? (
+          <div className="pointer-events-none absolute inset-x-2 top-9 z-10 overflow-hidden rounded-[16px] border border-[#00D2FF]/70 bg-[#04121a]/88 text-center text-white">
+            <p className="bg-gradient-to-b from-[#00D2FF] to-[#38bdf8] py-1 text-[22px] font-black leading-none text-[#04121a]">
+              {maneuverGlyph(miniCue.instruction)}
+            </p>
+            <p className="px-1 pt-1 text-[13px] font-black text-[#00D2FF]">{miniRemain}</p>
+            <p className="truncate px-1 pb-1 text-[10px] font-bold">{miniCue.instruction}</p>
+          </div>
+        ) : null}
         <div className="pointer-events-none absolute inset-0">
           <VmapNaverSurface
             active
@@ -2464,10 +2559,15 @@ export default function LocationPlatform() {
                     : "가족 이동"
                   : TRANSPORT_OPTIONS.find((row) => row.id === transportMode)?.label || "자동차"}
               </p>
-              {nearbySignal ? (
+              {self?.speedKmh != null || nearbySignal ? (
                 <p className="mt-2 rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold text-[#00D2FF]">
-                  신호 {nearbySignal.phase || "—"}
-                  {nearbySignal.remainSec != null ? ` · ${nearbySignal.remainSec}초` : ""}
+                  {self?.speedKmh != null ? `${self.speedKmh}km/h` : ""}
+                  {self?.speedKmh != null && nearbySignal ? " · " : ""}
+                  {nearbySignal
+                    ? `신호 ${nearbySignal.phase || "—"}${
+                        nearbySignal.remainSec != null ? ` ${nearbySignal.remainSec}초` : ""
+                      }${nearbySignal.flow ? ` · ${nearbySignal.flow}` : ""}`
+                    : ""}
                 </p>
               ) : null}
               <div className="mt-2 flex gap-1">

@@ -21,6 +21,8 @@ export type NearbySignal = {
   phase: string;
   label: string;
   distanceM: number;
+  speedKmh: number | null;
+  flow: string;
 };
 
 function num(value: unknown, fallback = NaN) {
@@ -98,6 +100,20 @@ function pickId(row: Record<string, unknown>, index: number) {
   return String(row.intsnId ?? row.ctrlerId ?? row.id ?? row.ITSSC_ID ?? `sig-${index}`);
 }
 
+function pickSpeedKmh(row: Record<string, unknown>) {
+  const n = num(row.speedKmh ?? row.vehSpd ?? row.vhclSpd ?? row.trvlSpd ?? row.speed ?? row.SPD);
+  return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
+}
+
+function pickFlow(row: Record<string, unknown>, remainSec: number | null, phase: string) {
+  const raw = String(row.flow ?? row.trficFlow ?? row.congestion ?? "").trim();
+  if (raw) return raw.slice(0, 24);
+  if (phase === "red") return remainSec != null && remainSec <= 8 ? "대기짧음" : "정지";
+  if (phase === "yellow") return "주의";
+  if (phase === "green") return remainSec != null && remainSec <= 5 ? "곧변경" : "통과";
+  return "";
+}
+
 /**
  * Nearby realtime signal snapshot.
  * API catalog paths vary by dataset revision — try a few known list endpoints.
@@ -116,22 +132,26 @@ export async function fetchNearbyTrafficSignals(
     "/getRtiList",
     "/getTrafficSignalList",
     "/getIntsnSttusList",
-    ""
+    "/getItsscList",
+    "/getNtLgtSttus",
+    "/getIntsnInfo",
+    "/itssc/getItsscNtLgtSttus",
+    "/itssc/getIntsnSttus"
   ];
 
   let lastError = "신호 데이터를 불러오지 못했습니다.";
   for (const path of paths) {
     try {
       const query = new URLSearchParams({
-        serviceKey,
         pageNo: "1",
         numOfRows: "50",
         type: "json",
+        _type: "json",
         lat: String(lat),
         lng: String(lng),
         radius: String(Math.round(radiusM))
       });
-      const url = `${BASE}${path}?${query}`;
+      const url = `${BASE}${path}?serviceKey=${serviceKey}&${query.toString()}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) {
@@ -150,14 +170,18 @@ export async function fetchNearbyTrafficSignals(
           if (!Number.isFinite(sLat) || !Number.isFinite(sLng)) return null;
           const distanceM = Math.round(haversineMeters(lat, lng, sLat, sLng));
           if (distanceM > radiusM * 1.5) return null;
+          const remainSec = pickRemain(row);
+          const phase = pickPhase(row);
           return {
             id: pickId(row, index),
             lat: sLat,
             lng: sLng,
-            remainSec: pickRemain(row),
-            phase: pickPhase(row),
+            remainSec,
+            phase,
             label: pickLabel(row),
-            distanceM
+            distanceM,
+            speedKmh: pickSpeedKmh(row),
+            flow: pickFlow(row, remainSec, phase)
           } satisfies NearbySignal;
         })
         .filter(Boolean)

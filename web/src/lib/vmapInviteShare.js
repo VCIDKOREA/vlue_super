@@ -91,7 +91,8 @@ export function buildVmapShareImageUrl(lat, lng) {
     lat: la.toFixed(5),
     lng: ln.toFixed(5),
     w: String(FEED_IMAGE_W),
-    h: String(FEED_IMAGE_H)
+    h: String(FEED_IMAGE_H),
+    t: String(Date.now())
   });
   return `https://api.vlue.kr/api/location/static-map?${q.toString()}`;
 }
@@ -142,8 +143,8 @@ async function resolveVmapShareImageUrl(Kakao, lat, lng) {
     }
   }
 
-  /* 스크랩·업로드 모두 실패 → 브랜딩 로고 */
-  return FALLBACK_THUMB;
+  /* 카카오 CDN 실패여도 좌표 지도 URL을 그대로 씀 — 로고는 좌표 없을 때만 */
+  return candidate;
 }
 
 /** 초대 토큰 발급 API 호출 */
@@ -368,15 +369,16 @@ export async function prepareVmapKakaoInviteShare(opts = {}) {
       ? tokenData.placeLng
       : null;
   const linkUrl = buildVmapInviteUrl(tokenData.token);
-  let imageUrl = FALLBACK_THUMB;
+  let imageUrl = buildVmapShareImageUrl(placeLat, placeLng);
   try {
-    imageUrl = await withTimeout(
+    const resolved = await withTimeout(
       resolveVmapShareImageUrl(Kakao, placeLat, placeLng),
       10_000,
       "지도 썸네일 생성"
     );
+    if (resolved && /^https:\/\//i.test(resolved)) imageUrl = resolved;
   } catch {
-    imageUrl = FALLBACK_THUMB;
+    /* 좌표 지도 URL 유지 */
   }
   if (!imageUrl || !/^https:\/\//i.test(imageUrl)) {
     imageUrl = FALLBACK_THUMB;

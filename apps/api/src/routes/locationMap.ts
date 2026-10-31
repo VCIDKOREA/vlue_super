@@ -356,9 +356,57 @@ locationMapRoutes.get("/map-config", async (c) => {
   });
 });
 
+async function fetchStaticMapBytes(lat: number, lng: number, w: number, h: number) {
+  const naverId = String(process.env.NAVER_MAP_CLIENT_ID || "").trim();
+  const naverSecret = String(process.env.NAVER_MAP_CLIENT_SECRET || "").trim();
+  const googleKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
+  const candidates: Array<{ url: string; headers?: Record<string, string> }> = [];
+  if (naverId && naverSecret) {
+    candidates.push({
+      url: `https://naveropenapi.apigw.ntruss.com/map-static/v2/raster?w=${w}&h=${h}&center=${lng},${lat}&level=16&format=png&markers=type:d|size:mid|color:0x00D2FF|pos:${lng}%20${lat}`,
+      headers: {
+        "X-NCP-APIGW-API-KEY-ID": naverId,
+        "X-NCP-APIGW-API-KEY": naverSecret,
+        Accept: "image/png,image/*,*/*"
+      }
+    });
+  }
+  if (googleKey) {
+    candidates.push({
+      url: `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=${w}x${h}&scale=2&maptype=roadmap&markers=color:0x00D2FF%7C${lat},${lng}&key=${encodeURIComponent(googleKey)}`
+    });
+  }
+  candidates.push({
+    url: `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=${w}x${h}&markers=${lat},${lng},lightblue1`
+  });
+  candidates.push({
+    url: `https://static-maps.yandex.ru/1.x/?lang=ko_KR&ll=${lng},${lat}&z=15&size=${Math.min(650, w)},${Math.min(450, h)}&l=map&pt=${lng},${lat},pm2blm`
+  });
+
+  for (const item of candidates) {
+    try {
+      const res = await fetch(item.url, {
+        headers: { Accept: "image/png,image/jpeg,image/*,*/*", ...(item.headers || {}) },
+        signal: AbortSignal.timeout(8_000)
+      });
+      if (!res.ok) continue;
+      const buf = await res.arrayBuffer();
+      if (!buf || buf.byteLength < 256) continue;
+      const sniff = new Uint8Array(buf.slice(0, 8));
+      const isPng = sniff[0] === 0x89 && sniff[1] === 0x50 && sniff[2] === 0x4e && sniff[3] === 0x47;
+      const isJpg = sniff[0] === 0xff && sniff[1] === 0xd8;
+      if (!isPng && !isJpg) continue;
+      return { buf, contentType: isJpg ? "image/jpeg" : "image/png" };
+    } catch {
+      /* next provider */
+    }
+  }
+  return null;
+}
+
 /**
  * V-MAP 카카오 Feed 썸네일용 Static Map 프록시 (공개).
- * Google Static Maps 우선, 없으면 Yandex. 실패 시 브랜딩 로고로 리다이렉트.
+ * 카카오 스크래퍼는 200 + image/* 바이너리를 요구 — 302 로고 리다이렉트 금지.
  */
 locationMapRoutes.get("/static-map", async (c) => {
   const lat = num(c.req.query("lat"), Number.NaN);
@@ -368,37 +416,20 @@ locationMapRoutes.get("/static-map", async (c) => {
   }
   const w = Math.min(800, Math.max(200, Math.round(num(c.req.query("w"), 800))));
   const h = Math.min(400, Math.max(120, Math.round(num(c.req.query("h"), 400))));
-  const googleKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  const upstream = googleKey
-    ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=${w}x${h}&scale=2&maptype=roadmap&markers=color:0x00D2FF%7C${lat},${lng}&key=${encodeURIComponent(googleKey)}`
-    : `https://static-maps.yandex.ru/1.x/?lang=ko_KR&ll=${lng},${lat}&z=15&size=${Math.min(650, w)},${Math.min(450, h)}&l=map&pt=${lng},${lat},pm2blm`;
-  try {
-    const res = await fetch(upstream, {
-      headers: { Accept: "image/*,*/*" },
-      signal: AbortSignal.timeout(8_000)
-    });
-    if (!res.ok) {
-      return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
-    }
-    const buf = await res.arrayBuffer();
-    if (!buf || buf.byteLength < 64) {
-      return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
-    }
-    const contentType = res.headers.get("content-type") || "image/png";
-    if (!/^image\//i.test(contentType)) {
-      return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
-    }
-    return new Response(buf, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
-  } catch {
+  const image = await fetchStaticMapBytes(lat, lng, w, h);
+  if (!image) {
     return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
   }
+  return new Response(image.buf, {
+    status: 200,
+    headers: {
+      "Content-Type": image.contentType,
+      "Content-Disposition": 'inline; filename="vmap-static-map.png"',
+      "Cache-Control": "public, max-age=120, must-revalidate",
+      "Access-Control-Allow-Origin": "*",
+      "X-Content-Type-Options": "nosniff"
+    }
+  });
 });
 
 /** 지도 하단 스폰서. 없으면 앱이 AdMob으로 대체한다. */
@@ -1462,7 +1493,7 @@ locationMapRoutes.post("/vmap/invite/:token/accept", requireUserHeader, async (c
       lat: null,
       lng: null
     },
-    update: { displayName }
+    update: { displayName, departed: false, lat: null, lng: null }
   });
 
   /* 초대자에게 수락 알림 */
@@ -1503,9 +1534,9 @@ locationMapRoutes.post("/vmap/invite/:token/accept", requireUserHeader, async (c
     roomId,
     room,
     joined: true,
-    departed: Boolean(member.departed),
+    departed: false,
     isJoined: true,
-    isDeparted: Boolean(member.departed)
+    isDeparted: false
   });
 });
 

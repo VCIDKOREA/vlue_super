@@ -27,6 +27,9 @@ object VmapMiniOverlay {
     private var params: WindowManager.LayoutParams? = null
     private var titleView: TextView? = null
     private var subView: TextView? = null
+    private var glyphView: TextView? = null
+    private var remainView: TextView? = null
+    private var instructionView: TextView? = null
     private var touchSlop = 12
     private var downX = 0f
     private var downY = 0f
@@ -83,7 +86,17 @@ object VmapMiniOverlay {
         val label = payload.optString("label").ifBlank { "V-Map" }
         val eta = payload.optString("eta").trim()
         val place = payload.optString("place").trim()
+        val glyph = payload.optString("glyph").trim()
+        val remain = payload.optString("remain").trim()
+        val instruction = payload.optString("instruction").trim()
         titleView?.text = label
+        glyphView?.text = if (glyph.isNotEmpty()) glyph else "↑"
+        remainView?.text = remain.ifBlank { "—" }
+        instructionView?.text = instruction.ifBlank { "경로 안내" }
+        val visible = glyph.isNotEmpty() || remain.isNotEmpty() || instruction.isNotEmpty()
+        glyphView?.visibility = if (visible) View.VISIBLE else View.GONE
+        remainView?.visibility = if (visible) View.VISIBLE else View.GONE
+        instructionView?.visibility = if (visible) View.VISIBLE else View.GONE
         subView?.text = when {
             eta.isNotEmpty() && place.isNotEmpty() -> "$eta · $place"
             eta.isNotEmpty() -> eta
@@ -104,12 +117,12 @@ object VmapMiniOverlay {
 
         val width = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
-            148f,
+            176f,
             app.resources.displayMetrics
         ).toInt()
         val height = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
-            168f,
+            228f,
             app.resources.displayMetrics
         ).toInt()
 
@@ -149,24 +162,59 @@ object VmapMiniOverlay {
             }
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
+        glyphView = TextView(app).apply {
+            text = "↑"
+            setTextColor(Color.parseColor("#04121A"))
+            textSize = 28f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(8, 10, 8, 10)
+            background = GradientDrawable().apply {
+                cornerRadius = 18f
+                setColor(Color.parseColor("#00D2FF"))
+            }
+        }
+        remainView = TextView(app).apply {
+            text = "—"
+            setTextColor(Color.parseColor("#00D2FF"))
+            textSize = 18f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, 8, 0, 0)
+        }
+        instructionView = TextView(app).apply {
+            text = "경로 안내"
+            setTextColor(Color.WHITE)
+            textSize = 12f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            maxLines = 2
+            setPadding(0, 4, 0, 4)
+        }
         titleView = TextView(app).apply {
             text = "V-Map"
             setTextColor(Color.WHITE)
-            textSize = 15f
+            textSize = 13f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setPadding(0, 18, 0, 6)
+            setPadding(0, 6, 0, 2)
         }
         subView = TextView(app).apply {
             text = "탭하면 지도 열기"
             setTextColor(Color.parseColor("#B3FFFFFF"))
-            textSize = 11f
+            textSize = 10f
             gravity = Gravity.CENTER
         }
         column.addView(badge, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        column.addView(glyphView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = 10 })
+        column.addView(remainView)
+        column.addView(instructionView)
         column.addView(titleView)
         column.addView(subView)
         root.addView(
@@ -265,6 +313,9 @@ object VmapMiniOverlay {
         params = null
         titleView = null
         subView = null
+        glyphView = null
+        remainView = null
+        instructionView = null
         windowManager = null
     }
 }

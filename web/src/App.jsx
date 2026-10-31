@@ -507,7 +507,7 @@ function App() {
       }
     };
 
-    const openJoinedRoom = (roomId, departed = false) => {
+    const openJoinedRoom = (roomId) => {
       window.setTimeout(() => {
         window.dispatchEvent(
           new CustomEvent("vlue-open-location", {
@@ -516,7 +516,8 @@ function App() {
               roomId,
               join: false,
               inviteResume: true,
-              departed: Boolean(departed),
+              departed: false,
+              waitDepart: true,
               expandChat: true
             }
           })
@@ -571,7 +572,7 @@ function App() {
         } catch {
           /* ignore */
         }
-        openJoinedRoom(validation.roomId, validation.departed);
+        openJoinedRoom(validation.roomId);
         return;
       }
 
@@ -2696,7 +2697,8 @@ function App() {
                 roomId: accepted.roomId,
                 join: false,
                 inviteResume: true,
-                departed: Boolean(accepted.departed || accepted.isDeparted),
+                departed: false,
+                waitDepart: true,
                 expandChat: true
               }
             })
