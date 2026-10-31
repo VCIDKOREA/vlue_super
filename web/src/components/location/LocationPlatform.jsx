@@ -524,6 +524,8 @@ export default function LocationPlatform() {
   const [chatExpandToken, setChatExpandToken] = useState(0);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [composerFocused, setComposerFocused] = useState(false);
+  const [destSearchFocused, setDestSearchFocused] = useState(false);
+  const pinClickGuardUntilRef = useRef(0);
   const [searchOpen, setSearchOpen] = useState(true);
   const [playingVoiceId, setPlayingVoiceId] = useState("");
   const [miniPos, setMiniPos] = useState(() => readMiniPos() || { x: null, y: null });
@@ -1570,9 +1572,10 @@ export default function LocationPlatform() {
   }, []);
 
   useEffect(() => {
+    if (destSearchFocused) return undefined;
     const t = window.setTimeout(() => mapSurfaceRef.current?.resize?.(), 60);
     return () => window.clearTimeout(t);
-  }, [keyboardInset, composerFocused]);
+  }, [keyboardInset, composerFocused, destSearchFocused]);
 
   useEffect(() => {
     if (!session.open) return undefined;
@@ -2620,7 +2623,8 @@ export default function LocationPlatform() {
       : null;
   const nearArrive = metersToPlace != null && metersToPlace <= MANUAL_ARRIVE_METERS;
   const sheetLift = `calc(${AD_BANNER_PX + 12}px + env(safe-area-inset-bottom, 0px))`;
-  const hideSheetOptions = composerFocused || keyboardInset > 80;
+  const hideSheetOptions = composerFocused || destSearchFocused || keyboardInset > 80;
+  const liftForKeyboard = destSearchFocused ? 0 : keyboardInset;
   const selfPaid = localHasCyanBadge();
   const selfWithBadge = self
     ? {
@@ -2633,7 +2637,7 @@ export default function LocationPlatform() {
   return (
     <section
       className={`fixed inset-x-0 top-0 z-[530] flex flex-col overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
-      style={{ bottom: keyboardInset }}
+      style={{ bottom: liftForKeyboard }}
       onPointerDownCapture={bindMapTapFeedback}
     >
       <div className="relative min-h-0 flex-1">
@@ -2857,12 +2861,12 @@ export default function LocationPlatform() {
             <p className="text-[18px] font-black leading-snug text-white">{farewell}</p>
           </div>
         ) : null}
-        {session.mode === "vmap" && isHost && session.roomId && !hideSheetOptions ? (
+        {session.mode === "vmap" && isHost && session.roomId ? (
           searchOpen ? (
-            <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-10 space-y-2 rounded-[28px] p-3 ${glass}`}>
+            <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-30 space-y-2 rounded-[28px] p-3 ${glass}`}>
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[12px] font-semibold tracking-tight opacity-70">도착지 검색</p>
-                <button type="button" className={quietBtn} onClick={() => { setSearchOpen(false); setPlaceHits([]); }}>접기</button>
+                <button type="button" className={quietBtn} onClick={() => { setDestSearchFocused(false); setSearchOpen(false); setPlaceHits([]); }}>접기</button>
               </div>
               <form
                 className="flex gap-2"
@@ -2871,7 +2875,21 @@ export default function LocationPlatform() {
                   searchVmapPlaces(placeQuery).then((data) => setPlaceHits(data.places || [])).catch((error) => pushNotice(error.message));
                 }}
               >
-                <input value={placeQuery} onChange={(event) => setPlaceQuery(event.target.value)} placeholder="주소·장소 검색" className="min-w-0 flex-1 rounded-full border bg-white/90 px-3 py-2 text-[13px] text-slate-900" />
+                <input
+                  value={placeQuery}
+                  onChange={(event) => setPlaceQuery(event.target.value)}
+                  onFocus={() => {
+                    setDestSearchFocused(true);
+                    pinClickGuardUntilRef.current = Date.now() + 900;
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => setDestSearchFocused(false), 180);
+                  }}
+                  autoComplete="off"
+                  enterKeyHint="search"
+                  placeholder="주소·장소 검색"
+                  className="min-w-0 flex-1 rounded-full border bg-white/90 px-3 py-2 text-[13px] text-slate-900"
+                />
                 <button type="submit" className={accentBtn}>검색</button>
               </form>
               {placeHits.length ? (
@@ -2904,6 +2922,7 @@ export default function LocationPlatform() {
                   type="button"
                   className={accentBtn}
                   onClick={() => {
+                    if (Date.now() < pinClickGuardUntilRef.current) return;
                     if (!draftPin) return;
                     pinDirtyRef.current = false;
                     const imageUrl = pickPlacePhoto(draftPin) || placeImageUrl;
@@ -2932,7 +2951,10 @@ export default function LocationPlatform() {
             <button
               type="button"
               className={`absolute left-3 top-[calc(68px+env(safe-area-inset-top))] z-10 max-w-[70%] truncate rounded-full px-3 py-2 text-[12px] font-semibold ${glass}`}
-              onClick={() => setSearchOpen(true)}
+              onClick={() => {
+                pinClickGuardUntilRef.current = Date.now() + 900;
+                setSearchOpen(true);
+              }}
             >
               ✎ {room?.placeLabel || "도착지 수정"}
             </button>
