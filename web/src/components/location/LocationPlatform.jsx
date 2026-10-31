@@ -1930,6 +1930,72 @@ export default function LocationPlatform() {
     }
   };
 
+  /**
+   * [출발] — 위치 공유 세션 시작 + 1인칭 체이싱 카메라 + TTS.
+   * 훅이 아니라 일반 핸들러: early return 뒤에 useCallback 을 두면 React #310 이 난다.
+   */
+  const onDeparture = () => {
+    if (session.mode !== "vmap" || !session.roomId || session.departed) return;
+    if (!room?.placeReady) {
+      pushNotice("방장이 도착 핀을 꽂은 뒤에 출발할 수 있습니다.");
+      return;
+    }
+    if (self?.lat == null || self?.lng == null) {
+      pushNotice("현재 위치를 받은 뒤에 출발할 수 있습니다.");
+      return;
+    }
+    const startLat = self.lat;
+    const startLng = self.lng;
+    const destLat = room.placeLat;
+    const destLng = room.placeLng;
+    departVmap(session.roomId, {
+      lat: startLat,
+      lng: startLng,
+      online: true,
+      displayName: self.displayName
+    })
+      .then(() => {
+        userZoomedRef.current = false;
+        patchLocationSession({ departed: true });
+        viewRef.current = {
+          ...viewRef.current,
+          lat: startLat,
+          lng: startLng,
+          zoom: zoomForMeters(haversineMeters(startLat, startLng, destLat, destLng)),
+          placed: true
+        };
+        setNativeVmapSession(true);
+
+        const mode = transportModeRef.current || transportMode || "car";
+        const immersive = ["car", "motorcycle", "bike"].includes(mode);
+        setRoutes({});
+        setGuideOn(true);
+        setFirstPersonNav(true);
+        lastSpokenCueRef.current = "";
+
+        const heading = bearingDeg(startLat, startLng, destLat, destLng);
+        const nextCam = {
+          lat: startLat,
+          lng: startLng,
+          heading,
+          tilt: 55,
+          zoom: 17,
+          at: Date.now()
+        };
+        setNavCamera(nextCam);
+        mapSurfaceRef.current?.setNavCamera?.(nextCam);
+
+        speakVmapGuide("길안내를 시작하겠습니다", { key: "nav-start" });
+        pushNotice(
+          immersive
+            ? "주행 중 · 위치 공유가 시작되었습니다."
+            : "위치 공유가 시작되었습니다. 길안내를 진행합니다."
+        );
+        refreshRoom(session.roomId);
+      })
+      .catch((error) => pushNotice(error.message || "출발에 실패했습니다."));
+  };
+
   if (!visible) return null;
 
   if (session.open && locationBlocked) {
@@ -2125,85 +2191,6 @@ export default function LocationPlatform() {
       setVmapKakaoPrepared(prepared);
     });
   };
-
-  /**
-   * [출발] — 위치 공유 세션 시작 + 1인칭 체이싱 카메라 + TTS.
-   * 하단 버튼 onClick 에 반드시 바인딩한다.
-   */
-  const onDeparture = useCallback(() => {
-    if (session.mode !== "vmap" || !session.roomId || session.departed) return;
-    if (!room?.placeReady) {
-      pushNotice("방장이 도착 핀을 꽂은 뒤에 출발할 수 있습니다.");
-      return;
-    }
-    if (self?.lat == null || self?.lng == null) {
-      pushNotice("현재 위치를 받은 뒤에 출발할 수 있습니다.");
-      return;
-    }
-    const startLat = self.lat;
-    const startLng = self.lng;
-    const destLat = room.placeLat;
-    const destLng = room.placeLng;
-    departVmap(session.roomId, {
-      lat: startLat,
-      lng: startLng,
-      online: true,
-      displayName: self.displayName
-    })
-      .then(() => {
-        userZoomedRef.current = false;
-        patchLocationSession({ departed: true });
-        viewRef.current = {
-          ...viewRef.current,
-          lat: startLat,
-          lng: startLng,
-          zoom: zoomForMeters(haversineMeters(startLat, startLng, destLat, destLng)),
-          placed: true
-        };
-        setNativeVmapSession(true);
-
-        const mode = transportModeRef.current || transportMode || "car";
-        const immersive = ["car", "motorcycle", "bike"].includes(mode);
-        setRoutes({});
-        setGuideOn(true);
-        setFirstPersonNav(true);
-        lastSpokenCueRef.current = "";
-
-        const heading = bearingDeg(startLat, startLng, destLat, destLng);
-        const nextCam = {
-          lat: startLat,
-          lng: startLng,
-          heading,
-          tilt: 55,
-          zoom: 17,
-          at: Date.now()
-        };
-        setNavCamera(nextCam);
-        mapSurfaceRef.current?.setNavCamera?.(nextCam);
-
-        speakVmapGuide("길안내를 시작하겠습니다", { key: "nav-start" });
-        pushNotice(
-          immersive
-            ? "주행 중 · 위치 공유가 시작되었습니다."
-            : "위치 공유가 시작되었습니다. 길안내를 진행합니다."
-        );
-        refreshRoom(session.roomId);
-      })
-      .catch((error) => pushNotice(error.message || "출발에 실패했습니다."));
-  }, [
-    session.mode,
-    session.roomId,
-    session.departed,
-    room?.placeReady,
-    room?.placeLat,
-    room?.placeLng,
-    self?.lat,
-    self?.lng,
-    self?.displayName,
-    transportMode,
-    refreshRoom,
-    pushNotice
-  ]);
 
   /** 클릭 제스처 안 — await 금지. 미리 준비한 Feed로 카톡 친구 선택 창을 즉시 연다. */
   const openVmapKakaoInvite = () => {
