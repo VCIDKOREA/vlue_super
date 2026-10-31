@@ -106,8 +106,10 @@ function MemberBroadcastTab({ onToast }) {
   const [body, setBody] = useState("");
   const [category, setCategory] = useState("공지");
   const [busy, setBusy] = useState(false);
-  const [verCode, setVerCode] = useState("46");
-  const [verName, setVerName] = useState("1.0.4");
+  const [verCode, setVerCode] = useState("88");
+  const [verName, setVerName] = useState("1.0.36");
+  const [verMinCode, setVerMinCode] = useState("1");
+  const [verForced, setVerForced] = useState(false);
   const [verBusy, setVerBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -121,6 +123,8 @@ function MemberBroadcastTab({ onToast }) {
       const ver = await fetchAdminAndroidVersion();
       if (ver?.latestVersionCode) setVerCode(String(ver.latestVersionCode));
       if (ver?.latestVersionName) setVerName(String(ver.latestVersionName));
+      if (ver?.minRequiredVersionCode != null) setVerMinCode(String(ver.minRequiredVersionCode));
+      if (typeof ver?.isForced === "boolean") setVerForced(ver.isForced);
     } catch {
       /* ignore */
     }
@@ -195,20 +199,44 @@ function MemberBroadcastTab({ onToast }) {
               value={verCode}
               onChange={(e) => setVerCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
-              placeholder="46"
+              placeholder="88"
             />
           </label>
           <label className="block">
-            <span className="text-[11px] font-black text-slate-500">버전명</span>
+            <span className="text-[11px] font-black text-slate-500">버전명 (latest_version)</span>
             <input
               value={verName}
               onChange={(e) => setVerName(e.target.value)}
               maxLength={32}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
-              placeholder="1.0.4"
+              placeholder="1.0.36"
             />
           </label>
+          <label className="block">
+            <span className="text-[11px] font-black text-slate-500">최소 지원 versionCode</span>
+            <input
+              value={verMinCode}
+              onChange={(e) => setVerMinCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-[13px]"
+              placeholder="1"
+            />
+          </label>
+          <label className="flex items-end gap-2 pb-2">
+            <input
+              type="checkbox"
+              checked={verForced}
+              onChange={(e) => setVerForced(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            <span className="text-[12px] font-bold text-slate-700">
+              강제 업데이트 (is_forced)
+            </span>
+          </label>
         </div>
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          앱이 최소 지원 버전 미만이거나 강제 플래그가 켜져 있으면 닫기 없는 강제 팝업,
+          그 외 최신보다 낮으면 &quot;다음에 하기&quot; 선택 팝업을 띄웁니다.
+        </p>
         <button
           type="button"
           disabled={verBusy || !verCode}
@@ -216,11 +244,15 @@ function MemberBroadcastTab({ onToast }) {
             setVerBusy(true);
             void saveAdminAndroidVersion({
               latestVersionCode: Number(verCode),
-              latestVersionName: verName.trim() || String(verCode)
+              latestVersionName: verName.trim() || String(verCode),
+              minRequiredVersionCode: Number(verMinCode) || 1,
+              isForced: verForced
             })
               .then((res) => {
                 onToast?.(
-                  `앱 최신 버전 저장: ${res.latestVersionName} (${res.latestVersionCode})`
+                  `앱 버전 저장: ${res.latestVersionName} (${res.latestVersionCode})` +
+                    ` / min ${res.minRequiredVersionCode}` +
+                    (res.isForced ? " / 강제" : "")
                 );
               })
               .catch((e) => onToast?.(e?.message || "버전 저장 실패"))

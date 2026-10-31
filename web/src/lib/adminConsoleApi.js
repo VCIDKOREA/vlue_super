@@ -285,14 +285,26 @@ export async function fetchAdminAndroidVersion() {
   return parseJson(res);
 }
 
-export async function saveAdminAndroidVersion({ latestVersionCode, latestVersionName, message }) {
+export async function saveAdminAndroidVersion({
+  latestVersionCode,
+  latestVersionName,
+  minRequiredVersionCode,
+  isForced,
+  message,
+  forceMessage
+}) {
   const res = await fetch(apiUrl("/api/admin/console/android-version"), {
     method: "PATCH",
     headers: adminHeaders(),
     body: JSON.stringify({
       latestVersionCode: Number(latestVersionCode),
       ...(latestVersionName ? { latestVersionName } : {}),
-      ...(message ? { message } : {})
+      ...(minRequiredVersionCode != null && minRequiredVersionCode !== ""
+        ? { minRequiredVersionCode: Number(minRequiredVersionCode) }
+        : {}),
+      ...(typeof isForced === "boolean" ? { isForced } : {}),
+      ...(message ? { message } : {}),
+      ...(forceMessage ? { forceMessage } : {})
     })
   });
   return parseJson(res);

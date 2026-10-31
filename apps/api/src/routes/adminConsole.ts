@@ -475,13 +475,22 @@ authed.patch("/android-version", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     latestVersionCode?: number;
     latestVersionName?: string;
+    minRequiredVersionCode?: number;
+    min_required_version?: number;
+    isForced?: boolean;
+    is_forced?: boolean;
     message?: string;
+    forceMessage?: string;
   };
   try {
     const cfg = await saveAndroidVersionConfig({
       latestVersionCode: Number(body.latestVersionCode),
       latestVersionName: body.latestVersionName,
-      message: body.message
+      minRequiredVersionCode:
+        body.minRequiredVersionCode ?? body.min_required_version,
+      isForced: body.isForced ?? body.is_forced,
+      message: body.message,
+      forceMessage: body.forceMessage
     });
     return c.json({ ok: true, ...cfg });
   } catch (e) {
