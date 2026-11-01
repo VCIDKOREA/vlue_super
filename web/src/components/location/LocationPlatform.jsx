@@ -144,7 +144,7 @@ function remainingRouteMeters(route, lat, lng) {
   return Number.isFinite(listed) && listed > 0 ? Math.round(listed) : null;
 }
 const ACCENT = "#00D2FF";
-const AD_BANNER_PX = 60;
+const AD_BANNER_PX = 50;
 /** 수동 도착 완료는 이 거리 안에 들어와야 한다. */
 const MANUAL_ARRIVE_METERS = 180;
 const MINI_KEY = "vlue_vmap_mini_pos_v1";
@@ -2570,9 +2570,15 @@ export default function LocationPlatform() {
   };
 
   const focusMember = (member, options = {}) => {
-    /* 이름 탭 = 선택 + 카메라만. 경로/안내는 시작하지 않음 */
     setSelected(member || null);
     setDetailOpen(Boolean(options?.detail));
+    const keepNav = Boolean(
+      (session.mode === "vmap" && (session.departed || driveChase || guideOn)) ||
+        (session.mode === "family" && familyGuiding)
+    );
+    /* 안내 중 프로필 탭은 카드만. 경로·체이싱을 끊지 않는다. */
+    if (keepNav) return;
+    /* 이름 탭 = 선택 + 카메라만. 경로/안내는 시작하지 않음 */
     setGuideOn(false);
     setRoutes({});
     setFamilyNavTarget(null);
@@ -2759,7 +2765,7 @@ export default function LocationPlatform() {
       ? haversineMeters(self.lat, self.lng, room.placeLat, room.placeLng)
       : null;
   const nearArrive = metersToPlace != null && metersToPlace <= MANUAL_ARRIVE_METERS;
-  const sheetLift = `calc(${AD_BANNER_PX + 12}px + env(safe-area-inset-bottom, 0px))`;
+  const sheetLift = `${AD_BANNER_PX}px`;
   const hideSheetOptions = composerFocused || destSearchFocused || keyboardInset > 80;
   const liftForKeyboard = destSearchFocused ? 0 : keyboardInset;
   const guideHudVisible = navigatingNow && (cue || showSpeedometer);
@@ -3002,8 +3008,8 @@ export default function LocationPlatform() {
           ) : null}
           <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
-        {!keyboardInset ? (
-          <div className={`absolute bottom-3 right-3 z-20 flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
+        {!keyboardInset && hideChromeForNav ? (
+          <div className={`absolute bottom-3 right-3 z-40 flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
             <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
             <div className={dark ? "h-px bg-white/10" : "h-px bg-black/10"} />
             <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
@@ -3134,8 +3140,15 @@ export default function LocationPlatform() {
             bottomOffset={navigatingNow ? 72 : 4}
           />
         ) : null}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
-      <div className={`pointer-events-auto space-y-2 px-3 pb-1 pt-2 ${hideChromeForNav ? "hidden" : ""}`}>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-end">
+        {!keyboardInset && !hideChromeForNav ? (
+          <div className={`pointer-events-auto mb-1.5 mr-3 flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
+            <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
+            <div className={dark ? "h-px bg-white/10" : "h-px bg-black/10"} />
+            <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
+          </div>
+        ) : null}
+      <div className={`pointer-events-auto w-full space-y-2 px-3 pb-1 pt-2 ${hideChromeForNav ? "hidden" : ""}`}>
         {selected && session.mode === "family" && !detailOpen ? (
           <div className="space-y-2">
           <div className={`flex flex-wrap gap-1 rounded-[18px] p-1.5 ${glass}`}>
@@ -3258,15 +3271,21 @@ export default function LocationPlatform() {
                     nameClassName="text-[15px] font-semibold tracking-tight"
                   />
                   <p className={`mt-2 inline-flex rounded-full bg-[#00D2FF]/15 px-2.5 py-1 text-[12px] font-semibold ${dark ? "text-[#00D2FF]" : "text-[#0e7490]"}`}>
-                    {selected.arrived
-                      ? "도착 완료"
-                      : selected.dropout
-                        ? "미도착 이탈자"
-                        : selected.departed && selected.lat != null && room?.placeReady
-                          ? `도착 예상 ${routes[selected.userId]?.durationSec ? Math.max(1, Math.round(routes[selected.userId].durationSec / 60)) : estimateEtaMinutes(haversineMeters(selected.lat, selected.lng, room.placeLat, room.placeLng))}분`
-                          : selected.departed
-                            ? "도착지가 정해지면 예상 시간이 나옵니다"
-                            : "출발 전"}
+                    {(() => {
+                      const mine = selected.self || selected.userId === getLocalVlueUserId();
+                      const live = members.find((row) => row.userId === selected.userId) || selected;
+                      const departedNow = Boolean(live.departed || (mine && (session.departed || driveChase)));
+                      if (live.arrived || (mine && selfArrived)) return "도착 완료";
+                      if (live.dropout) return "미도착 이탈자";
+                      if (departedNow && live.lat != null && room?.placeReady) {
+                        const eta = routes[live.userId]?.durationSec
+                          ? Math.max(1, Math.round(routes[live.userId].durationSec / 60))
+                          : estimateEtaMinutes(haversineMeters(live.lat, live.lng, room.placeLat, room.placeLng));
+                        return `도착 예상 ${eta}분`;
+                      }
+                      if (departedNow) return "도착지가 정해지면 예상 시간이 나옵니다";
+                      return "출발 전";
+                    })()}
                   </p>
                   <p className="mt-2 text-[12px] font-semibold">
                     🔋 {(() => {
@@ -3542,8 +3561,8 @@ export default function LocationPlatform() {
       </div>
 
       <div
-        className={`relative z-40 shrink-0 px-3 pt-2 ${dark ? "bg-[#0b1018]" : "bg-[#f6f8fb]"}`}
-        style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
+        className={`relative z-40 shrink-0 ${dark ? "bg-[#0b1018]" : "bg-[#f6f8fb]"}`}
+        style={{ height: AD_BANNER_PX }}
       >
         {settingsOpen || membersOpen || keyboardInset > 80 ? (
           <div style={{ height: AD_BANNER_PX }} aria-hidden />
@@ -3645,9 +3664,13 @@ export default function LocationPlatform() {
                           ? "도착 완료"
                           : member.dropout
                             ? "미도착 이탈자"
-                            : member.departed && member.lat != null && room?.placeReady
+                            : (member.departed || ((member.self || member.userId === getLocalVlueUserId()) && session.departed)) &&
+                                member.lat != null &&
+                                room?.placeReady
                               ? `도착 약 ${estimateEtaMinutes(haversineMeters(member.lat, member.lng, room.placeLat, room.placeLng))}분`
-                              : "출발 전"
+                              : member.departed || ((member.self || member.userId === getLocalVlueUserId()) && session.departed)
+                                ? "주행 중"
+                                : "출발 전"
                         : isOverseasMember(member)
                           ? [member.cityName || member.city_name, member.countryName || member.country_name]
                               .filter(Boolean)

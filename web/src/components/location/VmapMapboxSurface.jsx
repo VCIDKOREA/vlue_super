@@ -114,7 +114,7 @@ function chaseCenter(map, cam = {}) {
   const heading = Number.isFinite(cam.heading) ? cam.heading : map.getBearing();
   const zoom = Number.isFinite(cam.zoom) ? cam.zoom : CHASE_ZOOM;
   const height = map.getContainer()?.clientHeight || window.innerHeight || 640;
-  const meters = Number.isFinite(cam.lookAheadM) ? cam.lookAheadM : chaseLookAheadMeters(lat, zoom, height, 0.275);
+  const meters = Number.isFinite(cam.lookAheadM) ? cam.lookAheadM : chaseLookAheadMeters(lat, zoom, height);
   if (!(meters > 0) || !Number.isFinite(heading)) return { lat, lng };
   return lookAheadLatLng(lat, lng, heading, meters);
 }
@@ -207,6 +207,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
   const selfRef = useRef(self);
+  const peopleRef = useRef([]);
   const [mapEpoch, setMapEpoch] = useState(0);
 
   guideFollowRef.current = guideFollow;
@@ -440,6 +441,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
     const mineId = getLocalVlueUserId();
     const selfPhoto = readProfilePhotoAvatar();
     const visiblePeople = buildVisiblePeople({ members, self, mode, departed, mineId, selfPhoto });
+    peopleRef.current = visiblePeople;
     const keep = new Set();
 
     visiblePeople.forEach((member) => {
@@ -470,7 +472,10 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
       if (!entry) {
         const el = document.createElement("div");
         el.innerHTML = html;
-        el.addEventListener("click", () => onSelectRef.current?.(member));
+        el.addEventListener("click", () => {
+          const latest = peopleRef.current.find((row) => String(row.userId || row.displayName) === id);
+          onSelectRef.current?.(latest || member);
+        });
         const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
           .setLngLat([member.lng, member.lat])
           .addTo(map);

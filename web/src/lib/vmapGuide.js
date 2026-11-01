@@ -207,12 +207,16 @@ export function lookAheadLatLng(lat, lng, headingDeg, meters) {
   };
 }
 
-/** 차량을 화면 하단 20~25%(기본 22.5%)에 두기 위해 전방으로 밀어 올리는 거리. */
-export function chaseLookAheadMeters(lat, zoom, viewportHeightPx, fraction = 0.275) {
+/** 주행 중 차량 마커를 화면 하단에서 이 비율 높이에 둔다 (0.25 = 25%). */
+export const CHASE_MARKER_FROM_BOTTOM = 0.25;
+const CHASE_LOOKAHEAD_FRACTION = 0.5 - CHASE_MARKER_FROM_BOTTOM;
+
+/** 차량을 화면 하단 25%에 두기 위해 전방으로 밀어 올리는 거리. */
+export function chaseLookAheadMeters(lat, zoom, viewportHeightPx, fraction = CHASE_LOOKAHEAD_FRACTION) {
   const height = Number.isFinite(viewportHeightPx) && viewportHeightPx > 200 ? viewportHeightPx : 640;
   const z = Number.isFinite(zoom) ? zoom : 16.8;
   const mpp = (156543.03392 * Math.cos(((Number(lat) || 0) * Math.PI) / 180)) / 2 ** z;
-  const frac = Number.isFinite(fraction) ? fraction : 0.275;
+  const frac = Number.isFinite(fraction) ? fraction : CHASE_LOOKAHEAD_FRACTION;
   return Math.max(28, Math.min(240, height * frac * mpp));
 }
 
