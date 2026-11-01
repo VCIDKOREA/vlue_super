@@ -48,7 +48,9 @@ function personHtml(name, status, photoUrl, live, verified = false) {
     <div style="width:48px;height:48px;border-radius:999px;padding:3px;background:${ring};box-shadow:0 0 0 2px #fff,0 8px 20px rgba(0,210,255,0.35);box-sizing:border-box">
       <div style="width:100%;height:100%;border-radius:999px;overflow:hidden;background:#fff">${face}</div>
     </div>
-    <div style="margin-top:3px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.92);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:2px">${namePart}${badge}${statusPart}</div>
+    <div style="margin-top:3px;padding:2px 8px;border-radius:999px;background:rgba(4,18,26,0.92);border:1px solid rgba(0,210,255,0.55);color:#fff;font-size:11px;font-weight:700;white-space:nowrap;max-width:180px;display:inline-flex;align-items:center;gap:3px">
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${namePart}</span>${badge}${statusPart}
+    </div>
   </div>`;
 }
 
@@ -84,6 +86,10 @@ function buildVisiblePeople({ members, self, mode, departed, mineId, selfPhoto }
       lng: selfLng,
       online: self.online !== false,
       grayscale: false,
+      cyanBadgeActive: Boolean(self.cyanBadgeActive || prev.cyanBadgeActive),
+      isPaidUser: Boolean(self.isPaidUser || prev.isPaidUser),
+      isVerified: Boolean(self.isVerified || prev.isVerified),
+      vlueVerifiedBadge: Boolean(self.vlueVerifiedBadge || prev.vlueVerifiedBadge),
       departed: mode === "vmap" ? Boolean(departed || prev.departed) : prev.departed
     });
   }
@@ -436,7 +442,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
         status,
         mine && selfPhoto ? selfPhoto : member.photoUrl,
         !dead,
-        userHasVerifiedBadge(member)
+        userHasVerifiedBadge(member) || (mine && userHasVerifiedBadge(self))
       );
       let entry = overlaysRef.current.people.get(id);
       if (!entry) {

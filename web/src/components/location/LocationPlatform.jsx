@@ -1977,7 +1977,26 @@ export default function LocationPlatform() {
     setRoom(null);
     setMessages([]);
     setMembers([]);
-    exitVmapRoom();
+    setSelected(null);
+    setGuideOn(false);
+    setRoutes({});
+    setDraftPin(null);
+    setPlaceHits([]);
+    setSearchOpen(true);
+    setDriveChase(false);
+    setFirstPersonNav(false);
+    setNavCamera(null);
+    setNearbySignal(null);
+    setSettingsOpen(false);
+    mapSurfaceRef.current?.resetNavCamera?.();
+    patchLocationSession({
+      mode: "vmap",
+      roomId: "",
+      departed: false,
+      open: true,
+      minimized: false,
+      flyTo: null
+    });
     try {
       if (roomId) await exitVmapApi(roomId);
     } catch (error) {
@@ -1989,7 +2008,7 @@ export default function LocationPlatform() {
       syncOwnerInboxFromServer().catch(() => {});
       leaveLock.current = false;
       setRoomBusy("");
-      pushNotice(host ? "방이 삭제되었습니다." : "방에서 나갔습니다.");
+      pushNotice(host ? "안내를 종료했습니다." : "방에서 나갔습니다.");
     }
   };
 
@@ -2697,7 +2716,7 @@ export default function LocationPlatform() {
           />
         ) : null}
         {navigatingNow && (cue || showSpeedometer) ? (
-          <div className="pointer-events-none absolute left-3 right-3 z-40 top-[calc(64px+env(safe-area-inset-top))] flex justify-start">
+          <div className="pointer-events-none absolute left-3 right-3 z-40 top-[calc(64px+env(safe-area-inset-top))] flex justify-end">
             <div className="pointer-events-auto flex w-full max-w-[80%] items-center gap-2 overflow-hidden rounded-2xl border border-[#00D2FF] bg-[#04121a] px-2.5 py-2 text-white shadow-[0_10px_24px_rgba(0,0,0,0.45)]">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#00D2FF] text-[22px] font-black leading-none text-[#04121a]">
                 {maneuverGlyph(cue?.instruction || "")}
