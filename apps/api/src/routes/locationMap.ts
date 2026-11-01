@@ -418,7 +418,7 @@ locationMapRoutes.get("/static-map", async (c) => {
   if (!image) {
     return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
   }
-  return new Response(image.buf, {
+  return new Response(new Uint8Array(image.buf), {
     status: 200,
     headers: {
       "Content-Type": image.contentType,

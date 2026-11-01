@@ -62,13 +62,13 @@ function measureText(text: string, fontSize: number) {
   return w;
 }
 
-function sniffImage(buf: ArrayBuffer | Buffer) {
-  const u8 = buf instanceof Buffer ? buf : Buffer.from(buf);
+function sniffImage(buf: ArrayBuffer | Uint8Array) {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   if (u8.length < 24) return null;
   const isPng = u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47;
   const isJpg = u8[0] === 0xff && u8[1] === 0xd8;
   if (!isPng && !isJpg) return null;
-  return { buf: u8, contentType: isJpg ? "image/jpeg" : "image/png" };
+  return { buf: Buffer.from(u8), contentType: isJpg ? "image/jpeg" : "image/png" };
 }
 
 async function fetchImageBytes(url: string, headers?: Record<string, string>, ms = 8000) {
