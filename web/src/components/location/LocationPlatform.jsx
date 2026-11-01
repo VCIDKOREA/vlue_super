@@ -1095,9 +1095,10 @@ export default function LocationPlatform() {
       const prepared = await prepareVmapKakaoInviteShare({
         roomId: session.roomId,
         placeLabel: room?.placeLabel || room?.title || "",
+        placeAddress: draftPin?.address || "",
         placeLat: room?.placeLat,
         placeLng: room?.placeLng,
-        imageUrl: placeImageUrl || draftPin?.imageUrl || readPlaceImage(session.roomId)
+        avatarUrl: readProfilePhotoAvatar()
       });
       if (cancelled || gen !== vmapKakaoPrepGen.current) return;
       setVmapKakaoPrepared(prepared);
@@ -1113,8 +1114,7 @@ export default function LocationPlatform() {
     room?.title,
     room?.placeLat,
     room?.placeLng,
-    placeImageUrl,
-    draftPin?.imageUrl
+    draftPin?.address
   ]);
 
   useEffect(() => {
@@ -1199,6 +1199,7 @@ export default function LocationPlatform() {
       lat: room.placeLat,
       lng: room.placeLng,
       label: room.placeLabel || "",
+      address: prev?.address || "",
       ready: Boolean(room.placeReady),
       imageUrl: prev?.imageUrl || stored || ""
     }));
@@ -2498,10 +2499,11 @@ export default function LocationPlatform() {
     void prepareVmapKakaoInviteShare({
       roomId: session.roomId,
       placeLabel: room?.placeLabel || room?.title || "",
+      placeAddress: draftPin?.address || "",
       etaMinutes: etaMin,
       placeLat: room?.placeLat,
       placeLng: room?.placeLng,
-      imageUrl: placeImageUrl || draftPin?.imageUrl || readPlaceImage(session.roomId)
+      avatarUrl: readProfilePhotoAvatar()
     }).then((prepared) => {
       if (gen !== vmapKakaoPrepGen.current) return;
       setVmapKakaoPrepared(prepared);
@@ -2979,7 +2981,14 @@ export default function LocationPlatform() {
                           const imageUrl = pickPlacePhoto(place);
                           setPlaceImageUrl(imageUrl);
                           if (session.roomId) writePlaceImage(session.roomId, imageUrl);
-                          setDraftPin({ lat: place.lat, lng: place.lng, label: place.label, ready: false, imageUrl });
+                          setDraftPin({
+                            lat: place.lat,
+                            lng: place.lng,
+                            label: place.label,
+                            address: place.address || "",
+                            ready: false,
+                            imageUrl
+                          });
                           viewRef.current = { ...viewRef.current, lat: place.lat, lng: place.lng, placed: true };
                           mapSurfaceRef.current?.panTo?.(place.lat, place.lng, 17);
                           setPlaceHits([]);

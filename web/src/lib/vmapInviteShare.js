@@ -7,8 +7,11 @@ import { vlueAuthFetch, vlueAuthHeaders } from "./vlueAuthHeaders.js";
 const FALLBACK_APP = "https://www.vlue.kr/app";
 /** 카카오 Feed 썸네일 — OSM 등은 스크래퍼 차단으로 카드에 안 뜸. 반드시 vlue.kr HTTPS */
 const FALLBACK_THUMB = "https://www.vlue.kr/vlue-eye-closed-icon.png";
+/** 카카오링크 와이드(2:1) 대형 카드 */
 const FEED_IMAGE_W = 800;
 const FEED_IMAGE_H = 400;
+const FEED_MAP_ZOOM = 16;
+const GENERIC_PLACE = /^(도착지|약속|목적지|약속 장소|여기|나 여기|여기서 만나요|위치|초대)$/i;
 const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000;
 export const VMAP_PENDING_INVITE_KEY = "vlue_pending_vmap_invite";
 
@@ -81,7 +84,23 @@ export function buildVmapJoinUrl(roomId) {
  * 카카오 Feed imageUrl — 목적지 Static Map (api.vlue.kr 프록시).
  * 좌표 없거나 생성 불가 시 브랜딩 로고 Fallback.
  */
-export function buildVmapShareImageUrl(lat, lng) {
+function publicHttpsImage(url) {
+  const raw = String(url || "").trim();
+  if (!/^https:\/\//i.test(raw) || raw.length > 480) return "";
+  return raw;
+}
+
+function resolveSharePlaceLabel(placeLabel, placeAddress) {
+  const name = String(placeLabel || "").trim();
+  const addr = String(placeAddress || "").trim();
+  if (name && !GENERIC_PLACE.test(name)) return name;
+  return addr || name || "약속 장소";
+}
+
+/**
+ * 카카오 Feed imageUrl — 목적지 Static Map + 장소명 말풍선·아바타 합성 (api.vlue.kr 프록시).
+ */
+export function buildVmapShareImageUrl(lat, lng, extra = {}) {
   const la = Number(lat);
   const ln = Number(lng);
   if (!Number.isFinite(la) || !Number.isFinite(ln)) return FALLBACK_THUMB;
@@ -92,8 +111,15 @@ export function buildVmapShareImageUrl(lat, lng) {
     lng: ln.toFixed(5),
     w: String(FEED_IMAGE_W),
     h: String(FEED_IMAGE_H),
+    z: String(FEED_MAP_ZOOM),
     t: String(Date.now())
   });
+  const label = resolveSharePlaceLabel(extra.placeLabel || extra.label, extra.placeAddress || extra.address);
+  if (label) q.set("label", label.slice(0, 80));
+  const addr = String(extra.placeAddress || extra.address || "").trim();
+  if (addr) q.set("addr", addr.slice(0, 120));
+  const avatar = publicHttpsImage(extra.avatarUrl || extra.avatar);
+  if (avatar) q.set("avatar", avatar);
   return `https://api.vlue.kr/api/location/static-map?${q.toString()}`;
 }
 
@@ -156,8 +182,8 @@ async function hostKakaoImage(Kakao, candidate) {
 /**
  * Static Map URL → 카카오 CDN 업로드/스크랩. 실패 시 지도 URL, 좌표 없으면 로고.
  */
-async function resolveVmapShareImageUrl(Kakao, lat, lng) {
-  const candidate = buildVmapShareImageUrl(lat, lng);
+async function resolveVmapShareImageUrl(Kakao, lat, lng, extra = {}) {
+  const candidate = buildVmapShareImageUrl(lat, lng, extra);
   if (!candidate || candidate === FALLBACK_THUMB) return FALLBACK_THUMB;
   return hostKakaoImage(Kakao, candidate);
 }
@@ -260,17 +286,15 @@ export function buildVmapInviteMessage(opts = {}) {
 }
 
 function buildFeedDescription(opts = {}) {
-  const parts = [];
-  const place = String(opts.placeLabel || "약속").trim() || "약속";
-  parts.push(`목적지: ${place}`);
+  const place = resolveSharePlaceLabel(opts.placeLabel, opts.placeAddress);
+  const addr = String(opts.placeAddress || "").trim();
+  const lines = [];
+  if (addr && addr !== place) lines.push(addr);
+  else if (place) lines.push(place);
   if (Number.isFinite(opts.etaMinutes) && opts.etaMinutes >= 0) {
-    parts.push(`예상 도착 약 ${Math.round(opts.etaMinutes)}분`);
+    lines.push(`예상 도착 약 ${Math.round(opts.etaMinutes)}분`);
   }
-  if (Number.isFinite(opts.placeLat) && Number.isFinite(opts.placeLng)) {
-    parts.push(`${Number(opts.placeLat).toFixed(5)}, ${Number(opts.placeLng).toFixed(5)}`);
-  }
-  parts.push("버튼을 눌러 VLUÉ에서 위치를 확인하세요.");
-  return parts.join(" · ").slice(0, 200);
+  return lines.join("\n").slice(0, 200);
 }
 
 function isLocalDevOrigin(origin) {
@@ -375,7 +399,11 @@ export async function prepareVmapKakaoInviteShare(opts = {}) {
     return { ok: false, error: "카카오 Share API를 사용할 수 없습니다." };
   }
 
-  const placeLabel = String(opts.placeLabel || tokenData.placeLabel || "약속").trim() || "약속";
+  const placeLabel = resolveSharePlaceLabel(
+    opts.placeLabel || tokenData.placeLabel,
+    opts.placeAddress || tokenData.placeAddress
+  );
+  const placeAddress = String(opts.placeAddress || tokenData.placeAddress || "").trim();
   const placeLat = Number.isFinite(opts.placeLat)
     ? opts.placeLat
     : Number.isFinite(tokenData.placeLat)
@@ -387,21 +415,24 @@ export async function prepareVmapKakaoInviteShare(opts = {}) {
       ? tokenData.placeLng
       : null;
   const linkUrl = buildVmapInviteUrl(tokenData.token);
-  const placePhoto = asHttpsImage(opts.imageUrl || opts.thumUrl || opts.placeImageUrl);
-  let imageUrl = placePhoto || buildVmapShareImageUrl(placeLat, placeLng);
+  const inviterPhoto = publicHttpsImage(opts.avatarUrl || tokenData.inviterPhotoUrl);
+  const shareImageOpts = {
+    placeLabel,
+    placeAddress,
+    avatarUrl: inviterPhoto
+  };
+  let imageUrl = buildVmapShareImageUrl(placeLat, placeLng, shareImageOpts);
   try {
     const resolved = await withTimeout(
-      placePhoto ? hostKakaoImage(Kakao, placePhoto) : resolveVmapShareImageUrl(Kakao, placeLat, placeLng),
+      resolveVmapShareImageUrl(Kakao, placeLat, placeLng, shareImageOpts),
       10_000,
-      placePhoto ? "장소 사진 썸네일" : "지도 썸네일 생성"
+      "지도 썸네일 생성"
     );
     if (resolved && /^https:\/\//i.test(resolved)) imageUrl = resolved;
   } catch {
-    /* 장소 사진이 있으면 그 URL을 유지하고, 없을 때만 지도 URL */
+    /* 합성 지도 URL 유지 */
   }
-  if (placePhoto) {
-    imageUrl = /^https:\/\//i.test(imageUrl) ? imageUrl : placePhoto;
-  } else if (!imageUrl || !/^https:\/\//i.test(imageUrl)) {
+  if (!imageUrl || !/^https:\/\//i.test(imageUrl)) {
     imageUrl = FALLBACK_THUMB;
   }
   const inviter = tokenData.inviterName || getInviteSenderName();
@@ -423,24 +454,34 @@ export async function prepareVmapKakaoInviteShare(opts = {}) {
     return { ok: false, error: "카카오 공유 썸네일(imageUrl)을 준비하지 못했습니다." };
   }
 
-  const payload = {
-    objectType: "feed",
-    content: {
-      title: "VLUÉ 위치/목적지 초대",
-      description: buildFeedDescription({
-        placeLabel,
-        etaMinutes: opts.etaMinutes,
-        placeLat,
-        placeLng
-      }),
-      imageUrl,
-      imageWidth: FEED_IMAGE_W,
-      imageHeight: FEED_IMAGE_H,
-      link
-    },
-    buttons: [{ title: "위치/초대 확인하기", link }],
-    installTalk: true
+  const description = buildFeedDescription({
+    placeLabel,
+    placeAddress,
+    etaMinutes: opts.etaMinutes
+  });
+  const content = {
+    title: placeLabel,
+    description: description || placeLabel,
+    imageUrl,
+    imageWidth: FEED_IMAGE_W,
+    imageHeight: FEED_IMAGE_H,
+    link
   };
+  const payload = placeAddress
+    ? {
+        objectType: "location",
+        address: placeAddress,
+        addressTitle: placeLabel,
+        content,
+        buttons: [{ title: "위치/초대 확인하기", link }],
+        installTalk: true
+      }
+    : {
+        objectType: "feed",
+        content,
+        buttons: [{ title: "위치/초대 확인하기", link }],
+        installTalk: true
+      };
 
   return {
     ok: true,
@@ -449,6 +490,7 @@ export async function prepareVmapKakaoInviteShare(opts = {}) {
     linkUrl,
     imageUrl,
     placeLabel,
+    placeAddress,
     inviterName: inviter,
     expiresAt: tokenData.expiresAt || null,
     roomId

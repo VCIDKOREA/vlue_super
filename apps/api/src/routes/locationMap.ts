@@ -18,6 +18,9 @@ import {
 } from "../services/familyProtection/familyRemoteSecurityService.js";
 import { resolveUserPolicy } from "../services/membership/userPolicyManager.js";
 import { mapPublicDisplayNames } from "../services/profileDisplayService.js";
+import { reverseGeocodeKakao } from "../integrations/kakao/kakaoReverseGeocode.js";
+import { composeVmapShareThumbnail, VMAP_SHARE_IMAGE_H, VMAP_SHARE_IMAGE_W, VMAP_SHARE_ZOOM } from "../services/location/vmapStaticSharePng.js";
+import { normalizeSocialPhotoUrl } from "../lib/socialPhotoUrl.js";
 
 const LAST_LOCATION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -356,52 +359,23 @@ locationMapRoutes.get("/map-config", async (c) => {
   });
 });
 
-async function fetchStaticMapBytes(lat: number, lng: number, w: number, h: number) {
-  const naverId = String(process.env.NAVER_MAP_CLIENT_ID || "").trim();
-  const naverSecret = String(process.env.NAVER_MAP_CLIENT_SECRET || "").trim();
-  const googleKey = String(process.env.GOOGLE_MAPS_API_KEY || "").trim();
-  const candidates: Array<{ url: string; headers?: Record<string, string> }> = [];
-  if (naverId && naverSecret) {
-    candidates.push({
-      url: `https://naveropenapi.apigw.ntruss.com/map-static/v2/raster?w=${w}&h=${h}&center=${lng},${lat}&level=16&format=png&markers=type:d|size:mid|color:0x00D2FF|pos:${lng}%20${lat}`,
-      headers: {
-        "X-NCP-APIGW-API-KEY-ID": naverId,
-        "X-NCP-APIGW-API-KEY": naverSecret,
-        Accept: "image/png,image/*,*/*"
+async function inviterPhotoUrl(userId: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        vlueProfilePhotoUrl: true,
+        kakaoLink: { select: { profileImageUrl: true } }
       }
     });
+    return (
+      normalizeSocialPhotoUrl(user?.vlueProfilePhotoUrl || "") ||
+      normalizeSocialPhotoUrl(user?.kakaoLink?.profileImageUrl || "") ||
+      ""
+    );
+  } catch {
+    return "";
   }
-  if (googleKey) {
-    candidates.push({
-      url: `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=${w}x${h}&scale=2&maptype=roadmap&markers=color:0x00D2FF%7C${lat},${lng}&key=${encodeURIComponent(googleKey)}`
-    });
-  }
-  candidates.push({
-    url: `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=${w}x${h}&markers=${lat},${lng},lightblue1`
-  });
-  candidates.push({
-    url: `https://static-maps.yandex.ru/1.x/?lang=ko_KR&ll=${lng},${lat}&z=15&size=${Math.min(650, w)},${Math.min(450, h)}&l=map&pt=${lng},${lat},pm2blm`
-  });
-
-  for (const item of candidates) {
-    try {
-      const res = await fetch(item.url, {
-        headers: { Accept: "image/png,image/jpeg,image/*,*/*", ...(item.headers || {}) },
-        signal: AbortSignal.timeout(8_000)
-      });
-      if (!res.ok) continue;
-      const buf = await res.arrayBuffer();
-      if (!buf || buf.byteLength < 256) continue;
-      const sniff = new Uint8Array(buf.slice(0, 8));
-      const isPng = sniff[0] === 0x89 && sniff[1] === 0x50 && sniff[2] === 0x4e && sniff[3] === 0x47;
-      const isJpg = sniff[0] === 0xff && sniff[1] === 0xd8;
-      if (!isPng && !isJpg) continue;
-      return { buf, contentType: isJpg ? "image/jpeg" : "image/png" };
-    } catch {
-      /* next provider */
-    }
-  }
-  return null;
 }
 
 /**
@@ -414,9 +388,33 @@ locationMapRoutes.get("/static-map", async (c) => {
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
     return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
   }
-  const w = Math.min(800, Math.max(200, Math.round(num(c.req.query("w"), 800))));
-  const h = Math.min(400, Math.max(120, Math.round(num(c.req.query("h"), 400))));
-  const image = await fetchStaticMapBytes(lat, lng, w, h);
+  const w = Math.min(VMAP_SHARE_IMAGE_W, Math.max(200, Math.round(num(c.req.query("w"), VMAP_SHARE_IMAGE_W))));
+  const h = Math.min(VMAP_SHARE_IMAGE_H, Math.max(120, Math.round(num(c.req.query("h"), VMAP_SHARE_IMAGE_H))));
+  const zoom = Math.min(17, Math.max(14, Math.round(num(c.req.query("z"), VMAP_SHARE_ZOOM))));
+  let label = clip(c.req.query("label"), 80);
+  const address = clip(c.req.query("addr") || c.req.query("address"), 120);
+  const avatarUrl = clip(c.req.query("avatar"), 500);
+  if (!label && !address) {
+    try {
+      const geo = await Promise.race([
+        reverseGeocodeKakao(lat, lng),
+        new Promise<string>((resolve) => setTimeout(() => resolve(""), 2200))
+      ]);
+      if (geo) label = clip(geo, 80);
+    } catch {
+      /* overlay without text */
+    }
+  }
+  const image = await composeVmapShareThumbnail({
+    lat,
+    lng,
+    w,
+    h,
+    zoom,
+    label,
+    address,
+    avatarUrl
+  });
   if (!image) {
     return c.redirect("https://www.vlue.kr/vlue-eye-closed-icon.png", 302);
   }
@@ -1330,6 +1328,15 @@ locationMapRoutes.post("/vmap/:id/invite-token", requireUserHeader, async (c) =>
 
     const placeLat = Number(room.placeLat);
     const placeLng = Number(room.placeLng);
+    const [photo, geo] = await Promise.all([
+      inviterPhotoUrl(userId),
+      Number.isFinite(placeLat) && Number.isFinite(placeLng)
+        ? Promise.race([
+            reverseGeocodeKakao(placeLat, placeLng),
+            new Promise<string>((resolve) => setTimeout(() => resolve(""), 2200))
+          ]).catch(() => "")
+        : Promise.resolve("")
+    ]);
 
     return c.json({
       ok: true,
@@ -1337,7 +1344,9 @@ locationMapRoutes.post("/vmap/:id/invite-token", requireUserHeader, async (c) =>
       expiresAt: expiresAt.toISOString(),
       roomId,
       inviterName: hostName,
+      inviterPhotoUrl: photo || "",
       placeLabel: room.placeLabel || room.title || "약속",
+      placeAddress: String(geo || "").trim(),
       placeLat: Number.isFinite(placeLat) ? placeLat : null,
       placeLng: Number.isFinite(placeLng) ? placeLng : null
     });
