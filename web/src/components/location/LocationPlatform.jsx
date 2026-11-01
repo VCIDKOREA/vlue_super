@@ -2558,12 +2558,23 @@ export default function LocationPlatform() {
   };
 
   const showAllParty = () => {
+    const pool = session.mode === "family" ? folderPeople : members;
+    const ids = new Set();
+    const mine = String(getLocalVlueUserId() || "").trim();
+    if (mine) ids.add(mine);
+    (pool || []).forEach((row) => {
+      const id = String(row?.userId || "").trim();
+      if (id) ids.add(id);
+    });
+    if (session.mode === "vmap" && ids.size <= 1) {
+      pushNotice("함께하는 일행이 없습니다. 초대한 뒤에 일행을 볼 수 있습니다.");
+    }
     setFirstPersonNav(false);
     setNavCamera(null);
     mapSurfaceRef.current?.resetNavCamera?.();
     const pts = [];
     if (self?.lat != null && self?.lng != null) pts.push({ lat: self.lat, lng: self.lng });
-    (session.mode === "family" ? folderPeople : members).forEach((m) => {
+    (pool || []).forEach((m) => {
       if (m?.lat != null && m?.lng != null) pts.push({ lat: Number(m.lat), lng: Number(m.lng) });
     });
     if (room?.placeReady) pts.push({ lat: room.placeLat, lng: room.placeLng });
@@ -2571,6 +2582,31 @@ export default function LocationPlatform() {
     if (pts.length) mapSurfaceRef.current?.fitBounds?.(pts);
     else if (self?.lat != null) mapSurfaceRef.current?.panTo?.(self.lat, self.lng, 14);
   };
+
+  const applyRoutePreference = (mode, label) => {
+    if (routeMode === mode) {
+      pushNotice(`이미 ${label} 경로입니다.`);
+      return;
+    }
+    setRouteMode(mode);
+    routeModeRef.current = mode;
+    setRoutes({});
+    if (session.departed || driveChase || familyGuiding) {
+      userZoomedRef.current = false;
+      setGuideOn(true);
+      setFirstPersonNav(true);
+      lastSpokenCueRef.current = "";
+      pushNotice(`${label} 경로로 다시 안내합니다.`);
+    } else {
+      pushNotice(`${label} 경로로 설정했습니다.`);
+    }
+  };
+
+  const ROUTE_PREF_OPTIONS = [
+    ["recommend", "추천"],
+    ["free", "무료"],
+    ["highway", "고속"]
+  ];
 
   const returnToVmapDrive = () => {
     if (self?.lat == null || self?.lng == null) return;
@@ -2644,6 +2680,7 @@ export default function LocationPlatform() {
   const sheetLift = `calc(${AD_BANNER_PX + 12}px + env(safe-area-inset-bottom, 0px))`;
   const hideSheetOptions = composerFocused || destSearchFocused || keyboardInset > 80;
   const liftForKeyboard = destSearchFocused ? 0 : keyboardInset;
+  const guideHudVisible = navigatingNow && (cue || showSpeedometer);
   const selfPaid = localHasCyanBadge();
   const selfWithBadge = self
     ? {
@@ -2715,14 +2752,14 @@ export default function LocationPlatform() {
             onExpandedChange={setFamilyBarOpen}
           />
         ) : null}
-        {navigatingNow && (cue || showSpeedometer) ? (
-          <div className="pointer-events-none absolute left-3 right-3 z-40 top-[calc(64px+env(safe-area-inset-top))] flex justify-end">
-            <div className="pointer-events-auto flex w-full max-w-[80%] items-center gap-2 overflow-hidden rounded-2xl border border-[#00D2FF] bg-[#04121a] px-2.5 py-2 text-white shadow-[0_10px_24px_rgba(0,0,0,0.45)]">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#00D2FF] text-[22px] font-black leading-none text-[#04121a]">
+        {guideHudVisible ? (
+          <div className="pointer-events-none absolute right-3 z-40 top-[calc(64px+env(safe-area-inset-top))] w-[min(13.25rem,42%)]">
+            <div className="pointer-events-auto flex w-full items-center gap-1.5 overflow-hidden rounded-2xl border border-[#00D2FF] bg-[#04121a] px-2 py-1.5 text-white shadow-[0_10px_24px_rgba(0,0,0,0.45)]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#00D2FF] text-[20px] font-black leading-none text-[#04121a]">
                 {maneuverGlyph(cue?.instruction || "")}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[20px] font-black leading-none text-[#00D2FF]">
+                <p className="truncate text-[17px] font-black leading-none text-[#00D2FF]">
                   {cue ? formatGuideDistance(cue.remainM) : "경로 안내"}
                 </p>
                 <p className="mt-1 truncate text-[12px] font-bold leading-tight text-white">
@@ -2730,8 +2767,8 @@ export default function LocationPlatform() {
                 </p>
               </div>
               {showSpeedometer ? (
-                <div className={`w-14 shrink-0 text-right ${speedOverLimit ? "text-red-400" : "text-white"}`}>
-                  <p className="text-[20px] font-black leading-none">{hudSpeedKmh == null ? 0 : hudSpeedKmh}</p>
+                <div className={`w-11 shrink-0 text-right ${speedOverLimit ? "text-red-400" : "text-white"}`}>
+                  <p className="text-[16px] font-black leading-none">{hudSpeedKmh == null ? 0 : hudSpeedKmh}</p>
                   <p className="mt-0.5 text-[9px] font-black tracking-wide text-[#00D2FF]">km/h</p>
                 </div>
               ) : null}
@@ -2826,6 +2863,22 @@ export default function LocationPlatform() {
                 카카오톡으로 초대하기
               </button>
             ) : null}
+            {transportMode === "car" || transportMode === "motorcycle" ? (
+              <div className="flex w-full max-w-[168px] gap-1">
+                {ROUTE_PREF_OPTIONS.map(([mode, label]) => (
+                  <button
+                    key={`nav-${mode}`}
+                    type="button"
+                    className={`min-w-0 flex-1 rounded-full px-1.5 py-1 text-[10px] font-black shadow ${
+                      routeMode === mode ? "bg-[#00D2FF] text-[#04121a]" : "border border-white/20 bg-[#04121a]/90 text-white"
+                    }`}
+                    onClick={() => applyRoutePreference(mode, label)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
         </div>
@@ -2882,7 +2935,10 @@ export default function LocationPlatform() {
         ) : null}
         {session.mode === "vmap" && isHost && session.roomId ? (
           searchOpen ? (
-            <div className={`absolute inset-x-3 top-[calc(68px+env(safe-area-inset-top))] z-30 space-y-2 rounded-[28px] p-3 ${glass}`}>
+            <div
+              className={`absolute left-3 top-[calc(68px+env(safe-area-inset-top))] z-50 space-y-2 rounded-[28px] p-3 ${glass}`}
+              style={guideHudVisible ? { right: "14.75rem", maxWidth: "calc(100% - 15.5rem)" } : { right: 12 }}
+            >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[12px] font-semibold tracking-tight opacity-70">도착지 검색</p>
                 <button type="button" className={quietBtn} onClick={() => { setDestSearchFocused(false); setSearchOpen(false); setPlaceHits([]); }}>접기</button>
@@ -2969,7 +3025,7 @@ export default function LocationPlatform() {
           ) : (
             <button
               type="button"
-              className={`absolute left-3 top-[calc(68px+env(safe-area-inset-top))] z-10 max-w-[70%] truncate rounded-full px-3 py-2 text-[12px] font-semibold ${glass}`}
+              className={`absolute left-3 top-[calc(68px+env(safe-area-inset-top))] z-50 truncate rounded-full px-3 py-2 text-[12px] font-semibold ${glass} ${guideHudVisible ? "max-w-[min(48%,12rem)]" : "max-w-[70%]"}`}
               onClick={() => {
                 pinClickGuardUntilRef.current = Date.now() + 900;
                 setSearchOpen(true);
@@ -3232,19 +3288,12 @@ export default function LocationPlatform() {
                 </div>
                 {transportMode === "car" || transportMode === "motorcycle" ? (
                   <div className="mt-2 grid grid-cols-3 gap-1.5">
-                    {[
-                      ["recommend", "추천"],
-                      ["free", "무료"],
-                      ["highway", "고속"]
-                    ].map(([mode, label]) => (
+                    {ROUTE_PREF_OPTIONS.map(([mode, label]) => (
                       <button
                         key={mode}
                         type="button"
                         className={routeMode === mode ? accentBtn : quietBtn}
-                        onClick={() => {
-                          setRouteMode(mode);
-                          routeModeRef.current = mode;
-                        }}
+                        onClick={() => applyRoutePreference(mode, label)}
                       >
                         {label}
                       </button>
