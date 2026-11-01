@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters } from "../../lib/sunTheme.js";
-import { readMapboxToken } from "../../lib/mapboxToken.js";
+import { MAPBOX_PUBLIC_TOKEN, readMapboxToken } from "../../lib/mapboxToken.js";
 import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
@@ -280,7 +280,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
 
   useEffect(() => {
     if (!active || !hostRef.current) return undefined;
-    const token = readMapboxToken();
+    const token = readMapboxToken() || MAPBOX_PUBLIC_TOKEN;
     if (!token) {
       onErrorRef.current?.(new Error("Mapbox 토큰이 없습니다. NEXT_PUBLIC_MAPBOX_TOKEN을 설정하세요."));
       return undefined;

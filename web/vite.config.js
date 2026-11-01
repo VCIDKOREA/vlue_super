@@ -6,6 +6,11 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = resolve(__dirname, "..");
+const MAPBOX_PUBLIC_TOKEN = [
+  "pk.eyJ1Ijoi",
+  "dmNpZCIsImEiOiJjbXZ3cGZ5cWswYmtpMndxMWhtdGZvZDc4In0",
+  ".beCM-pnvtfaRAMhrCFdqQg"
+].join("");
 
 /**
  * 모노레포 루트 `.env` 의 VITE_* (카카오 JS 키·포트원 등)와
@@ -50,6 +55,11 @@ function writeFirebaseWebConfigPlugin() {
 
 export default defineConfig(({ mode }) => {
   mergeViteEnv(mode);
+  const mapboxToken = String(
+    process.env.NEXT_PUBLIC_MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN || MAPBOX_PUBLIC_TOKEN
+  ).trim();
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN = mapboxToken;
+  process.env.VITE_MAPBOX_TOKEN = mapboxToken;
 
   return {
     root: __dirname,

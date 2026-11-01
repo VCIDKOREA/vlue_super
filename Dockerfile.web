@@ -35,6 +35,12 @@ ENV NODE_ENV=production
 ENV REQUIRE_PC_INSTALLER=0
 ENV VLUE_PC_INSTALLER_URL="https://github.com/VCIDKOREA/vlue_super/releases/download/pc-v1.0.0/VLUE-Setup-1.0.0.exe"
 
+# Optional Mapbox bake via `fly deploy --build-arg` (runtime secrets are not visible to Vite).
+ARG NEXT_PUBLIC_MAPBOX_TOKEN=""
+ARG VITE_MAPBOX_TOKEN=""
+ENV NEXT_PUBLIC_MAPBOX_TOKEN=$NEXT_PUBLIC_MAPBOX_TOKEN
+ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+
 # Copy production env file for Vite bundle baking (if present)
 COPY web/.env.production* ./web/
 
