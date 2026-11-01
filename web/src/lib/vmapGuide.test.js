@@ -33,7 +33,9 @@ const ahead = lookAheadLatLng(37.5, 127.0, 0, 100);
 assert.ok(ahead.lat > 37.5, "heading 0 looks north");
 
 const meters = chaseLookAheadMeters(37.5, 16.8, 800);
-assert.ok(meters > 28 && meters < 240);
+assert.ok(meters > 8 && meters < 240);
+const withComposer = chaseLookAheadMeters(37.5, 16.8, 800, undefined, 96);
+assert.ok(withComposer < meters, "composer inset shortens look-ahead so the marker sits higher");
 
 assert.ok(Math.abs(lerpHeading(350, 10, 0.5) - 0) < 1, "heading lerp wraps");
 

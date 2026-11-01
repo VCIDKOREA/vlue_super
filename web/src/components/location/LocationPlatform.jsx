@@ -1342,6 +1342,7 @@ export default function LocationPlatform() {
       zoom: arrived ? 16.2 : 16.8,
       arrived,
       lookAheadM: arrived ? 0 : undefined,
+      overlayBottomPx: arrived ? 0 : 96,
       anchor: arrived ? "center" : "front",
       at: Date.now()
     };
@@ -2254,6 +2255,7 @@ export default function LocationPlatform() {
       tilt: 0,
       zoom: 16.8,
       arrived: false,
+      overlayBottomPx: 96,
       anchor: "front",
       at: Date.now()
     };
@@ -2723,6 +2725,7 @@ export default function LocationPlatform() {
       tilt: 0,
       zoom: 16.8,
       arrived: false,
+      overlayBottomPx: 96,
       anchor: "front",
       at: Date.now()
     };
@@ -3553,7 +3556,7 @@ export default function LocationPlatform() {
         {hideChromeForNav && chatReady ? (
           <div className="pointer-events-auto w-full px-3 pb-1.5">
             <form
-              className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 shadow-[0_10px_28px_rgba(0,0,0,0.28)] backdrop-blur-xl ${dark ? "border-white/15 bg-[#0c1220]/88" : "border-black/10 bg-white/90"}`}
+              className="flex min-w-0 items-center gap-1.5 rounded-full border border-white/25 bg-[#071018] py-1 pl-3 pr-1 shadow-[0_10px_28px_rgba(0,0,0,0.45)]"
               onSubmit={(event) => {
                 event.preventDefault();
                 void sendText();
@@ -3571,12 +3574,12 @@ export default function LocationPlatform() {
                 placeholder={session.mode === "family" ? "가족에게 메시지" : "메시지를 입력하세요"}
                 onFocus={() => setComposerFocused(true)}
                 onBlur={() => setComposerFocused(false)}
-                className={`min-w-0 flex-1 bg-transparent py-2 text-[13px] font-medium outline-none ${dark ? "text-white placeholder:text-white/45" : "text-slate-900 placeholder:text-slate-400"}`}
+                className="min-w-0 flex-1 bg-transparent py-2 text-[13px] font-semibold text-white outline-none placeholder:text-white/75"
               />
-              <button type="submit" aria-label="보내기" disabled={sending} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${draft.trim() ? "bg-[#00D2FF] text-[#04121a]" : dark ? "bg-white/10 text-white/35" : "bg-slate-200 text-slate-400"}`}>
+              <button type="submit" aria-label="보내기" disabled={sending} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${draft.trim() ? "bg-[#00D2FF] text-[#04121a]" : "bg-white/15 text-white/80"}`}>
                 <SendIcon />
               </button>
-              <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : dark ? "bg-white/10 text-white/80" : "bg-slate-200 text-slate-700"}`} aria-label="길게 눌러 음성 메시지">
+              <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : "bg-white/15 text-white"}`} aria-label="길게 눌러 음성 메시지">
                 {recording ? (
                   <span className="flex h-5 items-end gap-[2px]" aria-hidden>
                     {[0, 1, 2, 3, 4].map((i) => (

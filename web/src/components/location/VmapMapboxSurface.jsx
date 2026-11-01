@@ -5,7 +5,7 @@ import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserI
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters } from "../../lib/sunTheme.js";
 import { MAPBOX_PUBLIC_TOKEN, readMapboxToken } from "../../lib/mapboxToken.js";
-import { chaseLookAheadMeters, lerpHeading, lookAheadLatLng } from "../../lib/vmapGuide.js";
+import { CHASE_COMPOSER_INSET_PX, chaseLookAheadMeters, lerpHeading, lookAheadLatLng } from "../../lib/vmapGuide.js";
 import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
@@ -114,7 +114,10 @@ function chaseCenter(map, cam = {}) {
   const heading = Number.isFinite(cam.heading) ? cam.heading : map.getBearing();
   const zoom = Number.isFinite(cam.zoom) ? cam.zoom : CHASE_ZOOM;
   const height = map.getContainer()?.clientHeight || window.innerHeight || 640;
-  const meters = Number.isFinite(cam.lookAheadM) ? cam.lookAheadM : chaseLookAheadMeters(lat, zoom, height);
+  const overlay = Number.isFinite(cam.overlayBottomPx) ? cam.overlayBottomPx : CHASE_COMPOSER_INSET_PX;
+  const meters = Number.isFinite(cam.lookAheadM)
+    ? cam.lookAheadM
+    : chaseLookAheadMeters(lat, zoom, height, undefined, overlay);
   if (!(meters > 0) || !Number.isFinite(heading)) return { lat, lng };
   return lookAheadLatLng(lat, lng, heading, meters);
 }
@@ -238,7 +241,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
         bearing: map.getBearing()
       });
     },
-    setNavCamera({ lat, lng, heading, tilt, zoom, force = false, arrived = false, lookAheadM, anchor } = {}) {
+    setNavCamera({ lat, lng, heading, tilt, zoom, force = false, arrived = false, lookAheadM, anchor, overlayBottomPx } = {}) {
       const cam = {
         lat,
         lng,
@@ -246,6 +249,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
         tilt: Number.isFinite(tilt) ? tilt : CHASE_TILT,
         arrived: Boolean(arrived),
         lookAheadM: Number.isFinite(lookAheadM) ? lookAheadM : undefined,
+        overlayBottomPx: Number.isFinite(overlayBottomPx) ? overlayBottomPx : CHASE_COMPOSER_INSET_PX,
         anchor,
         zoom: Number.isFinite(zoom) ? zoom : CHASE_ZOOM
       };
@@ -518,6 +522,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
           tilt: Number.isFinite(locked?.tilt) ? locked.tilt : CHASE_TILT,
           arrived: Boolean(locked?.arrived || member.arrived),
           lookAheadM: Number.isFinite(locked?.lookAheadM) ? locked.lookAheadM : member.arrived ? 0 : undefined,
+          overlayBottomPx: Number.isFinite(locked?.overlayBottomPx) ? locked.overlayBottomPx : CHASE_COMPOSER_INSET_PX,
           anchor: locked?.anchor || (member.arrived ? "center" : undefined),
           heading: Number.isFinite(lockedHeading)
             ? lockedHeading

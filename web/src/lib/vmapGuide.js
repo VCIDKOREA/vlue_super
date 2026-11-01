@@ -207,17 +207,29 @@ export function lookAheadLatLng(lat, lng, headingDeg, meters) {
   };
 }
 
-/** 주행 중 차량 마커를 화면 하단에서 이 비율 높이에 둔다 (0.25 = 25%). */
-export const CHASE_MARKER_FROM_BOTTOM = 0.25;
-const CHASE_LOOKAHEAD_FRACTION = 0.5 - CHASE_MARKER_FROM_BOTTOM;
+/** 입력창 위를 기준으로, 남은 지도의 이 비율 높이에 마커(하단)를 둔다. */
+export const CHASE_MARKER_FROM_BOTTOM = 0.32;
+/** 채팅 입력창이 가리는 하단(px). 카메라가 이 영역 아래로는 마커를 두지 않는다. */
+export const CHASE_COMPOSER_INSET_PX = 96;
+const MAPBOX_TILE_PX = 512;
+const EARTH_CIRCUMFERENCE_M = 40075016.686;
 
-/** 차량을 화면 하단 25%에 두기 위해 전방으로 밀어 올리는 거리. */
-export function chaseLookAheadMeters(lat, zoom, viewportHeightPx, fraction = CHASE_LOOKAHEAD_FRACTION) {
-  const height = Number.isFinite(viewportHeightPx) && viewportHeightPx > 200 ? viewportHeightPx : 640;
+function mapboxMetersPerPixel(lat, zoom) {
   const z = Number.isFinite(zoom) ? zoom : 16.8;
-  const mpp = (156543.03392 * Math.cos(((Number(lat) || 0) * Math.PI) / 180)) / 2 ** z;
-  const frac = Number.isFinite(fraction) ? fraction : CHASE_LOOKAHEAD_FRACTION;
-  return Math.max(28, Math.min(240, height * frac * mpp));
+  const cos = Math.cos(((Number(lat) || 0) * Math.PI) / 180);
+  return (EARTH_CIRCUMFERENCE_M * Math.max(0.08, Math.abs(cos))) / (MAPBOX_TILE_PX * 2 ** z);
+}
+
+/** 입력창 위 여유를 두고 마커를 올리기 위한 전방 시선 거리. Mapbox GL 512타일 기준. */
+export function chaseLookAheadMeters(lat, zoom, viewportHeightPx, fraction = CHASE_MARKER_FROM_BOTTOM, overlayBottomPx = 0) {
+  const height = Number.isFinite(viewportHeightPx) && viewportHeightPx > 200 ? viewportHeightPx : 640;
+  const overlay = Math.max(0, Number(overlayBottomPx) || 0);
+  const usable = Math.max(160, height - overlay);
+  const fromBottom = overlay + (Number.isFinite(fraction) ? fraction : CHASE_MARKER_FROM_BOTTOM) * usable;
+  const lookAheadPx = height / 2 - fromBottom;
+  if (!(lookAheadPx > 4)) return 0;
+  const mpp = mapboxMetersPerPixel(lat, zoom);
+  return Math.max(8, Math.min(320, lookAheadPx * mpp));
 }
 
 export function isStraightGuide(instruction) {
