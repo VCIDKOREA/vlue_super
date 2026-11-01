@@ -207,8 +207,8 @@ export function lookAheadLatLng(lat, lng, headingDeg, meters) {
   };
 }
 
-/** 주행 중 마커를 화면 하단에서 이 비율 높이에 고정한다 (0.24 = 하단 24%). */
-export const CHASE_MARKER_FROM_BOTTOM = 0.24;
+/** 주행 중 마커를 화면 하단에서 이 비율 높이에 고정한다 (0.20 = 하단 20%). */
+export const CHASE_MARKER_FROM_BOTTOM = 0.20;
 /** 채팅 입력창 높이. 마커는 이 값보다 위에 둔다. */
 export const CHASE_COMPOSER_INSET_PX = 96;
 const MAPBOX_TILE_PX = 512;
@@ -225,7 +225,7 @@ export function chaseLookAheadMeters(lat, zoom, viewportHeightPx, fraction = CHA
   const height = Number.isFinite(viewportHeightPx) && viewportHeightPx > 200 ? viewportHeightPx : 640;
   const overlay = Math.max(0, Number(overlayBottomPx) || 0);
   const frac = Number.isFinite(fraction) ? fraction : CHASE_MARKER_FROM_BOTTOM;
-  const fromBottom = Math.max(height * frac, overlay + 40);
+  const fromBottom = Math.max(height * frac, overlay + 20);
   const lookAheadPx = height / 2 - fromBottom;
   if (!(lookAheadPx > 4)) return 0;
   const mpp = mapboxMetersPerPixel(lat, zoom);

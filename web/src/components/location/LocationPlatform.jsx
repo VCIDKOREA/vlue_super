@@ -2520,7 +2520,11 @@ export default function LocationPlatform() {
     guideOn &&
     ((session.mode === "vmap" && (session.departed || driveChase) && !selfArrived) || familyGuiding);
   const immersiveTransport = ["car", "motorcycle", "bike"].includes(transportMode);
-  const hideChromeForNav = navigatingNow && firstPersonNav && immersiveTransport;
+  const hideChromeForNav =
+    firstPersonNav &&
+    immersiveTransport &&
+    !selfArrived &&
+    ((session.mode === "vmap" && (session.departed || driveChase || guideOn)) || familyGuiding);
   const chatReady =
     session.open && ((session.mode === "vmap" && Boolean(session.roomId)) || session.mode === "family");
   const myRoute = routes[getLocalVlueUserId()] || null;
@@ -2988,7 +2992,15 @@ export default function LocationPlatform() {
               type="button"
               className={`min-w-0 flex-1 rounded-full px-2 py-2 text-[12px] font-semibold tracking-tight ${session.mode === "family" ? tabOn : ""}`}
               onClick={() => {
-                backToFamilyMap();
+                const keepVmapNav = session.mode === "vmap" && (session.departed || driveChase);
+                if (keepVmapNav) {
+                  setSelected(null);
+                  setDetailOpen(false);
+                  setFirstPersonNav(false);
+                  mapSurfaceRef.current?.resetNavCamera?.();
+                } else {
+                  backToFamilyMap();
+                }
                 setMembers([]);
                 patchLocationSession({ mode: "family" });
                 if (!localCanUseFamilyLocation()) {
@@ -3004,9 +3016,17 @@ export default function LocationPlatform() {
               onClick={() => {
                 setSelected(null);
                 setFamilyNavTarget(null);
-                setRoutes({});
-                setGuideOn(false);
+                const keepVmapNav = Boolean(session.departed || driveChase);
+                if (!keepVmapNav) {
+                  setRoutes({});
+                  setGuideOn(false);
+                }
                 patchLocationSession({ mode: "vmap" });
+                if (keepVmapNav) {
+                  setGuideOn(true);
+                  setDriveChase(true);
+                  setFirstPersonNav(true);
+                }
               }}
             >
               V-Map
@@ -3314,6 +3334,21 @@ export default function LocationPlatform() {
         ) : null}
         {session.mode === "vmap" ? (
           <div className={`space-y-2 rounded-[24px] p-2.5 ${glass}`}>
+            {session.departed && !hideChromeForNav ? (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className={quietBtn}
+                  onClick={() => {
+                    setGuideOn(true);
+                    setDriveChase(true);
+                    setFirstPersonNav(true);
+                  }}
+                >
+                  접기
+                </button>
+              </div>
+            ) : null}
             {session.roomId ? (
               <div className="flex items-center gap-2" style={{ display: hideSheetOptions ? "none" : undefined }}>
                 {session.departed ? (
