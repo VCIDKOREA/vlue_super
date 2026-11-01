@@ -77,7 +77,14 @@ import {
 import { getPublicDisplayName } from "../../lib/fiveWayProfile.js";
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters, resolveMapTheme } from "../../lib/sunTheme.js";
-import { alongRouteMeters, formatGuideDistance, guideTravelMeters, liveGuideCue, maneuverGlyph } from "../../lib/vmapGuide.js";
+import {
+  alongRouteMeters,
+  formatGuideDistance,
+  guideTravelMeters,
+  liveGuideCue,
+  maneuverGlyph,
+  matchGpsToRoute
+} from "../../lib/vmapGuide.js";
 import { bindMapTapFeedback, mapTapFeedback } from "../../lib/mapTapFeedback.js";
 import { syncOwnerInboxFromServer } from "../../lib/ownerInboxSync.js";
 import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserId.js";
@@ -131,27 +138,10 @@ function bearingDeg(fromLat, fromLng, toLat, toLng) {
 }
 
 function remainingRouteMeters(route, lat, lng) {
-  const points = Array.isArray(route?.points) ? route.points : [];
-  if (!points.length || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return Number(route?.distanceM) || 0;
-  }
-  let nearest = 0;
-  let best = Infinity;
-  for (let i = 0; i < points.length; i += 1) {
-    const [lngP, latP] = points[i];
-    const d = haversineMeters(lat, lng, latP, lngP);
-    if (d < best) {
-      best = d;
-      nearest = i;
-    }
-  }
-  let rest = 0;
-  for (let i = nearest; i + 1 < points.length; i += 1) {
-    const [lngA, latA] = points[i];
-    const [lngB, latB] = points[i + 1];
-    rest += haversineMeters(latA, lngA, latB, lngB);
-  }
-  return Math.max(0, Math.round(rest || best));
+  const along = alongRouteMeters(route?.points, lat, lng);
+  if (along && Number.isFinite(along.remain)) return Math.round(along.remain);
+  const listed = Number(route?.distanceM);
+  return Number.isFinite(listed) && listed > 0 ? Math.round(listed) : null;
 }
 const ACCENT = "#00D2FF";
 const AD_BANNER_PX = 56;
@@ -604,6 +594,8 @@ export default function LocationPlatform() {
   const guideLiveRef = useRef(null);
   const hudSpeedRef = useRef(null);
   const lastFixRef = useRef(null);
+  const lastMatchRef = useRef(null);
+  const rerouteGenRef = useRef(0);
   /** GPS → setSelf / 역지오코딩 / presence 과다 호출 방지 */
   const lastSelfUiRef = useRef({ lat: null, lng: null, at: 0 });
   routesRef.current = routes;
@@ -868,10 +860,6 @@ export default function LocationPlatform() {
       writeLastGeo(lat, lng);
       const nowTs = Date.now();
       const prevUi = lastSelfUiRef.current;
-      const movedUi =
-        prevUi.lat == null ||
-        haversineMeters(prevUi.lat, prevUi.lng, lat, lng) >= 4 ||
-        nowTs - prevUi.at >= 2500;
       const geoCache = lastGeocodeRef.current;
       const needGeocode =
         geoCache.lat == null ||
@@ -886,7 +874,20 @@ export default function LocationPlatform() {
       }
       if (Number.isFinite(speedKmh)) lastSpeedKmhRef.current = speedKmh;
       const liveRoute = routesRef.current?.[getLocalVlueUserId()];
-      const along = alongRouteMeters(liveRoute?.points, lat, lng);
+      const headingDeg = Number.isFinite(coords?.heading) ? coords.heading : null;
+      const navigatingNowGps = Boolean(guideOnRef.current) && Array.isArray(liveRoute?.points) && liveRoute.points.length >= 2;
+      const match = navigatingNowGps
+        ? matchGpsToRoute(liveRoute.points, lat, lng, lastMatchRef.current, { headingDeg, speedKmh })
+        : null;
+      if (match) lastMatchRef.current = match;
+      else lastMatchRef.current = null;
+      const showLat = match?.snapped ? match.lat : lat;
+      const showLng = match?.snapped ? match.lng : lng;
+      const movedUi =
+        prevUi.lat == null ||
+        haversineMeters(prevUi.lat, prevUi.lng, showLat, showLng) >= 4 ||
+        nowTs - prevUi.at >= 2500;
+      const along = match || alongRouteMeters(liveRoute?.points, showLat, showLng);
       const nextCue = liveGuideCue(liveRoute?.steps, guideTravelMeters(liveRoute?.steps, along));
       const prevCue = guideLiveRef.current;
       const sameCue =
@@ -899,10 +900,9 @@ export default function LocationPlatform() {
         guideLiveRef.current = nextCue;
         setGuideLive(nextCue);
       }
-      const headingDeg = Number.isFinite(coords?.heading) ? coords.heading : null;
       const next = {
-        lat,
-        lng,
+        lat: showLat,
+        lng: showLng,
         addressLabel: geoCache.label || "",
         batteryPct: null,
         online,
@@ -912,12 +912,12 @@ export default function LocationPlatform() {
         countryName: geoCache.meta?.countryName || "",
         cityName: geoCache.meta?.cityName || "",
         speedKmh: Number.isFinite(speedKmh) ? speedKmh : null,
-        headingDeg
+        headingDeg: Number.isFinite(match?.bearing) ? match.bearing : headingDeg
       };
 
       /* 미세 GPS 떨림마다 React 리렌더·네이버 마커 재생성 막기 */
       if (movedUi) {
-        lastSelfUiRef.current = { lat, lng, at: nowTs };
+        lastSelfUiRef.current = { lat: showLat, lng: showLng, at: nowTs };
         setSelf((prev) => ({
           ...(prev || {}),
           ...next,
@@ -1230,8 +1230,24 @@ export default function LocationPlatform() {
     const movers = members.filter((member) => member.departed && member.lat != null && member.lng != null);
     (async () => {
       const next = {};
+      const mineId = getLocalVlueUserId();
+      const gen = rerouteGenRef.current;
       for (const member of movers) {
         try {
+          const existing = routesRef.current?.[member.userId];
+          const isSelf = member.userId === mineId;
+          if (
+            isSelf &&
+            existing?.points?.length >= 2 &&
+            existing.mode === routeModeRef.current &&
+            String(existing.transport || transportModeRef.current) === String(transportModeRef.current)
+          ) {
+            const hold = matchGpsToRoute(existing.points, member.lat, member.lng, lastMatchRef.current);
+            if (hold.snapped && hold.distM < 55) {
+              next[member.userId] = existing;
+              continue;
+            }
+          }
           const data = await fetchVmapGuide({
             fromLat: member.lat,
             fromLng: member.lng,
@@ -1241,6 +1257,7 @@ export default function LocationPlatform() {
             transport: transportModeRef.current,
             region: isOverseasMember(member) || isOverseasMember(self) ? "overseas" : "kr"
           });
+          if (cancelled || gen !== rerouteGenRef.current) return;
           if (data?.ok && Array.isArray(data.points)) next[member.userId] = data;
         } catch {
           /* 도로 경로를 못 받으면 선을 그리지 않는다 */
@@ -1257,8 +1274,6 @@ export default function LocationPlatform() {
   const familyNavKey = familyNavTarget
     ? `${familyNavTarget.userId}:${Number(familyNavTarget.lat).toFixed(4)}:${Number(familyNavTarget.lng).toFixed(4)}`
     : "";
-  const selfNavKey =
-    self?.lat != null ? `${Number(self.lat).toFixed(4)}:${Number(self.lng).toFixed(4)}` : "";
   useEffect(() => {
     if (session.mode !== "family" || !familyNavTarget || !guideOn || self?.lat == null || self?.lng == null) {
       return undefined;
@@ -1278,7 +1293,7 @@ export default function LocationPlatform() {
         });
         if (cancelled) return;
         if (data?.ok && Array.isArray(data.points)) {
-          setRoutes({ [mineId]: data });
+          setRoutes((prev) => ({ ...prev, [mineId]: data }));
         }
       } catch {
         /* ignore */
@@ -1287,12 +1302,11 @@ export default function LocationPlatform() {
     return () => {
       cancelled = true;
     };
-  }, [session.mode, familyNavKey, selfNavKey, guideOn, routeMode, transportMode, familyNavTarget, self?.lat, self?.lng]);
+  }, [session.mode, familyNavKey, guideOn, routeMode, transportMode, familyNavTarget, Boolean(self?.lat && self?.lng)]);
 
-  /* 1인칭 카메라 + 남은 거리 */
+  /* 2D 탑뷰 카메라 + 남은 거리 — 채팅/패널 높이와 무관한 지리 오프셋만 사용 */
   useEffect(() => {
     if (!guideOn || !firstPersonNav || self?.lat == null || self?.lng == null) {
-      setRemainDistanceM(null);
       return undefined;
     }
     const mineId = getLocalVlueUserId();
@@ -1305,14 +1319,30 @@ export default function LocationPlatform() {
           : null;
     if (!dest) return undefined;
     const remain = remainingRouteMeters(route, self.lat, self.lng);
-    setRemainDistanceM(remain);
-    const heading = driveCourse(self.lat, self.lng, self.headingDeg, self.speedKmh, route?.points, dest.lat, dest.lng);
+    if (remain != null) setRemainDistanceM(remain);
+    const arrived =
+      members.some((row) => row.userId === mineId && row.arrived) || (remain != null && remain <= 28);
+    const match = Array.isArray(route?.points) && route.points.length >= 2
+      ? matchGpsToRoute(route.points, self.lat, self.lng, lastMatchRef.current, {
+          headingDeg: self.headingDeg,
+          speedKmh: self.speedKmh
+        })
+      : null;
+    if (match) lastMatchRef.current = match;
+    const lat = match?.snapped ? match.lat : self.lat;
+    const lng = match?.snapped ? match.lng : self.lng;
+    const heading = Number.isFinite(match?.bearing)
+      ? match.bearing
+      : driveCourse(lat, lng, self.headingDeg, self.speedKmh, route?.points, dest.lat, dest.lng);
     const nextCam = {
-      lat: self.lat,
-      lng: self.lng,
+      lat,
+      lng,
       heading,
-      tilt: 60,
-      zoom: 17,
+      tilt: 0,
+      zoom: arrived ? 16.2 : 16.8,
+      arrived,
+      lookAheadM: arrived ? 0 : undefined,
+      anchor: arrived ? "center" : "front",
       at: Date.now()
     };
     setNavCamera(nextCam);
@@ -1330,7 +1360,8 @@ export default function LocationPlatform() {
     room?.placeLat,
     room?.placeLng,
     room?.placeReady,
-    session.mode
+    session.mode,
+    members
   ]);
 
   /* TTS — 지금 위치의 상황 한 문장만. 더 급하면 재생 중인 일반 안내를 끊는다. */
@@ -1340,7 +1371,7 @@ export default function LocationPlatform() {
       guideLive && guideLive.instruction !== "목적지 도착"
         ? [{ instruction: guideLive.instruction, distanceM: guideLive.remainM }]
         : [];
-    const remain = remainDistanceM;
+    const remain = routes[getLocalVlueUserId()]?.points?.length ? remainDistanceM : null;
     const spoken = spokenNavKeysRef.current;
     const live = listLiveSpeeches({ steps, remainM: remain, signal: nearbySignal }).find((item) => !spoken.has(item.key));
     let chosen = live || null;
@@ -2220,8 +2251,10 @@ export default function LocationPlatform() {
       lat: startLat,
       lng: startLng,
       heading,
-      tilt: 60,
-      zoom: 17,
+      tilt: 0,
+      zoom: 16.8,
+      arrived: false,
+      anchor: "front",
       at: Date.now()
     };
     userZoomedRef.current = false;
@@ -2585,23 +2618,68 @@ export default function LocationPlatform() {
     else if (self?.lat != null) mapSurfaceRef.current?.panTo?.(self.lat, self.lng, 14);
   };
 
+  const rerouteActiveGuide = async () => {
+    const dest =
+      session.mode === "family" && familyNavTarget
+        ? familyNavTarget
+        : room?.placeReady
+          ? { lat: room.placeLat, lng: room.placeLng }
+          : null;
+    const from = lastFixRef.current?.lat != null ? lastFixRef.current : self;
+    if (!dest || from?.lat == null || from?.lng == null) return;
+    const gen = ++rerouteGenRef.current;
+    const mineId = getLocalVlueUserId();
+    try {
+      const data = await fetchVmapGuide({
+        fromLat: from.lat,
+        fromLng: from.lng,
+        toLat: dest.lat,
+        toLng: dest.lng,
+        mode: routeModeRef.current,
+        transport: transportModeRef.current,
+        region: isOverseasMember(self) || isOverseasMember(dest) ? "overseas" : "kr"
+      });
+      if (gen !== rerouteGenRef.current) return;
+      if (data?.ok && Array.isArray(data.points)) {
+        lastMatchRef.current = null;
+        setRoutes((prev) => ({ ...prev, [mineId]: data }));
+        setGuideOn(true);
+        setFirstPersonNav(true);
+        if (session.mode === "vmap") setDriveChase(true);
+      } else {
+        pushNotice(data?.error || "경로를 다시 찾지 못했습니다. 안내는 유지합니다.");
+      }
+    } catch (error) {
+      if (gen !== rerouteGenRef.current) return;
+      pushNotice(error?.message || "경로를 다시 찾지 못했습니다. 안내는 유지합니다.");
+    }
+  };
+
   const applyRoutePreference = (mode, label) => {
     if (routeMode === mode) {
       pushNotice(`이미 ${label} 경로입니다.`);
       return;
     }
+    const keepNav = Boolean(session.departed || driveChase || familyGuiding || guideOn);
     setRouteMode(mode);
     routeModeRef.current = mode;
-    setRoutes({});
-    if (session.departed || driveChase || familyGuiding) {
-      userZoomedRef.current = false;
-      setGuideOn(true);
-      setFirstPersonNav(true);
-      lastSpokenCueRef.current = "";
-      pushNotice(`${label} 경로로 다시 안내합니다.`);
-    } else {
+    if (!keepNav) {
       pushNotice(`${label} 경로로 설정했습니다.`);
+      return;
     }
+    userZoomedRef.current = false;
+    setGuideOn(true);
+    setFirstPersonNav(true);
+    if (session.mode === "vmap") setDriveChase(true);
+    lastSpokenCueRef.current = "";
+    spokenNavKeysRef.current = new Set(["reroute-pref"]);
+    pushNotice(`${label} 경로로 다시 안내합니다.`);
+    speakVmapGuide("경로를 재탐색합니다.", {
+      key: "reroute-pref",
+      interrupt: true,
+      priority: TTS_PRIORITY.NEAR
+    });
+    void rerouteActiveGuide();
   };
 
   const ROUTE_PREF_OPTIONS = [
@@ -2636,8 +2714,10 @@ export default function LocationPlatform() {
       lat: self.lat,
       lng: self.lng,
       heading,
-      tilt: 60,
-      zoom: 17,
+      tilt: 0,
+      zoom: 16.8,
+      arrived: false,
+      anchor: "front",
       at: Date.now()
     };
     setNavCamera(nextCam);
@@ -2694,11 +2774,11 @@ export default function LocationPlatform() {
     : null;
   return (
     <section
-      className={`fixed inset-x-0 top-0 z-[530] flex flex-col overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
+      className={`fixed inset-x-0 top-0 z-[530] overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
       style={{ bottom: liftForKeyboard }}
       onPointerDownCapture={bindMapTapFeedback}
     >
-      <div className="relative min-h-0 flex-1">
+      <div className="absolute inset-0 z-0">
         <VmapMapboxSurface
           ref={mapSurfaceRef}
           active={session.open}
@@ -3044,19 +3124,20 @@ export default function LocationPlatform() {
             </button>
           )
         ) : null}
-        {chatReady && !hideChromeForNav ? (
+        {chatReady ? (
           <VMapChatOverlay
             messages={messages}
             dark={dark}
             playingVoiceId={playingVoiceId}
             onPlayVoice={playVoice}
             expandToken={chatExpandToken}
-            bottomOffset={4}
+            bottomOffset={navigatingNow ? 72 : 4}
           />
         ) : null}
       </div>
 
-      <div className={`relative z-30 shrink-0 space-y-2 px-3 pb-1 pt-2 ${hideChromeForNav ? "hidden" : ""}`}>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col justify-end">
+      <div className={`pointer-events-auto space-y-2 px-3 pb-1 pt-2 ${hideChromeForNav ? "hidden" : ""}`}>
         {selected && session.mode === "family" && !detailOpen ? (
           <div className="space-y-2">
           <div className={`flex flex-wrap gap-1 rounded-[18px] p-1.5 ${glass}`}>
@@ -3278,17 +3359,21 @@ export default function LocationPlatform() {
                       onClick={() => {
                         setTransportMode(row.id);
                         transportModeRef.current = row.id;
-                        if (!session.departed) return;
+                        if (!session.departed && !familyGuiding) return;
                         const immersive = ["car", "motorcycle", "bike"].includes(row.id);
                         userZoomedRef.current = false;
-                        setRoutes({});
                         setGuideOn(true);
                         setFirstPersonNav(true);
                         lastSpokenCueRef.current = "";
+                        spokenNavKeysRef.current = new Set(["reroute-pref"]);
                         pushNotice(`${row.label} 길안내로 전환합니다.`);
-                        if (immersive) {
-                          speakVmapGuide("길안내를 시작하겠습니다", { key: `nav-mode-${row.id}` });
-                        }
+                        speakVmapGuide("경로를 재탐색합니다.", {
+                          key: "reroute-pref",
+                          interrupt: true,
+                          priority: TTS_PRIORITY.NEAR
+                        });
+                        void rerouteActiveGuide();
+                        if (immersive) setDriveChase(true);
                       }}
                     >
                       {row.label}
@@ -3456,7 +3541,7 @@ export default function LocationPlatform() {
         ) : null}
       </div>
 
-      <div className="shrink-0 px-3 pt-2" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
+      <div className="pointer-events-auto shrink-0 px-3 pt-2" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
         {settingsOpen || membersOpen || keyboardInset > 80 ? (
           <div style={{ height: AD_BANNER_PX }} aria-hidden />
         ) : sponsor ? (
@@ -3472,6 +3557,7 @@ export default function LocationPlatform() {
         ) : (
           <div style={{ height: AD_BANNER_PX }} />
         )}
+      </div>
       </div>
 
       {settingsOpen ? (

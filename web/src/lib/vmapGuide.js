@@ -73,6 +73,8 @@ export function alongRouteMeters(points, lat, lng) {
   let bestDist = Infinity;
   let bestTraveled = 0;
   let bestBearing = null;
+  let bestLat = lat;
+  let bestLng = lng;
   let walked = 0;
   for (let i = 0; i + 1 < points.length; i += 1) {
     const latA = points[i][1];
@@ -96,6 +98,8 @@ export function alongRouteMeters(points, lat, lng) {
     if (dist < bestDist - 0.3 || (Math.abs(dist - bestDist) <= 0.3 && traveled > bestTraveled)) {
       bestDist = dist;
       bestTraveled = traveled;
+      bestLat = projLat;
+      bestLng = projLng;
       bestBearing = bearingDegrees(latA, lngA, latB, lngB);
     }
     walked += len;
@@ -105,7 +109,73 @@ export function alongRouteMeters(points, lat, lng) {
     traveled,
     remain: Math.max(0, total - traveled),
     total,
-    bearing: bestBearing
+    bearing: bestBearing,
+    lat: bestLat,
+    lng: bestLng,
+    distM: Number.isFinite(bestDist) ? bestDist : Infinity
+  };
+}
+
+export function lerpHeading(from, to, t) {
+  if (!Number.isFinite(to)) return Number.isFinite(from) ? from : 0;
+  if (!Number.isFinite(from)) return ((to % 360) + 360) % 360;
+  const k = Math.max(0, Math.min(1, Number(t) || 0));
+  const delta = ((((to - from) % 360) + 540) % 360) - 180;
+  return (from + delta * k + 360) % 360;
+}
+
+const SNAP_ON_M = 42;
+const SNAP_HOLD_M = 80;
+const BACKTRACK_M = 16;
+
+/**
+ * GPS를 경로선에 붙인다. 건물·골목으로 튀는 점을 막고, 뒤로 미끄러지지 않게 한다.
+ */
+export function matchGpsToRoute(points, lat, lng, prev = null, extras = {}) {
+  const along = alongRouteMeters(points, lat, lng);
+  const speedKmh = Number(extras.speedKmh);
+  const gpsHeading = Number(extras.headingDeg);
+  if (!along || !Number.isFinite(along.lat) || !Number.isFinite(along.lng)) {
+    return {
+      lat,
+      lng,
+      snapped: false,
+      bearing: Number.isFinite(gpsHeading) ? gpsHeading : prev?.bearing ?? null,
+      traveled: Number(prev?.traveled) || 0,
+      remain: null,
+      total: 0,
+      distM: Infinity
+    };
+  }
+  const distM = along.distM;
+  let traveled = along.traveled;
+  let snapLat = along.lat;
+  let snapLng = along.lng;
+  const had = Boolean(prev?.snapped) && Number.isFinite(prev.lat) && Number.isFinite(prev.lng);
+  if (had && Number.isFinite(prev.traveled) && traveled + BACKTRACK_M < prev.traveled && distM <= SNAP_HOLD_M) {
+    traveled = prev.traveled;
+    snapLat = prev.lat;
+    snapLng = prev.lng;
+  }
+  const snapped = distM <= SNAP_ON_M || (had && distM <= SNAP_HOLD_M);
+  const outLat = snapped ? snapLat : lat;
+  const outLng = snapped ? snapLng : lng;
+  const mix = snapped ? (had ? 0.38 : 1) : 1;
+  const latSm = had && snapped ? prev.lat + (outLat - prev.lat) * mix : outLat;
+  const lngSm = had && snapped ? prev.lng + (outLng - prev.lng) * mix : outLng;
+  const routeHeading = Number.isFinite(along.bearing) ? along.bearing : null;
+  const preferGps = Number.isFinite(gpsHeading) && Number.isFinite(speedKmh) && speedKmh >= 8 && snapped;
+  const targetHeading = preferGps ? lerpHeading(routeHeading ?? gpsHeading, gpsHeading, 0.22) : routeHeading ?? gpsHeading;
+  const bearing = lerpHeading(prev?.bearing, targetHeading, snapped ? 0.34 : 0.18);
+  return {
+    lat: latSm,
+    lng: lngSm,
+    snapped,
+    bearing,
+    traveled,
+    remain: along.remain,
+    total: along.total,
+    distM
   };
 }
 
@@ -137,12 +207,18 @@ export function lookAheadLatLng(lat, lng, headingDeg, meters) {
   };
 }
 
-/** 화면 높이의 약 20%만큼 전방을 카메라 중심으로 밀어 차량이 하단 1/3에 오게 한다. */
-export function chaseLookAheadMeters(lat, zoom, viewportHeightPx) {
+/** 차량을 화면 하단 20~25%(기본 22.5%)에 두기 위해 전방으로 밀어 올리는 거리. */
+export function chaseLookAheadMeters(lat, zoom, viewportHeightPx, fraction = 0.275) {
   const height = Number.isFinite(viewportHeightPx) && viewportHeightPx > 200 ? viewportHeightPx : 640;
-  const z = Number.isFinite(zoom) ? zoom : 17;
+  const z = Number.isFinite(zoom) ? zoom : 16.8;
   const mpp = (156543.03392 * Math.cos(((Number(lat) || 0) * Math.PI) / 180)) / 2 ** z;
-  return Math.max(36, Math.min(280, height * 0.2 * mpp));
+  const frac = Number.isFinite(fraction) ? fraction : 0.275;
+  return Math.max(28, Math.min(240, height * frac * mpp));
+}
+
+export function isStraightGuide(instruction) {
+  const text = String(instruction || "");
+  return /직진|안내를 시작|안내를 종료|출발지/.test(text) && !/분기|갈래|인터체인지|IC/.test(text);
 }
 
 function stepCumulative(steps) {
@@ -171,13 +247,17 @@ export function guideTravelMeters(steps, along) {
 export function liveGuideCue(steps, traveledM = 0) {
   const rows = stepCumulative(steps);
   const traveled = Math.max(0, Number(traveledM) || 0);
+  let fallback = null;
   for (const step of rows) {
-    if (step.instruction === "안내를 시작합니다") continue;
+    if (step.instruction === "안내를 시작합니다" || /안내를 종료/.test(String(step.instruction || ""))) continue;
     const remain = step.cumulativeM - traveled;
     if (remain <= 0) continue;
-    return { ...step, remainM: Math.max(1, Math.round(remain)) };
+    const cue = { ...step, remainM: Math.max(1, Math.round(remain)) };
+    if (!fallback) fallback = cue;
+    if (isStraightGuide(step.instruction) && step.instruction !== "목적지 도착") continue;
+    return cue;
   }
-  return null;
+  return fallback;
 }
 
 export function nextGuideCue(steps, traveledM = 0) {

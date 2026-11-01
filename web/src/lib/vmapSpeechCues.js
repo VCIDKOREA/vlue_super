@@ -12,6 +12,7 @@ export function classifyTurn(instruction) {
   if (/U턴|유턴/i.test(text)) return "유턴";
   if (/10시/.test(text)) return "10시 방향";
   if (/2시/.test(text)) return "2시 방향";
+  if (/약간/.test(text)) return "";
   if (/급우|우회전|오른쪽/.test(text) && !/합류/.test(text)) return "우회전";
   if (/급좌|좌회전|왼쪽/.test(text) && !/합류/.test(text)) return "좌회전";
   return "";
@@ -24,19 +25,19 @@ export function turnBandKey(distanceM) {
 export function turnBand(distanceM) {
   const d = Number(distanceM);
   if (!Number.isFinite(d) || d < 0) return "";
-  if (d <= 70) return "50";
+  if (d <= 120) return "100";
   if (d <= 360) return "300";
-  if (d <= 620) return "500";
   return "";
 }
 
 export function phraseForTurn(instruction, distanceM) {
-  const turn = classifyTurn(instruction) || String(instruction || "직진").replace(/입니다\.?$/, "");
+  const classified = classifyTurn(instruction);
+  const turn = classified || String(instruction || "").replace(/입니다\.?$/, "");
   const band = turnBand(distanceM);
-  if (!turn || /직진|도착|안내를 시작/.test(turn)) return "";
-  if (band === "500") return `500미터 앞, ${turn}입니다.`;
+  if (!turn || /직진|도착|안내를 시작|안내를 종료|약간/.test(turn)) return "";
+  if (!classified && !/회전|유턴|U턴|분기|갈래|로터리|합류|10시|2시/.test(turn)) return "";
   if (band === "300") return `300미터 앞, ${turn}입니다.`;
-  if (band === "50" || band === "soon") return `50미터 앞, ${turn}입니다.`;
+  if (band === "100") return `100미터 앞, ${turn}입니다.`;
   return "";
 }
 
@@ -119,16 +120,16 @@ export function listLiveSpeeches({ steps, remainM, signal } = {}) {
     }
     const band = turnBand(dist);
     const turn = safety ? "" : phraseForTurn(upcoming.instruction, dist);
-    if (turn && band === "50") {
+    if (turn && band === "100") {
       out.push({
-        key: `tbt-${upcoming.instruction}-50`,
+        key: `tbt-${upcoming.instruction}-100`,
         text: turn,
         priority: TTS_PRIORITY.NEAR,
         rank: 2
       });
-    } else if (turn && (band === "300" || band === "500")) {
+    } else if (turn && band === "300") {
       out.push({
-        key: `tbt-${upcoming.instruction}-${band}`,
+        key: `tbt-${upcoming.instruction}-300`,
         text: turn,
         priority: TTS_PRIORITY.GENERAL,
         rank: 5

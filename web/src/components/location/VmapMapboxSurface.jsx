@@ -5,11 +5,13 @@ import { getLocalVlueUserId } from "../../lib/showcase/resolveShowcaseOwnerUserI
 import { readProfilePhotoAvatar } from "../../lib/vlueAvatar.js";
 import { estimateEtaMinutes, haversineMeters } from "../../lib/sunTheme.js";
 import { MAPBOX_PUBLIC_TOKEN, readMapboxToken } from "../../lib/mapboxToken.js";
+import { chaseLookAheadMeters, lerpHeading, lookAheadLatLng } from "../../lib/vmapGuide.js";
 import { userHasVerifiedBadge, verifiedSealSvgHtml } from "../UserBadgeLabel.jsx";
 
 const ACCENT = "#00D2FF";
-const CHASE_TILT = 60;
-const CHASE_ZOOM = 16.6;
+const CHASE_TILT = 0;
+const CHASE_ZOOM = 16.8;
+const ZERO_PAD = { top: 0, bottom: 0, left: 0, right: 0 };
 const STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 
 function bearingDegrees(fromLat, fromLng, toLat, toLng) {
@@ -105,9 +107,16 @@ function buildVisiblePeople({ members, self, mode, departed, mineId, selfPhoto }
   });
 }
 
-function chasePadding(map) {
-  const h = map.getContainer()?.clientHeight || 640;
-  return { top: Math.round(h * 0.32), bottom: Math.round(h * 0.12), left: 12, right: 12 };
+function chaseCenter(map, cam = {}) {
+  const lat = Number(cam.lat);
+  const lng = Number(cam.lng);
+  if (Boolean(cam.arrived) || cam.anchor === "center" || cam.lookAheadM === 0) return { lat, lng };
+  const heading = Number.isFinite(cam.heading) ? cam.heading : map.getBearing();
+  const zoom = Number.isFinite(cam.zoom) ? cam.zoom : CHASE_ZOOM;
+  const height = map.getContainer()?.clientHeight || window.innerHeight || 640;
+  const meters = Number.isFinite(cam.lookAheadM) ? cam.lookAheadM : chaseLookAheadMeters(lat, zoom, height, 0.275);
+  if (!(meters > 0) || !Number.isFinite(heading)) return { lat, lng };
+  return lookAheadLatLng(lat, lng, heading, meters);
 }
 
 function applyChaseCamera(map, cam = {}, { force = false } = {}) {
@@ -115,18 +124,28 @@ function applyChaseCamera(map, cam = {}, { force = false } = {}) {
   const lat = Number(cam.lat);
   const lng = Number(cam.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-  const pitch = Math.max(55, Number.isFinite(cam.tilt) ? cam.tilt : CHASE_TILT);
+  const pitch = Number.isFinite(cam.tilt) ? Math.max(0, cam.tilt) : CHASE_TILT;
   const zoom = Number.isFinite(cam.zoom) ? cam.zoom : CHASE_ZOOM;
-  const bearing = Number.isFinite(cam.heading) ? ((cam.heading % 360) + 360) % 360 : map.getBearing();
-  map.__vmapChase = { lat, lng, heading: bearing, tilt: pitch, zoom };
+  const targetH = Number.isFinite(cam.heading) ? ((cam.heading % 360) + 360) % 360 : map.getBearing();
+  const prevH = map.__vmapChase?.heading;
+  const bearing = force || !Number.isFinite(prevH) ? targetH : lerpHeading(prevH, targetH, 0.3);
+  const center = chaseCenter(map, { ...cam, heading: bearing });
+  const nowCenter = map.getCenter();
+  const moved = haversineMeters(nowCenter.lat, nowCenter.lng, center.lat, center.lng);
+  const yaw = Math.abs((((map.getBearing() - bearing) % 360) + 540) % 360 - 180);
+  if (!force && moved < 1.1 && yaw < 1.4 && Math.abs(map.getPitch() - pitch) < 0.8) {
+    map.__vmapChase = { lat, lng, heading: bearing, tilt: pitch, zoom, arrived: Boolean(cam.arrived) };
+    return;
+  }
+  map.__vmapChase = { lat, lng, heading: bearing, tilt: pitch, zoom, arrived: Boolean(cam.arrived) };
   map.easeTo({
-    center: [lng, lat],
+    center: [center.lng, center.lat],
     zoom,
     pitch,
     bearing,
-    duration: force ? 650 : 420,
+    duration: force ? 560 : 360,
     essential: true,
-    padding: chasePadding(map)
+    padding: ZERO_PAD
   });
 }
 
@@ -218,12 +237,15 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
         bearing: map.getBearing()
       });
     },
-    setNavCamera({ lat, lng, heading, tilt, zoom, force = false } = {}) {
+    setNavCamera({ lat, lng, heading, tilt, zoom, force = false, arrived = false, lookAheadM, anchor } = {}) {
       const cam = {
         lat,
         lng,
         heading: Number.isFinite(heading) ? heading : null,
         tilt: Number.isFinite(tilt) ? tilt : CHASE_TILT,
+        arrived: Boolean(arrived),
+        lookAheadM: Number.isFinite(lookAheadM) ? lookAheadM : undefined,
+        anchor,
         zoom: Number.isFinite(zoom) ? zoom : CHASE_ZOOM
       };
       pendingNavRef.current = cam;
@@ -250,7 +272,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
           pitch: 0,
           bearing: 0,
           duration: 400,
-          padding: { top: 0, bottom: 0, left: 0, right: 0 }
+          padding: ZERO_PAD
         });
       } catch {
         /* ignore */
@@ -479,15 +501,19 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
           }, 120);
         }
       }
-      if (mine && guideFollow && !member.arrived) {
+      if (mine && guideFollow) {
+        const locked = pendingNavRef.current;
         const destLat = mode === "family" ? toLatLngNum(destPin?.lat) : room?.placeReady ? room.placeLat : null;
         const destLng = mode === "family" ? toLatLngNum(destPin?.lng) : room?.placeReady ? room.placeLng : null;
-        const lockedHeading = pendingNavRef.current?.heading;
+        const lockedHeading = locked?.heading;
         followTargetRef.current = {
-          lat: member.lat,
-          lng: member.lng,
-          zoom: CHASE_ZOOM,
-          tilt: CHASE_TILT,
+          lat: Number.isFinite(locked?.lat) ? locked.lat : member.lat,
+          lng: Number.isFinite(locked?.lng) ? locked.lng : member.lng,
+          zoom: Number.isFinite(locked?.zoom) ? locked.zoom : CHASE_ZOOM,
+          tilt: Number.isFinite(locked?.tilt) ? locked.tilt : CHASE_TILT,
+          arrived: Boolean(locked?.arrived || member.arrived),
+          lookAheadM: Number.isFinite(locked?.lookAheadM) ? locked.lookAheadM : member.arrived ? 0 : undefined,
+          anchor: locked?.anchor || (member.arrived ? "center" : undefined),
           heading: Number.isFinite(lockedHeading)
             ? lockedHeading
             : destLat != null && destLng != null
