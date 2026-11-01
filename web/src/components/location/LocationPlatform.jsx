@@ -517,6 +517,7 @@ export default function LocationPlatform() {
   const [destSearchFocused, setDestSearchFocused] = useState(false);
   const pinClickGuardUntilRef = useRef(0);
   const [searchOpen, setSearchOpen] = useState(true);
+  const [pinInspectAt, setPinInspectAt] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState("");
   const [miniPos, setMiniPos] = useState(() => readMiniPos() || { x: null, y: null });
   const [roomBusy, setRoomBusy] = useState("");
@@ -2806,13 +2807,20 @@ export default function LocationPlatform() {
           guideFollow={
             ((guideOn && session.mode === "vmap" && (session.departed || driveChase) && !selfArrived) ||
               familyGuiding) &&
-            firstPersonNav
+            firstPersonNav &&
+            !pinInspectAt
           }
           flyTo={session.flyTo}
+          previewTarget={
+            pinInspectAt && draftPin?.lat != null && draftPin?.lng != null
+              ? { lat: Number(draftPin.lat), lng: Number(draftPin.lng), zoom: 17, at: pinInspectAt }
+              : null
+          }
           pinEditable={Boolean(room?.hostUserId === getLocalVlueUserId())}
           onSelectMember={focusMember}
           onDraftPinChange={(next) => {
             pinDirtyRef.current = true;
+            setPinInspectAt(Date.now());
             setDraftPin((prev) => ({ ...(prev || {}), ...next, ready: false }));
           }}
           onUserGesture={() => {
@@ -3025,7 +3033,7 @@ export default function LocationPlatform() {
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[12px] font-semibold tracking-tight opacity-70">도착지 검색</p>
-                <button type="button" className={quietBtn} onClick={() => { setDestSearchFocused(false); setSearchOpen(false); setPlaceHits([]); }}>접기</button>
+                <button type="button" className={quietBtn} onClick={() => { setDestSearchFocused(false); setSearchOpen(false); setPlaceHits([]); setPinInspectAt(0); }}>접기</button>
               </div>
               <form
                 className="flex gap-2"
@@ -3071,6 +3079,7 @@ export default function LocationPlatform() {
                             ready: false,
                             imageUrl
                           });
+                          setPinInspectAt(Date.now());
                           viewRef.current = { ...viewRef.current, lat: place.lat, lng: place.lng, placed: true };
                           mapSurfaceRef.current?.panTo?.(place.lat, place.lng, 17);
                           setPlaceHits([]);
@@ -3102,6 +3111,7 @@ export default function LocationPlatform() {
                       setRoom(data.room);
                       setRoutes({});
                       setSearchOpen(false);
+                      setPinInspectAt(0);
                       pushNotice("도착 핀을 저장했습니다.");
                     }).catch((error) => pushNotice(error.message));
                   }}

@@ -187,6 +187,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
     departed = false,
     guideFollow = false,
     flyTo = null,
+    previewTarget = null,
     pinEditable = false,
     onSelectMember,
     onDraftPinChange,
@@ -211,9 +212,11 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
   const onErrorRef = useRef(onError);
   const selfRef = useRef(self);
   const peopleRef = useRef([]);
+  const previewTargetRef = useRef(previewTarget);
   const [mapEpoch, setMapEpoch] = useState(0);
 
   guideFollowRef.current = guideFollow;
+  previewTargetRef.current = previewTarget;
   onSelectRef.current = onSelectMember;
   onPinRef.current = onDraftPinChange;
   onGestureRef.current = onUserGesture;
@@ -361,6 +364,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
       const live = mapRef.current;
       const target = followTargetRef.current;
       if (!live || !guideFollowRef.current || !target) return;
+      if (previewTargetRef.current) return;
       if (live.__vmapChasePausedUntil && Date.now() < live.__vmapChasePausedUntil) return;
       applyChaseCamera(live, target, { force: false });
     }, 480);
@@ -430,7 +434,29 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
   }, [active]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!previewTarget?.lat || !map) return;
+    programmaticRef.current += 1;
+    map.__vmapChasePausedUntil = Date.now() + 86400000;
+    map.easeTo({
+      center: [previewTarget.lng, previewTarget.lat],
+      zoom: Number.isFinite(previewTarget.zoom) ? previewTarget.zoom : 17,
+      bearing: 0,
+      pitch: 0,
+      duration: 420
+    });
+    const t = window.setTimeout(() => {
+      programmaticRef.current = Math.max(0, programmaticRef.current - 1);
+    }, 500);
+    return () => {
+      window.clearTimeout(t);
+      if (mapRef.current) mapRef.current.__vmapChasePausedUntil = 0;
+    };
+  }, [previewTarget?.lat, previewTarget?.lng, previewTarget?.at, previewTarget?.zoom]);
+
+  useEffect(() => {
     if (!flyTo?.lat || !mapRef.current) return;
+    if (previewTargetRef.current) return;
     if (mapRef.current.__vmapChase) return;
     mapRef.current.easeTo({
       center: [flyTo.lng, flyTo.lat],
@@ -500,7 +526,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
           entry.lng = member.lng;
         }
       }
-      if (mine && !guideFollow && performance.now() - gestureAtRef.current > 1400) {
+      if (mine && !guideFollow && !previewTarget && performance.now() - gestureAtRef.current > 1400) {
         const cur = map.getCenter();
         if (haversineMeters(cur.lat, cur.lng, member.lat, member.lng) > 35) {
           programmaticRef.current += 1;
@@ -585,7 +611,7 @@ const VmapMapboxSurface = forwardRef(function VmapMapboxSurface(
     }
 
     if (!guideFollow) followTargetRef.current = null;
-  }, [active, mapEpoch, members, self, room, draftPin, destPin, routes, mode, departed, guideFollow, pinEditable]);
+  }, [active, mapEpoch, members, self, room, draftPin, destPin, routes, mode, departed, guideFollow, pinEditable, previewTarget]);
 
   return <div ref={hostRef} className="absolute inset-0 h-full w-full" />;
 });

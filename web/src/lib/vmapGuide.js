@@ -207,9 +207,9 @@ export function lookAheadLatLng(lat, lng, headingDeg, meters) {
   };
 }
 
-/** 입력창 위를 기준으로, 남은 지도의 이 비율 높이에 마커(하단)를 둔다. */
-export const CHASE_MARKER_FROM_BOTTOM = 0.32;
-/** 채팅 입력창이 가리는 하단(px). 카메라가 이 영역 아래로는 마커를 두지 않는다. */
+/** 주행 중 마커를 화면 하단에서 이 비율 높이에 고정한다 (0.24 = 하단 24%). */
+export const CHASE_MARKER_FROM_BOTTOM = 0.24;
+/** 채팅 입력창 높이. 마커는 이 값보다 위에 둔다. */
 export const CHASE_COMPOSER_INSET_PX = 96;
 const MAPBOX_TILE_PX = 512;
 const EARTH_CIRCUMFERENCE_M = 40075016.686;
@@ -220,12 +220,12 @@ function mapboxMetersPerPixel(lat, zoom) {
   return (EARTH_CIRCUMFERENCE_M * Math.max(0.08, Math.abs(cos))) / (MAPBOX_TILE_PX * 2 ** z);
 }
 
-/** 입력창 위 여유를 두고 마커를 올리기 위한 전방 시선 거리. Mapbox GL 512타일 기준. */
+/** 차량을 화면 하단에 고정하기 위한 전방 시선 거리. Mapbox GL 512타일 기준. */
 export function chaseLookAheadMeters(lat, zoom, viewportHeightPx, fraction = CHASE_MARKER_FROM_BOTTOM, overlayBottomPx = 0) {
   const height = Number.isFinite(viewportHeightPx) && viewportHeightPx > 200 ? viewportHeightPx : 640;
   const overlay = Math.max(0, Number(overlayBottomPx) || 0);
-  const usable = Math.max(160, height - overlay);
-  const fromBottom = overlay + (Number.isFinite(fraction) ? fraction : CHASE_MARKER_FROM_BOTTOM) * usable;
+  const frac = Number.isFinite(fraction) ? fraction : CHASE_MARKER_FROM_BOTTOM;
+  const fromBottom = Math.max(height * frac, overlay + 40);
   const lookAheadPx = height / 2 - fromBottom;
   if (!(lookAheadPx > 4)) return 0;
   const mpp = mapboxMetersPerPixel(lat, zoom);
