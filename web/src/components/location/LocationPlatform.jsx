@@ -3008,13 +3008,6 @@ export default function LocationPlatform() {
           ) : null}
           <button type="button" onClick={() => { setMembersOpen(false); hideLocationAds(); setSettingsOpen((open) => !open); }} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75 text-white" : "border border-black/5 bg-white/85 text-slate-900"}`} aria-label="화면 설정">☼</button>
         </div>
-        {!keyboardInset && hideChromeForNav ? (
-          <div className={`absolute bottom-3 right-3 z-40 flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
-            <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
-            <div className={dark ? "h-px bg-white/10" : "h-px bg-black/10"} />
-            <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
-          </div>
-        ) : null}
         <p className="pointer-events-none absolute bottom-3 left-3 z-10 text-[10px] font-semibold text-slate-600/80">© Mapbox</p>
         {farewell ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 px-8 text-center">
@@ -3137,12 +3130,12 @@ export default function LocationPlatform() {
             playingVoiceId={playingVoiceId}
             onPlayVoice={playVoice}
             expandToken={chatExpandToken}
-            bottomOffset={navigatingNow ? 72 : 4}
+            bottomOffset={navigatingNow || hideChromeForNav ? 72 : 4}
           />
         ) : null}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-end">
-        {!keyboardInset && !hideChromeForNav ? (
-          <div className={`pointer-events-auto mb-1.5 mr-3 flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
+        {!keyboardInset ? (
+          <div className={`pointer-events-auto flex flex-col overflow-hidden rounded-2xl backdrop-blur-xl ${hideChromeForNav ? "absolute right-3 bottom-[3.65rem]" : "mb-1.5 mr-3"} ${dark ? "border border-white/10 bg-[#0c1220]/75" : "border border-black/5 bg-white/85"}`}>
             <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(1)} aria-label="확대">+</button>
             <div className={dark ? "h-px bg-white/10" : "h-px bg-black/10"} />
             <button type="button" className="h-11 w-11 text-[20px] font-medium leading-none text-[#00D2FF]" onClick={() => nudgeZoom(-1)} aria-label="축소">−</button>
@@ -3557,6 +3550,54 @@ export default function LocationPlatform() {
           </>
         ) : null}
       </div>
+        {hideChromeForNav && chatReady ? (
+          <div className="pointer-events-auto w-full px-3 pb-1.5">
+            <form
+              className={`flex min-w-0 items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 shadow-[0_10px_28px_rgba(0,0,0,0.28)] backdrop-blur-xl ${dark ? "border-white/15 bg-[#0c1220]/88" : "border-black/10 bg-white/90"}`}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void sendText();
+              }}
+            >
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    void sendText();
+                  }
+                }}
+                placeholder={session.mode === "family" ? "가족에게 메시지" : "메시지를 입력하세요"}
+                onFocus={() => setComposerFocused(true)}
+                onBlur={() => setComposerFocused(false)}
+                className={`min-w-0 flex-1 bg-transparent py-2 text-[13px] font-medium outline-none ${dark ? "text-white placeholder:text-white/45" : "text-slate-900 placeholder:text-slate-400"}`}
+              />
+              <button type="submit" aria-label="보내기" disabled={sending} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${draft.trim() ? "bg-[#00D2FF] text-[#04121a]" : dark ? "bg-white/10 text-white/35" : "bg-slate-200 text-slate-400"}`}>
+                <SendIcon />
+              </button>
+              <button type="button" onPointerDown={startVoice} onPointerUp={stopVoice} onPointerCancel={stopVoice} className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] ${recording ? "bg-rose-500 text-white" : dark ? "bg-white/10 text-white/80" : "bg-slate-200 text-slate-700"}`} aria-label="길게 눌러 음성 메시지">
+                {recording ? (
+                  <span className="flex h-5 items-end gap-[2px]" aria-hidden>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <span
+                        key={i}
+                        className="w-[2px] rounded-full bg-white"
+                        style={{
+                          height: "100%",
+                          animation: `vmap-voice-wave 0.9s ease-in-out ${i * 0.08}s infinite`,
+                          transformOrigin: "bottom"
+                        }}
+                      />
+                    ))}
+                  </span>
+                ) : (
+                  "🎤"
+                )}
+              </button>
+            </form>
+          </div>
+        ) : null}
         </div>
       </div>
 
