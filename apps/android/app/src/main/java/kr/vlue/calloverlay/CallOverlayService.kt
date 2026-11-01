@@ -3714,9 +3714,13 @@ class CallOverlayService : Service() {
                 } else if (kind == "lookup_pending" || kind == "unverified" ||
                     (o.has("matched") && !o.optBoolean("matched", true))
                 ) {
-                    ""
+                    clean(o.optString("contactName"))
+                        .ifBlank { clean(o.optString("softDisplayName")) }
+                        .ifBlank { clean(o.optString("displayName")) }
+                        .ifBlank { clean(o.optString("name")) }
                 } else {
-                    clean(o.optString("organization"))
+                    clean(o.optString("softDisplayName"))
+                        .ifBlank { clean(o.optString("organization")) }
                         .ifBlank { clean(o.optString("companyName")) }
                         .ifBlank { clean(o.optString("displayName")) }
                         .ifBlank { clean(o.optString("name")) }

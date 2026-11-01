@@ -52,9 +52,16 @@ export function mapLookupToLetteringCard(body = {}, incomingPhone = "") {
   /* 「—」를 name 에 넣으면 빅푸시가 폴백(전화·상호) 없이 대시만 고착됨 */
   const safeName = resolvedName === "—" || resolvedName === "-" ? "" : resolvedName;
 
+  const softDisplayName = String(
+    body.softDisplayName || nested.softDisplayName || safeName
+  ).trim();
+  const legalName = String(body.legalName || nested.legalName || "").trim();
+
   return {
     name: safeName,
     displayName: safeName,
+    softDisplayName: softDisplayName === "—" || softDisplayName === "-" ? "" : softDisplayName,
+    legalName,
     title: body.jobTitle || nested.jobTitle || nested.title || exportSnap.jobTitle || "",
     organization:
       (() => {

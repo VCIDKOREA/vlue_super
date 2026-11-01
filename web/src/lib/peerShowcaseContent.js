@@ -3,7 +3,8 @@ import { peerAuthCycleLapsed } from "./letteringMembership.js";
 /**
  * 통화·공유에서 상대가 DCC/쇼케이스 송출 콘텐츠가 있는지.
  * 네이티브 VlueAuthMemberPopupPolicy 와 동일:
- * 명시 includeDigitalCard:false 만 인증 팝업. 키 누락 + 실 DCC 는 쇼케이스.
+ * 명시 includeDigitalCard:false 만 인증 팝업.
+ * 쇼케이스 미디어 또는 DCC 상호/로고가 있을 때만 풀 쇼케이스.
  */
 
 /** 라이브 송출이 명시적으로 ON (includeDigitalCard === true) */
@@ -108,12 +109,8 @@ export function peerHasDccOrShowcaseContent(card, style) {
   if (peerAuthCycleLapsed(card)) return styleHasRegisteredShowcase(st);
   const media = styleHasShowcaseMedia(st);
   const body = cardHasDccBody(card);
-  const soft = cardHasSoftIdentityHints(card);
-  const handle = String(card?.publicHandle || card?.loginId || card?.vlueId || "")
-    .trim()
-    .replace(/^@/, "");
-  const digitalActive = card?.digitalCardActive === true || card?.digitalCardIssued === true;
-  if (media || body || soft || handle || digitalActive) return true;
+  /* 프로필 사진·이메일·핸들만으로 빈 쇼케이스를 열지 않음. 미디어 또는 DCC 상호/로고. */
+  if (media || body) return true;
   return false;
 }
 

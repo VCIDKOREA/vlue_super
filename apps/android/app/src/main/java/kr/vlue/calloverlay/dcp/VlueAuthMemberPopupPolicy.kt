@@ -126,28 +126,17 @@ object VlueAuthMemberPopupPolicy {
         }
         val media = styleHasMedia(style)
         val orgHints = hasBroadcastOrgHints(root, card)
-        val softHints = hasSoftIdentityHints(root, card)
-        val handle =
-            firstNonBlank(
-                card.optString("publicHandle"),
-                root.optString("publicHandle"),
-                card.optString("loginId"),
-                root.optString("loginId")
-            ) != null
-        val digitalActive =
-            root.optBoolean("digitalCardActive", false) ||
-                card.optBoolean("digitalCardActive", false) ||
-                root.optBoolean("digitalCardIssued", false) ||
-                card.optBoolean("digitalCardIssued", false)
 
         /*
          * 유료 구독 주기 종료 — DCC 는 열지 않는다.
          * 등록된 쇼케이스(페이지·갤러리·BGM)만 송출, 없으면 안심팝업.
          */
-        /* 구독 만료 — 사진이 있는 쇼케이스만. 빈 페이지·BGM·DCC 필드는 안심팝업. */
         if (authCycleLapsed(root, card)) return styleHasVisualShowcase(style)
-        /* 키 누락 = 기본 송출 ON. 실 DCC/미디어/상호가 있으면 쇼케이스 */
-        return media || orgHints || softHints || handle || digitalActive
+        /*
+         * 프로필 사진·이메일·핸들·digitalCardActive 만으로는 빈 쇼케이스를 열지 않는다.
+         * 실제 쇼케이스 미디어 또는 DCC 상호/로고/직함이 있을 때만 FULL_SHOWCASE.
+         */
+        return media || orgHints
     }
 
     /** authCycleEndAt 이 과거면 유료 DCC 자격 없음. 날짜가 없으면 만료로 보지 않는다. */
@@ -187,23 +176,6 @@ object VlueAuthMemberPopupPolicy {
             card.optString("jobTitle"),
             root.optString("jobTitle")
         ) != null
-    }
-
-    private fun hasSoftIdentityHints(root: JSONObject, card: JSONObject): Boolean {
-        return firstNonBlank(
-            card.optString("email"),
-            root.optString("email"),
-            card.optString("image_url"),
-            root.optString("image_url"),
-            card.optString("photoUrl"),
-            root.optString("photoUrl"),
-            card.optString("avatarUrl"),
-            root.optString("avatarUrl")
-        ) != null
-    }
-
-    private fun hasDccOrMediaHints(root: JSONObject, card: JSONObject): Boolean {
-        return hasBroadcastOrgHints(root, card) || hasSoftIdentityHints(root, card)
     }
 
     /** 통화에 보여줄 쇼케이스 사진. 타입만 있는 스텁과 BGM은 제외. */

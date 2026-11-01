@@ -43,16 +43,24 @@ export function resolveOutgoingLogoLabel(card, communityTipLabel = "") {
       cleanName(card.dcp?.contactName);
     return saved || OUTGOING_LOGO_TAP_HINT;
   }
-  /* 조회 대기 · 미등록 — 다른 회원의 제보 상호가 있으면 그 이름. 시안 배지는 붙이지 않는다. */
+  /* 조회 대기 · 미등록 — 저장 이름/제보 상호가 있으면 그걸 쓰고, 없을 때만 탭 안내. */
   if (kind === "lookup_pending" || kind === "unverified" || card.matched === false) {
-    return tipped || OUTGOING_LOGO_TAP_HINT;
+    const saved =
+      cleanName(card.contactName) ||
+      cleanName(card.softDisplayName) ||
+      cleanName(card.displayName) ||
+      cleanName(card.name) ||
+      cleanName(card.dcp?.contactName);
+    return saved || tipped || OUTGOING_LOGO_TAP_HINT;
   }
 
   const name =
+    cleanName(card.softDisplayName) ||
     cleanName(card.organization) ||
     cleanName(card.companyName) ||
     cleanName(card.displayName) ||
     cleanName(card.name) ||
+    cleanName(card.legalName) ||
     cleanName(card.contactName);
 
   return name || OUTGOING_LOGO_TAP_HINT;
@@ -115,7 +123,8 @@ export function resolveCallIdentityRoll(card, communityTipLabel = "") {
 /** 발신 탭로고 — 유료 회원·유료 가족 구성원 이름 옆 시안 배지. */
 export function outgoingLogoShowsMemberBadge(card, verified) {
   const flag = card?.vlueVerifiedBadge ?? card?.vlue_verified_badge;
-  if (flag !== true) return false;
+  const paid = String(card?.membershipTier || "").toLowerCase() === "paid";
+  if (flag !== true && !paid) return false;
   const kind = String(card?.profileKind || "").trim();
   if (
     kind === "contact_safe_care" ||

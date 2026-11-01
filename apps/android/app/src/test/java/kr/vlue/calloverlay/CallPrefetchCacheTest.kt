@@ -45,6 +45,17 @@ class CallPrefetchCacheTest {
             )
         )
         assertEquals(Tier.UNREGISTERED, CallPrefetchCache.classify(null))
+        assertEquals(
+            Tier.PUBLIC_DB,
+            CallPrefetchCache.classify(
+                CardLookupResult(
+                    matched = false,
+                    verified = false,
+                    displayName = "어머니",
+                    rawJson = """{"matched":false,"profileKind":"contact_safe_care","source":"device_contact_safe_care","displayName":"어머니","contactName":"어머니"}"""
+                )
+            )
+        )
     }
 
     @Test

@@ -148,6 +148,11 @@ android {
         }
         getByName("release") {
             isDebuggable = false
+            /* USB NTFS zip 손상 회피: 스토어 AAB는 기기 ABI만 포함 (x86 에뮬은 debug) */
+            ndk {
+                abiFilters.clear()
+                abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+            }
             /* 저메모리 PC에서 R8 OOM 방지 — 상태바 핫픽스 AAB용. 이후 RAM 여유 시 다시 true */
             isMinifyEnabled = false
             isShrinkResources = false

@@ -2,6 +2,8 @@ package kr.vlue.calloverlay
 
 import android.content.Context
 import android.util.Log
+import kr.vlue.calloverlay.dcp.CallPathVerdict
+import kr.vlue.calloverlay.dcp.ContactSafeCarePayload
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -153,6 +155,18 @@ object CallPrefetchCache {
                 )
             )
         }
+        val contactName = DeviceContactsReader.resolveDisplayNameForSafeCare(app, raw)?.trim().orEmpty()
+        if (contactName.isNotBlank()) {
+            val json = ContactSafeCarePayload.toJson(raw, contactName, CallPathVerdict.normal())
+            return entryFrom(
+                CardLookupResult(
+                    matched = false,
+                    verified = false,
+                    displayName = contactName,
+                    rawJson = json
+                )
+            )
+        }
         return null
     }
 
@@ -197,9 +211,9 @@ object CallPrefetchCache {
         return accepted
     }
 
-    /** 결과 → 티어. matched=false/null 은 미등록. */
+    /** 결과 → 티어. matched=false 라도 주소록 안심케어는 PUBLIC_DB. */
     internal fun classify(result: CardLookupResult?): Tier {
-        if (result == null || !result.matched) return Tier.UNREGISTERED
+        if (result == null) return Tier.UNREGISTERED
         return try {
             val json = JSONObject(result.rawJson)
             val kind = json.optString("profileKind").trim()
@@ -208,17 +222,20 @@ object CallPrefetchCache {
                 kind == "contact_safe_care" ||
                 source == "public_directory_local" ||
                 source == "public_directory" ||
+                source == "device_contact_safe_care" ||
                 source == "portal_kakao" ||
                 source == "portal_naver" ||
                 source == "community_tip" ||
                 json.optBoolean("vlueIntelligenceFound", false)
             ) {
                 Tier.PUBLIC_DB
+            } else if (!result.matched) {
+                Tier.UNREGISTERED
             } else {
                 Tier.VLUE_MEMBER
             }
         } catch (_: Exception) {
-            Tier.VLUE_MEMBER
+            if (!result.matched) Tier.UNREGISTERED else Tier.VLUE_MEMBER
         }
     }
 
@@ -233,9 +250,13 @@ object CallPrefetchCache {
                 json.optString("organization"),
                 card.optString("companyName"),
                 json.optString("companyName"),
+                card.optString("softDisplayName"),
+                json.optString("softDisplayName"),
                 result.displayName,
                 card.optString("displayName"),
-                json.optString("displayName")
+                json.optString("displayName"),
+                card.optString("contactName"),
+                json.optString("contactName")
             ).map { it.trim() }.firstOrNull { it.isNotEmpty() && it != "null" }.orEmpty()
         } catch (_: Exception) {
             result.displayName.trim()

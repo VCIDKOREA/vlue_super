@@ -1,6 +1,6 @@
 import { prisma } from "../db/client.js";
 import { absolutizeMediaUrl } from "../lib/mediaUrlGuard.js";
-import { normalizeToE164KR } from "../lib/phoneE164.js";
+import { normalizeToE164KR, phoneMatchVariants } from "../lib/phoneE164.js";
 import { isPlatformCeoHandle } from "./admin/platformAccountRoles.js";
 import { hasCurrentSelfPaidEntitlement } from "./membership/paidEntitlementDb.js";
 import { getVluePublicOrigin } from "./bizcard/bizcardPublicUrls.js";
@@ -670,12 +670,13 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
   if (!e164) {
     return { status: 400 as const, body: { error: "??????? ???????????.", matched: false } };
   }
+  const phoneKeys = [...new Set([...phoneMatchVariants(String(raw || "")), ...phoneMatchVariants(e164)])];
 
   const [peer, card] = await Promise.all([
     readOutgoingCallPathSignal(e164),
     prisma.businessCard.findFirst({
     where: {
-      phoneE164: e164,
+      phoneE164: { in: phoneKeys },
       /* DELETED/INACTIVE 소유 명함은 무시 — 재가입 ACTIVE 유저.phoneE164 폴백으로 넘김 */
       user: { status: "ACTIVE" }
     },
@@ -945,12 +946,13 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
     };
   }
 
+  /* 유료·가족 회원은 본인인증/DCC 명함이 없어도 통화 조회에 매칭한다.
+   * (이전: identityVerified 또는 digitalCard 필수 → 쇼케이스 미설정 유료회원이 미등록으로 떨어짐) */
   const user = await prisma.user.findFirst({
     where: {
-      phoneE164: e164,
+      phoneE164: { in: phoneKeys },
       status: { not: "DELETED" },
-      NOT: { accountStatus: "suspended" },
-      OR: [{ identityVerified: true }, { digitalCard: { isNot: null } }]
+      NOT: { accountStatus: "suspended" }
     },
     select: {
       id: true,
@@ -1012,7 +1014,8 @@ async function lookupCardForCallOverlay(raw: string, opts: LookupOptions) {
       body: attachPeerPath(
         {
           matched: true,
-          is_verified: Boolean(user.identityVerified) || Boolean(user.digitalCard),
+          is_verified:
+            Boolean(user.identityVerified) || Boolean(user.digitalCard) || callTier === "paid",
           vlue_verified_badge: await officialCyanBadgeForUserId(user.id),
           source: "user_mobile",
           userId: user.id,

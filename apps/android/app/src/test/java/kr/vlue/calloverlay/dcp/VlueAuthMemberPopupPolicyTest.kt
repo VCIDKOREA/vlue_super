@@ -54,11 +54,11 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun photoOnly_withoutStyleKey_isDisplayableDcc() {
+    fun photoOnly_withoutShowcase_isAuthMemberOnly() {
         val json =
-            """{"matched":true,"is_verified":true,"displayName":"이종근","phoneE164":"+821080144666","image_url":"https://x/a.png"}"""
-        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
-        assertTrue(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+            """{"matched":true,"is_verified":true,"displayName":"이종근","phoneE164":"+821080144666","image_url":"https://x/a.png","publicHandle":"mom1"}"""
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
     }
 
     @Test
@@ -98,20 +98,19 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun memberWithDcc_withoutStyleKey_isNotAuthMemberOnly() {
-        /* 키 누락 + 실 DCC(이메일·핸들·발급) → 쇼케이스. 인증팝업 고착 금지 */
+    fun memberWithHandleEmailOnly_isAuthMemberOnly() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"이슬기","publicHandle":"seulgi1","email":"a@b.c","digitalCardActive":true}"""
-        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
-        assertTrue(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
     }
 
     @Test
-    fun gwangdeokLikeDcc_withoutIncludeKey_opensShowcase() {
+    fun gwangdeokLikePaid_withoutOrgOrPages_isAuthPopup() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"김광덕","email":"zazajin@naver.com","digitalCardActive":true,"phoneE164":"+821020006466"}"""
-        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
-        assertTrue(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
     }
 
     @Test
@@ -139,10 +138,11 @@ class VlueAuthMemberPopupPolicyTest {
     }
 
     @Test
-    fun jeonjungheeBroadcastOn_withPhoto_isNotAuthMemberOnly() {
+    fun jeonjungheeBroadcastOn_withPhotoOnly_isAuthMemberOnly() {
         val json =
             """{"matched":true,"is_verified":true,"displayName":"전중희","showcaseStyle":{"includeDigitalCard":true},"photoUrl":"https://x/tree.png","email":"test@vlue.kr"}"""
-        assertFalse(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertTrue(VlueAuthMemberPopupPolicy.isAuthMemberOnly(json, verified = true))
+        assertFalse(VlueAuthMemberPopupPolicy.hasBroadcastShowcaseContent(json))
     }
 
     @Test
