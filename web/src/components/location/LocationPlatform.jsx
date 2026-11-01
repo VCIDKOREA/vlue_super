@@ -144,7 +144,7 @@ function remainingRouteMeters(route, lat, lng) {
   return Number.isFinite(listed) && listed > 0 ? Math.round(listed) : null;
 }
 const ACCENT = "#00D2FF";
-const AD_BANNER_PX = 56;
+const AD_BANNER_PX = 60;
 /** 수동 도착 완료는 이 거리 안에 들어와야 한다. */
 const MANUAL_ARRIVE_METERS = 180;
 const MINI_KEY = "vlue_vmap_mini_pos_v1";
@@ -2774,11 +2774,11 @@ export default function LocationPlatform() {
     : null;
   return (
     <section
-      className={`fixed inset-x-0 top-0 z-[530] overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
+      className={`fixed inset-x-0 top-0 z-[530] flex flex-col overflow-hidden ${dark ? "bg-[#0b1018] text-white" : "bg-[#f6f8fb] text-slate-900"}`}
       style={{ bottom: liftForKeyboard }}
       onPointerDownCapture={bindMapTapFeedback}
     >
-      <div className="absolute inset-0 z-0">
+      <div className="relative z-0 min-h-0 flex-1">
         <VmapMapboxSurface
           ref={mapSurfaceRef}
           active={session.open}
@@ -3134,9 +3134,7 @@ export default function LocationPlatform() {
             bottomOffset={navigatingNow ? 72 : 4}
           />
         ) : null}
-      </div>
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col justify-end">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
       <div className={`pointer-events-auto space-y-2 px-3 pb-1 pt-2 ${hideChromeForNav ? "hidden" : ""}`}>
         {selected && session.mode === "family" && !detailOpen ? (
           <div className="space-y-2">
@@ -3540,8 +3538,13 @@ export default function LocationPlatform() {
           </>
         ) : null}
       </div>
+        </div>
+      </div>
 
-      <div className="pointer-events-auto shrink-0 px-3 pt-2" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
+      <div
+        className={`relative z-40 shrink-0 px-3 pt-2 ${dark ? "bg-[#0b1018]" : "bg-[#f6f8fb]"}`}
+        style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
+      >
         {settingsOpen || membersOpen || keyboardInset > 80 ? (
           <div style={{ height: AD_BANNER_PX }} aria-hidden />
         ) : sponsor ? (
@@ -3557,7 +3560,6 @@ export default function LocationPlatform() {
         ) : (
           <div style={{ height: AD_BANNER_PX }} />
         )}
-      </div>
       </div>
 
       {settingsOpen ? (
