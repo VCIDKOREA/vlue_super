@@ -6,7 +6,8 @@ import {
   Globe,
   Printer,
   Check,
-  Landmark
+  Landmark,
+  UserPlus
 } from "lucide-react";
 import { formatLetteringPhoneDisplay } from "../lib/letteringPhoneMatch.js";
 import { isMaskedPhoneDisplay } from "../lib/dccExposure.js";
@@ -14,6 +15,7 @@ import {
   canShowDccAccountOnCard,
   formatDccAccountCopyText
 } from "../lib/dccAccountFields.js";
+import { saveDccCardToDeviceContacts } from "../lib/contactVcfSave.js";
 import {
   formatLetteringReceptionLines,
   resolveDccFrontIdentityLines,
@@ -884,8 +886,12 @@ function FrontPanel({
           {(() => {
             /* 미니미리보기·상대 쇼케이스·실통화 DCC — 동일 resolveDccFrontIdentityLines */
             const { primary, secondary } = resolveDccFrontIdentityLines(card);
-            const showAccountBtn = canShowDccAccountOnCard(card);
-            if (!secondary && !showAccountBtn) return null;
+            const canSaveContact = Boolean(
+              String(card.legalName || card.name || card.displayName || "").trim() ||
+                (!phoneMasked && phoneRaw) ||
+                emailClean
+            );
+            if (!secondary && !canSaveContact) return null;
 
             let nameNode = null;
             if (secondary) {
@@ -929,19 +935,31 @@ function FrontPanel({
             return (
               <div className="ldr-back-person-line">
                 {nameNode}
-                {showAccountBtn ? (
+                {canSaveContact ? (
                   <button
                     type="button"
                     className="ldr-account-view-btn"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setAccountOpen(true);
+                      void (async () => {
+                        const r = await saveDccCardToDeviceContacts(card);
+                        if (r?.cancelled) return;
+                        if (r?.ok) {
+                          onToast?.(
+                            r.method === "native"
+                              ? "연락처 앱으로 전달했습니다."
+                              : "연락처 파일을 저장했습니다."
+                          );
+                        } else {
+                          onToast?.(r?.error || "연락처 저장에 실패했습니다.");
+                        }
+                      })();
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
-                    <Landmark className="ldr-account-view-btn__icon" strokeWidth={2.4} aria-hidden />
-                    계좌보기
+                    <UserPlus className="ldr-account-view-btn__icon" strokeWidth={2.4} aria-hidden />
+                    연락처 저장
                   </button>
                 ) : null}
               </div>
@@ -1076,6 +1094,24 @@ function FrontPanel({
               )}
             </p>
           </FrontInfoRow>
+        ) : null}
+
+        {canShowDccAccountOnCard(card) ? (
+          <div className="ldr-front-account-sub">
+            <button
+              type="button"
+              className="ldr-account-view-btn ldr-account-view-btn--sub"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAccountOpen(true);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <Landmark className="ldr-account-view-btn__icon" strokeWidth={2.4} aria-hidden />
+              계좌보기
+            </button>
+          </div>
         ) : null}
 
       </div>

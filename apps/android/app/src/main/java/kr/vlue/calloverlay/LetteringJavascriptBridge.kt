@@ -386,6 +386,23 @@ class LetteringJavascriptBridge(
         service.hideOverlayBannerAd(slotKey)
     }
 
+    /** DCC 「연락처 저장」→ 시스템 새 연락처 추가 */
+    @JavascriptInterface
+    fun saveContactProfile(json: String?) {
+        OverlayDebugLog.bridgeIn("saveContactProfile", json.orEmpty().take(120))
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            ContactInsertHelper.openInsert(service, json)
+        }
+    }
+
+    @JavascriptInterface
+    fun saveContact(vcf: String?, filename: String?) {
+        OverlayDebugLog.bridgeIn("saveContact", filename.orEmpty())
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            ContactInsertHelper.shareVcf(service, vcf, filename)
+        }
+    }
+
     /**
      * 웹 → 시스템 클립보드 직접 복사 (Android OS ClipboardManager 호출).
      */
@@ -464,6 +481,10 @@ class LetteringJavascriptBridge(
                 window.Android.showBannerAd = window.VlueLettering.showBannerAd;
                 window.VlueLettering.hideBannerAd = function(slot){ try{ Android.hideBannerAd(String(slot||'')); }catch(e){} };
                 window.Android.hideBannerAd = window.VlueLettering.hideBannerAd;
+                window.VlueLettering.saveContactProfile = function(j){ try{ Android.saveContactProfile(String(j||'{}')); }catch(e){} };
+                window.Android.saveContactProfile = window.VlueLettering.saveContactProfile;
+                window.VlueLettering.saveContact = function(v,f){ try{ Android.saveContact(String(v||''), String(f||'')); }catch(e){} };
+                window.Android.saveContact = window.VlueLettering.saveContact;
                 window.VlueLettering.onNativeCallState = window.VlueLettering.onNativeCallState || function(){};
                 window.VlueLettering.logJsError = function(detail){ try{ Android.logJsError(String(detail||'')); }catch(e){} };
                 window.Android.logJsError = window.VlueLettering.logJsError;

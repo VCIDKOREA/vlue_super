@@ -8894,6 +8894,26 @@ button.ldr-back-person-name--link:active {
   flex-shrink: 0;
 }
 
+.ldr-back-person-line .ldr-account-view-btn {
+  margin-left: auto;
+}
+
+.ldr-front-account-sub {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  padding: 4px 0 2px;
+}
+
+.ldr-account-view-btn--sub {
+  background: transparent;
+  color: #a5f3fc;
+  border-color: rgba(165, 243, 252, 0.45);
+  box-shadow: none;
+  text-shadow: none;
+}
+
 .ldr-account-view-btn:active {
   transform: scale(0.96);
   filter: brightness(1.06);

@@ -1,4 +1,8 @@
 import { apiUrl } from "./apiBase.js";
+import { isMaskedPhoneDisplay } from "./dccExposure.js";
+
+/** vCard NOTE — DCC 연락처 저장 시그니처 */
+export const VLUE_VCARD_NOTE = "Saved via VLUÉ Secure Digital Card";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -19,7 +23,37 @@ function asciiFilename(name) {
   return base || "contact";
 }
 
-/** 채팅·지갑 스냅샷 → vCard 3.0 (서버 없을 때 폴백) */
+function scrubPlaceholder(value) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  if (/입력할 수 있습니다\.?$/.test(s)) return "";
+  return s;
+}
+
+/** DCC 앞면 카드 → vCard/네이티브 Insert 용 프로필 */
+export function dccCardToContactProfile(card = {}) {
+  const orgRaw = String(card.organization || card.companyName || "").trim();
+  const organization = /^vlue$/i.test(orgRaw) ? "" : orgRaw;
+  const name = String(card.legalName || card.name || card.displayName || "").trim();
+  const title = String(card.title || card.jobTitle || "").trim();
+  const department = String(card.department || "").trim();
+  const phoneRaw = String(card.phone || card.landline || "").trim();
+  const phone = isMaskedPhoneDisplay(phoneRaw) ? "" : phoneRaw;
+  return {
+    name,
+    legalName: name,
+    organization,
+    title,
+    department,
+    phone,
+    fax: scrubPlaceholder(card.fax),
+    email: scrubPlaceholder(card.email),
+    website: scrubPlaceholder(card.website || card.url),
+    address: scrubPlaceholder(card.address)
+  };
+}
+
+/** 채팅·지갑·DCC 스냅샷 → vCard 3.0 */
 export function buildLocalContactVcf(profile) {
   const name = String(profile.name || profile.legalName || "VLUÉ").trim() || "VLUÉ";
   const org = String(profile.organization || "").trim();
@@ -29,12 +63,12 @@ export function buildLocalContactVcf(profile) {
   const email = String(profile.email || "").trim();
   const website = String(profile.website || profile.url || "").trim();
   const address = String(profile.address || "").trim();
-  const note = String(profile.introBack || profile.backNote || "").trim();
+  const extra = String(profile.introBack || profile.backNote || "").trim();
+  const note = extra ? `${VLUE_VCARD_NOTE}\n${extra}` : VLUE_VCARD_NOTE;
 
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
-    "CHARSET=UTF-8",
     `FN:${escVcf(name)}`,
     `N:${escVcf(name)};;;;`,
     org ? `ORG:${escVcf(org)}` : "",
@@ -44,8 +78,7 @@ export function buildLocalContactVcf(profile) {
     email ? `EMAIL;TYPE=INTERNET:${escVcf(email)}` : "",
     website ? `URL:${escVcf(website)}` : "",
     address ? `ADR;TYPE=WORK:;;${escVcf(address)};;;;` : "",
-    note ? `NOTE:${escVcf(note)}` : "",
-    "SOURCE:VLUÉ App",
+    `NOTE:${escVcf(note)}`,
     "END:VCARD"
   ].filter(Boolean);
 
@@ -157,6 +190,38 @@ export async function saveProfileToDeviceContacts(profile) {
     vcf = buildLocalContactVcf(p);
     filename = `VLUÉ-${asciiFilename(p.name)}.vcf`;
   }
+
+  if (tryNativeContactBridge(vcf, filename, p)) {
+    return { ok: true, method: "native" };
+  }
+
+  const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
+  const file = new File([blob], filename, { type: "text/vcard" });
+
+  try {
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      return { ok: true, method: "share" };
+    }
+  } catch (e) {
+    if (e?.name === "AbortError") return { ok: false, cancelled: true };
+  }
+
+  triggerDownload(blob, filename);
+  return { ok: true, method: "download" };
+}
+
+/**
+ * DCC 앞면 「연락처 저장」.
+ * 로컬 vCard 3.0을 만들고, 앱 웹뷰면 순정 주소록 Insert, 아니면 .vcf 다운로드.
+ */
+export async function saveDccCardToDeviceContacts(card) {
+  const p = dccCardToContactProfile(card || {});
+  if (!p.name && !p.phone && !p.email && !p.organization) {
+    return { ok: false, error: "저장할 연락처 정보가 없습니다." };
+  }
+  const vcf = buildLocalContactVcf(p);
+  const filename = `VLUÉ-${asciiFilename(p.name || p.organization)}.vcf`;
 
   if (tryNativeContactBridge(vcf, filename, p)) {
     return { ok: true, method: "native" };
