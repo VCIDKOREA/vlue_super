@@ -39,6 +39,7 @@ import OutgoingCallLogo from "./call/OutgoingCallLogo.jsx";
 import { outgoingLogoShowsMemberBadge, resolveCallIdentityRoll } from "../lib/call/outgoingLogoLabel.js";
 import { cardHasOfficialCyanBadge } from "../lib/vlueVerifiedBadgeApi.js";
 import { COMPANION_MVP_DELEGATE_CALL_UI } from "../lib/call/companionMvpFlags.js";
+import { nativeGetScreenSize } from "../lib/call/nativeCallControl.js";
 import { trackCallInterfaceUse, trackShowcaseView } from "../lib/productMetrics.js";
 import { ShowcaseBgmProvider, useShowcaseBgm } from "../context/ShowcaseBgmContext.jsx";
 import { dcpCardMatchesIncoming, dcpRouteForIncoming, matchNationalAgency } from "../lib/nationalAgencyDcpClient.js";
@@ -52,16 +53,28 @@ const SHOWCASE_SURFACE_SELECTOR = [
   ".lettering-ongoing-expand-slot__inner"
 ].join(",");
 
+function applyNativeOverlayHeightFallback() {
+  const size = nativeGetScreenSize();
+  if (!size || size.h < 280) return "";
+  const cssPx = `${Math.round((size.h / (size.d || 1)) * 10) / 10}px`;
+  try {
+    document.documentElement.style.setProperty("--vlue-overlay-h", cssPx);
+  } catch {
+    /* ignore */
+  }
+  return cssPx;
+}
+
 function overlayHeightCss() {
   try {
     const raw = getComputedStyle(document.documentElement).getPropertyValue("--vlue-overlay-h").trim();
     const n = Number.parseFloat(raw);
     /* 미니·로고 잔여(≈120–168px)를 풀쇼케이스 높이로 쓰면 DCC 가 다시 접힌다. */
-    if (!Number.isFinite(n) || n < 280) return "";
-    return raw;
+    if (Number.isFinite(n) && n >= 280) return raw;
   } catch {
-    return "";
+    /* fall through */
   }
+  return applyNativeOverlayHeightFallback();
 }
 
 function clearShowcaseSurfaceUnlock() {

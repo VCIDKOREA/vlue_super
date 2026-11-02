@@ -65,16 +65,22 @@ class CompanionOverlaySession {
      * 측정된 창이 화면의 80% 이상일 때만 그 픽셀을 CSS 높이로 쓴다.
      * 로고·미니 높이에 화면 픽셀을 실으면 본문이 창 밖으로 잘려 빈 다크 화면이 된다.
      *
+     * Window 파라미터는 이미 전체화면인데 측정만 한 프레임 늦는 경우
+     * ([layoutCommittedFullscreen]) 화면 높이를 쓴다. 이때 CSS 를 비우면
+     * setExpanded 가 높이 0 뷰포트에 DCC 를 그려 중간에서 끊긴다.
+     *
      * @return 발행할 px. null 이면 아직 창이 안 커진 상태라 발행하지 않는다.
      */
-    fun fullscreenCssHeightPx(screenPx: Int, measuredPx: Int): Int? {
+    fun fullscreenCssHeightPx(
+        screenPx: Int,
+        measuredPx: Int,
+        layoutCommittedFullscreen: Boolean = false
+    ): Int? {
         if (screenPx <= 0) return null
         val floor = (screenPx * 0.8f).toInt()
-        if (measuredPx < floor) {
-            Log.i(TAG, "SKIP_COMPACT_HEIGHT measured=$measuredPx screen=$screenPx")
-            return null
-        }
-        return measuredPx
+        if (measuredPx >= floor) return measuredPx
+        if (layoutCommittedFullscreen) return screenPx
+        return null
     }
 
     /**

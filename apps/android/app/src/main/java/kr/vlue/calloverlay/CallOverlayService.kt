@@ -1899,8 +1899,19 @@ class CallOverlayService : Service() {
             OverlayDiagTracker.markShowcaseFullscreenCommit()
             OverlayDiagTracker.markLayoutApplied("FULLSCREEN", OverlayPosition.FULLSCREEN.name)
             if (!notifyWeb) showcaseWebExpandPending = false
-            /* 측정 전 화면 높이를 CSS에 넣지 않는다. 작은 창에 큰 본문이 잘린다. */
             lastChromeSignature = ""
+            /* Window 는 이미 화면 높이. 자식 측정이 미니로 남아도 CSS·펼침을 막지 않는다. */
+            (webView?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
+                if (lp.height != FrameLayout.LayoutParams.MATCH_PARENT ||
+                    lp.width != FrameLayout.LayoutParams.MATCH_PARENT
+                ) {
+                    lp.width = FrameLayout.LayoutParams.MATCH_PARENT
+                    lp.height = FrameLayout.LayoutParams.MATCH_PARENT
+                    webView?.layoutParams = lp
+                }
+            }
+            view.requestLayout()
+            writeOverlaySafeInsetsNow(forceScreenHeight = true)
             scheduleFullscreenSettle()
             VlueBigPushTrace.milestone(
                 "OVERLAY_ATTACHED",
@@ -1935,6 +1946,15 @@ class CallOverlayService : Service() {
     private fun flushShowcaseWebExpand(anchor: android.view.View) {
         if (!showcaseWebExpandPending || companion.position != OverlayPosition.FULLSCREEN) {
             anchor.alpha = 1f
+            return
+        }
+        val wroteHost = writeOverlaySafeInsetsNow(forceScreenHeight = true)
+        if (!wroteHost) {
+            VlueBigPushTrace.lifecycle(
+                "FULLSCREEN_EXPAND_WITHOUT_HOST_H",
+                "viewH=${rootContainer?.height} screen=${screenSizePx().second} layoutH=${layoutParams?.height}"
+            )
+            scheduleFullscreenSettle()
             return
         }
         showcaseWebExpandPending = false
@@ -3862,7 +3882,17 @@ class CallOverlayService : Service() {
          * 그 문서가 죽고 빈 DCC 로 다시 부팅된다.
          */
         lastLoadedOutgoing = outgoing
-        val navigate = overlaySession.shouldLoadDocument(docKey, urlNow, forceDoc)
+        /*
+         * 풀 쇼케이스 펼침 중 loadUrl 은 React/DCC 를 죽이고 빈 화면으로 재부팅한다.
+         * 같은 통화 카드 갱신은 JSON 바인딩만. 렌더러 복구(새 WebView)는 url 이 비어 navigate 된다.
+         */
+        val showcaseLive =
+            companion.state == OverlayState.SHOWCASE &&
+                companion.position == OverlayPosition.FULLSCREEN &&
+                committedAnswerPhase == CallUiPhasePolicy.Phase.FULL_SHOWCASE &&
+                urlNow.isNotBlank()
+        val forceDocSafe = forceDoc && !showcaseLive
+        val navigate = overlaySession.shouldLoadDocument(docKey, urlNow, forceDocSafe)
         liveOverlayDocumentKey = overlaySession.documentKey
         if (!navigate) {
             OverlayDebugLog.page(
@@ -4011,8 +4041,13 @@ class CallOverlayService : Service() {
                 OverlayDebugLog.page(
                     "onPageFinished url=$url progress=${view?.progress} title=${view?.title}"
                 )
-                /* 로드 중에 넣은 상태는 리스너 등록 전일 수 있다. 준비된 문서에 한 번 다시 넣는다. */
-                lastDeliveredWebCallState = ""
+                /* 로드 중에 넣은 상태는 리스너 등록 전일 수 있다. 준비된 문서에 한 번 다시 넣는다.
+                 * 이미 펼친 FULL_SHOWCASE 에서 비우면 connected 가 다시 타며 DCC enrich 가 빈 페이로드로 덮인다. */
+                val showcaseAlreadyOpen =
+                    companion.state == OverlayState.SHOWCASE &&
+                        companion.position == OverlayPosition.FULLSCREEN &&
+                        lastDeliveredWebCallState.isNotBlank()
+                if (!showcaseAlreadyOpen) lastDeliveredWebCallState = ""
                 if (!overlayLoadFailed) {
                     overlayLoadFailCount = 0
                     hideOverlayNativeFallback()
@@ -4038,10 +4073,14 @@ class CallOverlayService : Service() {
                 when (companion.state) {
                     OverlayState.SHOWCASE -> {
                         if (companion.position == OverlayPosition.FULLSCREEN) {
-                            commitFullscreenLayout(source = "onPageFinished_reaffirm")
+                            if (showcaseAlreadyOpen && fullscreenChromePublished) {
+                                writeOverlaySafeInsetsNow(forceScreenHeight = true)
+                            } else {
+                                commitFullscreenLayout(source = "onPageFinished_reaffirm")
+                            }
                         }
                         /* Web Content Ready — state 전이 아님 (이미 Answer에서 connected 알림) */
-                        notifyWebCallState("connected")
+                        if (!showcaseAlreadyOpen) notifyWebCallState("connected")
                     }
                     OverlayState.MINI_CASE -> {
                         /*
@@ -4299,7 +4338,12 @@ class CallOverlayService : Service() {
                 /* 다음 프레임이 이어받는다 */
             }
         }
-        if (!fullscreenHostSettled(view)) {
+        val layoutHNow = params?.height ?: 0
+        val screenHNow = screenSizePx().second
+        val layoutAlreadyFullscreen =
+            layoutHNow >= (screenHNow * 0.8f).toInt() ||
+                layoutHNow == WindowManager.LayoutParams.MATCH_PARENT
+        if (!fullscreenHostSettled(view) && !layoutAlreadyFullscreen) {
             fullscreenHeightLockAttempts += 1
             if (fullscreenHeightLockAttempts <= 24) {
                 scheduleFullscreenSettle()
@@ -4307,20 +4351,30 @@ class CallOverlayService : Service() {
             }
             VlueBigPushTrace.lifecycle(
                 "FULLSCREEN_HEIGHT_UNSETTLED",
-                "viewH=${view?.height} screen=${screenSizePx().second} attempts=$fullscreenHeightLockAttempts"
+                "viewH=${view?.height} screen=$screenHNow attempts=$fullscreenHeightLockAttempts"
             )
             view?.alpha = 1f
         }
         fullscreenHeightLock = false
         fullscreenChromePublished = true
-        writeOverlaySafeInsetsNow()
+        val wroteCss = writeOverlaySafeInsetsNow(forceScreenHeight = true)
+        if (!wroteCss) {
+            VlueBigPushTrace.lifecycle(
+                "FULLSCREEN_EXPAND_WITHOUT_HOST_H",
+                "viewH=${view?.height} screen=${screenSizePx().second} layoutH=${layoutParams?.height}"
+            )
+        }
         val queued = pendingFullscreenCallStates.toList()
         pendingFullscreenCallStates.clear()
         for (state in queued) {
             deliverWebCallState(state, withInsets = false, holdIfUnsettled = false)
         }
         if (showcaseWebExpandPending && view != null) {
-            flushShowcaseWebExpand(view)
+            if (wroteCss || writeOverlaySafeInsetsNow(forceScreenHeight = true)) {
+                flushShowcaseWebExpand(view)
+            } else {
+                scheduleFullscreenSettle()
+            }
         } else {
             dispatchOverlayResize()
         }
@@ -4355,6 +4409,14 @@ class CallOverlayService : Service() {
         if (companion.position == OverlayPosition.FULLSCREEN &&
             (fullscreenHeightLock || !fullscreenHostSettled(rootContainer))
         ) {
+            val layoutH = layoutParams?.height ?: 0
+            val screenH = screenSizePx().second
+            val layoutFullscreen =
+                layoutH >= (screenH * 0.8f).toInt() ||
+                    layoutH == WindowManager.LayoutParams.MATCH_PARENT
+            if (layoutFullscreen) {
+                writeOverlaySafeInsetsNow(view, forceScreenHeight = true)
+            }
             fullscreenHeightLock = true
             scheduleFullscreenSettle()
             return
@@ -4363,22 +4425,31 @@ class CallOverlayService : Service() {
     }
 
     /** 확정된 높이만 --vlue-overlay-h 로 넣는다. 같은 값의 재주입은 하지 않는다. */
-    private fun writeOverlaySafeInsetsNow(view: WebView? = webView) {
+    private fun writeOverlaySafeInsetsNow(
+        view: WebView? = webView,
+        forceScreenHeight: Boolean = false
+    ): Boolean {
         val density = resources.displayMetrics.density.coerceAtLeast(1f)
         val sbCss = statusBarHeightPx() / density
         val sbLabel = ((sbCss * 10).toInt() / 10f).toString()
         val navCss = navigationBarHeightPx() / density
         val navLabel = ((navCss * 10).toInt() / 10f).toString()
         val measuredPx = overlayHostHeightPx()
+        val screenH = screenSizePx().second
+        val layoutH = layoutParams?.height ?: 0
         val hostPx = if (companion.position == OverlayPosition.FULLSCREEN) {
-            overlaySession.fullscreenCssHeightPx(screenSizePx().second, rootContainer?.height ?: 0)
-                ?: return
+            val layoutFullscreen = layoutH >= (screenH * 0.8f).toInt() || layoutH == WindowManager.LayoutParams.MATCH_PARENT
+            overlaySession.fullscreenCssHeightPx(
+                screenH,
+                rootContainer?.height ?: 0,
+                layoutFullscreen || forceScreenHeight
+            ) ?: return false
         } else {
             measuredPx
         }
-        if (hostPx <= 0) return
+        if (hostPx <= 0) return false
         val signature = "${companion.position.name}:$hostPx:$navLabel"
-        if (signature == lastChromeSignature) return
+        if (signature == lastChromeSignature) return true
         lastChromeSignature = signature
         val hostLabel = ((hostPx / density * 10).toInt() / 10f).toString()
         OverlayDebugLog.bridgeOut(
@@ -4398,6 +4469,7 @@ class CallOverlayService : Service() {
                 "r.style.setProperty('--vlue-overlay-h','${hostLabel}px');" +
                 "}catch(e){}})();"
         view?.evaluateJavascript(script, null)
+        return true
     }
 
     fun showOverlayBannerAd(slotKey: String?, rectJson: String?) {
@@ -5376,9 +5448,16 @@ class CallOverlayService : Service() {
         }
         val holdForFullscreen =
             state == "connected" || state == "restore_showcase"
+        val layoutHHold = layoutParams?.height ?: 0
+        val screenHHold = screenSizePx().second
+        val layoutAlreadyFullscreen =
+            companion.position == OverlayPosition.FULLSCREEN &&
+                (layoutHHold >= (screenHHold * 0.8f).toInt() ||
+                    layoutHHold == WindowManager.LayoutParams.MATCH_PARENT)
         if (holdIfUnsettled &&
             holdForFullscreen &&
             companion.position == OverlayPosition.FULLSCREEN &&
+            !layoutAlreadyFullscreen &&
             (fullscreenHeightLock || !fullscreenHostSettled(rootContainer))
         ) {
             enqueueFullscreenCallState(state)
