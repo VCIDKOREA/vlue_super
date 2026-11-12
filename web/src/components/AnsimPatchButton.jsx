@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  collectNativeSafetyPatchSnapshot,
   completeSafetyPatch,
   fetchSafetyPatchBrief,
   fetchSafetyPatchStatus,
@@ -151,8 +152,10 @@ export default function AnsimPatchButton({ className = "", isDarkMode = false })
       /* non-blocking */
     }
     const started = Date.now();
+    const snapshotPromise = Promise.resolve().then(() => collectNativeSafetyPatchSnapshot());
     try {
-      const res = await completeSafetyPatch();
+      const snapshot = await snapshotPromise;
+      const res = await completeSafetyPatch(snapshot);
       const elapsed = Date.now() - started;
       if (elapsed < 1400) {
         await new Promise((r) => setTimeout(r, 1400 - elapsed));

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  collectNativeSafetyPatchSnapshot,
   completeSafetyPatch,
   fetchSafetyPatchBrief,
   fetchSafetyPatchStatus,
@@ -184,6 +185,7 @@ export default function TodaySafetyPatch({ isDarkMode = false, hideFloating = tr
     dismissPrompt();
     setScanError("");
     setScanning(true);
+    const wait = new Promise((resolve) => window.setTimeout(resolve, 2200));
     try {
       openCoupangAffiliateSession();
     } catch (error) {
@@ -192,14 +194,20 @@ export default function TodaySafetyPatch({ isDarkMode = false, hideFloating = tr
       setPromptOpen(true);
       return;
     }
-    await new Promise((resolve) => window.setTimeout(resolve, 2200));
+    let snapshot = null;
+    try {
+      snapshot = collectNativeSafetyPatchSnapshot();
+    } catch {
+      snapshot = null;
+    }
+    await wait;
     const stamped = new Date().toISOString();
     setLastPatchedAt(stamped);
     writeLocalPatch(stamped);
     remindedRef.current = false;
     let lines = FALLBACK_LINES;
     try {
-      const data = await completeSafetyPatch();
+      const data = await completeSafetyPatch(snapshot);
       if (data?.lastPatchedAt) {
         setLastPatchedAt(data.lastPatchedAt);
         writeLocalPatch(data.lastPatchedAt);

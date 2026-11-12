@@ -13,7 +13,18 @@ object FamilyBatteryMonitor {
     )
 
     fun read(context: Context): Snapshot {
-        val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val app = context.applicationContext
+        val manager = app.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val live = manager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: Int.MIN_VALUE
+        val liveCharging = try {
+            manager?.isCharging == true
+        } catch (_: Throwable) {
+            false
+        }
+        if (live in 0..100) {
+            return Snapshot(live, liveCharging)
+        }
+        val intent = app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1

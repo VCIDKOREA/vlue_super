@@ -59,6 +59,11 @@ object CardLookupRepository {
         return best
     }
 
+    /** 콜드 스타트에서 디스크 캐시 prefs 를 먼저 연다. 조회 자체는 하지 않는다. */
+    fun warm(context: Context) {
+        context.applicationContext.getSharedPreferences(DISK_PREFS, Context.MODE_PRIVATE)
+    }
+
     /** 메모리 → 디스크. 링잉 직후 인증명 즉시 표시용. */
     fun peekCached(context: Context, rawNumber: String): CardLookupResult? {
         peekCached(rawNumber)?.let { return it }

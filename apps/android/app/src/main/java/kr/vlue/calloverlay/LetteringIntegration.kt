@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.Intent
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import kr.vlue.calloverlay.runtime.ColdProcessBootstrap
+import kr.vlue.calloverlay.runtime.VlueBackgroundWork
+import kr.vlue.calloverlay.screening.CallScreeningRoleHelper
 
 /**
  * VLUÉ 메인 앱 진입점에서 호출 — 레터링 모듈 초기화·권한·세션
@@ -15,6 +18,7 @@ object LetteringIntegration {
     fun onApplicationCreate(app: Application) {
         try {
             Log.i(TAG, "lettering module ready api=${VlueLetteringConfig.apiBaseUrl} web=${VlueLetteringConfig.webBaseUrl}")
+            ColdProcessBootstrap.ensureReady(app)
             ensureLetteringArmedIfReady(app)
             LetteringCallMonitorService.syncWithPrefs(app)
         } catch (e: Exception) {
@@ -24,6 +28,7 @@ object LetteringIntegration {
 
     fun onMainActivityReady(activity: AppCompatActivity) {
         try {
+            ColdProcessBootstrap.ensureReady(activity)
             ensureLetteringArmedIfReady(activity)
             if (LetteringAuthGate.canRunCallOverlay(activity) &&
                 LetteringPrefs.isLetteringEnabled(activity) &&
@@ -32,6 +37,10 @@ object LetteringIntegration {
                 Log.w(TAG, "lettering enabled but permissions missing")
             }
             LetteringCallMonitorService.syncWithPrefs(activity)
+            VlueBackgroundWork.ensureScheduled(activity)
+            if (LetteringAuthGate.canRunCallOverlay(activity)) {
+                CallScreeningRoleHelper.requestOnce(activity)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "onMainActivityReady failed", e)
         }

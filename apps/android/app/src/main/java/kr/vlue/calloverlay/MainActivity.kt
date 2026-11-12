@@ -46,6 +46,7 @@ import kr.vlue.calloverlay.family.FamilyRemoteAppScanner
 import kr.vlue.calloverlay.family.FamilyRemoteSecurityGate
 import kr.vlue.calloverlay.family.ScreenSecureHelper
 import kr.vlue.calloverlay.family.VlueFamilyBridge
+import kr.vlue.calloverlay.safetypatch.SafetyPatchLiveProbe
 import android.view.ViewGroup
 
 /**
@@ -2333,6 +2334,24 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         fun openLocationSettings() {
             activity.runOnUiThread {
                 activity.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
+        }
+
+        /**
+         * 안심패치 탭 시점의 배터리·현재 GPS·설치 무결성.
+         * WebView 브리지 스레드에서 최대 12초 대기한다.
+         */
+        @android.webkit.JavascriptInterface
+        fun collectSafetyPatchSnapshot(): String {
+            return try {
+                kotlinx.coroutines.runBlocking {
+                    kotlinx.coroutines.withTimeout(12_000) {
+                        SafetyPatchLiveProbe.collect(activity.applicationContext)
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "collectSafetyPatchSnapshot failed", t)
+                """{"batteryPct":null,"isCharging":false,"lat":null,"lng":null,"locationStatus":"location_unavailable"}"""
             }
         }
 

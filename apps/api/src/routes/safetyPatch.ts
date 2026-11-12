@@ -6,6 +6,7 @@ import {
   completeSafetyPatch,
   isUuid,
   notifySafetyPatchExpiry,
+  parseSafetyPatchLive,
   readSafetyPatchStatus
 } from "../services/safetyPatch/safetyPatchService.js";
 
@@ -23,7 +24,8 @@ safetyPatchRoutes.get("/status", async (c) => {
 safetyPatchRoutes.post("/complete", async (c) => {
   const userId = String(c.get("vlueUserId") || "");
   if (!isUuid(userId)) return c.json({ ok: false, error: "로그인 세션이 없습니다." }, 401);
-  const status = await completeSafetyPatch(userId);
+  const body = await c.req.json().catch(() => ({}));
+  const status = await completeSafetyPatch(userId, parseSafetyPatchLive(body));
   const brief = await buildTodayPatchBrief(userId).catch(() => null);
   return c.json({ ...status, brief });
 });

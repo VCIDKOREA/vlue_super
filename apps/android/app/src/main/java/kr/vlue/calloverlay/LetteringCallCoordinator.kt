@@ -24,6 +24,7 @@ import kr.vlue.calloverlay.diagnostics.DiagnosticsSessionStore
 import kr.vlue.calloverlay.diagnostics.OverlayDiagTracker
 import kr.vlue.calloverlay.diagnostics.OverlayFailureReason
 import kr.vlue.calloverlay.diagnostics.ReleaseDebugGate
+import kr.vlue.calloverlay.runtime.ColdProcessBootstrap
 
 /**
  * 통화 이벤트 → Overlay 즉시 기동 → (이후) 번호/회원 enrich.
@@ -79,6 +80,7 @@ object LetteringCallCoordinator {
     fun onRinging(context: Context, number: String?, outgoing: Boolean = false) {
         try {
             val app = context.applicationContext
+            ColdProcessBootstrap.ensureReady(app)
             if (!LetteringAuthGate.canRunCallOverlay(app)) {
                 val reason = LetteringAuthGate.denyReason(app)
                 VlueBigPushTrace.skip(1, "auth_gate=$reason (coordinator)")

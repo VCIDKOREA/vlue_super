@@ -21,6 +21,62 @@ export function remainingMs(lastPatchedAt: Date | null, now = Date.now()) {
 
 type SessionRow = { last_patched_at: Date };
 
+export type SafetyPatchIntegrity = {
+  installerPackageName?: string | null;
+  playStoreInstall?: boolean;
+  emulator?: boolean;
+  rooted?: boolean;
+};
+
+export type SafetyPatchLiveInput = {
+  batteryPct: number | null;
+  isCharging: boolean;
+  lat: number | null;
+  lng: number | null;
+  locationStatus: string;
+  integrity: SafetyPatchIntegrity | null;
+};
+
+function finiteNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 안심패치 탭에서 네이티브가 붙인 실시간 스냅샷. 빈 본문은 null. */
+export function parseSafetyPatchLive(body: unknown): SafetyPatchLiveInput | null {
+  if (!body || typeof body !== "object") return null;
+  const o = body as Record<string, unknown>;
+  const has = "batteryPct" in o || "lat" in o || "locationStatus" in o || "integrity" in o;
+  if (!has) return null;
+  const batteryRaw = finiteNumber(o.batteryPct);
+  const latRaw = finiteNumber(o.lat);
+  const lngRaw = finiteNumber(o.lng);
+  let locationStatus = String(o.locationStatus || "").trim().slice(0, 40);
+  const lat = latRaw != null && Math.abs(latRaw) <= 90 ? latRaw : null;
+  const lng = lngRaw != null && Math.abs(lngRaw) <= 180 ? lngRaw : null;
+  if (locationStatus === "ok" && (lat == null || lng == null)) locationStatus = "location_unavailable";
+  const integrityRaw = o.integrity;
+  let integrity: SafetyPatchIntegrity | null = null;
+  if (integrityRaw && typeof integrityRaw === "object") {
+    const i = integrityRaw as Record<string, unknown>;
+    const installer = String(i.installerPackageName || "").trim().slice(0, 160);
+    integrity = {
+      installerPackageName: installer || null,
+      playStoreInstall: i.playStoreInstall === true,
+      emulator: i.emulator === true,
+      rooted: i.rooted === true
+    };
+  }
+  return {
+    batteryPct: batteryRaw == null ? null : Math.max(0, Math.min(100, Math.round(batteryRaw))),
+    isCharging: o.isCharging === true,
+    lat: locationStatus === "ok" ? lat : null,
+    lng: locationStatus === "ok" ? lng : null,
+    locationStatus,
+    integrity
+  };
+}
+
 export async function readSafetyPatchStatus(userId: string) {
   await ensureSafetyPatchSchema();
   const rows = await prisma.$queryRawUnsafe<SessionRow[]>(
@@ -38,18 +94,114 @@ export async function readSafetyPatchStatus(userId: string) {
   };
 }
 
-export async function completeSafetyPatch(userId: string) {
+async function mirrorLivePresence(userId: string, lat: number, lng: number, battery: number | null) {
+  const geo = await reverseGeocodeGoogle(lat, lng).catch(() => null);
+  const addressLabel = String(geo?.addressLabel || "").slice(0, 240);
+  const overseas = {
+    isOverseas: Boolean(geo?.isOverseas),
+    countryCode: String(geo?.countryCode || "").slice(0, 8),
+    countryName: String(geo?.countryName || "").slice(0, 80),
+    cityName: String(geo?.cityName || "").slice(0, 80),
+    timeZoneId: String(geo?.timeZoneId || "").slice(0, 64)
+  };
+  await prisma.locationPresence.upsert({
+    where: { userId },
+    create: {
+      userId,
+      lat,
+      lng,
+      addressLabel,
+      batteryPct: battery,
+      online: true,
+      ...overseas
+    },
+    update: {
+      lat,
+      lng,
+      addressLabel,
+      ...(battery == null ? {} : { batteryPct: battery }),
+      online: true,
+      ...overseas
+    }
+  });
+  await prisma.$executeRawUnsafe(
+    `UPDATE location_presence
+     SET last_lat = $2, last_lng = $3, last_seen_at = now(), connection_status = 'CONNECTED'
+     WHERE user_id = $1::uuid`,
+    userId,
+    lat,
+    lng
+  );
+}
+
+export async function completeSafetyPatch(userId: string, live?: SafetyPatchLiveInput | null) {
   await ensureSafetyPatchSchema();
+  const battery = live?.batteryPct ?? null;
+  const locationStatus = live?.locationStatus || "";
+  const lat = locationStatus === "ok" ? live?.lat ?? null : null;
+  const lng = locationStatus === "ok" ? live?.lng ?? null : null;
+  const integrity = live?.integrity || null;
+  const hasIntegrity = Boolean(integrity);
   const rows = await prisma.$queryRawUnsafe<SessionRow[]>(
     `
-    INSERT INTO safety_patch_sessions (user_id, last_patched_at, expiry_notified_at, updated_at)
-    VALUES ($1::uuid, NOW(), NULL, NOW())
-    ON CONFLICT (user_id) DO UPDATE
-      SET last_patched_at = NOW(), expiry_notified_at = NULL, updated_at = NOW()
+    INSERT INTO safety_patch_sessions (
+      user_id, last_patched_at, expiry_notified_at, updated_at,
+      battery_pct, is_charging, lat, lng, location_status,
+      installer_package, play_store_install, emulator, rooted
+    ) VALUES (
+      $1::uuid, NOW(), NULL, NOW(),
+      $2, $3, $4, $5, $6,
+      $7, $8, $9, $10
+    )
+    ON CONFLICT (user_id) DO UPDATE SET
+      last_patched_at = NOW(),
+      expiry_notified_at = NULL,
+      updated_at = NOW(),
+      battery_pct = COALESCE(EXCLUDED.battery_pct, safety_patch_sessions.battery_pct),
+      is_charging = CASE
+        WHEN EXCLUDED.battery_pct IS NOT NULL THEN EXCLUDED.is_charging
+        ELSE safety_patch_sessions.is_charging
+      END,
+      lat = COALESCE(EXCLUDED.lat, safety_patch_sessions.lat),
+      lng = COALESCE(EXCLUDED.lng, safety_patch_sessions.lng),
+      location_status = CASE
+        WHEN EXCLUDED.location_status <> '' THEN EXCLUDED.location_status
+        ELSE safety_patch_sessions.location_status
+      END,
+      installer_package = CASE WHEN $11::boolean THEN EXCLUDED.installer_package ELSE safety_patch_sessions.installer_package END,
+      play_store_install = CASE WHEN $11::boolean THEN EXCLUDED.play_store_install ELSE safety_patch_sessions.play_store_install END,
+      emulator = CASE WHEN $11::boolean THEN EXCLUDED.emulator ELSE safety_patch_sessions.emulator END,
+      rooted = CASE WHEN $11::boolean THEN EXCLUDED.rooted ELSE safety_patch_sessions.rooted END
     RETURNING last_patched_at
     `,
-    userId
+    userId,
+    battery,
+    battery == null ? null : live?.isCharging === true,
+    lat,
+    lng,
+    locationStatus,
+    hasIntegrity ? integrity?.installerPackageName || "" : null,
+    hasIntegrity ? integrity?.playStoreInstall === true : null,
+    hasIntegrity ? integrity?.emulator === true : null,
+    hasIntegrity ? integrity?.rooted === true : null,
+    hasIntegrity
   );
+  if (lat != null && lng != null) {
+    try {
+      await mirrorLivePresence(userId, lat, lng, battery);
+    } catch (err) {
+      console.warn("[safety-patch] presence mirror failed", err);
+    }
+  } else if (battery != null) {
+    try {
+      await prisma.locationPresence.updateMany({
+        where: { userId },
+        data: { batteryPct: battery, online: true }
+      });
+    } catch (err) {
+      console.warn("[safety-patch] battery mirror failed", err);
+    }
+  }
   const last = rows[0]?.last_patched_at ? new Date(rows[0].last_patched_at) : new Date();
   return {
     ok: true as const,
@@ -338,6 +490,42 @@ export async function buildFamilySafetyReport(viewerId: string, targetId: string
 
 export type PatchBriefLine = { icon: string; title: string; body: string };
 
+type LiveSessionRow = {
+  battery_pct: number | null;
+  is_charging: boolean | null;
+  location_status: string | null;
+  installer_package: string | null;
+  play_store_install: boolean | null;
+  emulator: boolean | null;
+  rooted: boolean | null;
+};
+
+function locationBrief(status: string, place: string) {
+  if (status === "permission_denied") return "위치 권한이 없어 이번 패치에서 현재 GPS를 받지 못했습니다.";
+  if (status === "gps_disabled") return "GPS가 꺼져 있어 현재 위치를 새로 받지 못했습니다.";
+  if (status === "timeout" || status === "location_unavailable") {
+    return "현재 위치 수신에 실패했습니다. GPS를 켠 뒤 다시 패치해 주세요.";
+  }
+  return String(place).slice(0, 120);
+}
+
+function integrityBrief(live: LiveSessionRow | undefined) {
+  if (!live || live.play_store_install == null) {
+    return "24시간 TODAY 안심패치 세션이 활성화되었습니다.";
+  }
+  const play = live.play_store_install === true;
+  const emulator = live.emulator === true;
+  const rooted = live.rooted === true;
+  if (play && !emulator && !rooted) {
+    return "구글 플레이 스토어 정식 설치입니다. 에뮬레이터·루팅 징후는 없습니다.";
+  }
+  const bits: string[] = [];
+  if (!play) bits.push(`설치원 ${live.installer_package || "확인 불가"}`);
+  if (emulator) bits.push("에뮬레이터");
+  if (rooted) bits.push("루팅");
+  return `위·변조 점검: ${bits.join(" · ")}`;
+}
+
 /** 패치 직후/접속 시 잠깐 보여주는 오늘의 안심패치 요약 */
 async function countDeviceThreats24h(userId: string) {
   let malware = 0;
@@ -429,6 +617,17 @@ export async function buildTodayPatchBrief(userId: string): Promise<{
   }
 
   const threats = await countDeviceThreats24h(userId);
+  const liveRows = await prisma.$queryRawUnsafe<LiveSessionRow[]>(
+    `
+    SELECT battery_pct, is_charging, location_status, installer_package,
+           play_store_install, emulator, rooted
+    FROM safety_patch_sessions
+    WHERE user_id = $1::uuid
+    LIMIT 1
+    `,
+    userId
+  ).catch(() => [] as LiveSessionRow[]);
+  const live = liveRows[0];
 
   const reportOk = report.ok === true ? report : null;
   const place =
@@ -436,12 +635,26 @@ export async function buildTodayPatchBrief(userId: string): Promise<{
     presence?.addressLabel ||
     [presence?.cityName, presence?.countryName].filter(Boolean).join(", ") ||
     "위치 동기화 대기";
+  const liveBattery = live?.battery_pct;
   const battery =
-    reportOk?.batteryPct != null
-      ? `${reportOk.batteryPct}%`
-      : presence?.batteryPct != null
-        ? `${presence.batteryPct}%`
-        : "확인 중";
+    liveBattery != null
+      ? `${liveBattery}%${live?.is_charging ? " · 충전 중" : ""}`
+      : reportOk?.batteryPct != null
+        ? `${reportOk.batteryPct}%`
+        : presence?.batteryPct != null
+          ? `${presence.batteryPct}%`
+          : "확인 중";
+  const locationStatus = String(live?.location_status || "");
+  const gpsLabel =
+    locationStatus === "ok"
+      ? "GPS 수신"
+      : locationStatus === "gps_disabled"
+        ? "GPS 꺼짐"
+        : locationStatus === "permission_denied"
+          ? "위치 권한 없음"
+          : locationStatus === "timeout" || locationStatus === "location_unavailable"
+            ? "GPS 수신 실패"
+            : "GPS";
   const geminiBody = reportOk?.summary
     ? `${reportOk.summary.split("\n")[0]} · 안심지수 ${reportOk.safetyIndex}`
     : "가족 안심 요약을 동기화했습니다.";
@@ -457,11 +670,11 @@ export async function buildTodayPatchBrief(userId: string): Promise<{
 
   const lines: PatchBriefLine[] = [
     { icon: "🤖", title: "Gemini AI 안심요약", body: geminiBody.slice(0, 160) },
-    { icon: "📍", title: "위치", body: String(place).slice(0, 120) },
+    { icon: "📍", title: "위치", body: locationBrief(locationStatus, String(place)) },
     {
       icon: "📡",
       title: "수집 정보",
-      body: `배터리 ${battery} · GPS · 접속 상태 동기화`
+      body: `배터리 ${battery} · ${gpsLabel} · 접속 상태 동기화`
     },
     {
       icon: "🦠",
@@ -484,7 +697,7 @@ export async function buildTodayPatchBrief(userId: string): Promise<{
     {
       icon: "🛡️",
       title: "보안패치",
-      body: "24시간 TODAY 안심패치 세션이 활성화되었습니다."
+      body: integrityBrief(live)
     }
   ];
   return { ok: true, lines };

@@ -48,6 +48,11 @@ object PublicDirectoryPhoneCache {
         return peek(rawNumber)
     }
 
+    /** 프로세스 재기동 직후 디스크 인덱스를 메모리에 올린다. */
+    fun warm(context: Context) {
+        ensureLoaded(context.applicationContext)
+    }
+
     fun remember(phoneDigitsOrE164: String, displayName: String) {
         val name = displayName.trim()
         if (name.isEmpty()) return

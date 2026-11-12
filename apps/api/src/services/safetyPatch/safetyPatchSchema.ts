@@ -17,6 +17,18 @@ export async function ensureSafetyPatchSchema() {
       ON safety_patch_sessions (last_patched_at);
   `);
   await prisma.$executeRawUnsafe(`
+    ALTER TABLE safety_patch_sessions
+      ADD COLUMN IF NOT EXISTS battery_pct integer,
+      ADD COLUMN IF NOT EXISTS is_charging boolean,
+      ADD COLUMN IF NOT EXISTS lat double precision,
+      ADD COLUMN IF NOT EXISTS lng double precision,
+      ADD COLUMN IF NOT EXISTS location_status text,
+      ADD COLUMN IF NOT EXISTS installer_package text,
+      ADD COLUMN IF NOT EXISTS play_store_install boolean,
+      ADD COLUMN IF NOT EXISTS emulator boolean,
+      ADD COLUMN IF NOT EXISTS rooted boolean;
+  `);
+  await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS safety_patch_reports (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       viewer_user_id uuid NOT NULL,

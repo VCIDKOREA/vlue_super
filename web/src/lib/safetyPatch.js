@@ -52,11 +52,26 @@ export function fetchSafetyPatchStatus() {
   return vlueAuthFetch(apiUrl("/api/safety-patch/status"), { headers: vlueAuthHeaders() }).then(readJson);
 }
 
-export function completeSafetyPatch() {
+/** 앱 WebView에서만 동작. 브라우저·미지원 브리지는 null. */
+export function collectNativeSafetyPatchSnapshot() {
+  try {
+    const native = typeof window !== "undefined" ? window.Android || window.VlueLettering : null;
+    if (!native || typeof native.collectSafetyPatchSnapshot !== "function") return null;
+    const raw = native.collectSafetyPatchSnapshot();
+    if (!raw) return null;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function completeSafetyPatch(snapshot) {
+  const body = snapshot && typeof snapshot === "object" ? snapshot : {};
   return vlueAuthFetch(apiUrl("/api/safety-patch/complete"), {
     method: "POST",
     headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
-    body: "{}"
+    body: JSON.stringify(body)
   }).then(readJson);
 }
 
