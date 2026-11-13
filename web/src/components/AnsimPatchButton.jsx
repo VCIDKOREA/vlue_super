@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   collectNativeSafetyPatchSnapshot,
   completeSafetyPatch,
-  fetchSafetyPatchBrief,
+  refreshSafetyPatchBrief,
   fetchSafetyPatchStatus,
   formatPatchCountdown,
   openCoupangAffiliateSession,
@@ -76,7 +76,7 @@ export default function AnsimPatchButton({ className = "", isDarkMode = false })
     setBriefOpen(true);
     showBrief(briefLines.length ? briefLines : FALLBACK_LINES, { autoCloseMs: 0 });
     try {
-      const brief = await fetchSafetyPatchBrief();
+      const brief = await refreshSafetyPatchBrief();
       if (Array.isArray(brief?.lines) && brief.lines.length) {
         showBrief(brief.lines, { autoCloseMs: 0 });
       }

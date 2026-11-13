@@ -7,7 +7,8 @@ import {
   isUuid,
   notifySafetyPatchExpiry,
   parseSafetyPatchLive,
-  readSafetyPatchStatus
+  readSafetyPatchStatus,
+  updateSafetyPatchLiveReading
 } from "../services/safetyPatch/safetyPatchService.js";
 
 export const safetyPatchRoutes = new Hono();
@@ -28,6 +29,14 @@ safetyPatchRoutes.post("/complete", async (c) => {
   const status = await completeSafetyPatch(userId, parseSafetyPatchLive(body));
   const brief = await buildTodayPatchBrief(userId).catch(() => null);
   return c.json({ ...status, brief });
+});
+
+safetyPatchRoutes.post("/live", async (c) => {
+  const userId = String(c.get("vlueUserId") || "");
+  if (!isUuid(userId)) return c.json({ ok: false, error: "로그인 세션이 없습니다." }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  const brief = await updateSafetyPatchLiveReading(userId, parseSafetyPatchLive(body));
+  return c.json(brief);
 });
 
 safetyPatchRoutes.get("/brief", async (c) => {

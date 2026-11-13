@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import kr.vlue.calloverlay.runtime.ColdProcessBootstrap
 import kr.vlue.calloverlay.runtime.VlueBackgroundWork
-import kr.vlue.calloverlay.screening.CallScreeningRoleHelper
 
 /**
  * VLUÉ 메인 앱 진입점에서 호출 — 레터링 모듈 초기화·권한·세션
@@ -38,9 +37,6 @@ object LetteringIntegration {
             }
             LetteringCallMonitorService.syncWithPrefs(activity)
             VlueBackgroundWork.ensureScheduled(activity)
-            if (LetteringAuthGate.canRunCallOverlay(activity)) {
-                CallScreeningRoleHelper.requestOnce(activity)
-            }
         } catch (e: Exception) {
             Log.e(TAG, "onMainActivityReady failed", e)
         }

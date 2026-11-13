@@ -3,6 +3,7 @@ import {
   collectNativeSafetyPatchSnapshot,
   completeSafetyPatch,
   fetchSafetyPatchBrief,
+  refreshSafetyPatchBrief,
   fetchSafetyPatchStatus,
   formatPatchCountdown,
   openCoupangAffiliateSession,
@@ -81,7 +82,7 @@ export default function TodaySafetyPatch({ isDarkMode = false, hideFloating = tr
     setBriefOpen(true);
     showBrief(briefLines.length ? briefLines : FALLBACK_LINES, { autoCloseMs: 0 });
     try {
-      const brief = await fetchSafetyPatchBrief();
+      const brief = await refreshSafetyPatchBrief();
       if (Array.isArray(brief?.lines) && brief.lines.length) {
         showBrief(brief.lines, { autoCloseMs: 0 });
       }

@@ -588,8 +588,8 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         val last = prefs.getInt("web_cache_version", -1)
         val lastRev = prefs.getInt("web_content_rev", 0)
         val current = BuildConfig.VERSION_CODE
-        /* 3 = Carto Positron 타일. 같은 versionCode 재설치에서도 옛 OSM HTML 을 버린다. */
-        val contentRev = 4
+        /* 5 = 안심패치 실시간 배터리. 같은 versionCode 재설치에서도 옛 웹 캐시를 버린다. */
+        val contentRev = 5
         if (last == current && lastRev == contentRev) return
         webView.clearCache(true)
         prefs.edit()
@@ -2341,6 +2341,16 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
          * 안심패치 탭 시점의 배터리·현재 GPS·설치 무결성.
          * WebView 브리지 스레드에서 최대 12초 대기한다.
          */
+        /** 안심패치 요약에 찍는 현재 배터리. GPS를 기다리지 않는다. */
+        @android.webkit.JavascriptInterface
+        fun readSafetyPatchBattery(): String {
+            val snap = SafetyPatchLiveProbe.readBattery(activity.applicationContext)
+            return JSONObject()
+                .put("batteryPct", snap.percent ?: JSONObject.NULL)
+                .put("isCharging", snap.charging)
+                .toString()
+        }
+
         @android.webkit.JavascriptInterface
         fun collectSafetyPatchSnapshot(): String {
             return try {

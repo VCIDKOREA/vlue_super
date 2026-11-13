@@ -211,6 +211,56 @@ export async function completeSafetyPatch(userId: string, live?: SafetyPatchLive
   };
 }
 
+/** 24시간 패치 시각은 유지하고, 요약에 쓰는 배터리·위치만 현재 값으로 바꾼다. */
+export async function updateSafetyPatchLiveReading(userId: string, live: SafetyPatchLiveInput | null) {
+  await ensureSafetyPatchSchema();
+  if (!live) return buildTodayPatchBrief(userId);
+  const battery = live.batteryPct;
+  const locationStatus = live.locationStatus || "";
+  const lat = locationStatus === "ok" ? live.lat : null;
+  const lng = locationStatus === "ok" ? live.lng : null;
+  const integrity = live.integrity;
+  const hasIntegrity = Boolean(integrity);
+  await prisma.$executeRawUnsafe(
+    `
+    UPDATE safety_patch_sessions SET
+      updated_at = NOW(),
+      battery_pct = COALESCE($2, battery_pct),
+      is_charging = CASE WHEN $2 IS NOT NULL THEN $3 ELSE is_charging END,
+      lat = COALESCE($4, lat),
+      lng = COALESCE($5, lng),
+      location_status = CASE WHEN $6 <> '' THEN $6 ELSE location_status END,
+      installer_package = CASE WHEN $7::boolean THEN $8 ELSE installer_package END,
+      play_store_install = CASE WHEN $7::boolean THEN $9 ELSE play_store_install END,
+      emulator = CASE WHEN $7::boolean THEN $10 ELSE emulator END,
+      rooted = CASE WHEN $7::boolean THEN $11 ELSE rooted END
+    WHERE user_id = $1::uuid
+    `,
+    userId,
+    battery,
+    battery == null ? null : live.isCharging === true,
+    lat,
+    lng,
+    locationStatus,
+    hasIntegrity,
+    hasIntegrity ? integrity?.installerPackageName || "" : null,
+    hasIntegrity ? integrity?.playStoreInstall === true : null,
+    hasIntegrity ? integrity?.emulator === true : null,
+    hasIntegrity ? integrity?.rooted === true : null
+  );
+  if (battery != null) {
+    try {
+      await prisma.locationPresence.updateMany({
+        where: { userId },
+        data: { batteryPct: battery, online: true }
+      });
+    } catch (err) {
+      console.warn("[safety-patch] battery mirror failed", err);
+    }
+  }
+  return buildTodayPatchBrief(userId);
+}
+
 const EXPIRY_TITLE = "TODAY 안심패치";
 const EXPIRY_BODY = "안심패치 유효 시간이 곧 종료됩니다. 패치를 진행해 최신 안전 상태를 동기화하세요.";
 

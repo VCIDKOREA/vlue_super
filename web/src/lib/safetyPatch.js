@@ -95,6 +95,35 @@ export function fetchSafetyPatchBrief() {
   return vlueAuthFetch(apiUrl("/api/safety-patch/brief"), { headers: vlueAuthHeaders() }).then(readJson);
 }
 
+/** 요약 화면을 여는 순간의 배터리. 저장된 66% 같은 값을 그대로 두지 않는다. */
+export function readNativeSafetyPatchBattery() {
+  try {
+    const native = typeof window !== "undefined" ? window.Android || window.VlueLettering : null;
+    if (!native || typeof native.readSafetyPatchBattery !== "function") return null;
+    const raw = native.readSafetyPatchBattery();
+    if (!raw) return null;
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return parsed && typeof parsed.batteryPct === "number" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function refreshSafetyPatchBrief() {
+  const battery = readNativeSafetyPatchBattery();
+  const snapshot = battery || collectNativeSafetyPatchSnapshot();
+  const pct = Number(snapshot?.batteryPct);
+  if (!Number.isFinite(pct)) return fetchSafetyPatchBrief();
+  return vlueAuthFetch(apiUrl("/api/safety-patch/live"), {
+    method: "POST",
+    headers: { ...vlueAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      batteryPct: Math.round(pct),
+      isCharging: Boolean(snapshot.isCharging)
+    })
+  }).then(readJson);
+}
+
 /** 쿠팡 제휴 링크를 연 뒤 VLUÉ로 돌아온다. */
 export function openCoupangAffiliateSession(url = COUPANG_AFFILIATE_URL) {
   const native = typeof window !== "undefined" ? window.Android || window.VlueLettering : null;
