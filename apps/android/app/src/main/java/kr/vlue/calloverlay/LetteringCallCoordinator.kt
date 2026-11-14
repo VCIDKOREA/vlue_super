@@ -764,6 +764,7 @@ object LetteringCallCoordinator {
 
             /* 창 제거를 세션 end 보다 먼저 — orphan ContextWatch 레이스 방지 */
             CallOverlayService.dismissNow(app)
+            OverlayWindowRegistry.removeIfAttached()
             CompanionRuntimeStabilityDiag.endCallSession("LetteringCallCoordinator.onCallEnded")
 
             if (CompanionMvpConfig.DELEGATE_CALL_UI) {
@@ -782,6 +783,7 @@ object LetteringCallCoordinator {
             Log.e(TAG, "onCallEnded failed", e)
             try {
                 CallOverlayService.dismissNow(context.applicationContext)
+                OverlayWindowRegistry.removeIfAttached()
             } catch (_: Exception) {
                 /* ignore */
             }

@@ -903,7 +903,9 @@ class CallOverlayService : Service() {
                 )
             }
             CompanionRuntimeStabilityDiag.mark("ADD_VIEW_BEGIN", if (asBigPush) "bigPush" else "showcase")
-        windowManager?.addView(container, params)
+            val wm = windowManager
+            wm?.addView(container, params)
+            if (wm != null) OverlayWindowRegistry.hold(wm, container)
             OverlayDiagTracker.onAddView()
             OverlayDiagTracker.markAddViewSuccess()
             CompanionRuntimeStabilityDiag.mark("ADD_VIEW_SUCCESS", if (asBigPush) "bigPush" else "showcase")
@@ -5681,6 +5683,7 @@ class CallOverlayService : Service() {
                 )
             }
         }
+        OverlayWindowRegistry.removeIfAttached()
         rootContainer = null
         layoutParams = null
         nativeBanner = null

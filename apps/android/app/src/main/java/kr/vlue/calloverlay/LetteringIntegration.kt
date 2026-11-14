@@ -37,6 +37,7 @@ object LetteringIntegration {
             }
             LetteringCallMonitorService.syncWithPrefs(activity)
             VlueBackgroundWork.ensureScheduled(activity)
+            BatteryOptimizationPrompt.requestIfNeeded(activity)
         } catch (e: Exception) {
             Log.e(TAG, "onMainActivityReady failed", e)
         }
