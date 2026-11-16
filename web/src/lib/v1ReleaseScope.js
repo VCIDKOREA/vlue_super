@@ -100,7 +100,7 @@ export const v1AppShell = {
   phoneSearchPortal: true,
   /** 메인 본문 — 업체·명함 검색바 (헤더와 분리) */
   homeBizSearch: true,
-  /** 메인 헤더 — 명함 스캐너만 (검색·QR 숨김) */
+  /** 메인 헤더 — 검색 아이콘 (명함 스캐너는 홈 퀵메뉴) */
   homeHeaderMinimal: true,
   /** 메인 빅푸시 — 일상/비즈 탭 숨김 */
   callBigPushTierTabs: true,

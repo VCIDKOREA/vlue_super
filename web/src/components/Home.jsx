@@ -26,6 +26,7 @@ import {
 import { fetchPublicHomeLayout } from "../lib/hqAdminApi.js";
 import VLUE_SHIELD_LOGO from "../assets/vlue-shield-logo.svg?url";
 import HomeBizDirectorySearch from "./HomeBizDirectorySearch.jsx";
+import HomeQuickMenu from "./HomeQuickMenu.jsx";
 import CallBigPushPreviewSection from "./CallBigPushPreviewSection.jsx";
 import FriendShowcaseList from "./FriendShowcaseList.jsx";
 import HomeNotificationPanel from "./HomeNotificationPanel.jsx";
@@ -930,12 +931,11 @@ function Home({
     >
       <div className={v1FriendHomeLayout ? "home-kakao-stack flex min-h-0 flex-1 flex-col gap-0 px-0 pt-0 pb-0 mb-0" : "contents"}>
       {v1AppShell.homeBizSearch ? (
-      <div data-home-anchor="search" className="home-kakao-anchor home-kakao-anchor--search shrink-0">
-      <HomeBizDirectorySearch
-        categoryExposedPosts={categoryExposedPosts}
-        onOpenBusinessRoom={onOpenBusinessRoom}
-      />
-      </div>
+        <HomeBizDirectorySearch
+          presentation="launcher"
+          categoryExposedPosts={categoryExposedPosts}
+          onOpenBusinessRoom={onOpenBusinessRoom}
+        />
       ) : null}
 
       {v1AppShell.callBigPush ? (
@@ -944,11 +944,13 @@ function Home({
       </div>
       ) : null}
 
-      {/* 1. 추천 스폰서 세로 AD 영역 (최대 6개 좌우 스와이프 캐러셀 & 브랜드 타겟팅) */}
+      <HomeQuickMenu isDarkMode={isDarkMode} />
+
+      {/* 추천 스폰서 세로 AD 영역 (최대 6개 좌우 스와이프 캐러셀 & 브랜드 타겟팅) */}
       <SponsorAdSwiper className="mt-1" />
 
-      {/* 2. TODAY 안심패치 버튼 (고정 블록형 필수 포함) */}
-      <AnsimPatchButton className="my-1" isDarkMode={isDarkMode} />
+      {/* 안심패치 배너는 퀵메뉴로 옮김. 요약·패치 모달과 만료 알림은 유지 */}
+      <AnsimPatchButton hideBanner isDarkMode={isDarkMode} />
 
       {/* 3. 네이버 뉴스 API 연동 보안/생활정보 뉴스 피드 (중간 스폰서 카드 교차 삽입) */}
       <SecurityNewsFeed isDarkMode={isDarkMode} className="mb-0 pb-0" />

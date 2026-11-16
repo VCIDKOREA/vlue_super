@@ -34,6 +34,11 @@ export function writeLocalPatch(lastPatchedAt) {
   } catch {
     /* ignore */
   }
+  try {
+    window.dispatchEvent(new CustomEvent("vlue-safety-patch-changed"));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function remainingFrom(lastPatchedAt, now = Date.now()) {

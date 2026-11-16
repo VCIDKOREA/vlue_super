@@ -1489,9 +1489,23 @@ html.vlue-safety-patch .home-kakao-stack {
   z-index: 128;
 }
 
+.home-biz-search--panel {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  padding: 0.35rem 0.45rem 0.45rem;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 18%);
+}
+
+.home-biz-search--panel.home-biz-search--active {
+  z-index: 3;
+}
+
 .home-biz-search__backdrop {
   position: fixed;
-  inset: 52px 0 calc(54px + env(safe-area-inset-bottom, 0px)) 0;
+  inset: calc(52px + var(--vlue-safe-top, 0px)) 0 calc(54px + env(safe-area-inset-bottom, 0px)) 0;
   z-index: 127;
   border: none;
   background: rgb(15 23 42 / 28%);

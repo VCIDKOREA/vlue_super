@@ -30,7 +30,9 @@ const FALLBACK_LINES = [
   { icon: "🛡️", title: "보안패치", body: "24시간 TODAY 안심패치 세션이 활성화되었습니다." }
 ];
 
-export default function AnsimPatchButton({ className = "", isDarkMode = false }) {
+export const OPEN_SAFETY_PATCH_EVENT = "vlue-open-safety-patch";
+
+export default function AnsimPatchButton({ className = "", isDarkMode = false, hideBanner = false }) {
   const [lastPatchedAt, setLastPatchedAt] = useState(() => readLocalPatch()?.lastPatchedAt || null);
   const [now, setNow] = useState(() => Date.now());
   const [promptOpen, setPromptOpen] = useState(false);
@@ -42,6 +44,7 @@ export default function AnsimPatchButton({ className = "", isDarkMode = false })
   const wasCompleteRef = useRef(false);
   const briefTimerRef = useRef(0);
   const briefTapGuardRef = useRef(0);
+  const openFromMenuRef = useRef(() => {});
 
   const remaining = remainingFrom(lastPatchedAt, now);
   const complete = remaining > 0;
@@ -118,6 +121,18 @@ export default function AnsimPatchButton({ className = "", isDarkMode = false })
   }, []);
 
   // 5. 만료 알림 및 푸시 연동 (기존 백그라운드 기능 100% 동일 유지)
+  openFromMenuRef.current = () => {
+    if (scanning) return;
+    if (complete) void openCompletedBrief();
+    else void runPatch();
+  };
+
+  useEffect(() => {
+    const onOpen = () => openFromMenuRef.current();
+    window.addEventListener(OPEN_SAFETY_PATCH_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SAFETY_PATCH_EVENT, onOpen);
+  }, []);
+
   useEffect(() => {
     if (complete) {
       wasCompleteRef.current = true;
@@ -179,80 +194,14 @@ export default function AnsimPatchButton({ className = "", isDarkMode = false })
     }
   };
 
-  return (
-    <div
-      className={`ansim-patch-block relative w-full shrink-0 px-2.5 py-1.5 ${className}`.trim()}
-      aria-label="TODAY 안심패치 영역"
-    >
-      {/* 에러 메시지 노출 */}
-      {scanError && !promptOpen && !scanning && !briefOpen ? (
-        <p className="mb-1.5 rounded-xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white shadow-sm">
+  const dialogs = (
+    <>
+      {hideBanner && scanError && !promptOpen && !scanning && !briefOpen ? (
+        <p className="pointer-events-none fixed inset-x-4 top-[calc(60px+var(--vlue-safe-top,0px))] z-[170] rounded-xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white shadow-sm">
           {scanError}
         </p>
       ) : null}
 
-      {/* 고정 블록형 안심패치 버튼 (rounded-xl / rounded-full) */}
-      {complete ? (
-        <button
-          type="button"
-          onClick={(e) => void openCompletedBrief(e)}
-          className="group relative flex w-full cursor-pointer items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 px-4 py-3 text-white shadow-md transition-all duration-200 active:scale-[0.98] hover:shadow-emerald-500/25"
-          aria-label="TODAY 안심패치 완료 및 요약 보기"
-        >
-          {/* 빛나는 오버레이 효과 */}
-          <div className="absolute inset-0 bg-white/5 opacity-0 transition-opacity group-hover:opacity-100" />
-
-          {/* 좌측: 초록색 라이브 닷 인디케이터 + 타이틀 + 카운트다운 타이머 */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* 펄스 애니메이션 라이브 닷 */}
-            <span className="relative flex h-3 w-3 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-200" />
-            </span>
-
-            <div className="flex flex-col text-left min-w-0">
-              <span className="truncate text-[13.5px] font-black tracking-tight text-white drop-shadow-sm">
-                TODAY 안심패치 완료
-              </span>
-              <span className="text-[11px] font-bold text-emerald-100/90">
-                유효 시간 | {formatPatchCountdown(remaining)}
-              </span>
-            </div>
-          </div>
-
-          {/* 우측: 상태 배지 */}
-          <div className="shrink-0 flex items-center gap-1 rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-1 text-[10.5px] font-black text-white">
-            <span>보안 요약</span>
-            <span className="text-[11px]">›</span>
-          </div>
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => void runPatch()}
-          className="group relative flex w-full cursor-pointer items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 px-4 py-3 text-white shadow-md transition-all duration-200 active:scale-[0.98] hover:shadow-cyan-500/25 animate-pulse"
-          aria-label="TODAY 안심패치 미완료 - 패치 진행하기"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="text-[16px]">🛡️</span>
-            <div className="flex flex-col text-left min-w-0">
-              <span className="truncate text-[13.5px] font-black tracking-tight text-white">
-                TODAY 안심패치 미완료
-              </span>
-              <span className="text-[11px] font-medium text-cyan-100">
-                탭하여 24시간 안심 안전 상태를 동기화하세요
-              </span>
-            </div>
-          </div>
-
-          <div className="shrink-0 flex items-center gap-1 rounded-full bg-white/25 px-2.5 py-1 text-[11px] font-black text-white">
-            <span>패치 실행</span>
-            <span>›</span>
-          </div>
-        </button>
-      )}
-
-      {/* 패치 안내 팝업 다이얼로그 */}
       {promptOpen && !scanning && !briefOpen ? (
         <div className="fixed inset-0 z-[640] flex items-end justify-center bg-black/45 px-4 pb-[calc(54px+env(safe-area-inset-bottom,0px)+64px)]">
           <div
@@ -364,6 +313,73 @@ export default function AnsimPatchButton({ className = "", isDarkMode = false })
           </div>
         </div>
       ) : null}
+    </>
+  );
+
+  if (hideBanner) return dialogs;
+
+  return (
+    <div
+      className={`ansim-patch-block relative w-full shrink-0 px-2.5 py-1.5 ${className}`.trim()}
+      aria-label="TODAY 안심패치 영역"
+    >
+      {scanError && !promptOpen && !scanning && !briefOpen ? (
+        <p className="mb-1.5 rounded-xl bg-rose-600 px-3 py-1.5 text-center text-[11px] font-bold text-white shadow-sm">
+          {scanError}
+        </p>
+      ) : null}
+      {complete ? (
+        <button
+          type="button"
+          onClick={(e) => void openCompletedBrief(e)}
+          className="group relative flex w-full cursor-pointer items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 px-4 py-3 text-white shadow-md transition-all duration-200 active:scale-[0.98] hover:shadow-emerald-500/25"
+          aria-label="TODAY 안심패치 완료 및 요약 보기"
+        >
+          <div className="absolute inset-0 bg-white/5 opacity-0 transition-opacity group-hover:opacity-100" />
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="relative flex h-3 w-3 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-200" />
+            </span>
+            <span className="flex min-w-0 flex-col text-left">
+              <span className="truncate text-[13.5px] font-black tracking-tight text-white drop-shadow-sm">
+                TODAY 안심패치 완료
+              </span>
+              <span className="text-[11px] font-bold text-emerald-100/90">
+                유효 시간 | {formatPatchCountdown(remaining)}
+              </span>
+            </span>
+          </div>
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-[10.5px] font-black text-white backdrop-blur-sm">
+            <span>보안 요약</span>
+            <span className="text-[11px]">›</span>
+          </span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void runPatch()}
+          className="group relative flex w-full cursor-pointer items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 px-4 py-3 text-white shadow-md transition-all duration-200 active:scale-[0.98] hover:shadow-cyan-500/25 animate-pulse"
+          aria-label="TODAY 안심패치 미완료 - 패치 진행하기"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="text-[16px]">🛡️</span>
+            <span className="flex min-w-0 flex-col text-left">
+              <span className="truncate text-[13.5px] font-black tracking-tight text-white">
+                TODAY 안심패치 미완료
+              </span>
+              <span className="text-[11px] font-medium text-cyan-100">
+                탭하여 24시간 안심 안전 상태를 동기화하세요
+              </span>
+            </span>
+          </div>
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/25 px-2.5 py-1 text-[11px] font-black text-white">
+            <span>패치 실행</span>
+            <span>›</span>
+          </span>
+        </button>
+      )}
+      {dialogs}
     </div>
   );
 }

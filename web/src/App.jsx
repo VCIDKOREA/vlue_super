@@ -23,6 +23,7 @@ import { fetchMemoMeta, receiveShareMemo } from "./lib/memoApi.js";
 import { LOCAL_MEMO_CHANGED } from "./lib/localMemoStorage.js";
 import { OPEN_CALENDAR_EVENT_KEY } from "./lib/calendarConstants.js";
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "./lib/showcase/showcaseStyleStorage.js";
+import { OPEN_HOME_BIZ_SEARCH_EVENT } from "./components/HomeBizDirectorySearch.jsx";
 import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "./lib/letteringBizcardStorage.js";
 import { OPEN_POS_DASHBOARD_KEY, requestOpenFamilyProtectionTab } from "./lib/posDashboardConstants.js";
 import { isVlueKidsApp } from "./lib/vlueKidsApp.js";
@@ -679,13 +680,32 @@ function App() {
       setProfileOpen(true);
     };
     const onV1PaidGate = () => setV1PaidGateOpen(true);
+    const openBizcardScanner = () => {
+      setAppNotificationOpen(false);
+      setCallShowcaseSheetOpen(false);
+      setSmsInboxOpen(false);
+      setShowcaseStyleSheetOpen(false);
+      setProfileOpen(false);
+      setCsScannerOpen(true);
+    };
+    const openSmsInbox = () => {
+      setAppNotificationOpen(false);
+      setCallShowcaseSheetOpen(false);
+      setShowcaseStyleSheetOpen(false);
+      setProfileOpen(false);
+      setSmsInboxOpen(true);
+    };
     window.addEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
     window.addEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
     window.addEventListener(V1_PAID_PACKAGE_GATE_EVENT, onV1PaidGate);
+    window.addEventListener("vlue-open-bizcard-scanner", openBizcardScanner);
+    window.addEventListener("vlue-open-sms-inbox", openSmsInbox);
     return () => {
       window.removeEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
       window.removeEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
       window.removeEventListener(V1_PAID_PACKAGE_GATE_EVENT, onV1PaidGate);
+      window.removeEventListener("vlue-open-bizcard-scanner", openBizcardScanner);
+      window.removeEventListener("vlue-open-sms-inbox", openSmsInbox);
     };
   }, []);
   const [parentalConsentRequest, setParentalConsentRequest] = useState(null);
@@ -5141,17 +5161,17 @@ function App() {
           </div>
 
           <div className="relative flex shrink-0 items-center gap-1">
-            {v1AppShell.bizcardScanner && homeHeaderMinimal ? (
+            {homeHeaderMinimal && v1AppShell.homeBizSearch ? (
             <button
               type="button"
-              onClick={() => requireAuth(() => setCsScannerOpen(true))}
+              onClick={() => window.dispatchEvent(new Event(OPEN_HOME_BIZ_SEARCH_EVENT))}
               className="shrink-0 rounded-full p-1.5 text-gray-500 active:scale-90 transition-transform"
-              aria-label="명함 스캐너"
-              title="명함 스캐너 — 종이 명함 인식 후 연락처 저장"
+              aria-label="검색"
+              title="해시태그 · 아이디 · 상호 검색"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 7h4l2-3h4l2 3h4v12H4z" />
-                <circle cx="12" cy="13" r="3.5" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </button>
             ) : null}

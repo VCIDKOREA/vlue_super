@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import "../styles.css";
 import { suggestIndustries } from "../lib/homeBizDirectory.js";
@@ -35,19 +36,23 @@ function pickPeerProfileAvatar(...candidates) {
   return "";
 }
 
-function BizSearchBar({ query, onQueryChange, onSubmit, logoSize = 22 }) {
+function BizSearchBar({ query, onQueryChange, onSubmit, onEscape, logoSize = 22, inputRef = null, autoFocus = false }) {
   return (
     <div className="home-biz-search__shell">
       <div className="home-biz-search__naver">
         <VlueBrandLogo size={logoSize} className="home-biz-search__logo" alt="" />
         <input
+          ref={inputRef}
           type="search"
           value={query}
+          autoFocus={autoFocus}
           onChange={(e) => onQueryChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
               onSubmit?.();
+            } else if (e.key === "Escape") {
+              onEscape?.();
             }
           }}
           placeholder="#해시태그 · @아이디 · 상호 검색"
@@ -204,9 +209,12 @@ function VlueLogoAvatar({ avatarUrl }) {
   );
 }
 
+export const OPEN_HOME_BIZ_SEARCH_EVENT = "vlue-open-home-biz-search";
+
 export default function HomeBizDirectorySearch({
   categoryExposedPosts: _categoryExposedPosts = [],
-  onOpenBusinessRoom: _onOpenBusinessRoom
+  onOpenBusinessRoom: _onOpenBusinessRoom,
+  presentation = "inline"
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("popular");
@@ -225,7 +233,10 @@ export default function HomeBizDirectorySearch({
   const [previewKind, setPreviewKind] = useState(/** @type {'showcase'|'idcard'} */ ("showcase"));
   const [previewCard, setPreviewCard] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [launcherOpen, setLauncherOpen] = useState(false);
   const stickySentinelRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const launcher = presentation === "launcher";
 
   const rows = useMemo(() => {
     const mapped = apiHits.map((hit, i) => mapHitToRow(hit, i, tagLabel, idLabel));
@@ -329,8 +340,27 @@ export default function HomeBizDirectorySearch({
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!launcher) return undefined;
+    const onOpen = () => {
+      setResultsOpen(false);
+      setLauncherOpen((open) => !open);
+    };
+    window.addEventListener(OPEN_HOME_BIZ_SEARCH_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_HOME_BIZ_SEARCH_EVENT, onOpen);
+  }, [launcher]);
+
+  useEffect(() => {
+    if (!launcher || !launcherOpen) return undefined;
+    const timer = window.setTimeout(() => searchInputRef.current?.focus(), 40);
+    return () => window.clearTimeout(timer);
+  }, [launcher, launcherOpen]);
+
   const openResults = () => setResultsOpen(true);
-  const closeResults = () => setResultsOpen(false);
+  const closeResults = () => {
+    setResultsOpen(false);
+    if (launcher) setLauncherOpen(false);
+  };
 
   const applySuggestion = (item) => {
     setQuery(item.value);
@@ -433,7 +463,9 @@ export default function HomeBizDirectorySearch({
     return "#해시태그 또는 @아이디로 검색해 보세요.";
   })();
 
-  return (
+  if (launcher && !launcherOpen) return null;
+
+  const searchTree = (
     <>
       <div ref={stickySentinelRef} className="home-biz-search__sentinel" aria-hidden />
 
@@ -447,10 +479,17 @@ export default function HomeBizDirectorySearch({
       ) : null}
 
       <section
-        className={`home-biz-search home-biz-search--sticky ${stuck || resultsOpen ? "home-biz-search--stuck" : ""} ${resultsOpen ? "home-biz-search--active" : ""}`}
+        className={`home-biz-search ${launcher ? "home-biz-search--panel" : "home-biz-search--sticky"} ${!launcher && (stuck || resultsOpen) ? "home-biz-search--stuck" : ""} ${resultsOpen ? "home-biz-search--active" : ""}`}
         aria-label="쇼케이스 #해시태그 · @아이디 검색"
       >
-        <BizSearchBar query={query} onQueryChange={setQuery} onSubmit={openResults} />
+        <BizSearchBar
+          query={query}
+          onQueryChange={setQuery}
+          onSubmit={openResults}
+          onEscape={launcher ? closeResults : undefined}
+          inputRef={searchInputRef}
+          autoFocus={launcher}
+        />
 
         {resultsOpen ? (
           <div className="home-biz-search__sheet" role="dialog" aria-modal="true" aria-label="쇼케이스 검색 결과">
@@ -585,4 +624,23 @@ export default function HomeBizDirectorySearch({
       </AppFullScreenView>
     </>
   );
+
+  if (launcher && typeof document !== "undefined") {
+    return createPortal(
+      <div className="fixed inset-0 z-[90]">
+        <button
+          type="button"
+          className="absolute inset-0 bg-slate-900/35"
+          aria-label="검색 닫기"
+          onClick={closeResults}
+        />
+        <div className="absolute inset-x-2.5" style={{ top: "calc(52px + var(--vlue-safe-top, 0px))" }}>
+          {searchTree}
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  return searchTree;
 }
