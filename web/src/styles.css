@@ -1503,6 +1503,31 @@ html.vlue-safety-patch .home-kakao-stack {
   z-index: 3;
 }
 
+@keyframes vlue-card-scan {
+  0% { top: 16%; opacity: 0; }
+  18% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { top: 78%; opacity: 0; }
+}
+
+.home-quick-scan {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.home-quick-scan__line {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #fff, #a5f3fc, #fff, transparent);
+  box-shadow: 0 0 8px #22d3ee;
+  animation: vlue-card-scan 1.7s ease-in-out infinite;
+  pointer-events: none;
+}
+
 .home-biz-search__backdrop {
   position: fixed;
   inset: calc(52px + var(--vlue-safe-top, 0px)) 0 calc(54px + env(safe-area-inset-bottom, 0px)) 0;

@@ -13,67 +13,79 @@ function patchIsComplete() {
 
 function IconCard() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
-      <rect x="2.5" y="5" width="19" height="14" rx="3" fill="currentColor" opacity="0.18" />
-      <rect x="2.5" y="5" width="19" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="8.2" cy="11" r="2" fill="currentColor" />
-      <path d="M12.2 9.6h6.2M12.2 12.6h4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <circle cx="17.6" cy="16.2" r="3.1" fill="currentColor" />
-      <path d="m16.3 16.2 0.9 0.9 1.7-1.8" fill="none" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden>
+      <rect x="3" y="9" width="42" height="28" rx="8" fill="#1D4ED8" />
+      <rect x="6" y="12" width="36" height="22" rx="6" fill="#3B82F6" />
+      <circle cx="16" cy="21" r="4.2" fill="#fff" />
+      <rect x="23" y="17.2" width="14" height="3.2" rx="1.6" fill="#fff" />
+      <rect x="23" y="22.6" width="9" height="3" rx="1.5" fill="#DBEAFE" />
+      <circle cx="35.5" cy="31.5" r="8" fill="#16A34A" />
+      <path d="m31.8 31.6 2.3 2.3 4.6-4.8" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
 function IconScan() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 8.2V6.2A2.2 2.2 0 0 1 6.2 4H8.4" />
-      <path d="M15.6 4h2.2A2.2 2.2 0 0 1 20 6.2v2" />
-      <path d="M20 15.6v2.2A2.2 2.2 0 0 1 17.8 20H15.6" />
-      <path d="M8.4 20H6.2A2.2 2.2 0 0 1 4 17.8v-2.2" />
-      <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
+    <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden>
+      <rect x="5" y="5" width="38" height="38" rx="12" fill="#0891B2" />
+      <rect x="11" y="12" width="26" height="20" rx="4" fill="#fff" />
+      <circle cx="19" cy="19" r="3" fill="#22D3EE" />
+      <path d="M24 17.5h9M24 22h6" stroke="#0891B2" strokeWidth="2" strokeLinecap="round" />
+      <path d="M14 36.5h20" stroke="#CFFAFE" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="37" cy="12" r="7" fill="#F59E0B" />
+      <path d="m37 8.6 1 2.3 2.4.2-1.9 1.6.6 2.4L37 13.8l-2.1 1.3.6-2.4-1.9-1.6 2.4-.2z" fill="#fff" />
     </svg>
   );
 }
 
 function IconShowcase() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
-      <rect x="2.8" y="3.2" width="13.6" height="15.2" rx="3.4" fill="currentColor" opacity="0.16" />
-      <rect x="2.8" y="3.2" width="13.6" height="15.2" rx="3.4" fill="none" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="7.4" cy="8.2" r="1.7" fill="currentColor" />
-      <path d="M5.2 14.4c.55-1.35 1.5-2 2.2-2s1.65.65 2.2 2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path
-        d="M18.5 12.1c0-.95-.75-1.7-1.7-1.7-.55 0-1.05.28-1.35.72-.3-.44-.8-.72-1.35-.72-.95 0-1.7.75-1.7 1.7 0 1.7 3.05 3.25 3.05 3.25s3.05-1.55 3.05-3.25z"
-        fill="currentColor"
-      />
+    <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden>
+      <rect x="8" y="8" width="26" height="32" rx="6" fill="#C4B5FD" />
+      <rect x="12" y="5" width="26" height="34" rx="7" fill="#7C3AED" />
+      <rect x="16" y="9" width="18" height="12" rx="3" fill="#DDD6FE" />
+      <circle cx="21" cy="14" r="2" fill="#7C3AED" />
+      <path d="m16.5 20.5 4-4 3 3 6-6 4.5 7" fill="none" stroke="#7C3AED" strokeWidth="1.6" strokeLinejoin="round" />
+      <rect x="16" y="24" width="14" height="2.4" rx="1.2" fill="#EDE9FE" />
+      <rect x="16" y="28.5" width="9" height="2.4" rx="1.2" fill="#C4B5FD" />
+      <circle cx="34" cy="33" r="8" fill="#F43F5E" />
+      <path d="M34 37.2s-4.6-2.8-4.6-5.2a2.5 2.5 0 0 1 4.6-1.3 2.5 2.5 0 0 1 4.6 1.3c0 2.4-4.6 5.2-4.6 5.2z" fill="#fff" />
     </svg>
   );
 }
 
 function IconFamily() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
-      <path d="M12 21.2s6.4-4.7 6.4-9.2a6.4 6.4 0 1 0-12.8 0c0 4.5 6.4 9.2 6.4 9.2z" fill="currentColor" opacity="0.18" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-      <circle cx="12" cy="11.6" r="2.1" fill="currentColor" />
+    <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden>
+      <path d="M24 44s14-10.2 14-20.2C38 15.2 31.7 9 24 9S10 15.2 10 23.8C10 33.8 24 44 24 44z" fill="#059669" />
+      <path d="M24 40.5s11.2-8.4 11.2-16.6C35.2 16.6 30.2 12 24 12s-11.2 4.6-11.2 11.9c0 8.2 11.2 16.6 11.2 16.6z" fill="#10B981" />
+      <circle cx="24" cy="22.5" r="6.2" fill="#fff" />
+      <circle cx="24" cy="20.6" r="2.2" fill="#047857" />
+      <path d="M20.2 25.6c.7-1.6 2-2.4 3.8-2.4s3.1.8 3.8 2.4" fill="none" stroke="#047857" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
 
 function IconSms() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
-      <path d="M5 5.5h14a2.2 2.2 0 0 1 2.2 2.2v6.2A2.2 2.2 0 0 1 19 16.1h-6.2L8 19.2v-3.1H5A2.2 2.2 0 0 1 2.8 13.9V7.7A2.2 2.2 0 0 1 5 5.5z" fill="currentColor" opacity="0.16" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-      <path d="M7.4 10.6h9.2M7.4 13.2h5.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden>
+      <path d="M10 8h26a6 6 0 0 1 6 6v14a6 6 0 0 1-6 6H22l-8 7v-7h-4a6 6 0 0 1-6-6V14a6 6 0 0 1 6-6z" fill="#6D28D9" />
+      <path d="M12 11h24a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H22.5L16 36.2V31H12a4 4 0 0 1-4-4V15a4 4 0 0 1 4-4z" fill="#8B5CF6" />
+      <rect x="15" y="17" width="16" height="2.6" rx="1.3" fill="#fff" />
+      <rect x="15" y="22.2" width="11" height="2.6" rx="1.3" fill="#EDE9FE" />
+      <circle cx="36.5" cy="14" r="7" fill="#F59E0B" />
+      <path d="m36.5 10.6 1 2.3 2.4.2-1.9 1.6.6 2.4-2.1-1.3-2.1 1.3.6-2.4-1.9-1.6 2.4-.2z" fill="#fff" />
     </svg>
   );
 }
 
 function IconShield() {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
-      <path d="M12 3.2 5.2 6v5.6c0 4 2.6 6.8 6.8 8.4 4.2-1.6 6.8-4.4 6.8-8.4V6L12 3.2z" fill="currentColor" opacity="0.18" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-      <path d="m8.8 11.8 2.2 2.2 4.2-4.3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden>
+      <path d="M24 4 8 10.5v12.2c0 8.6 6 14.6 16 18.3 10-3.7 16-9.7 16-18.3V10.5L24 4z" fill="#0F766E" />
+      <path d="M24 8.2 12 13.2v9.2c0 6.6 4.6 11.4 12 14.4 7.4-3 12-7.8 12-14.4v-9.2L24 8.2z" fill="#14B8A6" />
+      <path d="m17.2 23.2 4.2 4.2 9-9.2" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -82,43 +94,36 @@ const ITEMS = [
   {
     id: "dcc",
     label: "디지털인증명함",
-    tone: "bg-blue-50 text-blue-600",
     icon: IconCard,
     action: () => window.dispatchEvent(new Event(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT))
   },
   {
     id: "scan",
     label: "AI명함스캔",
-    tone: "bg-cyan-50 text-cyan-700",
     icon: IconScan,
-    spark: true,
     action: () => window.dispatchEvent(new Event(OPEN_BIZCARD_SCANNER_EVENT))
   },
   {
     id: "showcase",
     label: "SNS쇼케이스",
-    tone: "bg-indigo-50 text-indigo-600",
     icon: IconShowcase,
     action: () => window.dispatchEvent(new Event(SHOWCASE_OPEN_SETTINGS_EVENT))
   },
   {
     id: "family",
     label: "가족위치",
-    tone: "bg-emerald-50 text-emerald-600",
     icon: IconFamily,
     action: () => window.dispatchEvent(new CustomEvent("vlue-open-location", { detail: { mode: "family" } }))
   },
   {
     id: "sms",
     label: "AI문자검사",
-    tone: "bg-violet-50 text-violet-600",
     icon: IconSms,
     action: () => window.dispatchEvent(new Event(OPEN_SMS_INBOX_EVENT))
   },
   {
     id: "patch",
     label: "안심패치",
-    tone: "bg-teal-50 text-teal-700",
     icon: IconShield,
     patch: true,
     action: () => window.dispatchEvent(new Event(OPEN_SAFETY_PATCH_EVENT))
@@ -141,12 +146,12 @@ export default function HomeQuickMenu({ isDarkMode = false }) {
 
   return (
     <section
-      className={`mx-2.5 mt-2 shrink-0 rounded-2xl border px-1.5 py-2 shadow-sm ${
+      className={`mx-2.5 mt-2 shrink-0 rounded-2xl border px-1 py-3 shadow-sm ${
         isDarkMode ? "border-white/10 bg-[#111827]" : "border-gray-100 bg-white"
       }`}
       aria-label="바로가기"
     >
-      <div className="grid grid-cols-3 gap-y-1">
+      <div className="grid grid-cols-3 gap-x-1 gap-y-3">
         {ITEMS.map((item) => {
           const Icon = item.icon;
           return (
@@ -154,27 +159,22 @@ export default function HomeQuickMenu({ isDarkMode = false }) {
               key={item.id}
               type="button"
               onClick={item.action}
-              className="flex flex-col items-center gap-1 rounded-xl px-1 py-1.5 active:scale-95"
+              className="flex flex-col items-center gap-1.5 rounded-xl px-0.5 py-1 active:scale-95"
             >
-              <span className="relative">
-                <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${item.tone}`}>
-                  <Icon />
-                </span>
-                {item.spark ? (
-                  <span
-                    className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-black text-white shadow-sm"
-                    aria-hidden
-                  >
-                    ✦
-                  </span>
-                ) : null}
+              <span className={`relative drop-shadow-[0_4px_6px_rgba(15,23,42,0.18)] ${item.id === "scan" ? "home-quick-scan" : ""}`}>
+                <Icon />
+                {item.id === "scan" ? <span className="home-quick-scan__line" aria-hidden /> : null}
                 {item.patch ? (
-                  <span className="absolute -right-3 -top-1.5 rounded-full bg-emerald-500 px-1.5 py-px text-[8px] font-black leading-tight text-white shadow-sm">
+                  <span className="absolute -right-1 -top-1 rounded-full bg-emerald-600 px-1.5 py-px text-[9px] font-black leading-tight text-white shadow-sm">
                     {patchComplete ? "완료" : "ON"}
                   </span>
                 ) : null}
               </span>
-              <span className={`max-w-full text-center text-[10.5px] font-bold leading-tight ${isDarkMode ? "text-slate-100" : "text-slate-700"}`}>
+              <span
+                className={`max-w-full text-center text-[12px] font-extrabold leading-tight tracking-tight ${
+                  isDarkMode ? "text-white" : "text-gray-950"
+                }`}
+              >
                 {item.label}
               </span>
             </button>

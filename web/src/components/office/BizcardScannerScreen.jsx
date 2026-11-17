@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Check, ImagePlus, Loader2, RefreshCw, X } from "lucide-react";
 import { sampleBizcardAlignment } from "../../lib/bizcardAutoDetect.js";
-import { parseBizcardFromText } from "../../lib/bizcardOcrParser.js";
+import { EMPTY_BIZCARD, structureBizcardScan } from "../../lib/bizcardStructuredScan.js";
 import { hasNativeDocumentOcr, runNativeDocumentOcr } from "../../lib/documentOcrBridge.js";
 import { hasNativePosOcr, runNativePosBillOcr } from "../../lib/posBillNativeOcr.js";
 import { preloadBizcardTesseract, runTesseractBizcardOcr } from "../../lib/bizcardTesseractOcr.js";
@@ -14,16 +14,8 @@ const MAX_AUTO_FAILS = 3;
 const DETECT_INTERVAL_MS = 280;
 const AUTO_COOLDOWN_MS = 2200;
 
-const EMPTY_FIELDS = {
-  name: "",
-  organization: "",
-  title: "",
-  phone: "",
-  fax: "",
-  email: "",
-  website: "",
-  address: ""
-};
+const EMPTY_FIELDS = { ...EMPTY_BIZCARD };
+const EMPTY_TRUST = { score: 0, badge: "미확인", notes: [] };
 
 /**
  * OCR 우선순위: Android ML Kit → POS OCR → Tesseract.js(웹)
@@ -105,8 +97,21 @@ function FieldRow({ label, value, onChange, placeholder, inputMode }) {
 
 function fieldsHaveData(f) {
   return Boolean(
-    f.name.trim() || f.phone.trim() || f.email.trim() || f.fax.trim() || f.address.trim() || f.organization.trim()
+    f.name.trim() ||
+      f.company.trim() ||
+      f.mobile.trim() ||
+      f.tel.trim() ||
+      f.email.trim() ||
+      f.fax.trim() ||
+      f.address.trim()
   );
+}
+
+function trustBadgeClass(badge) {
+  if (badge === "DB 검증 완료") return "bg-emerald-600 text-white";
+  if (badge === "위치 실존 확인") return "bg-blue-600 text-white";
+  if (badge === "부분 일치") return "bg-amber-500 text-white";
+  return "bg-slate-500 text-white";
 }
 
 /**
@@ -133,6 +138,7 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState(EMPTY_FIELDS);
+  const [trust, setTrust] = useState(EMPTY_TRUST);
   const [rawOcr, setRawOcr] = useState("");
   const [guideReady, setGuideReady] = useState(false);
   const [scanComplete, setScanComplete] = useState(false);
@@ -189,6 +195,7 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
     autoFailRef.current = 0;
     setPreviewUrl("");
     setFields(EMPTY_FIELDS);
+    setTrust(EMPTY_TRUST);
     setRawOcr("");
     setOcrLoading(false);
     setSaving(false);
@@ -232,26 +239,20 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
       try {
         const { text, engine } = await runBizcardOcr(dataUrl);
         setRawOcr(text);
-        const parsed = parseBizcardFromText(text);
-        const next = {
-          name: parsed.name,
-          organization: parsed.organization,
-          title: parsed.title,
-          phone: parsed.phone,
-          fax: parsed.fax,
-          email: parsed.email,
-          website: parsed.website,
-          address: parsed.address
-        };
+        const structured = await structureBizcardScan({ text, imageDataUrl: dataUrl });
+        const next = structured.card;
         setFields(next);
+        setTrust(structured.trust || EMPTY_TRUST);
         const filled = fieldsHaveData(next);
         if (filled) {
           setScanComplete(true);
           scanCompleteRef.current = true;
           onToast?.(
-            engine === "tesseract"
-              ? "스캔 완료 · 명함 정보를 입력란에 채웠습니다."
-              : "스캔 완료 · 명함 정보를 인식했습니다."
+            structured.provider === "gemini"
+              ? `스캔 완료 · ${structured.trust?.badge || "미확인"} ${structured.trust?.score ?? 0}점. 확인 후 저장하세요.`
+              : engine === "tesseract"
+                ? "스캔 완료 · 기본 분류로 채웠습니다. 확인 후 저장하세요."
+                : "스캔 완료 · 명함 정보를 확인한 뒤 저장하세요."
           );
         } else {
           if (fromAuto) {
@@ -271,8 +272,12 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
             setPreviewUrl("");
             void startCamera();
           } else if (!text.trim()) {
-            onToast?.("글자를 읽지 못했습니다. 직접 입력하거나 다시 촬영해 주세요.");
+            setScanComplete(true);
+            scanCompleteRef.current = true;
+            onToast?.("글자를 읽지 못했습니다. 칸을 직접 입력하거나 다시 촬영해 주세요.");
           } else {
+            setScanComplete(true);
+            scanCompleteRef.current = true;
             onToast?.("글자는 읽었지만 필드를 자동 분류하지 못했습니다. 아래를 수정해 주세요.");
           }
         }
@@ -396,15 +401,20 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
     setSaving(true);
     try {
       const res = await saveProfileToDeviceContacts({
-        name: fields.name || fields.organization || "명함",
-        organization: fields.organization,
-        title: fields.title,
-        phone: fields.phone,
+        name: fields.name || fields.company || "명함",
+        organization: fields.company,
+        company: fields.company,
+        department: fields.department,
+        title: fields.position,
+        position: fields.position,
+        phone: fields.mobile,
+        mobile: fields.mobile,
+        tel: fields.tel,
         fax: fields.fax,
         email: fields.email,
         website: fields.website,
         address: fields.address,
-        introBack: rawOcr ? `VLUÉ 명함스캔\n${rawOcr.slice(0, 400)}` : "VLUÉ 명함스캔"
+        trustScore: trust.score
       });
       if (res?.cancelled) {
         onToast?.("저장이 취소되었습니다.");
@@ -416,7 +426,7 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
       }
       onToast?.(
         res.method === "native"
-          ? "연락처 저장 화면을 열었습니다."
+          ? "명함을 연락처에 저장했습니다."
           : res.method === "share"
             ? "연락처 파일로 공유했습니다."
             : "연락처 파일(.vcf)을 저장했습니다."
@@ -445,8 +455,8 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
   const borderClass = guideReady || scanComplete ? "border-emerald-400/90" : "border-slate-400/80";
 
   const statusHint = (() => {
-    if (ocrLoading) return "명함 글자 인식 중…";
-    if (scanComplete && canSave) return "스캔 완료 · 아래 정보를 확인한 뒤 저장하세요";
+    if (ocrLoading) return "명함 구조 분석 · 신뢰도 검증 중…";
+    if (scanComplete && canSave) return `${trust.badge} · 신뢰도 ${trust.score}점 · 틀린 칸만 고치고 명함 저장`;
     if (manualUnlocked) return "직접 촬영 모드 · 가운데 셔터를 눌러 주세요";
     if (guideReady) return "인식 가능 · 잠시 고정하면 자동 촬영됩니다";
     if (autoFailCount > 0) {
@@ -529,7 +539,7 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
         {ocrLoading ? (
           <div className="absolute inset-x-4 bottom-4 flex items-center justify-center gap-2 rounded-xl bg-blue-600/90 px-3 py-2 text-[12px] font-bold">
             <Loader2 className="h-4 w-4 animate-spin" />
-            OCR 인식 중…
+            명함 구조 분석 중…
           </div>
         ) : null}
         {scanComplete && canSave && !ocrLoading ? (
@@ -541,46 +551,36 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
 
       <div className="flex min-h-0 flex-1 flex-col bg-slate-100 text-slate-900">
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5">
-          <FieldRow
-            label="상호"
-            value={fields.organization}
-            onChange={setField("organization")}
-            placeholder="회사명"
-          />
-          <FieldRow label="이름" value={fields.name} onChange={setField("name")} placeholder="홍길동" />
-          <FieldRow
-            label="전화번호"
-            value={fields.phone}
-            onChange={setField("phone")}
-            placeholder="010-0000-0000"
-            inputMode="tel"
-          />
-          <FieldRow
-            label="이메일"
-            value={fields.email}
-            onChange={setField("email")}
-            placeholder="name@company.com"
-            inputMode="email"
-          />
-          <FieldRow
-            label="팩스번호"
-            value={fields.fax}
-            onChange={setField("fax")}
-            placeholder="02-000-0000"
-            inputMode="tel"
-          />
-          <FieldRow
-            label="주소"
-            value={fields.address}
-            onChange={setField("address")}
-            placeholder="서울시 …"
-          />
+          {scanComplete ? (
+            <div className={`flex items-center justify-between rounded-xl px-3 py-2 ${trustBadgeClass(trust.badge)}`}>
+              <span className="text-[12px] font-black">{trust.badge}</span>
+              <span className="text-[12px] font-black">신뢰도 {trust.score}점</span>
+            </div>
+          ) : (
+            <p className="px-1 py-6 text-center text-[12px] font-bold text-slate-500">
+              명함을 맞추면 자동으로 읽고, 저장 전에 칸을 확인할 수 있습니다.
+            </p>
+          )}
+          {scanComplete ? (
+            <>
+              <FieldRow label="이름" value={fields.name} onChange={setField("name")} placeholder="홍길동" />
+              <FieldRow label="회사" value={fields.company} onChange={setField("company")} placeholder="(주)회사명" />
+              <FieldRow label="부서" value={fields.department} onChange={setField("department")} placeholder="없으면 비움" />
+              <FieldRow label="직함" value={fields.position} onChange={setField("position")} placeholder="대표이사" />
+              <FieldRow label="휴대폰" value={fields.mobile} onChange={setField("mobile")} placeholder="010-0000-0000" inputMode="tel" />
+              <FieldRow label="유선전화" value={fields.tel} onChange={setField("tel")} placeholder="02-000-0000" inputMode="tel" />
+              <FieldRow label="팩스" value={fields.fax} onChange={setField("fax")} placeholder="02-000-0000" inputMode="tel" />
+              <FieldRow label="이메일" value={fields.email} onChange={setField("email")} placeholder="name@company.com" inputMode="email" />
+              <FieldRow label="주소" value={fields.address} onChange={setField("address")} placeholder="도로명 주소" />
+              <FieldRow label="홈페이지" value={fields.website} onChange={setField("website")} placeholder="company.com" inputMode="url" />
+            </>
+          ) : null}
         </div>
 
         <div className="shrink-0 space-y-2 border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5">
           <p className="text-center text-[11px] font-semibold text-slate-500">
             {scanComplete && canSave
-              ? "정보가 채워졌습니다 · 저장 버튼으로 연락처에 저장하세요"
+              ? "틀린 칸만 수정한 뒤 명함 저장을 누르세요"
               : manualUnlocked
                 ? "자동 촬영 3회 실패 · 셔터로 직접 촬영하세요"
                 : "프레임에 맞추면 자동 촬영 · 이름·전화·이메일 등을 채웁니다"}
@@ -612,14 +612,14 @@ export default function BizcardScannerScreen({ open, onClose, onToast }) {
                     ? "border-white/40 bg-white text-slate-900"
                     : "border-slate-300 bg-slate-200 text-slate-500"
               }`}
-              aria-label={showSaveButton ? "저장" : "촬영"}
+              aria-label={showSaveButton ? "명함 저장" : "촬영"}
             >
               {saving ? (
                 <Loader2 className="h-7 w-7 animate-spin" />
               ) : showSaveButton ? (
                 <>
                   <Check className="h-7 w-7" strokeWidth={2.6} />
-                  <span className="mt-0.5 text-[10px] font-black leading-none">저장</span>
+                  <span className="mt-0.5 text-[10px] font-black leading-none">명함 저장</span>
                 </>
               ) : (
                 <Camera className="h-8 w-8" strokeWidth={2.2} />

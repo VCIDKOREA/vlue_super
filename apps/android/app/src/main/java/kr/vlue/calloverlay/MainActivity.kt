@@ -1668,6 +1668,12 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
             }
             notifyWebPermissionStatus()
         }
+        if (requestCode == ContactInsertHelper.REQ_WRITE_CONTACTS) {
+            val granted = grantResults.isNotEmpty() &&
+                grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
+            ContactInsertHelper.onWritePermissionResult(this, granted)
+            return
+        }
         if (requestCode == REQ_FAMILY && FamilyPermissionHelper.allGranted(this)) {
             Toast.makeText(this, "가족 보호 권한이 준비되었습니다.", Toast.LENGTH_SHORT).show()
             scanRemoteApps()
@@ -2311,7 +2317,7 @@ class MainActivity : AppCompatActivity(), VlueFamilyBridge.FamilyBridgeHost {
         /** DCC·명함 → 시스템 연락처 추가 화면 (Insert Intent) */
         @android.webkit.JavascriptInterface
         fun saveContactProfile(json: String?) {
-            activity.runOnUiThread { ContactInsertHelper.openInsert(activity, json) }
+            activity.runOnUiThread { ContactInsertHelper.saveFromWeb(activity, json) }
         }
 
         /** VCF 폴백 — 공유/뷰어로 열기 */

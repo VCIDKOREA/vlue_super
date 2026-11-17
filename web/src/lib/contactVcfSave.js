@@ -56,24 +56,32 @@ export function dccCardToContactProfile(card = {}) {
 /** 채팅·지갑·DCC 스냅샷 → vCard 3.0 */
 export function buildLocalContactVcf(profile) {
   const name = String(profile.name || profile.legalName || "VLUÉ").trim() || "VLUÉ";
-  const org = String(profile.organization || "").trim();
-  const title = [profile.title, profile.department].filter(Boolean).join(" · ");
-  const phone = String(profile.phone || profile.landline || "").replace(/\s/g, "");
+  const org = String(profile.organization || profile.company || "").trim();
+  const department = String(profile.department || "").trim();
+  const title = String(profile.title || profile.position || "").trim();
+  const mobile = String(profile.mobile || profile.phone || "").replace(/\s/g, "");
+  const tel = String(profile.tel || profile.landline || "").replace(/\s/g, "");
   const fax = String(profile.fax || "").replace(/\s/g, "");
   const email = String(profile.email || "").trim();
   const website = String(profile.website || profile.url || "").trim();
   const address = String(profile.address || "").trim();
+  const trustScore = Number(profile.trustScore);
+  const scanNote = Number.isFinite(trustScore) && trustScore >= 0
+    ? `[VLUE 인증 스캔 명함 - 신뢰도 ${Math.round(trustScore)}점]`
+    : "";
   const extra = String(profile.introBack || profile.backNote || "").trim();
-  const note = extra ? `${VLUE_VCARD_NOTE}\n${extra}` : VLUE_VCARD_NOTE;
+  const note = scanNote || (extra ? `${VLUE_VCARD_NOTE}\n${extra}` : VLUE_VCARD_NOTE);
+  const orgLine = department ? `${escVcf(org)};${escVcf(department)}` : escVcf(org);
 
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
     `FN:${escVcf(name)}`,
     `N:${escVcf(name)};;;;`,
-    org ? `ORG:${escVcf(org)}` : "",
+    org ? `ORG:${orgLine}` : "",
     title ? `TITLE:${escVcf(title)}` : "",
-    phone ? `TEL;TYPE=CELL:${phone}` : "",
+    mobile ? `TEL;TYPE=CELL:${mobile}` : "",
+    tel && tel !== mobile ? `TEL;TYPE=WORK:${tel}` : "",
     fax ? `TEL;TYPE=FAX,WORK:${fax}` : "",
     email ? `EMAIL;TYPE=INTERNET:${escVcf(email)}` : "",
     website ? `URL:${escVcf(website)}` : "",
@@ -139,13 +147,22 @@ function tryNativeContactBridge(vcf, filename, profile = {}) {
       android.saveContactProfile(
         JSON.stringify({
           name: profile.name || profile.legalName || "",
-          organization: profile.organization || "",
-          title: [profile.title, profile.department].filter(Boolean).join(" · "),
-          phone: profile.phone || profile.landline || "",
+          organization: profile.organization || profile.company || "",
+          company: profile.company || profile.organization || "",
+          department: profile.department || "",
+          title: profile.title || profile.position || "",
+          position: profile.position || profile.title || "",
+          phone: profile.mobile || profile.phone || "",
+          mobile: profile.mobile || profile.phone || "",
+          tel: profile.tel || profile.landline || "",
           fax: profile.fax || "",
           email: profile.email || "",
           website: profile.website || "",
-          address: profile.address || ""
+          address: profile.address || "",
+          trustScore: Number.isFinite(Number(profile.trustScore)) ? Math.round(Number(profile.trustScore)) : -1,
+          note: Number.isFinite(Number(profile.trustScore)) && Number(profile.trustScore) >= 0
+            ? `[VLUE 인증 스캔 명함 - 신뢰도 ${Math.round(Number(profile.trustScore))}점]`
+            : ""
         })
       );
       return true;
