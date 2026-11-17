@@ -21,7 +21,7 @@ const DISCLOSURE =
   "본 VLUÉ 안심패치 동기화 서비스는 쿠팡 파트너스 활동의 일환으로, 구매 발생 시 일정액의 수수료를 제공받습니다.";
 
 const FALLBACK_LINES = [
-  { icon: "🤖", title: "Gemini AI 안심요약", body: "오늘의 가족 안심 요약을 동기화했습니다." },
+  { icon: "🤖", title: "Gemini AI 안심요약", body: "연결된 가족 수와 이 기기 상태를 확인하는 중입니다." },
   { icon: "📍", title: "위치", body: "최근 GPS·주소 정보를 점검했습니다." },
   { icon: "📡", title: "수집 정보", body: "배터리 · 접속 · GPS 상태를 동기화했습니다." },
   { icon: "🦠", title: "기기 악성 APP 감지", body: "최근 24시간 기기 악성·위험 권한 APP 감지 현황을 동기화합니다." },

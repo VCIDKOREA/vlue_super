@@ -346,6 +346,8 @@ type Snapshot = {
   online: boolean;
   fresh: boolean;
   updatedAt: Date | null;
+  /** 활성 familyProtectionLink 건수. 위치 접속과 별개다. */
+  familyLinkCount: number;
 };
 
 function computeSafetyIndex(snap: Snapshot) {
@@ -360,12 +362,27 @@ function computeSafetyIndex(snap: Snapshot) {
   return Math.max(1, Math.min(99, score));
 }
 
+/** 위치 수신 여부를 가족 관계로 말하지 않는다. */
+export function familyLinkSentence(familyLinkCount: number) {
+  const count = Math.max(0, Math.floor(familyLinkCount || 0));
+  if (count === 0) return "연결된 가족이 없습니다.";
+  return `활성 가족 연결이 ${count}건 있습니다.`;
+}
+
+export function claimsUnverifiedFamilyConnection(summary: string) {
+  const text = String(summary || "");
+  if (/연결된\s*가족이\s*없/.test(text)) return false;
+  return /가족과\s*연결|가족에게\s*연결|가족이\s*연결|가족\s*연결됨|가족과\s*함께/.test(text);
+}
+
 function fallbackSummary(snap: Snapshot, safetyIndex: number) {
   const where = snap.addressLabel ? `${snap.addressLabel} 부근에 있습니다.` : "상세 위치는 아직 수신되지 않았습니다.";
-  const link = snap.online ? "현재 가족과 연결되어 있습니다." : "최근 위치가 유지되고 있으며 실시간 접속은 잠시 끊겨 있습니다.";
+  const device = snap.online
+    ? "이 기기의 최근 위치가 수신되고 있습니다."
+    : "이 기기의 실시간 위치는 지금 수신되지 않았습니다.";
   const battery =
     snap.batteryPct == null ? "배터리 정보는 다음 동기화에서 갱신됩니다." : `배터리 잔량은 ${snap.batteryPct}%입니다.`;
-  return `${snap.displayName}님은 ${link}\n${where}\n${battery} 오늘의 안심지수는 ${safetyIndex}입니다.`;
+  return `${snap.displayName}님은 ${familyLinkSentence(snap.familyLinkCount)}\n${device} ${where}\n${battery} 오늘의 안심지수는 ${safetyIndex}입니다.`;
 }
 
 async function callGeminiBrief(snap: Snapshot, safetyIndex: number): Promise<string | null> {
@@ -374,11 +391,15 @@ async function callGeminiBrief(snap: Snapshot, safetyIndex: number): Promise<str
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const prompt = [
-    "가족 안심 브리핑을 한국어 2~3문장으로 작성하라.",
+    "본인 안심 브리핑을 한국어 2~3문장으로 작성하라.",
     "의료 진단, 범죄 단정, 과장된 위험 경고는 하지 마라.",
+    "가족 관계는 아래 '활성 가족 연결 수'만 사실로 사용하라. 수를 바꾸거나 연결을 추측하지 마라.",
+    "활성 가족 연결 수가 0이면 첫 문장은 반드시 '연결된 가족이 없습니다.' 이다. '가족과 연결되어 있습니다'라고 쓰지 마라.",
+    "접속은 이 기기의 위치 수신 여부일 뿐이며 가족 연결이 아니다.",
     "반드시 JSON만 반환: {\"summary\":\"문장\"}",
     `이름: ${snap.displayName}`,
-    `접속: ${snap.online ? "연결됨" : "최근 위치 유지"}`,
+    `활성 가족 연결 수: ${snap.familyLinkCount}`,
+    `기기 위치 수신: ${snap.online ? "최근 위치 수신됨" : "실시간 위치 미수신"}`,
     `배터리: ${snap.batteryPct == null ? "없음" : `${snap.batteryPct}%`}`,
     `주소: ${snap.addressLabel || "없음"}`,
     `안심지수: ${safetyIndex}`
@@ -400,7 +421,9 @@ async function callGeminiBrief(snap: Snapshot, safetyIndex: number): Promise<str
     if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]) as { summary?: string };
     const summary = String(parsed.summary || "").trim();
-    return summary ? summary.slice(0, 500) : null;
+    if (!summary) return null;
+    if (snap.familyLinkCount === 0 && claimsUnverifiedFamilyConnection(summary)) return null;
+    return summary.slice(0, 500);
   } catch (err) {
     console.warn("[safety-patch] gemini failed", err);
     return null;
@@ -464,15 +487,22 @@ async function loadSnapshot(targetId: string, roomId: string): Promise<Snapshot>
     : member
       ? member.online !== false && fresh
       : Boolean(presence?.online) && fresh;
+  const familyLinkCount = await prisma.familyProtectionLink.count({
+    where: {
+      status: "active",
+      OR: [{ guardianUserId: targetId }, { wardUserId: targetId }]
+    }
+  });
   return {
-    displayName: presence?.displayName || user?.legalName || user?.publicHandle || member?.displayName || "가족",
+    displayName: presence?.displayName || user?.legalName || user?.publicHandle || member?.displayName || "회원",
     lat,
     lng,
     batteryPct: member?.batteryPct ?? presence?.batteryPct ?? null,
     addressLabel: address.slice(0, 240),
     online,
     fresh,
-    updatedAt
+    updatedAt,
+    familyLinkCount
   };
 }
 
@@ -500,7 +530,9 @@ export async function buildFamilySafetyReport(viewerId: string, targetId: string
   const cacheFresh =
     hit &&
     (!snap.updatedAt || new Date(hit.created_at).getTime() >= snap.updatedAt.getTime() - 60_000);
-  if (hit && cacheFresh) {
+  const cacheContradictsFamily =
+    snap.familyLinkCount === 0 && claimsUnverifiedFamilyConnection(hit?.summary || "");
+  if (hit && cacheFresh && !cacheContradictsFamily) {
     return {
       ok: true as const,
       summary: hit.summary,
