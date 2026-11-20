@@ -1,4 +1,4 @@
-/** VLUE SPACE — 사용자가 스캔을 시작한 동안에만 쓰는 설정. */
+/** HIDDEN CAM CHECK — 카메라 미리보기를 켠 동안에만 쓰는 설정. */
 
 export const OPEN_SPACE_EVENT = "vlue-open-space";
 
@@ -35,8 +35,6 @@ export const DEFAULT_SPACE_CONFIG = {
   mode: "general",
   palette: "THERMAL_IRON",
   optical: true,
-  radio: false,
-  audioSensor: false,
   suppress: "high",
   stability: "sustained",
   guidance: "STANDARD",

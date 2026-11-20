@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { acceptStable, directionCue, measureHotspot } from "../../lib/vlueSpace/analyzeFrame.js";
-import { applyOpticalPalette, paintSampleScene } from "../../lib/vlueSpace/opticalPalette.js";
+import { applyOpticalPalette } from "../../lib/vlueSpace/opticalPalette.js";
 import { requestSpaceGuide } from "../../lib/vlueSpace/spaceGuide.js";
 import { readSpaceAuth } from "../../lib/vlueSpace/spaceSession.js";
 
@@ -42,6 +42,7 @@ export function useSpaceScan(config, active) {
   const loopRef = useRef(0);
   const stableRef = useRef({ streak: 0, point: null });
   const guideAbort = useRef(null);
+  const runToken = useRef(0);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const audioStream = useRef(null);
@@ -68,6 +69,7 @@ export function useSpaceScan(config, active) {
   }, []);
 
   const releaseMedia = useCallback(() => {
+    runToken.current += 1;
     guideAbort.current?.abort();
     guideAbort.current = null;
     silence();
@@ -132,8 +134,19 @@ export function useSpaceScan(config, active) {
     const maxY = Math.max(0, vh - sh);
     const sx = maxX * (0.5 + pan.x * 0.5);
     const sy = maxY * (0.5 + pan.y * 0.5);
-    if (live) ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    else paintSampleScene(ctx, canvas.width, canvas.height);
+    if (!live) {
+      ctx.fillStyle = "#05080d";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      stableRef.current = { streak: 0, point: null };
+      lockedRef.current = false;
+      const idleNow = performance.now();
+      if (idleNow - lastUiAt.current > 180) {
+        lastUiAt.current = idleNow;
+        setReading({ hotspot: null, cue: directionCue(null, z), locked: false, needZoom: false, rejected: "", live: false });
+      }
+      return;
+    }
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const measured = current.optical ? measureHotspot(frame, current.suppress) : { hotspot: null, mean: 0 };
     const stable = current.optical
@@ -281,6 +294,7 @@ export function useSpaceScan(config, active) {
 
   const start = useCallback(async () => {
     releaseMedia();
+    const token = runToken.current;
     setCameraError("");
     setRecordNote("");
     setPhase("live");
@@ -295,16 +309,19 @@ export function useSpaceScan(config, active) {
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
+      if (token !== runToken.current || !videoRef.current) {
+        stopStream(stream);
+        return;
       }
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play().catch(() => {});
       setSampleMode(false);
       pushLog("카메라 스트림을 열었습니다.");
     } catch (err) {
+      if (token !== runToken.current) return;
       setSampleMode(true);
-      setCameraError(err?.name === "NotAllowedError" ? "카메라 권한이 없습니다. 샘플 광학 화면으로 이어갑니다." : "카메라를 열 수 없습니다. 샘플 광학 화면으로 이어갑니다.");
-      pushLog("카메라 폴백 · 샘플 프레임");
+      setCameraError(err?.name === "NotAllowedError" ? "카메라 권한이 없습니다. 측정값을 만들지 않습니다." : "카메라를 열 수 없습니다. 측정값을 만들지 않습니다.");
+      pushLog("카메라 프레임 없음");
     }
   }, [config.mode, pushLog, releaseMedia]);
 
