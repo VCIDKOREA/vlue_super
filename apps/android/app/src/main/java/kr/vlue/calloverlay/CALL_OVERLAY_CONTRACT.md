@@ -158,6 +158,11 @@ Do not add parallel “open showcase” / “open popup” helpers that skip thi
 - **After ANY change under `web/src` that affects the overlay** (`LetteringOverlayHost`, `OutgoingCallLogo`, styles, lib/*):
   run `npm run build:overlay --workspace @vlue/web` and commit `apps/android/app/src/main/assets/vlue-overlay/`, then rebuild the APK.
 
+### 5b. Call end
+
+- Hangup removes every overlay window: outgoing logo, showcase, mini case, and center popup. Attaching a new window drops the previous one so the logo cannot stay beside Mini.
+- `CallEndWatchPolicy` is the backup when the IDLE callback never arrives. Dismiss only after the raw call state is idle, telecom is not in a call, and audio mode is not in-call, for 3 consecutive watches. A new outgoing overlay has a 4s grace before that watch can fire, unless a live call was already seen.
+
 ---
 
 ## 6. Regression checklist (manual)

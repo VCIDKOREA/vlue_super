@@ -14,9 +14,23 @@ object OverlayWindowRegistry {
     private var root: View? = null
 
     fun hold(wm: WindowManager, view: View) {
+        val previous: View?
+        val previousWm: WindowManager?
         synchronized(lock) {
+            previous = if (root != null && root !== view) root else null
+            previousWm = windowManager
             windowManager = wm
             root = view
+        }
+        if (previous == null || !previous.isAttachedToWindow) return
+        try {
+            previousWm?.removeViewImmediate(previous)
+        } catch (_: Exception) {
+            try {
+                previousWm?.removeView(previous)
+            } catch (_: Exception) {
+                /* 이미 떨어진 창 */
+            }
         }
     }
 

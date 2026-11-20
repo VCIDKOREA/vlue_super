@@ -15,6 +15,8 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.TypedValue
+import android.media.AudioManager
+import android.telecom.TelecomManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import java.util.concurrent.Executor
@@ -147,6 +149,10 @@ class CallOverlayService : Service() {
     @Suppress("DEPRECATION")
     private var idlePhoneStateListener: android.telephony.PhoneStateListener? = null
     private var lastTelephonyStateForDismiss: Int = TelephonyManager.CALL_STATE_IDLE
+    /** OFFHOOK·통화 오디오를 본 뒤에만 조용한 틱으로 종료를 확정한다. */
+    private var sawLiveCallForEndWatch: Boolean = false
+    private var idleConfirmStreak: Int = 0
+    private var overlayShownAtElapsed: Long = 0L
     private val bigPushSettle400 = Runnable {
         if (!dismissing && companion.state == OverlayState.BIG_PUSH) {
             reevaluateForegroundContext("bigPush_settle_400")
@@ -444,6 +450,9 @@ class CallOverlayService : Service() {
         cardJson: String? = null,
         dcpRoute: String = ""
     ) {
+        if (overlayShownAtElapsed == 0L) {
+            overlayShownAtElapsed = android.os.SystemClock.elapsedRealtime()
+        }
         if (dismissing) {
             pendingShowAfterDismiss =
                 PendingShowOverlay(phone, verified, outgoing, cardJson, dcpRoute)
@@ -519,6 +528,9 @@ class CallOverlayService : Service() {
             return
         }
         if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
+            overlayShownAtElapsed = android.os.SystemClock.elapsedRealtime()
+            sawLiveCallForEndWatch = false
+            idleConfirmStreak = 0
             CompanionRuntimeStabilityDiag.beginCallSession(
                 if (answered) "showOverlay_answered" else "showOverlay_ringing"
             )
@@ -2651,6 +2663,12 @@ class CallOverlayService : Service() {
     private fun onTelephonyStateForDismiss(state: Int) {
         val prev = lastTelephonyStateForDismiss
         lastTelephonyStateForDismiss = state
+        if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
+            sawLiveCallForEndWatch = true
+            idleConfirmStreak = 0
+        } else if (state == TelephonyManager.CALL_STATE_RINGING) {
+            idleConfirmStreak = 0
+        }
         if (state != TelephonyManager.CALL_STATE_IDLE) return
         mainHandler.post {
             /*
@@ -5603,6 +5621,9 @@ class CallOverlayService : Service() {
     fun dismissOverlay() {
         if (dismissing) return
         dismissing = true
+        sawLiveCallForEndWatch = false
+        idleConfirmStreak = 0
+        overlayShownAtElapsed = 0L
         showcaseWebExpandPending = false
         cancelFullscreenExpandAnimator()
         cancelBigPushSettle()
@@ -5985,9 +6006,78 @@ class CallOverlayService : Service() {
         }
     }
 
+    /**
+     * IDLE 콜백이 없어도 통화가 끝났으면 로고·미니를 내린다.
+     * 발신 직후 잠깐 IDLE 은 [CallEndWatchPolicy] 유예로 로고를 유지한다.
+     */
+    private fun confirmCallEndedByWatch(): Boolean {
+        val attached =
+            rootContainer?.isAttachedToWindow == true ||
+                dcpPopupView?.isAttachedToWindow == true
+        if (!attached) {
+            idleConfirmStreak = 0
+            return false
+        }
+        val raw = rawTelephonyCallState()
+        val telecomInCall = telecomReportsInCall()
+        val audioInCall = audioReportsInCall()
+        if (raw == TelephonyManager.CALL_STATE_OFFHOOK || telecomInCall || audioInCall) {
+            sawLiveCallForEndWatch = true
+        }
+        val age = android.os.SystemClock.elapsedRealtime() - overlayShownAtElapsed
+        val decision = CallEndWatchPolicy.decide(
+            CallEndWatchPolicy.Sample(
+                callIdle = raw == TelephonyManager.CALL_STATE_IDLE,
+                telecomInCall = telecomInCall,
+                audioInCall = audioInCall,
+                sawLiveCall = sawLiveCallForEndWatch,
+                overlayAgeMs = age.coerceAtLeast(0L),
+                priorIdleStreak = idleConfirmStreak
+            )
+        )
+        idleConfirmStreak = decision.nextIdleStreak
+        if (!decision.dismiss) return false
+        VlueBigPushTrace.lifecycle(
+            "CALL_END_WATCH",
+            "age=$age sawLive=$sawLiveCallForEndWatch raw=$raw audio=$audioInCall"
+        )
+        dismissOrphanOverlayIfPresent("call_end_watch")
+        return true
+    }
+
+    private fun rawTelephonyCallState(): Int {
+        return try {
+            (getSystemService(TELEPHONY_SERVICE) as? TelephonyManager)?.callState
+                ?: TelephonyManager.CALL_STATE_IDLE
+        } catch (_: Exception) {
+            TelephonyManager.CALL_STATE_IDLE
+        }
+    }
+
+    private fun telecomReportsInCall(): Boolean {
+        return try {
+            val telecom = getSystemService(TELECOM_SERVICE) as? TelecomManager ?: return false
+            telecom.isInCall
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun audioReportsInCall(): Boolean {
+        return try {
+            val audio = getSystemService(AUDIO_SERVICE) as? AudioManager ?: return true
+            val mode = audio.mode
+            mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION
+        } catch (_: Exception) {
+            /* 오디오를 못 읽으면 통화 중으로 보고 창을 내리지 않는다. */
+            true
+        }
+    }
+
     private val contextWatchRunnable = object : Runnable {
         override fun run() {
             if (dismissing) return
+            if (confirmCallEndedByWatch()) return
             /* 세션 종료 후 잔존 창만 주기적으로 수거 — 활성 통화 중엔 getCallState IDLE 로 내리지 않음 */
             if (!CompanionRuntimeStabilityDiag.isCallSessionActive()) {
                 if (dismissOrphanOverlayIfPresent("contextWatch_tick")) return

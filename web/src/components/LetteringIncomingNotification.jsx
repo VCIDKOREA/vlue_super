@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { getLetteringCallStatusLabel } from "../lib/letteringCallStatus.js";
 import { compareLetteringPhones, formatLetteringPhoneDisplay, isUnknownPhoneToken, normalizePhoneDigits } from "../lib/letteringPhoneMatch.js";
 import { openLetteringCertInVlueApp } from "../lib/letteringOpenVlueApp.js";
 import { VLUE_CARD_CAUTION } from "../lib/vlueDigitalCardUi.js";
@@ -185,9 +184,7 @@ export default function LetteringIncomingNotification({
   verified = true,
   callPhase = "ringing",
   platform = "android",
-  isRecording = false,
   callDurationSec = 0,
-  recordingDurationSec = 0,
   incomingNumber = "",
   savedContactName = "",
   savedContactPhone = "",
@@ -480,13 +477,6 @@ export default function LetteringIncomingNotification({
     const s = sec % 60;
     return `${m}:${String(s).padStart(2, "0")}`;
   }, [callTick, callDurationSec, useCompanionDelegate]);
-  const statusLabel = getLetteringCallStatusLabel({
-    callActive: onCall,
-    isRecording,
-    callDurationSec,
-    recordingDurationSec,
-    platform
-  });
 
   const liveIncoming = isUnknownPhoneToken(incomingNumber) ? "" : String(incomingNumber || "").trim();
   const cardPhone = isUnknownPhoneToken(c.phone) ? "" : String(c.phone || "").trim();
@@ -931,7 +921,6 @@ export default function LetteringIncomingNotification({
       (!showcaseOffPreview && Boolean(collapsedPhoneDisplay) && !phoneSameAsPrimary);
 
   const isInCallChromePreview = Boolean(previewMode && inCallChromePreview);
-  const previewStatusLabel = previewMode ? "" : statusLabel;
 
   const closeInCallChromePreview = useCallback(() => {
     setKeypadOpen(false);
@@ -1457,10 +1446,6 @@ export default function LetteringIncomingNotification({
           <span className="lettering-live-bar__ad-badge shrink-0 rounded bg-black/55 px-2 py-0.5 text-[10px] font-black text-white">
             [광고] AD
           </span>
-        ) : previewMode && showOwnerSettings ? (
-          <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />
-        ) : previewStatusLabel ? (
-          <span className="lettering-live-bar__status">{previewStatusLabel}</span>
         ) : (
           <span className="lettering-live-bar__status lettering-live-bar__status--empty" aria-hidden />
         )}

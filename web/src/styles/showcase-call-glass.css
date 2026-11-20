@@ -218,8 +218,8 @@ html.vlue-overlay-webview .lettering-overlay-host--connected:not(.lettering-over
   display: flex !important;
   flex-direction: column !important;
   position: relative !important;
-  flex: 1 1 auto !important;
-  height: 100% !important;
+  flex: 1 1 0% !important;
+  height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
   overflow: hidden !important;
