@@ -3,6 +3,7 @@ import { LETTERING_OPEN_BIZCARD_SETTINGS_EVENT } from "../lib/letteringBizcardSt
 import { SHOWCASE_OPEN_SETTINGS_EVENT } from "../lib/showcase/showcaseStyleStorage.js";
 import { readLocalPatch, remainingFrom } from "../lib/safetyPatch.js";
 import { OPEN_SAFETY_PATCH_EVENT } from "./AnsimPatchButton.jsx";
+import { OPEN_SPACE_EVENT } from "../lib/vlueSpace/spaceConfig.js";
 
 const OPEN_BIZCARD_SCANNER_EVENT = "vlue-open-bizcard-scanner";
 const OPEN_SMS_INBOX_EVENT = "vlue-open-sms-inbox";
@@ -76,6 +77,18 @@ function IconSms() {
       <rect x="15" y="22.2" width="11" height="2.6" rx="1.3" fill="#EDE9FE" />
       <circle cx="36.5" cy="14" r="7" fill="#F59E0B" />
       <path d="m36.5 10.6 1 2.3 2.4.2-1.9 1.6.6 2.4-2.1-1.3-2.1 1.3.6-2.4-1.9-1.6 2.4-.2z" fill="#fff" />
+    </svg>
+  );
+}
+
+function IconSpace() {
+  return (
+    <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden>
+      <rect x="4" y="6" width="40" height="36" rx="8" fill="#0F172A" />
+      <rect x="8" y="10" width="32" height="28" rx="4" fill="#164E63" />
+      <circle cx="24" cy="24" r="7" fill="none" stroke="#67E8F9" strokeWidth="2" />
+      <path d="M24 13v4M24 31v4M13 24h4M31 24h4" stroke="#A5F3FC" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="30" cy="18" r="2.2" fill="#FDE68A" />
     </svg>
   );
 }
@@ -159,7 +172,7 @@ export default function HomeQuickMenu({ isDarkMode = false }) {
               key={item.id}
               type="button"
               onClick={item.action}
-              className="flex flex-col items-center gap-1.5 rounded-xl px-0.5 py-1 active:scale-95"
+              className="flex min-h-11 flex-col items-center justify-center gap-1.5 rounded-xl px-0.5 py-1 active:scale-95"
             >
               <span className={`relative drop-shadow-[0_4px_6px_rgba(15,23,42,0.18)] ${item.id === "scan" ? "home-quick-scan" : ""}`}>
                 <Icon />
@@ -170,8 +183,8 @@ export default function HomeQuickMenu({ isDarkMode = false }) {
                   </span>
                 ) : null}
               </span>
-              <span
-                className={`max-w-full text-center text-[12px] font-extrabold leading-tight tracking-tight ${
+                <span
+                className={`max-w-full whitespace-normal break-keep text-center text-[11px] font-extrabold leading-tight tracking-tight sm:text-[12px] ${
                   isDarkMode ? "text-white" : "text-gray-950"
                 }`}
               >
@@ -181,6 +194,23 @@ export default function HomeQuickMenu({ isDarkMode = false }) {
           );
         })}
       </div>
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event(OPEN_SPACE_EVENT))}
+        className={`mx-1 mt-3 flex min-h-12 w-[calc(100%-0.5rem)] items-center gap-3 rounded-2xl border px-3 py-2 text-left active:scale-[0.99] ${
+          isDarkMode ? "border-cyan-300/30 bg-cyan-950/40" : "border-cyan-200 bg-cyan-50"
+        }`}
+        aria-label="VLUE SPACE 온디맨드 공간 스캔"
+      >
+        <span className="drop-shadow-[0_4px_6px_rgba(15,23,42,0.18)]">
+          <IconSpace />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className={`block text-[13px] font-extrabold leading-tight ${isDarkMode ? "text-white" : "text-gray-950"}`}>VLUE SPACE</span>
+          <span className={`block text-[11px] font-bold leading-tight ${isDarkMode ? "text-cyan-100" : "text-cyan-800"}`}>온디맨드 공간 스캔</span>
+        </span>
+        <span className="shrink-0 rounded-full bg-cyan-700 px-2 py-1 text-[10px] font-black text-white">온디맨드</span>
+      </button>
     </section>
   );
 }

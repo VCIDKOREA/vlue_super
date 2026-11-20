@@ -52,6 +52,8 @@ import {
 } from "./lib/vmapInviteShare.js";
 import VmapInviteConfirmModal from "./components/location/VmapInviteConfirmModal.jsx";
 import TodaySafetyPatch from "./components/TodaySafetyPatch.jsx";
+import VlueSpaceScreen from "./components/vlueSpace/VlueSpaceScreen.jsx";
+import { OPEN_SPACE_EVENT } from "./lib/vlueSpace/spaceConfig.js";
 import VlueBrandWordmark from "./components/VlueBrandWordmark.jsx";
 import V1PaidPackageGateModal from "./components/V1PaidPackageGateModal.jsx";
 import {
@@ -695,17 +697,28 @@ function App() {
       setProfileOpen(false);
       setSmsInboxOpen(true);
     };
+    const openSpace = () => {
+      setAppNotificationOpen(false);
+      setCallShowcaseSheetOpen(false);
+      setSmsInboxOpen(false);
+      setShowcaseStyleSheetOpen(false);
+      setProfileOpen(false);
+      setSpaceOpen(true);
+    };
     window.addEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
     window.addEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
     window.addEventListener(V1_PAID_PACKAGE_GATE_EVENT, onV1PaidGate);
     window.addEventListener("vlue-open-bizcard-scanner", openBizcardScanner);
     window.addEventListener("vlue-open-sms-inbox", openSmsInbox);
+    window.addEventListener(OPEN_SPACE_EVENT, openSpace);
+    if (window.location.hash === "#vlue-space") openSpace();
     return () => {
       window.removeEventListener(SHOWCASE_OPEN_SETTINGS_EVENT, openShowcaseSettings);
       window.removeEventListener(LETTERING_OPEN_BIZCARD_SETTINGS_EVENT, openBizcardSettings);
       window.removeEventListener(V1_PAID_PACKAGE_GATE_EVENT, onV1PaidGate);
       window.removeEventListener("vlue-open-bizcard-scanner", openBizcardScanner);
       window.removeEventListener("vlue-open-sms-inbox", openSmsInbox);
+      window.removeEventListener(OPEN_SPACE_EVENT, openSpace);
     };
   }, []);
   const [parentalConsentRequest, setParentalConsentRequest] = useState(null);
@@ -727,6 +740,7 @@ function App() {
     blockedReasonType: "GENERAL_LIMIT_EXCEEDED"
   });
   const [csScannerOpen, setCsScannerOpen] = useState(false);
+  const [spaceOpen, setSpaceOpen] = useState(false);
   const [emailInboxOpen, setEmailInboxOpen] = useState(false);
   const [emailForwardingSettingsOpen, setEmailForwardingSettingsOpen] = useState(
     () =>
@@ -6442,6 +6456,7 @@ function App() {
         </nav>
       </footer>
       <Suspense fallback={null}>
+        <VlueSpaceScreen open={spaceOpen} onClose={() => setSpaceOpen(false)} />
         {v1AppShell.bizcardScanner && homeHeaderMinimal ? (
           <BizcardScannerScreen
             open={csScannerOpen}
