@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildHiddenCamResult } from "../../lib/vlueSpace/hiddenCamResult.js";
 import { appendSpaceRecord, readSpaceRecords } from "../../lib/vlueSpace/spaceRecords.js";
 import {
@@ -57,12 +57,6 @@ export default function HiddenCamFlow({ onBack }) {
     return undefined;
   }, [scan.start, step]);
 
-  const reticle = useMemo(() => {
-    const hotspot = scan.reading.live ? scan.reading.hotspot : null;
-    if (!hotspot) return { left: "50%", top: "46%" };
-    return { left: `${hotspot.nx * 100}%`, top: `${hotspot.ny * 100}%` };
-  }, [scan.reading.hotspot, scan.reading.live]);
-
   const leaveRun = (next, snapshot) => {
     if (snapshot) setResult(snapshot);
     scan.stop();
@@ -83,7 +77,7 @@ export default function HiddenCamFlow({ onBack }) {
       {step === "intro" ? (
         <div className="space-y-3 text-[13px] leading-relaxed text-slate-300">
           <h3 className="text-[18px] font-black text-slate-50">카메라로 주변을 살펴봅니다</h3>
-          <p>렌즈처럼 작게 반짝이는 지점을 고휘도 점으로 보여 줍니다. 숨은 카메라라고 단정하지 않습니다.</p>
+          <p>밝게 연결된 픽셀을 광학 반사 후보로 보여 줍니다. 렌즈라고 단정하지 않습니다.</p>
           <p>점검은 이 화면에서 시작할 때만 카메라를 엽니다. 다른 기능의 센서는 켜지 않습니다.</p>
           <button type="button" onClick={() => { setStep("support"); void readSpaceSupport().then((next) => setSupport(next["hidden-cam"])); }} className="min-h-12 w-full rounded-xl bg-cyan-400 text-[14px] font-black text-slate-950">
             권한과 기기 확인
@@ -173,16 +167,37 @@ export default function HiddenCamFlow({ onBack }) {
           <video ref={scan.videoRef} className="hidden" playsInline muted />
           <canvas ref={scan.canvasRef} className="h-full w-full object-cover" />
           {scan.reading.live ? (
-            <div className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2" style={reticle}>
-              <span className="absolute left-1/2 top-0 h-full w-px bg-cyan-200" />
-              <span className="absolute left-0 top-1/2 h-px w-full bg-cyan-200" />
-              <span className={`absolute inset-3 rounded-full border ${scan.reading.locked ? "border-amber-300" : "border-cyan-100"}`} />
-            </div>
+            <>
+              {(scan.reading.markers || []).map((mark) => (
+                <div key={mark.id} className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${mark.nx * 100}%`, top: `${mark.ny * 100}%` }}>
+                  <span className={`block h-8 w-8 rounded-full border border-dashed ${mark.kind === "sustained" ? "border-sky-200" : "border-white/80"}`} />
+                  <span className="mt-0.5 block whitespace-nowrap text-[9px] font-bold text-white">{mark.label}</span>
+                </div>
+              ))}
+              <p className="pointer-events-none absolute inset-x-2 top-16 rounded-lg bg-black/70 px-2 py-1 text-[10px] leading-snug text-slate-100">
+                표시는 광학 반사 후보입니다. 형태와 밝기만으로 렌즈 여부를 확인하지 않습니다.
+              </p>
+            </>
           ) : (
             <p className="absolute inset-x-4 top-16 rounded-xl bg-black/75 p-3 text-[12px] leading-snug text-slate-200">
               {scan.cameraError || "카메라 프레임이 없습니다. 측정값을 만들지 않습니다."}
             </p>
           )}
+          <div className="absolute inset-x-2 bottom-16 z-10 space-y-1">
+            {scan.torchLamp.lit === true ? <p className="rounded-lg bg-amber-200 px-2 py-1 text-[11px] font-black text-slate-950">손전등이 켜져 있습니다.</p> : null}
+            {scan.flash.phase === "off" ? <p className="rounded-lg bg-black/75 px-2 py-1 text-[10px] font-bold text-slate-100">조명 OFF 측정</p> : null}
+            {scan.flash.phase === "on" ? <p className="rounded-lg bg-black/75 px-2 py-1 text-[10px] font-bold text-slate-100">조명 ON 측정</p> : null}
+            {scan.flash.phase === "settle" ? <p className="rounded-lg bg-black/75 px-2 py-1 text-[10px] font-bold text-slate-100">조명 전환 중입니다. 이 구간은 측정하지 않습니다.</p> : null}
+            <button
+              type="button"
+              disabled={!scan.torch.supported || !scan.reading.live || scan.flash.running}
+              onClick={() => void scan.runFlashAnalysis()}
+              className="min-h-11 w-full rounded-lg bg-white/90 text-[12px] font-black text-slate-950 disabled:bg-black/70 disabled:text-slate-400"
+            >
+              조명 반응 분석
+            </button>
+            {scan.torch.checked && !scan.torch.supported ? <p className="rounded-lg bg-black/75 px-2 py-1 text-[10px] leading-snug text-slate-200">{scan.torch.reason}</p> : null}
+          </div>
           <div className="absolute left-2 right-2 top-2 flex items-center justify-between gap-2">
             <span className="rounded-full border border-cyan-300/50 bg-black/70 px-2 py-1 text-[10px] font-black text-cyan-100">OPTICAL VISUALIZATION FILTER</span>
             <div className="flex gap-1">
@@ -198,7 +213,7 @@ export default function HiddenCamFlow({ onBack }) {
           </div>
           <div className="absolute bottom-2 right-2 flex max-w-[46%] flex-col gap-1">
             <button type="button" onClick={() => void scan.capture()} className="min-h-11 rounded-lg bg-black/70 text-[12px] font-black">캡처</button>
-            <button type="button" onClick={() => leaveRun("result", buildHiddenCamResult({ config, reading: scan.reading, cameraError: scan.cameraError }))} className="min-h-11 rounded-lg bg-cyan-300 text-[12px] font-black text-slate-950">결과 보기</button>
+            <button type="button" onClick={() => leaveRun("result", buildHiddenCamResult({ config, reading: { ...scan.reading, flash: scan.flash.report }, cameraError: scan.cameraError }))} className="min-h-11 rounded-lg bg-cyan-300 text-[12px] font-black text-slate-950">결과 보기</button>
           </div>
         </div>
       ) : null}

@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { acceptStable, directionCue, measureHotspot } from "../../lib/vlueSpace/analyzeFrame.js";
+import { directionCue, measureCandidates, TRACK_SUSTAIN_MS, updateCandidateTracks } from "../../lib/vlueSpace/analyzeFrame.js";
+import {
+  applyTorch,
+  buildFlashReport,
+  createFlashGate,
+  finishFlashSample,
+  FLASH_SAMPLE_MS,
+  FLASH_SETTLE_MS,
+  readTorchSupport,
+  shutdownVideo,
+  summarizeFlashSamples,
+  tryBeginFlashSample
+} from "../../lib/vlueSpace/flashResponse.js";
 import { applyOpticalPalette } from "../../lib/vlueSpace/opticalPalette.js";
 import { requestSpaceGuide } from "../../lib/vlueSpace/spaceGuide.js";
 import { readSpaceAuth } from "../../lib/vlueSpace/spaceSession.js";
@@ -27,6 +39,21 @@ function speak(text, guidance) {
   }
 }
 
+const MEASURE_INTERVAL_MS = 100;
+const MARK_LABEL = { candidate: "반사 후보", sustained: "지속 관찰", review: "추가 확인" };
+
+function markerKind(track, stability, zoom) {
+  const sustained = track.status === "sustained" || (track.status === "gap" && track.durationMs >= TRACK_SUSTAIN_MS);
+  if (!sustained) return "candidate";
+  if (stability === "zoom_verified" && zoom < 2) return "review";
+  return "sustained";
+}
+
+function guideHotspot(point) {
+  if (!point) return null;
+  return { nx: point.nx, ny: point.ny, score: point.score, area: point.area };
+}
+
 function silence() {
   try {
     window.speechSynthesis?.cancel();
@@ -40,7 +67,13 @@ export function useSpaceScan(config, active) {
   const canvasRef = useRef(null);
   const configRef = useRef(config);
   const loopRef = useRef(0);
-  const stableRef = useRef({ streak: 0, point: null });
+  const trackRef = useRef(null);
+  const measureRef = useRef(null);
+  const lastMeasureAt = useRef(0);
+  const announcedRef = useRef(new Set());
+  const videoTrackRef = useRef(null);
+  const flashGateRef = useRef(createFlashGate());
+  const flashToken = useRef(0);
   const guideAbort = useRef(null);
   const runToken = useRef(0);
   const recorderRef = useRef(null);
@@ -48,7 +81,6 @@ export function useSpaceScan(config, active) {
   const audioStream = useRef(null);
   const lastGuideAt = useRef(0);
   const lastUiAt = useRef(0);
-  const lockedRef = useRef(false);
   const startedRef = useRef(false);
   configRef.current = config;
 
@@ -63,6 +95,9 @@ export function useSpaceScan(config, active) {
   const [logs, setLogs] = useState([]);
   const [recording, setRecording] = useState(false);
   const [recordNote, setRecordNote] = useState("");
+  const [torchInfo, setTorchInfo] = useState({ supported: false, checked: false, reason: "카메라 트랙 확인 전입니다." });
+  const [torchLamp, setTorchLamp] = useState({ lit: false, confirmed: false, note: "" });
+  const [flashUi, setFlashUi] = useState({ running: false, phase: "idle", report: null });
 
   const pushLog = useCallback((line) => {
     setLogs((prev) => [{ id: `${Date.now()}-${prev.length}`, line, at: new Date().toLocaleTimeString("ko-KR") }, ...prev].slice(0, 12));
@@ -80,11 +115,31 @@ export function useSpaceScan(config, active) {
     }
     recorderRef.current = null;
     chunksRef.current = [];
-    stopStream(videoRef.current?.srcObject);
+    const videoTrack = videoTrackRef.current;
+    videoTrackRef.current = null;
+    flashToken.current += 1;
+    const gate = flashGateRef.current;
+    gate.active = false;
+    gate.phase = "idle";
+    gate.busy = false;
+    setFlashUi((prev) => ({ running: false, phase: prev.report ? "done" : "idle", report: prev.report }));
+    const stream = videoRef.current?.srcObject;
     if (videoRef.current) videoRef.current.srcObject = null;
+    void shutdownVideo(videoTrack, () => stopStream(stream)).then((result) => {
+      if (!result?.torch?.attempted) {
+        setTorchLamp({ lit: false, confirmed: false, note: "" });
+        return;
+      }
+      if (result.torch.ok && result.torch.applied === false) setTorchLamp({ lit: false, confirmed: true, note: "손전등이 꺼져 있습니다." });
+      else setTorchLamp({ lit: null, confirmed: false, note: result.torch.reason || "손전등이 꺼졌는지는 확인하지 못했습니다." });
+    });
     stopStream(audioStream.current);
     audioStream.current = null;
     setRecording(false);
+    trackRef.current = null;
+    measureRef.current = null;
+    lastMeasureAt.current = 0;
+    announcedRef.current = new Set();
   }, []);
 
   const askGuide = useCallback(
@@ -137,47 +192,97 @@ export function useSpaceScan(config, active) {
     if (!live) {
       ctx.fillStyle = "#05080d";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      stableRef.current = { streak: 0, point: null };
-      lockedRef.current = false;
+      if (trackRef.current || measureRef.current) {
+        trackRef.current = null;
+        measureRef.current = null;
+        lastMeasureAt.current = 0;
+        announcedRef.current = new Set();
+      }
       const idleNow = performance.now();
       if (idleNow - lastUiAt.current > 180) {
         lastUiAt.current = idleNow;
-        setReading({ hotspot: null, cue: directionCue(null, z), locked: false, needZoom: false, rejected: "", live: false });
+        setReading({
+          hotspot: null,
+          cue: directionCue(null, z),
+          locked: false,
+          needZoom: false,
+          rejected: "",
+          rejectedWide: 0,
+          limited: false,
+          live: false,
+          candidates: [],
+          tracks: [],
+          markers: []
+        });
       }
       return;
     }
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const measured = current.optical ? measureHotspot(frame, current.suppress) : { hotspot: null, mean: 0 };
-    const stable = current.optical
-      ? acceptStable(stableRef.current, measured.hotspot, current.stability, z)
-      : { locked: false, streak: 0, point: null };
-    stableRef.current = stable;
+    const gate = flashGateRef.current;
+    if (gate.active && current.optical) {
+      if (tryBeginFlashSample(gate)) {
+        try {
+          const flashed = measureCandidates(frame, current.suppress);
+          gate.samples.push({ at: new Date().toISOString(), candidates: flashed.candidates });
+          measureRef.current = flashed;
+        } finally {
+          finishFlashSample(gate);
+        }
+      }
+      applyOpticalPalette(frame, current.palette);
+      ctx.putImageData(frame, 0, 0);
+      return;
+    }
+    const now = performance.now();
+    let measured = measureRef.current || { candidates: [], hotspot: null, rejected: "", rejectedWide: 0, limited: false };
+    let trackState = trackRef.current || { tracks: [], ended: [], seq: 1 };
+    if (!current.optical) {
+      measured = { candidates: [], hotspot: null, rejected: "", rejectedWide: 0, limited: false };
+      trackState = { tracks: [], ended: [], seq: trackState.seq || 1 };
+      measureRef.current = measured;
+      trackRef.current = trackState;
+    } else if (now - lastMeasureAt.current >= MEASURE_INTERVAL_MS) {
+      measured = measureCandidates(frame, current.suppress);
+      trackState = updateCandidateTracks(trackState, measured.candidates, now);
+      measureRef.current = measured;
+      trackRef.current = trackState;
+      lastMeasureAt.current = now;
+    }
     applyOpticalPalette(frame, current.palette);
     ctx.putImageData(frame, 0, 0);
-    const cue = directionCue(stable.point, z);
-    const now = performance.now();
+    const activeTracks = trackState.tracks || [];
+    const sustained = activeTracks.filter((track) => track.status === "sustained" || (track.status === "gap" && track.durationMs >= TRACK_SUSTAIN_MS));
+    const primary = sustained[0] || activeTracks[0] || measured.hotspot || null;
+    const needZoom = current.stability === "zoom_verified" && sustained.length > 0 && z < 2;
+    const markers = activeTracks.map((track) => {
+      const kind = markerKind(track, current.stability, z);
+      return { id: track.id, nx: track.nx, ny: track.ny, kind, label: MARK_LABEL[kind] };
+    });
+    const cue = directionCue(primary, z);
     if (now - lastUiAt.current > 180) {
       lastUiAt.current = now;
       setReading({
-        hotspot: stable.point,
+        hotspot: guideHotspot(primary),
         cue,
-        locked: stable.locked,
-        needZoom: Boolean(stable.needZoom),
+        locked: false,
+        needZoom,
         rejected: measured.rejected || "",
-        live
+        rejectedWide: measured.rejectedWide || 0,
+        limited: Boolean(measured.limited),
+        live,
+        candidates: measured.candidates || [],
+        tracks: activeTracks,
+        markers
       });
     }
-    if (stable.locked && !lockedRef.current) {
-      lockedRef.current = true;
-      try {
-        navigator.vibrate?.(18);
-      } catch {
-        /* ignore */
+    if (current.stability !== "zoom_verified" || z >= 2) {
+      const fresh = sustained.find((track) => !announcedRef.current.has(track.id));
+      if (fresh) {
+        announcedRef.current.add(fresh.id);
+        void askGuide("lock", { hotspot: guideHotspot(fresh), needZoom: false });
       }
-      void askGuide("lock", { hotspot: stable.point, needZoom: stable.needZoom });
     }
-    if (!stable.locked) lockedRef.current = false;
   }, [active, askGuide, pan.x, pan.y, sampleMode, zoom]);
 
   useEffect(() => {
@@ -299,7 +404,6 @@ export function useSpaceScan(config, active) {
     setRecordNote("");
     setPhase("live");
     startedRef.current = true;
-    stableRef.current = { streak: 0, point: null };
     if (config.mode === "closed" && !readSpaceAuth().closedAllowed) {
       setPhase("locked");
       return;
@@ -315,15 +419,115 @@ export function useSpaceScan(config, active) {
       }
       videoRef.current.srcObject = stream;
       await videoRef.current.play().catch(() => {});
+      const videoTrack = stream.getVideoTracks?.()[0] || null;
+      videoTrackRef.current = videoTrack;
+      const support = readTorchSupport(videoTrack);
+      setTorchInfo({ ...support, checked: true });
+      setTorchLamp({ lit: false, confirmed: false, note: support.supported ? "" : support.reason });
+      setFlashUi({ running: false, phase: "idle", report: null });
       setSampleMode(false);
-      pushLog("카메라 스트림을 열었습니다.");
+      pushLog(support.supported ? "카메라 스트림을 열었습니다. 토치 제어를 사용할 수 있습니다." : "카메라 스트림을 열었습니다. 토치 제어는 사용할 수 없습니다.");
     } catch (err) {
       if (token !== runToken.current) return;
       setSampleMode(true);
+      setTorchInfo({ supported: false, checked: true, reason: "카메라 프레임이 없어 토치를 확인하지 못했습니다. 조명 비교 불가." });
       setCameraError(err?.name === "NotAllowedError" ? "카메라 권한이 없습니다. 측정값을 만들지 않습니다." : "카메라를 열 수 없습니다. 측정값을 만들지 않습니다.");
       pushLog("카메라 프레임 없음");
     }
   }, [config.mode, pushLog, releaseMedia]);
+
+  const runFlashAnalysis = useCallback(async () => {
+    const token = flashToken.current + 1;
+    flashToken.current = token;
+    const track = videoTrackRef.current;
+    const support = readTorchSupport(track);
+    setTorchInfo({ ...support, checked: true });
+    const gate = flashGateRef.current;
+    gate.samples = [];
+    gate.busy = false;
+    gate.phase = "idle";
+    if (!support.supported) {
+      gate.active = false;
+      const report = buildFlashReport({ support });
+      setFlashUi({ running: false, phase: "idle", report });
+      return report;
+    }
+    const video = videoRef.current;
+    if (!video || video.readyState < 2 || sampleMode) {
+      gate.active = false;
+      const report = buildFlashReport({
+        support,
+        control: { ok: false, reason: "카메라 프레임이 없어 조명 비교를 시작하지 않았습니다. 조명 비교 불가." }
+      });
+      setFlashUi({ running: false, phase: "idle", report });
+      return report;
+    }
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const collectPhase = async (phase) => {
+      gate.phase = "settle";
+      gate.busy = false;
+      setFlashUi((prev) => ({ ...prev, running: true, phase: "settle", report: null }));
+      await wait(FLASH_SETTLE_MS);
+      if (token !== flashToken.current) return null;
+      const mark = gate.samples.length;
+      gate.phase = phase;
+      setFlashUi((prev) => ({ ...prev, running: true, phase, report: null }));
+      await wait(FLASH_SAMPLE_MS);
+      if (token !== flashToken.current) return null;
+      return gate.samples.slice(mark);
+    };
+    gate.active = true;
+    setFlashUi({ running: true, phase: "off", report: null });
+    const offControl = await applyTorch(track, false);
+    if (token !== flashToken.current) return null;
+    if (!offControl.ok) {
+      gate.active = false;
+      gate.phase = "idle";
+      setTorchLamp({ lit: null, confirmed: false, note: offControl.reason });
+      const report = buildFlashReport({ support, control: offControl });
+      setFlashUi({ running: false, phase: "idle", report });
+      return report;
+    }
+    setTorchLamp({ lit: false, confirmed: true, note: "손전등이 꺼져 있습니다." });
+    const offSamples = await collectPhase("off");
+    if (!offSamples) return null;
+    const onControl = await applyTorch(track, true);
+    if (token !== flashToken.current) return null;
+    if (!onControl.ok) {
+      const back = await applyTorch(track, false);
+      gate.active = false;
+      gate.phase = "idle";
+      setTorchLamp(back.ok && back.applied === false ? { lit: false, confirmed: true, note: "손전등이 꺼져 있습니다." } : { lit: null, confirmed: false, note: back.reason || onControl.reason });
+      const report = buildFlashReport({ support, control: onControl, offPhase: summarizeFlashSamples(offSamples) });
+      setFlashUi({ running: false, phase: "idle", report });
+      return report;
+    }
+    setTorchLamp({ lit: true, confirmed: true, note: "손전등이 켜져 있습니다." });
+    const onSamples = await collectPhase("on");
+    const back = await applyTorch(track, false);
+    if (token !== flashToken.current) return null;
+    gate.active = false;
+    gate.phase = "idle";
+    setTorchLamp(back.ok && back.applied === false ? { lit: false, confirmed: true, note: "손전등이 꺼져 있습니다." } : { lit: null, confirmed: false, note: back.reason || "손전등이 꺼졌는지는 확인하지 못했습니다." });
+    if (!onSamples) return null;
+    if (!offSamples.length || !onSamples.length) {
+      const report = buildFlashReport({
+        support,
+        control: { ok: false, reason: "조명 전환 전후 프레임을 모으지 못했습니다. 조명 비교 불가." },
+        offPhase: summarizeFlashSamples(offSamples),
+        onPhase: summarizeFlashSamples(onSamples)
+      });
+      setFlashUi({ running: false, phase: "idle", report });
+      return report;
+    }
+    const report = buildFlashReport({
+      support,
+      offPhase: summarizeFlashSamples(offSamples),
+      onPhase: summarizeFlashSamples(onSamples)
+    });
+    setFlashUi({ running: false, phase: "done", report });
+    return report;
+  }, [sampleMode]);
 
   const stop = useCallback(() => {
     const wasRunning = startedRef.current;
@@ -454,6 +658,10 @@ export function useSpaceScan(config, active) {
     changeZoom,
     capture,
     toggleRecord,
-    askGuide
+    askGuide,
+    torch: torchInfo,
+    torchLamp,
+    flash: flashUi,
+    runFlashAnalysis
   };
 }
