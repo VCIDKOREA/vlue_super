@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { appendSpaceRecord, readSpaceRecords } from "../../lib/vlueSpace/spaceRecords.js";
 import { buildTofResult, describeTofEnvironment, requestDepthSample } from "../../lib/vlueSpace/tofSupport.js";
+import { SpaceButton, SpaceChannel, SpacePanel } from "./SpaceConsole.jsx";
 import SpaceHistoryView from "./SpaceHistoryView.jsx";
 import SpaceResultView from "./SpaceResultView.jsx";
 
@@ -37,47 +38,47 @@ export default function SpaceTofFlow({ onBack }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <button type="button" onClick={step === "intro" ? onBack : () => setStep("intro")} className="min-h-11 rounded-lg border border-white/15 px-3 text-[12px] font-bold">
-          {step === "intro" ? "기능 목록" : "처음으로"}
-        </button>
-        <p className="text-[11px] font-black tracking-wide text-cyan-300">SPACE ToF</p>
-      </div>
+      <SpaceChannel
+        code="SPACE ToF"
+        title="공간 깊이 측정"
+        action={step === "intro" ? "기능 목록" : "처음으로"}
+        onAction={step === "intro" ? onBack : () => setStep("intro")}
+      />
 
       {step === "intro" ? (
-        <div className="space-y-3 text-[13px] leading-relaxed text-slate-300">
-          <h3 className="text-[18px] font-black text-slate-50">깊이 센서가 있을 때만 거리를 봅니다</h3>
+        <div className="space-y-3 text-[13px] leading-relaxed text-white/70">
+          <h3 className="text-[18px] font-semibold text-white">깊이 센서가 있을 때만 거리를 봅니다</h3>
           <p>일반 카메라 영상은 깊이 지도로 바꾸지 않습니다. 지원 여부를 모르면 측정 화면을 열지 않습니다.</p>
-          <button type="button" onClick={openSupport} className="min-h-12 w-full rounded-xl bg-cyan-400 text-[14px] font-black text-slate-950">센서 지원 확인</button>
+          <SpaceButton onClick={openSupport}>센서 지원 확인</SpaceButton>
         </div>
       ) : null}
 
       {step === "support" ? (
-        <div className="space-y-3 text-[13px] leading-snug text-slate-300">
-          <h3 className="text-[18px] font-black text-slate-50">{env?.headline || "확인 중"}</h3>
-          <p>{env?.detail}</p>
+        <div className="space-y-3 text-[13px] leading-snug text-white/70">
+          <h3 className="text-[18px] font-semibold text-white">{env?.headline || "확인 중"}</h3>
+          <SpacePanel><p>{env?.detail}</p></SpacePanel>
           <p>지원 단서와 깊이 프레임 수신은 따로 판단합니다. 프레임이 없으면 측정을 시작하지 않습니다.</p>
           {env?.support === "advertised" ? (
-            <button type="button" onClick={() => void askDepth()} className="min-h-12 w-full rounded-xl bg-cyan-400 text-[14px] font-black text-slate-950">깊이 데이터 요청</button>
+            <SpaceButton onClick={() => void askDepth()}>깊이 데이터 요청</SpaceButton>
           ) : (
-            <button type="button" onClick={() => { setResult(buildTofResult({ support: env?.support || "unknown", frames: [], note: env?.detail || "" })); setStep("result"); }} className="min-h-12 w-full rounded-xl bg-cyan-400 text-[14px] font-black text-slate-950">측정 없이 결과 보기</button>
+            <SpaceButton onClick={() => { setResult(buildTofResult({ support: env?.support || "unknown", frames: [], note: env?.detail || "" })); setStep("result"); }}>측정 없이 결과 보기</SpaceButton>
           )}
         </div>
       ) : null}
 
       {step === "measure" && result?.enterMeasure ? (
         <div className="space-y-3">
-          <h3 className="text-[18px] font-black">수신한 깊이 표본</h3>
+          <h3 className="text-[18px] font-semibold">수신한 깊이 표본</h3>
           <SpaceResultView result={result} />
-          <button type="button" onClick={() => setStep("result")} className="min-h-11 w-full rounded-xl border border-white/15 text-[13px] font-bold">결과 화면</button>
+          <SpaceButton variant="ghost" onClick={() => setStep("result")}>결과 화면</SpaceButton>
         </div>
       ) : null}
 
       {step === "result" ? (
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
           <SpaceResultView result={result} />
-          <button type="button" disabled={!result?.observed?.length} onClick={() => setRecords(appendSpaceRecord(result))} className="min-h-11 w-full rounded-xl bg-white/10 text-[13px] font-black disabled:text-slate-500">깊이 표본이 있을 때만 기록</button>
-          <button type="button" onClick={() => setStep("history")} className="min-h-11 w-full rounded-xl border border-white/15 text-[13px] font-bold">기록 보기</button>
+          <SpaceButton variant="quiet" disabled={!result?.observed?.length} onClick={() => setRecords(appendSpaceRecord(result))}>깊이 표본이 있을 때만 기록</SpaceButton>
+          <SpaceButton variant="ghost" onClick={() => setStep("history")}>기록 보기</SpaceButton>
         </div>
       ) : null}
 

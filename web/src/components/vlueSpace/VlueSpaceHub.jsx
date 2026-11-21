@@ -1,35 +1,12 @@
 import { useEffect, useState } from "react";
 import { SPACE_MODULES, readSpaceSupport } from "../../lib/vlueSpace/support.js";
+import { SpaceCorners } from "./SpaceConsole.jsx";
 
-const LOOK = {
-  "hidden-cam": {
-    emoji: "📷",
-    card: "border-amber-300/80 bg-amber-400/10 shadow-[0_0_32px_rgba(251,191,36,0.16)]",
-    badge: "bg-amber-300/20",
-    ink: "text-amber-200",
-    pill: "bg-amber-300 text-slate-950"
-  },
-  "device-id": {
-    emoji: "📡",
-    card: "border-sky-300/80 bg-sky-400/10 shadow-[0_0_32px_rgba(56,189,248,0.16)]",
-    badge: "bg-sky-300/20",
-    ink: "text-sky-200",
-    pill: "bg-sky-300 text-slate-950"
-  },
-  "home-guard": {
-    emoji: "🏠",
-    card: "border-emerald-300/80 bg-emerald-400/10 shadow-[0_0_32px_rgba(52,211,153,0.16)]",
-    badge: "bg-emerald-300/20",
-    ink: "text-emerald-200",
-    pill: "bg-emerald-300 text-slate-950"
-  },
-  "space-tof": {
-    emoji: "📏",
-    card: "border-violet-300/80 bg-violet-400/10 shadow-[0_0_32px_rgba(167,139,250,0.18)]",
-    badge: "bg-violet-300/20",
-    ink: "text-violet-200",
-    pill: "bg-violet-300 text-slate-950"
-  }
+const CONSOLE = {
+  "hidden-cam": { index: "01", name: "야간 광학 관측" },
+  "device-id": { index: "02", name: "장비 식별" },
+  "home-guard": { index: "03", name: "네트워크 감시" },
+  "space-tof": { index: "04", name: "공간 깊이 측정" }
 };
 
 export default function VlueSpaceHub({ onOpen }) {
@@ -46,25 +23,27 @@ export default function VlueSpaceHub({ onOpen }) {
   }, []);
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col justify-center">
-      <p className="mb-4 text-center text-[12px] leading-snug text-slate-400">기능을 고르면 그 기능의 소개와 확인만 진행합니다. 다른 기능의 센서는 켜지 않습니다.</p>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      <p className="mb-3 text-[12px] leading-snug text-white/50">기능을 고르면 그 기능의 소개와 확인만 진행합니다. 다른 기능의 센서는 켜지 않습니다.</p>
+      <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto">
         {SPACE_MODULES.map((item) => {
           const state = support?.[item.id];
-          const look = LOOK[item.id];
+          const look = CONSOLE[item.id];
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => onOpen?.(item.id)}
-              className={`flex min-h-[188px] flex-col items-center rounded-3xl border p-4 text-center ${look.card}`}
+              className="relative flex min-h-[92px] items-stretch gap-3 border border-white/15 bg-white/[0.03] px-3 py-3 text-left"
             >
-              <span className={`flex h-16 w-16 items-center justify-center rounded-2xl text-[34px] leading-none ${look.badge}`} aria-hidden>
-                {look.emoji}
+              <SpaceCorners />
+              <span className="w-8 pt-1 text-[11px] font-semibold tracking-[0.14em] text-white/40">{look.index}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] font-semibold tracking-wide">{item.title}</span>
+                <span className="mt-0.5 block text-[12px] text-white/70">{look.name}</span>
+                <span className="mt-1 block text-[11px] leading-snug text-white/40">{item.summary}</span>
               </span>
-              <span className="mt-3 text-[13px] font-black leading-tight">{item.title}</span>
-              <span className="mt-1 text-[11px] font-semibold leading-snug text-slate-300">{item.summary}</span>
-              <span className={`mt-auto inline-flex min-h-7 items-center rounded-full px-2.5 text-[11px] font-black ${look.pill}`}>
+              <span className="self-start border border-white/25 px-2 py-1 text-[10px] font-semibold tracking-wide text-white/80">
                 {state?.headline || "확인 중"}
               </span>
             </button>
